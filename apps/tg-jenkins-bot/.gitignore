@@ -225,9 +225,3 @@ __marimo__/
 
 # Data (persistent state for the bot)
 data/
-
-# IDE & Editor files
-.idea/
-.vscode/
-*.swp
-*.swo

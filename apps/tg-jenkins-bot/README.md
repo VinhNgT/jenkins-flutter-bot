@@ -124,8 +124,8 @@ BOT_WEBHOOK_PORT=9090
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/VinhNgT/tg-jenkins-bot.git
-cd tg-jenkins-bot
+git clone https://github.com/VinhNgT/jenkins-flutter-bot.git
+cd jenkins-flutter-bot/apps/tg-jenkins-bot
 ```
 
 ### 2. Install dependencies & Run
@@ -164,7 +164,7 @@ uv run tg-jenkins-bot
 ## Project Structure
 
 ```text
-tg-jenkins-bot/
+apps/tg-jenkins-bot/
 ├── pyproject.toml                   # Metadata, dependencies
 ├── uv.lock                          # Locked dependency versions
 ├── .env.example                     # Environment template

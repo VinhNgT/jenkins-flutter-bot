@@ -1,1 +1,32 @@
-/.DS_STORE
+# ==============================================================================
+# Root .gitignore — OS & Editor patterns only
+# Language-specific ignores live in each app's own .gitignore
+# ==============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Editors & IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~.nib
+.project
+.settings/
+*.sublime-workspace
+*.sublime-project

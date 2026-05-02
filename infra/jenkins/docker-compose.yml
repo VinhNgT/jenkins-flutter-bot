@@ -1,0 +1,80 @@
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+    networks:
+      - jenkins
+
+  config-ui:
+    build:
+      context: ../../apps/config-ui
+      dockerfile: Dockerfile
+    container_name: config-ui
+    restart: on-failure
+    ports:
+      - "9000:9000"
+    environment:
+      BOT_CONTROL_URL: http://tg-bot:9090
+      AGENT_CONTROL_URL: http://flutter-agent:9091
+      BOT_CONFIG_PATH: /config/bot/bot.json
+      AGENT_CONFIG_PATH: /config/agent/agent.json
+    volumes:
+      - bot-config:/config/bot
+      - agent-config:/config/agent
+    depends_on:
+      - tg-bot
+      - flutter-agent
+    networks:
+      - jenkins
+
+  tg-bot:
+    build:
+      context: ../../apps/tg-jenkins-bot
+      dockerfile: Dockerfile
+    container_name: tg-bot
+    restart: on-failure
+    environment:
+      CONFIG_PATH: /config/bot.json
+      CONFIG_UI_URL: http://localhost:9000
+      BOT_WEBHOOK_PORT: "9090"
+    expose:
+      - "9090"
+    volumes:
+      - bot-config:/config
+      - bot-data:/app/data
+    networks:
+      - jenkins
+
+  flutter-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.flutter-agent
+    container_name: flutter-agent
+    restart: on-failure
+    environment:
+      CONFIG_PATH: /config/agent.json
+      JENKINS_URL: http://jenkins:8080
+      JENKINS_AGENT_NAME: flutter-agent
+      JENKINS_WEB_SOCKET: "true"
+    expose:
+      - "9091"
+    volumes:
+      - agent-config:/config
+    networks:
+      - jenkins
+
+volumes:
+  jenkins-data:
+  bot-config:
+  agent-config:
+  bot-data:
+
+networks:
+  jenkins:

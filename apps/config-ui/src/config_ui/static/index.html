@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Config UI</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --panel-strong: #1f2430;
+        --panel-soft: #11151c;
+        --ink: #e7eaf0;
+        --muted: #9ea7b3;
+        --accent: #4f8cff;
+        --accent-soft: #1a2640;
+        --danger: #c65b5b;
+        --danger-soft: #34191d;
+        --border: #2a3140;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+      }
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+      h1,
+      h2,
+      h3 {
+        margin: 0 0 10px;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .hero {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .hero-card,
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .status-grid,
+      .config-grid {
+        display: grid;
+        gap: 12px;
+      }
+      .status-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+      .config-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+      .status-chip {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: var(--accent-soft);
+        color: #b9d1ff;
+        font-size: 0.85rem;
+        border: 1px solid #2d426f;
+      }
+      .row {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.88rem;
+        color: #c8d0db;
+      }
+      input,
+      textarea,
+      select,
+      button {
+        font: inherit;
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel-soft);
+        color: var(--ink);
+      }
+      input::placeholder,
+      textarea::placeholder {
+        color: #7f8894;
+      }
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: 2px solid rgba(79, 140, 255, 0.25);
+        outline-offset: 0;
+        border-color: var(--accent);
+      }
+      textarea {
+        min-height: 84px;
+        resize: vertical;
+      }
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      button {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 9px 14px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        transition:
+          background-color 120ms ease,
+          border-color 120ms ease;
+      }
+      button:hover {
+        background: #669dff;
+      }
+      button.secondary {
+        background: var(--panel-strong);
+        color: var(--ink);
+        border-color: var(--border);
+      }
+      button.secondary:hover {
+        background: #262d3a;
+      }
+      button.danger {
+        background: var(--danger);
+        border-color: #8d3c3c;
+      }
+      button.danger:hover {
+        background: #d86b6b;
+      }
+      .small {
+        font-size: 0.86rem;
+        color: var(--muted);
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-family: 'SFMono-Regular', ui-monospace, monospace;
+        font-size: 0.85rem;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: #d8dee8;
+        max-height: 320px;
+        overflow: auto;
+      }
+      .hero-card p {
+        max-width: 760px;
+      }
+      .panel h2,
+      .panel h3 {
+        margin-bottom: 12px;
+      }
+      .panel + .panel {
+        margin-top: 12px;
+      }
+      @media (max-width: 700px) {
+        .button-row {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+        button {
+          width: 100%;
+        }
+      }
+      @media (max-width: 700px) {
+        main {
+          padding-inline: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div class="hero-card">
+          <h1>Stack Control</h1>
+          <p>
+            Configure the Telegram bot and Jenkins agent, save secrets without
+            retyping unchanged values, and control services from one place.
+          </p>
+        </div>
+      </section>
+
+      <section class="status-grid" id="status-grid"></section>
+
+      <section class="config-grid" style="margin-top: 20px">
+        <div class="panel">
+          <h2>Bot Config</h2>
+          <div class="row">
+            <label
+              >Telegram bot token<input name="bot:telegram.bot_token"
+            /></label>
+          </div>
+          <div class="row">
+            <label
+              >Allowed chat IDs<input name="bot:telegram.allowed_chat_ids"
+            /></label>
+          </div>
+          <div class="row">
+            <label>Jenkins URL<input name="bot:jenkins.url" /></label>
+          </div>
+          <div class="row">
+            <label>Jenkins user<input name="bot:jenkins.user" /></label>
+          </div>
+          <div class="row">
+            <label
+              >Jenkins API token<input name="bot:jenkins.api_token"
+            /></label>
+          </div>
+          <div class="row">
+            <label>Jenkins job name<input name="bot:jenkins.job_name" /></label>
+          </div>
+          <div class="row">
+            <label>Jenkins job ID<input name="bot:jenkins.job_id" /></label>
+          </div>
+          <div class="row">
+            <label>Drive client ID<input name="bot:drive.client_id" /></label>
+          </div>
+          <div class="row">
+            <label
+              >Drive client secret<input name="bot:drive.client_secret"
+            /></label>
+          </div>
+          <div class="row">
+            <label
+              >Drive folder name<input name="bot:drive.folder_name"
+            /></label>
+          </div>
+          <div class="row">
+            <label
+              >Bot callback host<input name="bot:bot.callback_host"
+            /></label>
+          </div>
+          <div class="row">
+            <label>Bot webhook port<input name="bot:bot.webhook_port" /></label>
+          </div>
+          <div class="row">
+            <label>GitLab PAT<input name="bot:gitlab.pat" /></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Agent Config</h2>
+          <div class="row">
+            <label>Jenkins URL<input name="agent:jenkins.url" /></label>
+          </div>
+          <div class="row">
+            <label>Agent name<input name="agent:agent.name" /></label>
+          </div>
+          <div class="row">
+            <label>Agent secret<input name="agent:agent.secret" /></label>
+          </div>
+          <div class="small">
+            Agent control endpoints can be wired now even before the wrapper
+            implementation is complete.
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 20px">
+        <h2>Google Drive Setup</h2>
+        <p class="small" id="drive-status">Checking Drive status...</p>
+        <p class="small" style="margin-top: 6px">
+          Start authorization in Google and the dashboard will finish the
+          connection automatically. No code copy and paste is required.
+        </p>
+        <div class="button-row" style="margin-bottom: 12px">
+          <button id="drive-start">Connect Google Drive</button>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 20px">
+        <h2>Actions</h2>
+        <div class="button-row" style="margin-bottom: 12px">
+          <button id="save-config">Save config</button>
+          <button class="secondary" id="refresh-all">Refresh</button>
+          <button id="bot-start">Start bot</button>
+          <button class="secondary" id="bot-restart">Restart bot</button>
+          <button class="danger" id="bot-stop">Stop bot</button>
+          <button id="agent-start">Start agent</button>
+          <button class="secondary" id="agent-restart">Restart agent</button>
+          <button class="danger" id="agent-stop">Stop agent</button>
+        </div>
+        <pre id="log">Ready.</pre>
+      </section>
+    </main>
+
+    <script>
+      const log = document.getElementById('log');
+      const statusGrid = document.getElementById('status-grid');
+      const driveStatus = document.getElementById('drive-status');
+
+      function nestedSet(target, dotted, value) {
+        const parts = dotted.split('.');
+        let current = target;
+        for (const part of parts.slice(0, -1)) {
+          if (!(part in current) || typeof current[part] !== 'object') {
+            current[part] = {};
+          }
+          current = current[part];
+        }
+        current[parts[parts.length - 1]] = value;
+      }
+
+      function nestedGet(target, dotted) {
+        return dotted.split('.').reduce((value, part) => {
+          if (!value || typeof value !== 'object') return '';
+          return value[part] ?? '';
+        }, target);
+      }
+
+      function setLog(message) {
+        log.textContent =
+          typeof message === 'string'
+            ? message
+            : JSON.stringify(message, null, 2);
+      }
+
+      function collectConfig() {
+        const payload = { bot: {}, agent: {} };
+        document.querySelectorAll('input[name]').forEach((input) => {
+          const [scope, dotted] = input.name.split(':');
+          nestedSet(payload[scope], dotted, input.value);
+        });
+        return payload;
+      }
+
+      function populateConfig(payload) {
+        document.querySelectorAll('input[name]').forEach((input) => {
+          const [scope, dotted] = input.name.split(':');
+          input.value = nestedGet(payload[scope] || {}, dotted);
+        });
+      }
+
+      function renderStatusCard(name, status) {
+        return `
+          <div class="panel">
+            <h3>${name}</h3>
+            <div class="status-chip">${status.available === false ? 'Unavailable' : status.running ? 'Running' : 'Stopped'}</div>
+            <p class="small">configured: ${String(status.configured ?? false)}</p>
+            <p class="small">drive connected: ${String(status.drive_connected ?? false)}</p>
+            <p class="small">pending builds: ${String(status.pending_builds ?? 0)}</p>
+            <p class="small">last error: ${status.last_error ?? status.detail ?? 'none'}</p>
+          </div>
+        `;
+      }
+
+      function renderDriveStatus(status) {
+        if (!status.configured) {
+          return `Bot Drive credentials are not configured yet. Token path: ${status.token_path}`;
+        }
+        const state = status.connected ? 'Connected' : 'Not connected';
+        const pending = status.auth_pending
+          ? ' Waiting for the Google callback.'
+          : '';
+        return `${state}. Token path: ${status.token_path}.${pending}`;
+      }
+
+      async function refreshAll() {
+        const [configResponse, statusResponse, driveResponse] =
+          await Promise.all([
+            fetch('/api/config'),
+            fetch('/api/services/status'),
+            fetch('/api/drive/status'),
+          ]);
+        const config = await configResponse.json();
+        const status = await statusResponse.json();
+        const drive = await driveResponse.json();
+        populateConfig(config);
+        statusGrid.innerHTML =
+          renderStatusCard('Bot', status.bot) +
+          renderStatusCard('Agent', status.agent);
+        driveStatus.textContent = renderDriveStatus(drive);
+        setLog(status);
+      }
+
+      async function saveConfig() {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(collectConfig()),
+        });
+        const result = await response.json();
+        setLog(result);
+        await refreshAll();
+      }
+
+      async function control(service, action) {
+        const response = await fetch(`/api/services/${service}/${action}`, {
+          method: 'POST',
+        });
+        const result = await response.json();
+        setLog(result);
+        await refreshAll();
+      }
+
+      async function startDriveSetup() {
+        const response = await fetch('/api/drive/connect/start', {
+          method: 'POST',
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          setLog(result);
+          return;
+        }
+        window.open(result.auth_url, '_blank', 'noopener');
+        await refreshAll();
+        setLog(
+          'Google authorization opened in a new window. Finish approval there and the dashboard will update automatically.',
+        );
+      }
+
+      window.addEventListener('message', async (event) => {
+        if (event.origin !== window.location.origin) {
+          return;
+        }
+        if (event.data?.type !== 'drive-oauth-complete') {
+          return;
+        }
+        await refreshAll();
+        setLog(event.data.message);
+      });
+
+      document
+        .getElementById('save-config')
+        .addEventListener('click', saveConfig);
+      document
+        .getElementById('refresh-all')
+        .addEventListener('click', refreshAll);
+      document
+        .getElementById('drive-start')
+        .addEventListener('click', startDriveSetup);
+      document
+        .getElementById('bot-start')
+        .addEventListener('click', () => control('bot', 'start'));
+      document
+        .getElementById('bot-stop')
+        .addEventListener('click', () => control('bot', 'stop'));
+      document
+        .getElementById('bot-restart')
+        .addEventListener('click', () => control('bot', 'restart'));
+      document
+        .getElementById('agent-start')
+        .addEventListener('click', () => control('agent', 'start'));
+      document
+        .getElementById('agent-stop')
+        .addEventListener('click', () => control('agent', 'stop'));
+      document
+        .getElementById('agent-restart')
+        .addEventListener('click', () => control('agent', 'restart'));
+
+      refreshAll().catch((error) => setLog(String(error)));
+    </script>
+  </body>
+</html>

@@ -34,7 +34,7 @@ class BotContext:
     """Shared context between Telegram handlers and the webhook server.
 
     Owns:
-    - Pending build tracking (queue_id → chat_id mapping)
+    - Pending build tracking (request_id → chat_id mapping)
     - Build result handling (Drive upload + Telegram notification)
     """
 
@@ -43,46 +43,44 @@ class BotContext:
         config: Config,
         jenkins: JenkinsClient,
         drive: DriveUploader,
-        bot: Bot,
+        bot: Bot | None,
     ) -> None:
         self.config = config
         self.jenkins = jenkins
         self.drive = drive
         self.bot = bot
-        self._pending: dict[int, PendingBuild] = {}
+        self._pending: dict[str, PendingBuild] = {}
 
     # ------------------------------------------------------------------
     # Pending build tracking
     # ------------------------------------------------------------------
 
-    def add_pending(
-        self, queue_id: int, chat_id: int, ref: str
-    ) -> None:
+    def add_pending(self, request_id: str, chat_id: int, ref: str) -> None:
         """Track a Telegram-triggered build."""
         self._cleanup_expired()
-        self._pending[queue_id] = PendingBuild(
+        self._pending[request_id] = PendingBuild(
             chat_id=chat_id,
             ref=ref,
             triggered_at=time.time(),
         )
 
-    def consume_pending(self, queue_id: int | None) -> PendingBuild | None:
+    def consume_pending(self, request_id: str | None) -> PendingBuild | None:
         """Look up and remove a pending build. Returns None if not found."""
-        if queue_id is None:
+        if not request_id:
             return None
         self._cleanup_expired()
-        return self._pending.pop(queue_id, None)
+        return self._pending.pop(request_id, None)
 
     def _cleanup_expired(self) -> None:
         """Remove pending builds older than TTL."""
         now = time.time()
         expired = [
-            qid
-            for qid, p in self._pending.items()
-            if now - p.triggered_at > PENDING_BUILD_TTL
+            request_id
+            for request_id, pending in self._pending.items()
+            if now - pending.triggered_at > PENDING_BUILD_TTL
         ]
-        for qid in expired:
-            del self._pending[qid]
+        for request_id in expired:
+            del self._pending[request_id]
 
     # ------------------------------------------------------------------
     # Build result handlers (called by webhook)
@@ -118,10 +116,7 @@ class BotContext:
             # Generate filename
             now = datetime.now(timezone.utc)
             folder_name = self.config.drive_folder_name or "flutter-builds"
-            filename = (
-                f"{folder_name}-{now.strftime('%Y%m%d-%H%M')}"
-                f"-{short_hash}.apk"
-            )
+            filename = f"{folder_name}-{now.strftime('%Y%m%d-%H%M')}-{short_hash}.apk"
 
             folder_id = await self.drive.ensure_folder(creds, folder_name)
             file_id, drive_link = await self.drive.upload_file(
@@ -137,9 +132,7 @@ class BotContext:
             )
 
         except Exception as e:
-            logger.exception(
-                "Failed to upload/notify for build %s", commit_hash
-            )
+            logger.exception("Failed to upload/notify for build %s", commit_hash)
             await self.bot.send_message(
                 pending.chat_id,
                 f"✅ Build succeeded (`{short_hash}`) but upload failed: {e}",
@@ -149,9 +142,7 @@ class BotContext:
         finally:
             Path(artifact_path).unlink(missing_ok=True)
 
-    async def on_build_failure(
-        self, pending: PendingBuild, metadata: dict
-    ) -> None:
+    async def on_build_failure(self, pending: PendingBuild, metadata: dict) -> None:
         """Handle failed build — notify user."""
         commit_hash = metadata.get("commit_hash", "unknown")
         short_hash = commit_hash[:7]

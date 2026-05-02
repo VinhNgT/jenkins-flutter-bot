@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 class JenkinsClient:
     """Triggers parameterized Jenkins builds and queries build history."""
 
-    def __init__(
-        self, url: str, user: str, api_token: str, job_name: str
-    ) -> None:
+    def __init__(self, url: str, user: str, api_token: str, job_name: str) -> None:
         self.base_url = url.rstrip("/")
         self.job_name = job_name
         self._auth = aiohttp.BasicAuth(user, api_token)
@@ -24,7 +22,11 @@ class JenkinsClient:
         return f"{self.base_url}/job/{self.job_name}"
 
     async def trigger_build(
-        self, branch: str, callback_url: str
+        self,
+        branch: str,
+        callback_url: str,
+        request_id: str,
+        job_id: str,
     ) -> int | None:
         """Trigger a parameterized Jenkins build.
 
@@ -34,24 +36,20 @@ class JenkinsClient:
         params = {
             "BRANCH": branch,
             "BOT_CALLBACK_URL": callback_url,
+            "BOT_REQUEST_ID": request_id,
+            "BOT_JOB_ID": job_id,
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, params=params, auth=self._auth
-            ) as resp:
+            async with session.post(url, params=params, auth=self._auth) as resp:
                 if resp.status == 201:
                     queue_url = resp.headers.get("Location", "")
                     try:
-                        queue_id = int(
-                            queue_url.rstrip("/").split("/")[-1]
-                        )
+                        queue_id = int(queue_url.rstrip("/").split("/")[-1])
                         logger.info("Build queued: queue_id=%d", queue_id)
                         return queue_id
                     except (ValueError, IndexError):
-                        logger.error(
-                            "Could not parse queue ID from: %s", queue_url
-                        )
+                        logger.error("Could not parse queue ID from: %s", queue_url)
                         return None
                 else:
                     body = await resp.text()

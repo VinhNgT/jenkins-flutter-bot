@@ -24,12 +24,18 @@ class DriveUploader:
     OAuth flow:
     1. get_auth_url() — generates consent URL for the user
     2. exchange_code() — exchanges the pasted auth code for tokens
-    3. Tokens are persisted to data/oauth.json and auto-refreshed
+    3. Tokens are persisted to the configured token path and auto-refreshed
     """
 
-    def __init__(self, client_id: str, client_secret: str) -> None:
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        token_path: Path | None = None,
+    ) -> None:
         self._client_id = client_id
         self._client_secret = client_secret
+        self._token_path = token_path or TOKEN_PATH
         self._folder_id_cache: dict[str, str] = {}
         self._pending_flow: InstalledAppFlow | None = None
 
@@ -46,7 +52,7 @@ class DriveUploader:
         }
 
     # ------------------------------------------------------------------
-    # OAuth flow (one-time setup via Telegram /connect_drive)
+    # OAuth flow (one-time setup coordinated by config-ui)
     # ------------------------------------------------------------------
 
     def get_auth_url(self) -> str:
@@ -69,7 +75,7 @@ class DriveUploader:
         flow = self._pending_flow
         if flow is None:
             raise RuntimeError(
-                "No pending OAuth flow — run /connect_drive first."
+                "No pending OAuth flow — start authorization again from the config UI."
             )
         self._pending_flow = None
 
@@ -77,8 +83,8 @@ class DriveUploader:
         creds = flow.credentials
 
         # Save tokens to disk
-        TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
-        TOKEN_PATH.write_text(
+        self._token_path.parent.mkdir(parents=True, exist_ok=True)
+        self._token_path.write_text(
             json.dumps(
                 {
                     "token": creds.token,
@@ -90,7 +96,7 @@ class DriveUploader:
                 }
             )
         )
-        logger.info("OAuth tokens saved to %s", TOKEN_PATH)
+        logger.info("OAuth tokens saved to %s", self._token_path)
 
     # ------------------------------------------------------------------
     # Token management
@@ -98,16 +104,14 @@ class DriveUploader:
 
     def load_tokens(self) -> Credentials | None:
         """Load saved OAuth tokens from disk, refreshing if needed."""
-        if not TOKEN_PATH.exists():
+        if not self._token_path.exists():
             return None
 
-        data = json.loads(TOKEN_PATH.read_text())
+        data = json.loads(self._token_path.read_text())
         creds = Credentials(
             token=data.get("token"),
             refresh_token=data.get("refresh_token"),
-            token_uri=data.get(
-                "token_uri", "https://oauth2.googleapis.com/token"
-            ),
+            token_uri=data.get("token_uri", "https://oauth2.googleapis.com/token"),
             client_id=data.get("client_id", self._client_id),
             client_secret=data.get("client_secret", self._client_secret),
             scopes=data.get("scopes"),
@@ -117,7 +121,7 @@ class DriveUploader:
             creds.refresh(Request())
             # Persist the refreshed access token
             data["token"] = creds.token
-            TOKEN_PATH.write_text(json.dumps(data))
+            self._token_path.write_text(json.dumps(data))
 
         return creds if creds.valid else None
 
@@ -133,9 +137,7 @@ class DriveUploader:
         """Build an authenticated Drive API service."""
         return build_service("drive", "v3", credentials=creds)
 
-    async def ensure_folder(
-        self, creds: Credentials, folder_name: str
-    ) -> str:
+    async def ensure_folder(self, creds: Credentials, folder_name: str) -> str:
         """Find or create a Drive folder by name. Returns folder ID."""
         if folder_name in self._folder_id_cache:
             return self._folder_id_cache[folder_name]
@@ -166,11 +168,7 @@ class DriveUploader:
                 "name": folder_name,
                 "mimeType": "application/vnd.google-apps.folder",
             }
-            folder = (
-                service.files()
-                .create(body=file_metadata, fields="id")
-                .execute()
-            )
+            folder = service.files().create(body=file_metadata, fields="id").execute()
             folder_id = folder["id"]
             logger.info(
                 "Created Drive folder '%s' (ID: %s)",
@@ -222,25 +220,17 @@ class DriveUploader:
         ).execute()
 
         # Re-fetch to get the updated link
-        file = (
-            service.files()
-            .get(fileId=file_id, fields="webViewLink")
-            .execute()
-        )
+        file = service.files().get(fileId=file_id, fields="webViewLink").execute()
         web_link = file.get("webViewLink", "")
 
         logger.info("Uploaded: %s -> %s", filename, web_link)
         return file_id, web_link
 
-    async def delete_file(
-        self, file_id: str, creds: Credentials
-    ) -> None:
+    async def delete_file(self, file_id: str, creds: Credentials) -> None:
         """Delete a file from Google Drive."""
         try:
             service = self._get_drive_service(creds)
             service.files().delete(fileId=file_id).execute()
             logger.info("Deleted Drive file: %s", file_id)
         except Exception as e:
-            logger.warning(
-                "Failed to delete Drive file %s: %s", file_id, e
-            )
+            logger.warning("Failed to delete Drive file %s: %s", file_id, e)

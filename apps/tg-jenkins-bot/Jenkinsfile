@@ -8,6 +8,8 @@
 //   BRANCH           — Branch or commit hash to build (default: main)
 //   BOT_CALLBACK_URL — Bot webhook URL for build result notification
 //                      (empty for manual Jenkins triggers)
+//   BOT_REQUEST_ID   — Bot-generated build correlation key
+//   BOT_JOB_ID       — Stable bot-side job identifier
 
 pipeline {
     agent { label 'flutter' }
@@ -22,6 +24,16 @@ pipeline {
             name: 'BOT_CALLBACK_URL',
             defaultValue: '',
             description: 'Bot webhook URL (set automatically by bot, leave empty for manual builds)'
+        )
+        string(
+            name: 'BOT_REQUEST_ID',
+            defaultValue: '',
+            description: 'Bot-generated request ID for result correlation'
+        )
+        string(
+            name: 'BOT_JOB_ID',
+            defaultValue: '',
+            description: 'Stable bot-side job ID for callback scoping'
         )
     }
 
@@ -57,7 +69,7 @@ pipeline {
 
                     sh """
                         curl -s -X POST "${params.BOT_CALLBACK_URL}" \
-                            -F 'metadata={"queue_id": ${env.BUILD_NUMBER}, "status": "success", "commit_hash": "${commitHash}"};type=application/json' \
+                            -F 'metadata={"request_id": "${params.BOT_REQUEST_ID}", "job_id": "${params.BOT_JOB_ID}", "status": "success", "commit_hash": "${commitHash}"};type=application/json' \
                             -F 'artifact=@build/app/outputs/flutter-apk/app-release.apk'
                     """
                 }
@@ -74,7 +86,7 @@ pipeline {
 
                     sh """
                         curl -s -X POST "${params.BOT_CALLBACK_URL}" \
-                            -F 'metadata={"queue_id": ${env.BUILD_NUMBER}, "status": "failed", "commit_hash": "${commitHash}", "logs": "Check Jenkins console for details"};type=application/json'
+                            -F 'metadata={"request_id": "${params.BOT_REQUEST_ID}", "job_id": "${params.BOT_JOB_ID}", "status": "failed", "commit_hash": "${commitHash}", "logs": "Check Jenkins console for details"};type=application/json'
                     """
                 }
             }

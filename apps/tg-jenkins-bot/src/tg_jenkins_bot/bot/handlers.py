@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-import logging
+import secrets
 from datetime import datetime, timezone
 
 from telegram import Update
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import ContextTypes
 
 from .context import BotContext
-
-logger = logging.getLogger(__name__)
-
-# ConversationHandler states for /connect_drive
-AWAITING_CODE = 0
 
 
 def _get_ctx(context: ContextTypes.DEFAULT_TYPE) -> BotContext:
@@ -21,25 +16,53 @@ def _get_ctx(context: ContextTypes.DEFAULT_TYPE) -> BotContext:
     return context.bot_data["bot_context"]
 
 
+def _config_ui_hint(ctx: BotContext) -> str:
+    """Point users at the config UI when Drive setup is required."""
+    if ctx.config.config_ui_url:
+        return f"Open {ctx.config.config_ui_url} to complete Drive setup."
+    return "Open the config UI dashboard to complete Drive setup."
+
+
+async def _ensure_authorized(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> bool:
+    """Reject chats that are not allowed to use the bot."""
+    assert update.message
+    assert update.effective_chat
+
+    chat_id = update.effective_chat.id
+    if chat_id not in _get_ctx(context).config.allowed_chat_ids:
+        await update.message.reply_text(
+            "❌ This chat is not allowed to use the build bot."
+        )
+        return False
+
+    return True
+
+
 # ------------------------------------------------------------------
 # /start
 # ------------------------------------------------------------------
 
 
-async def start_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command — welcome message."""
     assert update.message
+    ctx = _get_ctx(context)
     await update.message.reply_text(
         "🤖 *Flutter Build Bot*\n\n"
+        "This bot triggers Jenkins builds, tracks only the builds started "
+        "from Telegram, and delivers finished APKs through Google Drive.\n\n"
+        "Before using `/build`:\n"
+        f"1. {_config_ui_hint(ctx)}\n"
+        "2. Check `/status` to confirm the bot is ready\n\n"
         "Available commands:\n"
+        "▸ `/help` — Show this message\n"
         "▸ `/build` — Build latest commit on main\n"
         "▸ `/build <branch>` — Build latest on a branch\n"
         "▸ `/build <hash>` — Build a specific commit\n"
-        "▸ `/status` — Current build status\n"
-        "▸ `/recent` — Recent build history\n"
-        "▸ `/connect_drive` — Connect Google Drive",
+        "▸ `/status` — Bot readiness and pending build status\n"
+        "▸ `/recent` — Recent Jenkins history (not bot-scoped)",
         parse_mode="Markdown",
     )
 
@@ -49,49 +72,53 @@ async def start_handler(
 # ------------------------------------------------------------------
 
 
-async def build_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Trigger a Jenkins build and track for notification."""
     assert update.message
     assert update.effective_chat
     ctx = _get_ctx(context)
     config = ctx.config
-    chat_id = update.effective_chat.id
 
     # Check allowed chats
-    if chat_id not in config.allowed_chat_ids:
-        await update.message.reply_text("❌ Unauthorized.")
+    if not await _ensure_authorized(update, context):
         return
+
+    chat_id = update.effective_chat.id
 
     ref = context.args[0] if context.args else "main"
 
     # Check Drive connection
     if not ctx.drive.is_connected():
         await update.message.reply_text(
-            "❌ Google Drive is not connected.\n"
-            "Use /connect\\_drive to set up uploads first."
+            "❌ Google Drive setup is required before builds can run.\n"
+            f"{_config_ui_hint(ctx)}\n"
+            "Run /status again after setup finishes.",
+            parse_mode="Markdown",
         )
         return
 
     # Trigger Jenkins build
+    request_id = secrets.token_hex(16)
     queue_id = await ctx.jenkins.trigger_build(
         branch=ref,
         callback_url=config.bot_callback_url,
+        request_id=request_id,
+        job_id=config.jenkins_job_id,
     )
 
     if queue_id is None:
         await update.message.reply_text(
-            "❌ Failed to trigger Jenkins build.\n"
-            "Check bot logs for details."
+            "❌ Failed to trigger Jenkins build.\nCheck bot logs for details."
         )
         return
 
-    ctx.add_pending(queue_id, chat_id, ref)
+    ctx.add_pending(request_id, chat_id, ref)
 
     await update.message.reply_text(
         f"🚀 Build triggered for `{ref}`\n"
-        f"⏳ You'll be notified when it completes.",
+        f"🆔 Request: `{request_id[:8]}`\n"
+        f"☁️ Delivery: Google Drive\n"
+        f"⏳ You'll be notified here when Jenkins completes.",
         parse_mode="Markdown",
     )
 
@@ -101,33 +128,32 @@ async def build_handler(
 # ------------------------------------------------------------------
 
 
-async def status_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Query Jenkins for current build status."""
     assert update.message
     assert update.effective_chat
     ctx = _get_ctx(context)
-    chat_id = update.effective_chat.id
 
-    if chat_id not in ctx.config.allowed_chat_ids:
-        await update.message.reply_text("❌ Unauthorized.")
+    if not await _ensure_authorized(update, context):
         return
 
     lines = ["📊 *Bot Status*\n"]
+    lines.append(
+        f"▸ Job: `{ctx.config.jenkins_job_name}` (ID: `{ctx.config.jenkins_job_id}`)"
+    )
+    lines.append("▸ Scope: only builds triggered from this bot are tracked")
 
     # Drive connection
     if ctx.drive.is_connected():
         lines.append("▸ Drive: ✅ Connected")
+        lines.append("▸ Ready to build: ✅ Yes")
     else:
-        lines.append("▸ Drive: ❌ Not connected")
+        lines.append("▸ Drive: ❌ Setup required in config UI")
+        lines.append("▸ Ready to build: ❌ No")
 
     # Pending builds
     pending_count = len(ctx._pending)
-    if pending_count > 0:
-        lines.append(f"▸ Pending builds: {pending_count}")
-    else:
-        lines.append("▸ Pending builds: None")
+    lines.append(f"▸ Pending bot-triggered builds: {pending_count}")
 
     # Jenkins connection check — try to get recent builds
     try:
@@ -136,15 +162,14 @@ async def status_handler(
             last = builds[0]
             result = last.get("result") or "IN PROGRESS"
             lines.append("▸ Jenkins: ✅ Connected")
-            lines.append(f"▸ Last build: #{last['number']} — {result}")
+            lines.append(f"▸ Latest Jenkins build: #{last['number']} — {result}")
+            lines.append("▸ Note: latest Jenkins build may include manual runs")
         else:
             lines.append("▸ Jenkins: ✅ Connected (no builds yet)")
-    except Exception:
-        lines.append("▸ Jenkins: ❌ Unreachable")
+    except Exception as exc:
+        lines.append(f"▸ Jenkins: ❌ Unreachable ({exc.__class__.__name__})")
 
-    await update.message.reply_text(
-        "\n".join(lines), parse_mode="Markdown"
-    )
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 # ------------------------------------------------------------------
@@ -152,17 +177,13 @@ async def status_handler(
 # ------------------------------------------------------------------
 
 
-async def recent_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Query Jenkins for recent build history."""
     assert update.message
     assert update.effective_chat
     ctx = _get_ctx(context)
-    chat_id = update.effective_chat.id
 
-    if chat_id not in ctx.config.allowed_chat_ids:
-        await update.message.reply_text("❌ Unauthorized.")
+    if not await _ensure_authorized(update, context):
         return
 
     try:
@@ -172,10 +193,13 @@ async def recent_handler(
         return
 
     if not builds:
-        await update.message.reply_text("📭 No builds yet.")
+        await update.message.reply_text("📭 No Jenkins builds found.")
         return
 
-    lines = ["📦 *Recent Builds*\n"]
+    lines = [
+        "📦 *Recent Jenkins Builds*\n",
+        "_This history is not limited to bot-triggered builds._\n",
+    ]
     for b in builds:
         number = b.get("number", "?")
         result = b.get("result") or "IN PROGRESS"
@@ -197,81 +221,4 @@ async def recent_handler(
 
         lines.append(f"{icon} #{number} — {result} — {date_str}")
 
-    await update.message.reply_text(
-        "\n".join(lines), parse_mode="Markdown"
-    )
-
-
-# ------------------------------------------------------------------
-# /connect_drive (ConversationHandler)
-# ------------------------------------------------------------------
-
-
-async def connect_drive_start(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Start the Google Drive OAuth flow."""
-    assert update.message
-    assert update.effective_chat
-    ctx = _get_ctx(context)
-    chat_id = update.effective_chat.id
-
-    if chat_id not in ctx.config.allowed_chat_ids:
-        await update.message.reply_text("❌ Unauthorized.")
-        return ConversationHandler.END
-
-    if ctx.drive.is_connected():
-        await update.message.reply_text(
-            "✅ Google Drive is already connected.\n"
-            "Send /connect\\_drive again and paste a new code to "
-            "re-authorize."
-        )
-
-    auth_url = ctx.drive.get_auth_url()
-
-    await update.message.reply_text(
-        "🔗 *Authorize Google Drive access:*\n\n"
-        f"[Click here to authorize]({auth_url})\n\n"
-        "After authorizing, your browser will show "
-        '"can\'t reach this page".\n'
-        "Copy the `code=` value from the URL bar and send it here.\n\n"
-        "_Send /cancel to abort._",
-        parse_mode="Markdown",
-        disable_web_page_preview=True,
-    )
-
-    return AWAITING_CODE
-
-
-async def connect_drive_code(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Receive the OAuth code and exchange it for tokens."""
-    assert update.message
-    assert update.message.text
-    ctx = _get_ctx(context)
-    code = update.message.text.strip()
-
-    try:
-        ctx.drive.exchange_code(code)
-        await update.message.reply_text(
-            "✅ Google Drive connected successfully!\n"
-            "You can now use /build to trigger builds."
-        )
-    except Exception as e:
-        logger.exception("OAuth code exchange failed")
-        await update.message.reply_text(
-            f"❌ Failed to connect: {e}\n"
-            f"Try /connect\\_drive again."
-        )
-
-    return ConversationHandler.END
-
-
-async def connect_drive_cancel(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Cancel the OAuth flow."""
-    assert update.message
-    await update.message.reply_text("❌ OAuth flow cancelled.")
-    return ConversationHandler.END
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")

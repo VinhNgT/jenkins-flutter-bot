@@ -1,15 +1,75 @@
+# ==============================================================================
+# Stage 1 — Download and prepare SDKs
+# ==============================================================================
+FROM jenkins/inbound-agent:jdk21 AS sdk-builder
+
+USER root
+
+# Build-only tools (won't be in the final image)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git curl wget unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Android SDK ----
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
+
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
+    && cd ${ANDROID_HOME}/cmdline-tools \
+    && wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+        -O cmdline-tools.zip \
+    && unzip -q cmdline-tools.zip \
+    && mv cmdline-tools latest \
+    && rm cmdline-tools.zip \
+    && yes | sdkmanager --licenses > /dev/null 2>&1 \
+    && sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+# ---- Flutter SDK ----
+ENV FLUTTER_HOME=/opt/flutter
+ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
+
+RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 ${FLUTTER_HOME}
+
+# Pre-cache Flutter artifacts so the runtime image is ready to build immediately
+RUN flutter precache --android \
+    && flutter doctor --android-licenses 2>/dev/null || true
+
+# Clean up to minimize COPY size
+RUN rm -rf ${FLUTTER_HOME}/.git/refs/remotes \
+    && rm -rf ${FLUTTER_HOME}/dev ${FLUTTER_HOME}/examples
+
+# ==============================================================================
+# Stage 2 — Minimal runtime image
+# ==============================================================================
 FROM jenkins/inbound-agent:jdk21
 
 USER root
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip \
+# Runtime-only system deps (no wget/xz-utils)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git curl zip unzip libglu1-mesa ca-certificates \
+        python3 python3-pip \
     && pip3 install --break-system-packages fastapi uvicorn python-dotenv \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Copy pre-built SDKs from builder stage
+COPY --from=sdk-builder /opt/android-sdk /opt/android-sdk
+COPY --from=sdk-builder /opt/flutter /opt/flutter
+
+ENV ANDROID_HOME=/opt/android-sdk
+ENV FLUTTER_HOME=/opt/flutter
+ENV PATH="${FLUTTER_HOME}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
+
+# Ensure jenkins user owns the SDKs
+RUN chown -R jenkins:jenkins ${ANDROID_HOME} ${FLUTTER_HOME}
+
+# Control API
 COPY agent-control.py /opt/agent-control.py
 
 USER jenkins
 
-ENTRYPOINT ["python3", "-m", "uvicorn", "agent-control:app", "--host", "0.0.0.0", "--port", "9091", "--app-dir", "/opt"]
+# Verify everything works
+RUN flutter doctor
+
+ENTRYPOINT ["python3", "-m", "uvicorn", "agent-control:app", \
+            "--host", "0.0.0.0", "--port", "9091", "--app-dir", "/opt"]

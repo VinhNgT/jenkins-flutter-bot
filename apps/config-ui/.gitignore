@@ -1,3 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
+data/

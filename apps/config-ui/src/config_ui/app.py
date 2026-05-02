@@ -20,7 +20,6 @@ BOT_SECRET_FIELDS = (
     "telegram.bot_token",
     "jenkins.api_token",
     "drive.client_secret",
-    "gitlab.pat",
 )
 AGENT_SECRET_FIELDS = ("agent.secret",)
 STATIC_DIR = Path(__file__).parent / "static"

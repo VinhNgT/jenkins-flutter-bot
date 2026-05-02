@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-import aiohttp
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class JenkinsClient:
     def __init__(self, url: str, user: str, api_token: str, job_name: str) -> None:
         self.base_url = url.rstrip("/")
         self.job_name = job_name
-        self._auth = aiohttp.BasicAuth(user, api_token)
+        self._auth = httpx.BasicAuth(user, api_token)
 
     @property
     def job_url(self) -> str:
@@ -40,34 +40,33 @@ class JenkinsClient:
             "BOT_JOB_ID": job_id,
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, params=params, auth=self._auth) as resp:
-                if resp.status == 201:
-                    queue_url = resp.headers.get("Location", "")
-                    try:
-                        queue_id = int(queue_url.rstrip("/").split("/")[-1])
-                        logger.info("Build queued: queue_id=%d", queue_id)
-                        return queue_id
-                    except (ValueError, IndexError):
-                        logger.error("Could not parse queue ID from: %s", queue_url)
-                        return None
-                else:
-                    body = await resp.text()
-                    logger.error(
-                        "Jenkins trigger failed: %d — %s",
-                        resp.status,
-                        body[:200],
-                    )
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, params=params, auth=self._auth)
+            if resp.status_code == 201:
+                queue_url = resp.headers.get("Location", "")
+                try:
+                    queue_id = int(queue_url.rstrip("/").split("/")[-1])
+                    logger.info("Build queued: queue_id=%d", queue_id)
+                    return queue_id
+                except (ValueError, IndexError):
+                    logger.error("Could not parse queue ID from: %s", queue_url)
                     return None
+            else:
+                logger.error(
+                    "Jenkins trigger failed: %d — %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+                return None
 
     async def get_build_status(self, build_number: int) -> dict | None:
         """Query a specific build's status."""
         url = f"{self.job_url}/{build_number}/api/json"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, auth=self._auth) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-                return None
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, auth=self._auth)
+            if resp.status_code == 200:
+                return resp.json()
+            return None
 
     async def get_recent_builds(self, count: int = 5) -> list[dict]:
         """Get recent build history for /recent command."""
@@ -76,18 +75,18 @@ class JenkinsClient:
             f"?tree=builds[number,result,timestamp,duration]"
             f"{{0,{count}}}"
         )
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, auth=self._auth) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("builds", [])
-                return []
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, auth=self._auth)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("builds", [])
+            return []
 
     async def get_queue_item(self, queue_id: int) -> dict | None:
         """Get info about a queued build item."""
         url = f"{self.base_url}/queue/item/{queue_id}/api/json"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, auth=self._auth) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-                return None
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, auth=self._auth)
+            if resp.status_code == 200:
+                return resp.json()
+            return None

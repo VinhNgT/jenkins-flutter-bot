@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -49,11 +50,39 @@ class BotContext:
         self.jenkins = jenkins
         self.drive = drive
         self.bot = bot
-        self._pending: dict[str, PendingBuild] = {}
+        self._pending_path = Path("data/pending_builds.json")
+        self._pending: dict[str, PendingBuild] = self._load_pending()
 
     # ------------------------------------------------------------------
-    # Pending build tracking
+    # Pending build tracking (persisted to JSON)
     # ------------------------------------------------------------------
+
+    def _load_pending(self) -> dict[str, PendingBuild]:
+        """Load pending builds from disk on startup."""
+        if not self._pending_path.exists():
+            return {}
+        try:
+            data = json.loads(self._pending_path.read_text())
+            return {
+                k: PendingBuild(**v)
+                for k, v in data.items()
+            }
+        except Exception as exc:
+            logger.warning("Failed to load pending builds: %s", exc)
+            return {}
+
+    def _save_pending(self) -> None:
+        """Persist pending builds to disk."""
+        self._pending_path.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            k: {
+                "chat_id": v.chat_id,
+                "ref": v.ref,
+                "triggered_at": v.triggered_at,
+            }
+            for k, v in self._pending.items()
+        }
+        self._pending_path.write_text(json.dumps(data))
 
     def add_pending(self, request_id: str, chat_id: int, ref: str) -> None:
         """Track a Telegram-triggered build."""
@@ -63,13 +92,17 @@ class BotContext:
             ref=ref,
             triggered_at=time.time(),
         )
+        self._save_pending()
 
     def consume_pending(self, request_id: str | None) -> PendingBuild | None:
         """Look up and remove a pending build. Returns None if not found."""
         if not request_id:
             return None
         self._cleanup_expired()
-        return self._pending.pop(request_id, None)
+        result = self._pending.pop(request_id, None)
+        if result:
+            self._save_pending()
+        return result
 
     def _cleanup_expired(self) -> None:
         """Remove pending builds older than TTL."""
@@ -81,6 +114,8 @@ class BotContext:
         ]
         for request_id in expired:
             del self._pending[request_id]
+        if expired:
+            self._save_pending()
 
     # ------------------------------------------------------------------
     # Build result handlers (called by webhook)
@@ -99,11 +134,16 @@ class BotContext:
         try:
             creds = self.drive.load_tokens()
             if not creds:
+                ui_hint = ""
+                if self.config.config_ui_url:
+                    ui_hint = (
+                        f"\nSet up Google Drive in the "
+                        f"[config dashboard]({self.config.config_ui_url})."
+                    )
                 await self.bot.send_message(
                     pending.chat_id,
                     f"✅ Build successful (`{short_hash}`) but Google Drive "
-                    f"is not connected.\n"
-                    f"Use /connect\\_drive to set up uploads.",
+                    f"is not connected.{ui_hint}",
                     parse_mode="Markdown",
                 )
                 return

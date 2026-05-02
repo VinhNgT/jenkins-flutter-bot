@@ -1,18 +1,16 @@
 # 🏗️ Jenkins Flutter Bot — Monorepo
 
-A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram bot trigger layer and supporting infrastructure.
+A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram bot trigger layer, config UI dashboard, and supporting infrastructure.
 
 ## Repository Structure
 
 ```text
-├── apps/                   Deployable applications
-│   └── tg-jenkins-bot/     Python — Telegram bot that triggers Jenkins builds
+├── apps/                       Deployable applications
+│   ├── tg-jenkins-bot/         Python — Telegram bot that triggers Jenkins builds
+│   └── config-ui/              Python — Web dashboard for stack configuration
 │
-├── infra/                  Infrastructure & CI/CD
-│   ├── jenkins/            Jenkins pipeline definitions & shared libraries
-│   └── scripts/            Deployment & utility scripts
-│
-└── docs/                   Project-wide documentation
+└── infra/                      Infrastructure & CI/CD
+    └── jenkins/                Docker Compose stack, agent Dockerfile, controller Dockerfile
 ```
 
 ## Apps
@@ -20,10 +18,22 @@ A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram
 | App | Language | Description |
 |-----|----------|-------------|
 | [tg-jenkins-bot](apps/tg-jenkins-bot/) | Python | Telegram bot that triggers Jenkins builds and uploads artifacts to Google Drive |
+| [config-ui](apps/config-ui/) | Python | FastAPI dashboard for managing bot and agent configuration, Google Drive OAuth |
 
 ## Getting Started
 
-Each app is self-contained with its own dependencies and setup instructions. Navigate to the app directory and follow its `README.md`:
+### Full Stack (Recommended)
+
+```bash
+cd infra/jenkins
+docker compose up -d
+```
+
+This starts Jenkins, the Telegram bot, the config UI, and the Flutter build agent. Open the config UI at `http://localhost:9000` to configure the stack.
+
+### Local Development
+
+Each app is self-contained with its own dependencies:
 
 ```bash
 cd apps/tg-jenkins-bot

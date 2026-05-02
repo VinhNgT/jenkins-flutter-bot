@@ -2,7 +2,7 @@
 name = "config-ui"
 version = "0.1.0"
 description = "Web dashboard for Jenkins Flutter Bot stack configuration"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.111.0",
     "google-auth-oauthlib>=1.2.0",

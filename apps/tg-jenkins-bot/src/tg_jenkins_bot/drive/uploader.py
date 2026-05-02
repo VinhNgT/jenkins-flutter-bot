@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -25,6 +26,9 @@ class DriveUploader:
     1. get_auth_url() — generates consent URL for the user
     2. exchange_code() — exchanges the pasted auth code for tokens
     3. Tokens are persisted to the configured token path and auto-refreshed
+
+    All Drive API calls are offloaded to threads via asyncio.to_thread()
+    to avoid blocking the event loop.
     """
 
     def __init__(
@@ -130,18 +134,15 @@ class DriveUploader:
         return self.load_tokens() is not None
 
     # ------------------------------------------------------------------
-    # Drive file operations
+    # Drive file operations (sync internals wrapped with to_thread)
     # ------------------------------------------------------------------
 
     def _get_drive_service(self, creds: Credentials):
         """Build an authenticated Drive API service."""
         return build_service("drive", "v3", credentials=creds)
 
-    async def ensure_folder(self, creds: Credentials, folder_name: str) -> str:
+    def _ensure_folder_sync(self, creds: Credentials, folder_name: str) -> str:
         """Find or create a Drive folder by name. Returns folder ID."""
-        if folder_name in self._folder_id_cache:
-            return self._folder_id_cache[folder_name]
-
         service = self._get_drive_service(creds)
 
         query = (
@@ -176,17 +177,27 @@ class DriveUploader:
                 folder_id,
             )
 
+        return folder_id
+
+    async def ensure_folder(self, creds: Credentials, folder_name: str) -> str:
+        """Find or create a Drive folder by name. Returns folder ID."""
+        if folder_name in self._folder_id_cache:
+            return self._folder_id_cache[folder_name]
+
+        folder_id = await asyncio.to_thread(
+            self._ensure_folder_sync, creds, folder_name
+        )
         self._folder_id_cache[folder_name] = folder_id
         return folder_id
 
-    async def upload_file(
+    def _upload_file_sync(
         self,
         file_path: str,
         filename: str,
         creds: Credentials,
         folder_id: str,
     ) -> tuple[str, str]:
-        """Upload a file to Google Drive.
+        """Upload a file to Google Drive (blocking).
 
         Returns (file_id, web_view_link).
         """
@@ -226,11 +237,30 @@ class DriveUploader:
         logger.info("Uploaded: %s -> %s", filename, web_link)
         return file_id, web_link
 
+    async def upload_file(
+        self,
+        file_path: str,
+        filename: str,
+        creds: Credentials,
+        folder_id: str,
+    ) -> tuple[str, str]:
+        """Upload a file to Google Drive.
+
+        Returns (file_id, web_view_link).
+        """
+        return await asyncio.to_thread(
+            self._upload_file_sync, file_path, filename, creds, folder_id
+        )
+
+    def _delete_file_sync(self, file_id: str, creds: Credentials) -> None:
+        """Delete a file from Google Drive (blocking)."""
+        service = self._get_drive_service(creds)
+        service.files().delete(fileId=file_id).execute()
+        logger.info("Deleted Drive file: %s", file_id)
+
     async def delete_file(self, file_id: str, creds: Credentials) -> None:
         """Delete a file from Google Drive."""
         try:
-            service = self._get_drive_service(creds)
-            service.files().delete(fileId=file_id).execute()
-            logger.info("Deleted Drive file: %s", file_id)
+            await asyncio.to_thread(self._delete_file_sync, file_id, creds)
         except Exception as e:
             logger.warning("Failed to delete Drive file %s: %s", file_id, e)

@@ -264,9 +264,6 @@
           <div class="row">
             <label>Bot webhook port<input name="bot:bot.webhook_port" /></label>
           </div>
-          <div class="row">
-            <label>GitLab PAT<input name="bot:gitlab.pat" /></label>
-          </div>
         </div>
 
         <div class="panel">
@@ -280,9 +277,16 @@
           <div class="row">
             <label>Agent secret<input name="agent:agent.secret" /></label>
           </div>
-          <div class="small">
-            Agent control endpoints can be wired now even before the wrapper
-            implementation is complete.
+          <div class="row">
+            <label>WebSocket mode
+              <select name="agent:agent.web_socket">
+                <option value="true">Enabled (default)</option>
+                <option value="false">Disabled (TCP)</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label>Tunnel (TCP only)<input name="agent:agent.tunnel" placeholder="host:port" /></label>
           </div>
         </div>
       </section>

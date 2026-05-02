@@ -161,24 +161,26 @@ class AgentManager:
         }
 
 
-app = FastAPI(title="agent-control")
-app.state.manager = AgentManager()
+from collections.abc import Generator
+from contextlib import contextmanager
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@contextmanager
+def lifespan(app: FastAPI) -> Generator[None, None, None]:
+    """Manage agent lifecycle on startup/shutdown."""
     try:
         config = AgentConfig.resolve()
+        app.state.manager.start(config)
     except Exception as exc:
         logger.info("Agent not auto-started: %s", exc)
-        return
 
-    app.state.manager.start(config)
+    yield
 
-
-@app.on_event("shutdown")
-async def shutdown() -> None:
     app.state.manager.stop()
+
+
+app = FastAPI(title="agent-control", lifespan=lifespan)
+app.state.manager = AgentManager()
 
 
 @app.post("/control/start")

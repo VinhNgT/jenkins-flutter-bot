@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
@@ -28,27 +30,26 @@ def _resolve_listen_port() -> int:
         return 9090
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage bot lifecycle on startup/shutdown."""
+    try:
+        config = Config.resolve()
+        await app.state.manager.start(config)
+    except Exception as exc:
+        logger.info("Bot not auto-started: %s", exc)
+
+    yield
+
+    await app.state.manager.stop()
+
+
 def create_app() -> FastAPI:
     """Create the FastAPI app hosting webhook and control routes."""
-    app = FastAPI(title="tg-jenkins-bot")
+    app = FastAPI(title="tg-jenkins-bot", lifespan=lifespan)
     app.state.manager = BotManager()
     app.include_router(control_router)
     app.include_router(webhook_router)
-
-    @app.on_event("startup")
-    async def startup() -> None:
-        try:
-            config = Config.resolve()
-        except Exception as exc:
-            logger.info("Bot not auto-started: %s", exc)
-            return
-
-        await app.state.manager.start(config)
-
-    @app.on_event("shutdown")
-    async def shutdown() -> None:
-        await app.state.manager.stop()
-
     return app
 
 

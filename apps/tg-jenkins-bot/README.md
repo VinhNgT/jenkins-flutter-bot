@@ -30,7 +30,7 @@ A self-hosted Telegram bot that acts as a thin trigger layer for Jenkins CI/CD. 
 
 | Tool        | Version | Purpose                           |
 | ----------- | ------- | --------------------------------- |
-| **Python**  | ≥ 3.11  | Runtime                           |
+| **Python**  | ≥ 3.12  | Runtime                           |
 | **uv**      | latest  | Package & virtualenv manager      |
 | **Jenkins** | any     | A Jenkins server with a build job |
 
@@ -56,10 +56,9 @@ Collect this checklist before you start:
 | `JENKINS_JOB_ID`       | Usually  | Your own logical identifier | Usually set equal to `JENKINS_JOB_NAME`             |
 | `GOOGLE_CLIENT_ID`     | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
 | `GOOGLE_CLIENT_SECRET` | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
-| `BOT_CALLBACK_HOST`    | Yes      | Your deployment topology    | Base URL that Jenkins can reach                     |
-| `BOT_WEBHOOK_PORT`     | Yes      | Your deployment topology    | Listen port for the bot service                     |
+| `BOT_CALLBACK_HOST`    | Optional | Your deployment topology    | Defaults to `http://tg-bot:9090` in Docker          |
+| `BOT_WEBHOOK_PORT`     | Optional | Your deployment topology    | Defaults to `9090`                                  |
 | `CONFIG_UI_URL`        | Optional | Your deployment topology    | Public config UI URL shown in bot guidance          |
-| `GITLAB_PAT`           | Optional | GitLab user settings        | Needed only when private GitLab access is required  |
 | `DRIVE_FOLDER_NAME`    | Optional | Your choice                 | Destination folder name in Google Drive             |
 
 ### 1. Telegram Bot Token
@@ -150,12 +149,11 @@ BOT_CALLBACK_HOST=http://tg-jenkins-bot:9090
 
 Use these only when your deployment needs them:
 
-| Setting                | When to use it                                                                                                             | How to get it                                                                              |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `CONFIG_UI_URL`        | You want the bot to point users to the dashboard URL                                                                       | Use the full external URL of the config UI, for example `https://config.example.com`       |
-| `GITLAB_PAT`           | Jenkins or your agent needs to clone private GitLab repositories and you are not already using Jenkins-managed credentials | GitLab -> User Settings -> Access Tokens -> create a token with at least `read_repository` |
-| `DRIVE_FOLDER_NAME`    | You want uploads grouped in a specific Drive folder                                                                        | Choose any folder name you want the uploader to create or reuse                            |
-| `BOT_OAUTH_TOKEN_PATH` | You want the Drive OAuth token stored outside the default config directory                                                 | Choose a writable path shared by the config UI and bot                                     |
+| Setting                | When to use it                                                                         | How to get it                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `CONFIG_UI_URL`        | You want the bot to point users to the dashboard URL                                   | Use the full external URL of the config UI, for example `https://config.example.com` |
+| `DRIVE_FOLDER_NAME`    | You want uploads grouped in a specific Drive folder                                    | Choose any folder name you want the uploader to create or reuse                      |
+| `BOT_OAUTH_TOKEN_PATH` | You want the Drive OAuth token stored outside the default config directory             | Choose a writable path shared by the config UI and bot                               |
 
 ---
 
@@ -197,7 +195,6 @@ BOT_WEBHOOK_PORT=9090
 # CONFIG_PATH=/app/config/bot.json
 # CONFIG_UI_URL=http://localhost:9000
 # BOT_OAUTH_TOKEN_PATH=/app/config/oauth.json
-# GITLAB_PAT=
 # DRIVE_FOLDER_NAME=flutter-builds
 ```
 
@@ -229,6 +226,85 @@ uv run tg-jenkins-bot
 6. Google will redirect back to the config UI callback page automatically.
 7. Wait for the dashboard to refresh and show that Drive is connected. No code copy and paste is required.
 8. Return to Telegram and run `/status` to confirm the bot is ready.
+
+---
+
+## Jenkins Pipeline Setup
+
+The bot triggers Jenkins builds but does **not** manage the pipeline definition. Configure your pipeline directly in Jenkins:
+
+1. Create a new **Pipeline** job in Jenkins
+2. Under "Pipeline", select **"Pipeline script"** (not "from SCM")
+3. Paste the pipeline script below and customize `url` and `credentialsId`
+4. The bot passes `BRANCH`, `BOT_CALLBACK_URL`, `BOT_REQUEST_ID`, and `BOT_JOB_ID` as build parameters — Jenkins handles everything else
+
+<details>
+<summary>Reference pipeline script</summary>
+
+```groovy
+pipeline {
+    agent { label 'flutter' }
+    parameters {
+        string(name: 'BRANCH', defaultValue: 'main')
+        string(name: 'BOT_CALLBACK_URL', defaultValue: '')
+        string(name: 'BOT_REQUEST_ID', defaultValue: '')
+        string(name: 'BOT_JOB_ID', defaultValue: '')
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM',
+                    branches: [[name: "*/${params.BRANCH}"]],
+                    userRemoteConfigs: [[
+                        url: 'https://gitlab.com/your-org/your-flutter-app.git',
+                        credentialsId: 'gitlab-credentials'
+                    ]]
+                ])
+            }
+        }
+        stage('Build APK') {
+            steps { sh 'flutter build apk --release' }
+        }
+    }
+    post {
+        success {
+            script {
+                if (params.BOT_CALLBACK_URL) {
+                    def commit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    def meta = [request_id: params.BOT_REQUEST_ID, job_id: params.BOT_JOB_ID,
+                                status: 'success', commit_hash: commit,
+                                build_number: env.BUILD_NUMBER, build_url: env.BUILD_URL]
+                    writeJSON file: 'metadata.json', json: meta
+                    retry(3) {
+                        sh "curl -sf -X POST \"${params.BOT_CALLBACK_URL}\" " +
+                           "-F 'metadata=@metadata.json;type=application/json' " +
+                           "-F 'artifact=@build/app/outputs/flutter-apk/app-release.apk'"
+                    }
+                }
+            }
+        }
+        failure {
+            script {
+                if (params.BOT_CALLBACK_URL) {
+                    def commit = sh(script: 'git rev-parse HEAD || echo unknown', returnStdout: true).trim()
+                    def meta = [request_id: params.BOT_REQUEST_ID, job_id: params.BOT_JOB_ID,
+                                status: 'failed', commit_hash: commit,
+                                build_number: env.BUILD_NUMBER, build_url: env.BUILD_URL,
+                                logs: 'Check Jenkins console for details']
+                    writeJSON file: 'metadata.json', json: meta
+                    retry(3) {
+                        sh "curl -sf -X POST \"${params.BOT_CALLBACK_URL}\" " +
+                           "-F 'metadata=@metadata.json;type=application/json'"
+                    }
+                }
+            }
+        }
+        always { cleanWs() }
+    }
+}
+```
+
+</details>
 
 ---
 
@@ -300,11 +376,6 @@ apps/tg-jenkins-bot/
 - Ensure `BOT_CALLBACK_HOST` is accessible from the Jenkins server.
 - Verify `BOT_WEBHOOK_PORT` is not blocked by a firewall.
 
-### "Cooldown active" message
-
-- Default cooldown is 300 seconds (5 minutes)
-- Reduce it via `COOLDOWN_SECONDS` or the Web UI config page
-- Use `/status` to see remaining cooldown time
 
 ---
 

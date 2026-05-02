@@ -23,6 +23,8 @@ services:
     environment:
       BOT_CONTROL_URL: http://tg-bot:9090
       AGENT_CONTROL_URL: http://flutter-agent:9091
+      # Both config-ui and tg-bot mount bot-config at /config/bot
+      # so oauth.json lands at the same path in both containers.
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
     volumes:
@@ -41,13 +43,17 @@ services:
     container_name: tg-bot
     restart: on-failure
     environment:
-      CONFIG_PATH: /config/bot.json
+      CONFIG_PATH: /config/bot/bot.json
+      BOT_CALLBACK_HOST: "http://tg-bot:9090"
+      # Host-facing URL shown in Telegram messages so users can open it
+      # in their browser. Not used for internal service communication.
       CONFIG_UI_URL: http://localhost:9000
       BOT_WEBHOOK_PORT: "9090"
     expose:
       - "9090"
     volumes:
-      - bot-config:/config
+      # Same mount point as config-ui for bot-config volume
+      - bot-config:/config/bot
       - bot-data:/app/data
     networks:
       - jenkins

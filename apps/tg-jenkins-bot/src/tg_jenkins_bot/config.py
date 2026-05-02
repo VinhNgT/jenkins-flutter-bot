@@ -61,11 +61,10 @@ class Config:
     oauth_token_path: Path
 
     # Bot webhook (Jenkins calls this)
-    bot_callback_host: str  # e.g. "http://192.168.1.50:9090"
+    bot_callback_host: str  # e.g. "http://tg-bot:9090"
     bot_webhook_port: int = 9090
 
     # Optional
-    gitlab_pat: str = ""
     drive_folder_name: str = ""
     config_ui_url: str = ""
 
@@ -162,7 +161,7 @@ class Config:
             bot_callback_host=get_value(
                 "bot.callback_host",
                 "BOT_CALLBACK_HOST",
-                required=True,
+                default="http://tg-bot:9090",
             ),
             bot_webhook_port=int(
                 get_value(
@@ -170,11 +169,6 @@ class Config:
                     "BOT_WEBHOOK_PORT",
                     default="9090",
                 )
-            ),
-            gitlab_pat=get_value(
-                "gitlab.pat",
-                "GITLAB_PAT",
-                default="",
             ),
             drive_folder_name=get_value(
                 "drive.folder_name",

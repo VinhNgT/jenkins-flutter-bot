@@ -55,8 +55,8 @@ jenkins-flutter-bot/
 │
 ├── infra/                          Infrastructure & CI/CD
 │   └── jenkins/
-│       ├── docker-compose.yml      Stack orchestration (4 services)
-│       ├── Dockerfile              Jenkins controller
+│       ├── docker-compose.yml      Stack orchestration (4 services; jenkins is dev-only)
+│       ├── Dockerfile              Jenkins controller (dev/testing convenience)
 │       ├── Dockerfile.flutter-agent  Multi-stage (SDKs + agent-control via uv)
 │       └── .env.example            Reference env vars
 │
@@ -89,7 +89,7 @@ Jenkins UI    → jenkins:8080 (exposed) → flutter-agent:9091 (internal)
 |---------|------|---------|------|
 | `tg-bot` | 9090 | No | Telegram polling bot + FastAPI webhook/control server |
 | `config-ui` | 9000 | Yes | Web dashboard for config, service control, Drive OAuth |
-| `jenkins` | 8080 | Yes | Standard Jenkins controller |
+| `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
 | `flutter-agent` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 
 ### Design Principles
@@ -126,7 +126,7 @@ These are architectural boundaries. Do not violate them.
 
 The architecture supports these evolutions without structural changes:
 
-- **External Jenkins** — point `JENKINS_URL` to an external instance and remove the `jenkins` service.
+- **External Jenkins** — the `jenkins` service in docker-compose is a **development/testing convenience**. In production, point `JENKINS_URL` to an external Jenkins instance and remove the `jenkins` service. The bot and agent are Jenkins-agnostic — they only need a reachable URL.
 - **Multiple agents** — add more agent services with different `JENKINS_AGENT_NAME` values.
 - **Additional build targets** — iOS, web, etc. The bot just needs the artifact file and metadata from the webhook.
 - **Notification channels** — the `on_build_success` / `on_build_failure` handlers can extend to Slack, email, etc.

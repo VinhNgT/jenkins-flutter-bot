@@ -182,11 +182,6 @@ class Config:
             ),
         )
 
-    @classmethod
-    def from_env(cls) -> Config:
-        """Backward-compatible alias for the current env-driven entrypoint."""
-        return cls.resolve()
-
     @property
     def bot_callback_url(self) -> str:
         """Full webhook URL that Jenkins calls on build completion."""

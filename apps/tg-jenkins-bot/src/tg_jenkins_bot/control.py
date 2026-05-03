@@ -93,7 +93,8 @@ class BotManager:
 
                 await application.initialize()
                 await application.start()
-                assert application.updater
+                if not application.updater:
+                    raise RuntimeError("Application.updater is None after start")
                 await application.updater.start_polling(drop_pending_updates=True)
 
                 self._application = application
@@ -114,10 +115,14 @@ class BotManager:
 
             application = self._application
             logger.info("Stopping Telegram bot...")
-            assert application.updater
-            await application.updater.stop()
+            if application.updater:
+                await application.updater.stop()
             await application.stop()
             await application.shutdown()
+
+            # Close the reusable httpx client
+            if self._bot_context:
+                await self._bot_context.jenkins.close()
 
             self._application = None
             self._bot_context = None
@@ -137,7 +142,7 @@ class BotManager:
             "drive_connected": (
                 bot_context.drive.is_connected() if bot_context else False
             ),
-            "pending_builds": (len(bot_context._pending) if bot_context else 0),
+            "pending_builds": (bot_context.pending_count if bot_context else 0),
             "last_error": self._last_error,
             "job_id": self._config.jenkins_job_id if self._config else None,
         }

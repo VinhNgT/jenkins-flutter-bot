@@ -255,145 +255,147 @@ def _drive_callback_page(*, success: bool, message: str) -> HTMLResponse:
     )
 
 
-app = FastAPI(title="config-ui")
-app.state.settings = Settings.from_env()
-app.state.service_client = ServiceClient(app.state.settings)
-app.state.drive_oauth = DriveOAuthManager(
-    _drive_token_path(app.state.settings.bot_config_path)
-)
-
-
-@app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
-
-
-@app.get("/api/config")
-async def get_config() -> dict[str, Any]:
-    settings: Settings = app.state.settings
-    bot = _load_json(settings.bot_config_path)
-    agent = _load_json(settings.agent_config_path)
-    return {
-        "bot": _mask_secrets(bot, BOT_SECRET_FIELDS),
-        "agent": _mask_secrets(agent, AGENT_SECRET_FIELDS),
-    }
-
-
-@app.post("/api/config")
-async def save_config(payload: dict[str, Any]) -> dict[str, Any]:
-    settings: Settings = app.state.settings
-    incoming_bot = payload.get("bot", {})
-    incoming_agent = payload.get("agent", {})
-
-    if not isinstance(incoming_bot, dict) or not isinstance(incoming_agent, dict):
-        raise HTTPException(status_code=400, detail="Invalid config payload")
-
-    existing_bot = _load_json(settings.bot_config_path)
-    existing_agent = _load_json(settings.agent_config_path)
-
-    merged_bot = _deep_merge(existing_bot, incoming_bot)
-    merged_agent = _deep_merge(existing_agent, incoming_agent)
-    merged_bot = _restore_masked_secrets(
-        merged_bot, incoming_bot, existing_bot, BOT_SECRET_FIELDS
+def create_app() -> FastAPI:
+    """Create and configure the config-ui FastAPI application."""
+    app = FastAPI(title="config-ui")
+    settings = Settings.from_env()
+    app.state.settings = settings
+    app.state.service_client = ServiceClient(settings)
+    app.state.drive_oauth = DriveOAuthManager(
+        _drive_token_path(settings.bot_config_path)
     )
-    merged_agent = _restore_masked_secrets(
-        merged_agent, incoming_agent, existing_agent, AGENT_SECRET_FIELDS
-    )
-
-    _write_json(settings.bot_config_path, merged_bot)
-    _write_json(settings.agent_config_path, merged_agent)
-    return {"saved": True}
+    _register_routes(app)
+    return app
 
 
-@app.get("/api/drive/status")
-async def get_drive_status() -> dict[str, Any]:
-    settings: Settings = app.state.settings
-    drive_oauth: DriveOAuthManager = app.state.drive_oauth
-    bot = _load_json(settings.bot_config_path)
-    client_id, client_secret = _drive_credentials(bot)
+def _register_routes(app: FastAPI) -> None:
+    """Register all routes on the app instance."""
 
-    if not client_id or not client_secret:
+    @app.get("/")
+    async def index() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/api/config")
+    async def get_config(request: Request) -> dict[str, Any]:
+        settings: Settings = request.app.state.settings
+        bot = _load_json(settings.bot_config_path)
+        agent = _load_json(settings.agent_config_path)
         return {
-            "configured": False,
-            "connected": False,
-            "auth_pending": drive_oauth.auth_pending,
-            "token_path": str(drive_oauth.token_path),
+            "bot": _mask_secrets(bot, BOT_SECRET_FIELDS),
+            "agent": _mask_secrets(agent, AGENT_SECRET_FIELDS),
         }
 
-    status = drive_oauth.status(client_id, client_secret)
-    status["configured"] = True
-    return status
+    @app.post("/api/config")
+    async def save_config(request: Request, payload: dict[str, Any]) -> dict[str, Any]:
+        settings: Settings = request.app.state.settings
+        incoming_bot = payload.get("bot", {})
+        incoming_agent = payload.get("agent", {})
 
+        if not isinstance(incoming_bot, dict) or not isinstance(incoming_agent, dict):
+            raise HTTPException(status_code=400, detail="Invalid config payload")
 
-@app.get("/api/drive/oauth/callback")
-async def drive_oauth_callback(request: Request) -> HTMLResponse:
-    drive_oauth: DriveOAuthManager = app.state.drive_oauth
-    error = request.query_params.get("error")
-    if error:
-        description = request.query_params.get("error_description")
-        message = "Google authorization was not completed."
-        if description:
-            message = f"{message} {description}"
-        return _drive_callback_page(success=False, message=message)
+        existing_bot = _load_json(settings.bot_config_path)
+        existing_agent = _load_json(settings.agent_config_path)
 
-    try:
-        drive_oauth.exchange_callback(str(request.url))
-    except RuntimeError as exc:
-        return _drive_callback_page(success=False, message=str(exc))
-    except Exception as exc:
+        merged_bot = _deep_merge(existing_bot, incoming_bot)
+        merged_agent = _deep_merge(existing_agent, incoming_agent)
+        merged_bot = _restore_masked_secrets(
+            merged_bot, incoming_bot, existing_bot, BOT_SECRET_FIELDS
+        )
+        merged_agent = _restore_masked_secrets(
+            merged_agent, incoming_agent, existing_agent, AGENT_SECRET_FIELDS
+        )
+
+        _write_json(settings.bot_config_path, merged_bot)
+        _write_json(settings.agent_config_path, merged_agent)
+        return {"saved": True}
+
+    @app.get("/api/drive/status")
+    async def get_drive_status(request: Request) -> dict[str, Any]:
+        settings: Settings = request.app.state.settings
+        drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
+        bot = _load_json(settings.bot_config_path)
+        client_id, client_secret = _drive_credentials(bot)
+
+        if not client_id or not client_secret:
+            return {
+                "configured": False,
+                "connected": False,
+                "auth_pending": drive_oauth.auth_pending,
+                "token_path": str(drive_oauth.token_path),
+            }
+
+        status = drive_oauth.status(client_id, client_secret)
+        status["configured"] = True
+        return status
+
+    @app.get("/api/drive/oauth/callback")
+    async def drive_oauth_callback(request: Request) -> HTMLResponse:
+        drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
+        error = request.query_params.get("error")
+        if error:
+            description = request.query_params.get("error_description")
+            message = "Google authorization was not completed."
+            if description:
+                message = f"{message} {description}"
+            return _drive_callback_page(success=False, message=message)
+
+        try:
+            drive_oauth.exchange_callback(str(request.url))
+        except RuntimeError as exc:
+            return _drive_callback_page(success=False, message=str(exc))
+        except Exception as exc:
+            return _drive_callback_page(
+                success=False,
+                message=f"Drive authorization failed: {exc}",
+            )
+
         return _drive_callback_page(
-            success=False,
-            message=f"Drive authorization failed: {exc}",
+            success=True,
+            message="Google Drive is connected. You can return to the dashboard.",
         )
 
-    return _drive_callback_page(
-        success=True,
-        message="Google Drive is connected. You can return to the dashboard.",
-    )
+    @app.post("/api/drive/connect/start")
+    async def start_drive_connect(request: Request) -> dict[str, Any]:
+        settings: Settings = request.app.state.settings
+        drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
+        bot = _load_json(settings.bot_config_path)
+        client_id, client_secret = _drive_credentials(bot)
 
+        if not client_id or not client_secret:
+            raise HTTPException(
+                status_code=400,
+                detail="Configure the bot Google Drive client ID and client secret first.",
+            )
 
-@app.post("/api/drive/connect/start")
-async def start_drive_connect(request: Request) -> dict[str, Any]:
-    settings: Settings = app.state.settings
-    drive_oauth: DriveOAuthManager = app.state.drive_oauth
-    bot = _load_json(settings.bot_config_path)
-    client_id, client_secret = _drive_credentials(bot)
+        return {
+            "auth_url": drive_oauth.start(
+                client_id,
+                client_secret,
+                _drive_callback_url(request),
+            )
+        }
 
-    if not client_id or not client_secret:
-        raise HTTPException(
-            status_code=400,
-            detail="Configure the bot Google Drive client ID and client secret first.",
-        )
+    @app.get("/api/services/status")
+    async def get_service_status(request: Request) -> dict[str, Any]:
+        client: ServiceClient = request.app.state.service_client
+        return {
+            "bot": await client.status("bot"),
+            "agent": await client.status("agent"),
+        }
 
-    return {
-        "auth_url": drive_oauth.start(
-            client_id,
-            client_secret,
-            _drive_callback_url(request),
-        )
-    }
+    @app.post("/api/services/{service}/{action}")
+    async def control_service(
+        request: Request, service: str, action: str
+    ) -> dict[str, Any]:
+        if service not in {"bot", "agent"}:
+            raise HTTPException(status_code=404, detail="Unknown service")
+        if action not in {"start", "stop", "restart"}:
+            raise HTTPException(status_code=404, detail="Unknown action")
 
-
-
-@app.get("/api/services/status")
-async def get_service_status() -> dict[str, Any]:
-    client: ServiceClient = app.state.service_client
-    return {
-        "bot": await client.status("bot"),
-        "agent": await client.status("agent"),
-    }
-
-
-@app.post("/api/services/{service}/{action}")
-async def control_service(service: str, action: str) -> dict[str, Any]:
-    if service not in {"bot", "agent"}:
-        raise HTTPException(status_code=404, detail="Unknown service")
-    if action not in {"start", "stop", "restart"}:
-        raise HTTPException(status_code=404, detail="Unknown action")
-
-    client: ServiceClient = app.state.service_client
-    if action == "start":
-        return await client.start(service)
-    if action == "stop":
-        return await client.stop(service)
-    return await client.restart(service)
+        client: ServiceClient = request.app.state.service_client
+        if action == "start":
+            return await client.start(service)
+        if action == "stop":
+            return await client.stop(service)
+        return await client.restart(service)

@@ -42,14 +42,58 @@ async def handle_build_complete(
     Expected multipart POST:
             - Field 'metadata': JSON with request_id, status, commit_hash, logs
       - Field 'artifact': The built APK file (only on success)
+
+    Validation order: metadata is parsed and request_id/job_id are
+    validated *before* the artifact is written to disk.  This avoids
+    unnecessary disk I/O for invalid requests.
     """
     ctx = _get_bot_context(request)
     if ctx is None:
         raise HTTPException(status_code=503, detail="Bot is not running")
 
+    # ------------------------------------------------------------------
+    # 1. Parse and validate metadata BEFORE writing artifact to disk
+    # ------------------------------------------------------------------
     metadata_obj = json.loads(metadata)
-    artifact_path = None
+    request_id = metadata_obj.get("request_id")
+    job_id = metadata_obj.get("job_id")
+    status = metadata_obj.get("status", "unknown")
+    commit_hash = metadata_obj.get("commit_hash", "unknown")
 
+    # Truncate request_id in logs to prevent token leakage
+    short_rid = request_id[:8] if request_id else "none"
+
+    logger.info(
+        "Build callback: request_id=%s…, job_id=%s, status=%s, commit=%s",
+        short_rid,
+        job_id,
+        status,
+        commit_hash,
+    )
+
+    # Reject mismatched job_id early — no artifact written
+    if job_id and job_id != ctx.config.jenkins_job_id:
+        logger.info(
+            "Ignoring callback for job_id=%s (expected %s)",
+            job_id,
+            ctx.config.jenkins_job_id,
+        )
+        return {"status": "ignored", "reason": "different job_id"}
+
+    # Consume pending build — returns None if not triggered via Telegram
+    pending = ctx.consume_pending(request_id)
+
+    if pending is None:
+        logger.info(
+            "No pending Telegram request for request_id=%s… — ignoring.",
+            short_rid,
+        )
+        return {"status": "ignored", "reason": "not triggered by bot"}
+
+    # ------------------------------------------------------------------
+    # 2. Only write artifact to disk after validation passes
+    # ------------------------------------------------------------------
+    artifact_path = None
     if artifact is not None:
         WORK_DIR.mkdir(parents=True, exist_ok=True)
         tmp = tempfile.NamedTemporaryFile(
@@ -63,42 +107,9 @@ async def handle_build_complete(
         tmp.close()
         artifact_path = tmp.name
 
-    request_id = metadata_obj.get("request_id")
-    job_id = metadata_obj.get("job_id")
-    status = metadata_obj.get("status", "unknown")
-    commit_hash = metadata_obj.get("commit_hash", "unknown")
-
-    logger.info(
-        "Build callback: request_id=%s, job_id=%s, status=%s, commit=%s",
-        request_id,
-        job_id,
-        status,
-        commit_hash,
-    )
-
-    if job_id and job_id != ctx.config.jenkins_job_id:
-        logger.info(
-            "Ignoring callback for job_id=%s (expected %s)",
-            job_id,
-            ctx.config.jenkins_job_id,
-        )
-        if artifact_path:
-            Path(artifact_path).unlink(missing_ok=True)
-        return {"status": "ignored", "reason": "different job_id"}
-
-    # Look up pending build (returns None if not triggered via Telegram)
-    pending = ctx.consume_pending(request_id)
-
-    if pending is None:
-        logger.info(
-            "No pending Telegram request for request_id=%s — ignoring.",
-            request_id,
-        )
-        if artifact_path:
-            Path(artifact_path).unlink(missing_ok=True)
-        return {"status": "ignored", "reason": "not triggered by bot"}
-
-    # Telegram-triggered build — process the result
+    # ------------------------------------------------------------------
+    # 3. Process the validated, Telegram-triggered build result
+    # ------------------------------------------------------------------
     if status == "success" and artifact_path:
         await ctx.on_build_success(pending, metadata_obj, artifact_path)
     else:

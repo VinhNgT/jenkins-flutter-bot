@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 PENDING_BUILD_TTL = 3600  # 1 hour
 
 
-@dataclass
+@dataclass(frozen=True)
 class PendingBuild:
     """Tracks a build triggered via Telegram."""
 
@@ -56,6 +56,11 @@ class BotContext:
     # ------------------------------------------------------------------
     # Pending build tracking (persisted to JSON)
     # ------------------------------------------------------------------
+
+    @property
+    def pending_count(self) -> int:
+        """Number of pending builds currently tracked."""
+        return len(self._pending)
 
     def _load_pending(self) -> dict[str, PendingBuild]:
         """Load pending builds from disk on startup."""
@@ -131,6 +136,11 @@ class BotContext:
         commit_hash = metadata.get("commit_hash", "unknown")
         short_hash = commit_hash[:7]
 
+        if not self.bot:
+            logger.error("Cannot notify — bot instance is not available")
+            Path(artifact_path).unlink(missing_ok=True)
+            return
+
         try:
             creds = self.drive.load_tokens()
             if not creds:
@@ -184,6 +194,10 @@ class BotContext:
 
     async def on_build_failure(self, pending: PendingBuild, metadata: dict) -> None:
         """Handle failed build — notify user."""
+        if not self.bot:
+            logger.error("Cannot notify — bot instance is not available")
+            return
+
         commit_hash = metadata.get("commit_hash", "unknown")
         short_hash = commit_hash[:7]
         logs = metadata.get("logs", "No logs available")

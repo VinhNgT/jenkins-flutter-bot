@@ -17,4 +17,4 @@ COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["uvicorn", "config_ui.app:app", "--host", "0.0.0.0", "--port", "9000", "--app-dir", "/app/src"]
+CMD ["config-ui"]

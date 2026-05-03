@@ -1,4 +1,6 @@
 services:
+  # Development/testing convenience — in production, point JENKINS_URL to an
+  # external Jenkins instance and remove this service entirely.
   jenkins:
     build:
       context: .

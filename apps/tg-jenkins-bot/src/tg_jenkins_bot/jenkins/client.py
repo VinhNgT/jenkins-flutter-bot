@@ -16,10 +16,15 @@ class JenkinsClient:
         self.base_url = url.rstrip("/")
         self.job_name = job_name
         self._auth = httpx.BasicAuth(user, api_token)
+        self._client = httpx.AsyncClient(auth=self._auth)
 
     @property
     def job_url(self) -> str:
         return f"{self.base_url}/job/{self.job_name}"
+
+    async def close(self) -> None:
+        """Close the underlying HTTP client."""
+        await self._client.aclose()
 
     async def trigger_build(
         self,
@@ -40,32 +45,22 @@ class JenkinsClient:
             "BOT_JOB_ID": job_id,
         }
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, params=params, auth=self._auth)
-            if resp.status_code == 201:
-                queue_url = resp.headers.get("Location", "")
-                try:
-                    queue_id = int(queue_url.rstrip("/").split("/")[-1])
-                    logger.info("Build queued: queue_id=%d", queue_id)
-                    return queue_id
-                except (ValueError, IndexError):
-                    logger.error("Could not parse queue ID from: %s", queue_url)
-                    return None
-            else:
-                logger.error(
-                    "Jenkins trigger failed: %d — %s",
-                    resp.status_code,
-                    resp.text[:200],
-                )
+        resp = await self._client.post(url, params=params)
+        if resp.status_code == 201:
+            queue_url = resp.headers.get("Location", "")
+            try:
+                queue_id = int(queue_url.rstrip("/").split("/")[-1])
+                logger.info("Build queued: queue_id=%d", queue_id)
+                return queue_id
+            except (ValueError, IndexError):
+                logger.error("Could not parse queue ID from: %s", queue_url)
                 return None
-
-    async def get_build_status(self, build_number: int) -> dict | None:
-        """Query a specific build's status."""
-        url = f"{self.job_url}/{build_number}/api/json"
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, auth=self._auth)
-            if resp.status_code == 200:
-                return resp.json()
+        else:
+            logger.error(
+                "Jenkins trigger failed: %d — %s",
+                resp.status_code,
+                resp.text[:200],
+            )
             return None
 
     async def get_recent_builds(self, count: int = 5) -> list[dict]:
@@ -75,18 +70,8 @@ class JenkinsClient:
             f"?tree=builds[number,result,timestamp,duration]"
             f"{{0,{count}}}"
         )
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, auth=self._auth)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data.get("builds", [])
-            return []
-
-    async def get_queue_item(self, queue_id: int) -> dict | None:
-        """Get info about a queued build item."""
-        url = f"{self.base_url}/queue/item/{queue_id}/api/json"
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, auth=self._auth)
-            if resp.status_code == 200:
-                return resp.json()
-            return None
+        resp = await self._client.get(url)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("builds", [])
+        return []

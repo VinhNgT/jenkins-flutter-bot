@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import datetime, timezone
 
@@ -9,6 +10,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from .context import BotContext
+
+logger = logging.getLogger(__name__)
 
 
 def _get_ctx(context: ContextTypes.DEFAULT_TYPE) -> BotContext:
@@ -27,8 +30,8 @@ async def _ensure_authorized(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> bool:
     """Reject chats that are not allowed to use the bot."""
-    assert update.message
-    assert update.effective_chat
+    if not update.message or not update.effective_chat:
+        return False
 
     chat_id = update.effective_chat.id
     if chat_id not in _get_ctx(context).config.allowed_chat_ids:
@@ -47,7 +50,8 @@ async def _ensure_authorized(
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command — welcome message."""
-    assert update.message
+    if not update.message:
+        return
     ctx = _get_ctx(context)
     await update.message.reply_text(
         "🤖 *Flutter Build Bot*\n\n"
@@ -74,8 +78,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Trigger a Jenkins build and track for notification."""
-    assert update.message
-    assert update.effective_chat
+    if not update.message or not update.effective_chat:
+        return
     ctx = _get_ctx(context)
     config = ctx.config
 
@@ -130,8 +134,8 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Query Jenkins for current build status."""
-    assert update.message
-    assert update.effective_chat
+    if not update.message or not update.effective_chat:
+        return
     ctx = _get_ctx(context)
 
     if not await _ensure_authorized(update, context):
@@ -152,8 +156,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lines.append("▸ Ready to build: ❌ No")
 
     # Pending builds
-    pending_count = len(ctx._pending)
-    lines.append(f"▸ Pending bot-triggered builds: {pending_count}")
+    lines.append(f"▸ Pending bot-triggered builds: {ctx.pending_count}")
 
     # Jenkins connection check — try to get recent builds
     try:
@@ -179,8 +182,8 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Query Jenkins for recent build history."""
-    assert update.message
-    assert update.effective_chat
+    if not update.message or not update.effective_chat:
+        return
     ctx = _get_ctx(context)
 
     if not await _ensure_authorized(update, context):

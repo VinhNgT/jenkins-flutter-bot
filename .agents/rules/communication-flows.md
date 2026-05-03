@@ -33,12 +33,22 @@ Jenkins POSTs to `/webhook/build-complete` with two multipart fields:
 - **`metadata`**: JSON string containing `request_id`, `job_id`, `status`, `commit_hash`, etc.
 - **`artifact`** (optional): the built APK file, present only on success
 
-The webhook handler:
-1. Validates `job_id` matches the bot's configured job — rejects mismatches
-2. Looks up `request_id` in pending builds — `consume_pending()` is a pop (one-time use)
-3. On match: uploads artifact to Drive, notifies Telegram
-4. On no match: returns `{"status": "ignored"}` (the build wasn't triggered by this bot)
-5. Always cleans up temporary artifact files regardless of outcome
+### Security Model
+
+The `request_id` is a 128-bit random token (`secrets.token_hex(16)`) generated per build. It acts as the primary webhook authentication — only callers who know the exact token can trigger a Telegram notification. The token is:
+- Logged **truncated** (first 8 chars) to prevent leakage via log aggregation
+- Displayed truncated in Telegram messages
+- Consumed on first use (one-time pop via `consume_pending()`)
+
+### Validation Order
+
+The handler validates metadata **before** writing any artifact to disk. This prevents disk exhaustion from unauthenticated callers:
+
+1. Parse metadata JSON and extract `request_id`, `job_id`
+2. Reject mismatched `job_id` — no file I/O occurs
+3. Look up `request_id` in pending builds — reject if not found, no file I/O occurs
+4. Only after validation: write artifact to temp file and process
+5. Always clean up temporary files regardless of outcome
 
 ---
 

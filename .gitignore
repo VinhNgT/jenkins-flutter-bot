@@ -1,6 +1,5 @@
 # ==============================================================================
-# Root .gitignore — OS & Editor patterns only
-# Language-specific ignores live in each app's own .gitignore
+# Root .gitignore — OS, Editor, and Python patterns
 # ==============================================================================
 
 # macOS
@@ -30,3 +29,16 @@ Desktop.ini
 .settings/
 *.sublime-workspace
 *.sublime-project
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+
+# Runtime data
+data/

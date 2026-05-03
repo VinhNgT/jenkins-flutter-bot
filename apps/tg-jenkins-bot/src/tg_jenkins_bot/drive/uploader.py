@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -15,7 +16,6 @@ from googleapiclient.http import MediaFileUpload
 logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
-TOKEN_PATH = Path("data/oauth.json")
 
 
 class DriveUploader:
@@ -33,11 +33,11 @@ class DriveUploader:
         self,
         client_id: str,
         client_secret: str,
-        token_path: Path | None = None,
+        token_path: Path,
     ) -> None:
         self._client_id = client_id
         self._client_secret = client_secret
-        self._token_path = token_path or TOKEN_PATH
+        self._token_path = token_path
         self._folder_id_cache: dict[str, str] = {}
 
     # ------------------------------------------------------------------
@@ -75,7 +75,7 @@ class DriveUploader:
     # Drive file operations (sync internals wrapped with to_thread)
     # ------------------------------------------------------------------
 
-    def _get_drive_service(self, creds: Credentials):
+    def _get_drive_service(self, creds: Credentials) -> Any:
         """Build an authenticated Drive API service."""
         return build_service("drive", "v3", credentials=creds)
 
@@ -189,16 +189,3 @@ class DriveUploader:
         return await asyncio.to_thread(
             self._upload_file_sync, file_path, filename, creds, folder_id
         )
-
-    def _delete_file_sync(self, file_id: str, creds: Credentials) -> None:
-        """Delete a file from Google Drive (blocking)."""
-        service = self._get_drive_service(creds)
-        service.files().delete(fileId=file_id).execute()
-        logger.info("Deleted Drive file: %s", file_id)
-
-    async def delete_file(self, file_id: str, creds: Credentials) -> None:
-        """Delete a file from Google Drive."""
-        try:
-            await asyncio.to_thread(self._delete_file_sync, file_id, creds)
-        except Exception as e:
-            logger.warning("Failed to delete Drive file %s: %s", file_id, e)

@@ -352,17 +352,17 @@
 
       function collectConfig() {
         const payload = { bot: {}, agent: {} };
-        document.querySelectorAll('input[name]').forEach((input) => {
-          const [scope, dotted] = input.name.split(':');
-          nestedSet(payload[scope], dotted, input.value);
+        document.querySelectorAll('input[name], select[name]').forEach((el) => {
+          const [scope, dotted] = el.name.split(':');
+          nestedSet(payload[scope], dotted, el.value);
         });
         return payload;
       }
 
       function populateConfig(payload) {
-        document.querySelectorAll('input[name]').forEach((input) => {
-          const [scope, dotted] = input.name.split(':');
-          input.value = nestedGet(payload[scope] || {}, dotted);
+        document.querySelectorAll('input[name], select[name]').forEach((el) => {
+          const [scope, dotted] = el.name.split(':');
+          el.value = nestedGet(payload[scope] || {}, dotted);
         });
       }
 

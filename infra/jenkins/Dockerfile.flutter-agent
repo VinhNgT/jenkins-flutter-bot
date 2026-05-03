@@ -21,7 +21,7 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
     && unzip -q cmdline-tools.zip \
     && mv cmdline-tools latest \
     && rm cmdline-tools.zip \
-    && yes | sdkmanager --licenses > /dev/null 2>&1 \
+    && (yes || true) | sdkmanager --licenses > /dev/null 2>&1 \
     && sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
 # ---- Flutter SDK ----

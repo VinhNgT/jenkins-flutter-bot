@@ -84,8 +84,8 @@ class BotContext:
         try:
             data = json.loads(self._pending_path.read_text())
             return {k: PendingBuild(**v) for k, v in data.items()}
-        except Exception as exc:
-            logger.warning("Failed to load pending builds: %s", exc)
+        except Exception:
+            logger.exception("Failed to load pending builds")
             return {}
 
     def _save_pending(self) -> None:
@@ -150,8 +150,8 @@ class BotContext:
         try:
             data = json.loads(self._history_path.read_text())
             return [CompletedBuild(**entry) for entry in data]
-        except Exception as exc:
-            logger.warning("Failed to load build history: %s", exc)
+        except Exception:
+            logger.exception("Failed to load build history")
             return []
 
     def _save_history(self) -> None:
@@ -216,11 +216,10 @@ class BotContext:
                     build.filename,
                     build.drive_file_id,
                 )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to delete Drive file %s: %s",
+            except Exception:
+                logger.exception(
+                    "Failed to delete Drive file %s",
                     build.drive_file_id,
-                    exc,
                 )
 
     # ------------------------------------------------------------------

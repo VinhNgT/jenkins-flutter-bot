@@ -129,8 +129,8 @@ class DriveOAuthManager:
         if not creds.valid and creds.refresh_token:
             try:
                 creds.refresh(Request())
-            except Exception as exc:
-                logger.warning("Failed to refresh Drive token: %s", exc)
+            except Exception:
+                logger.exception("Failed to refresh Drive token")
                 return None
 
             data["token"] = creds.token

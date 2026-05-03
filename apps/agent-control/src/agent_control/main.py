@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         config = AgentConfig.resolve()
         app.state.manager.start(config)
-    except Exception as exc:
-        logger.info("Agent not auto-started: %s", exc)
+    except Exception:
+        logger.exception("Agent not auto-started")
 
     yield
 

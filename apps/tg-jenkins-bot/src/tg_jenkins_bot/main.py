@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         config = Config.resolve()
         await app.state.manager.start(config)
     except Exception as exc:
-        logger.info("Bot not auto-started: %s", exc)
+        logger.exception("Bot not auto-started")
 
     yield
 

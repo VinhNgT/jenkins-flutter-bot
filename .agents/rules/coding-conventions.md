@@ -91,10 +91,8 @@ Use `logging.getLogger(__name__)` consistently. No `print()` statements — the 
 
 ---
 
-## Error Handling Patterns
+## Error Handling
 
-These are the current patterns. They work well but can be improved:
-
-- **Config resolution** raises `KeyError` for missing required values. Callers catch and log.
-- **FastAPI lifespan** catches startup failures and logs them, keeping the server running so the control API remains available for retries.
-- **Webhook handlers** never crash on unexpected input — they return `{"status": "ignored"}` for unrecognized callbacks and always clean up temp files.
+1. **Never suppress exceptions.** Every `except` block must log with a full traceback via `logger.exception()`. Never use `logger.info()` or `logger.warning()` inside an `except` block.
+2. **Always include tracebacks.** Use `logger.exception()` — the standard Python idiom for logging caught exceptions with full stack traces.
+3. **Keep services available.** FastAPI lifespan hooks and optional operations catch errors and continue so the control API stays up for retries. Webhook handlers return `{"status": "ignored"}` for unrecognized callbacks and always clean up temp files.

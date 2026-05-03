@@ -106,6 +106,8 @@ Jenkins UI    → jenkins:8080 (exposed) → flutter-agent:9091 (internal)
 
 6. **Consistent Packaging** — All three apps use uv with `src` layout, `pyproject.toml`, and `[project.scripts]` entry points. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12, so uv manages both Python and dependencies).
 
+7. **Config-UI is Setup-Only** — The config-ui dashboard is a convenience for initial configuration and operational control. On first boot with missing configuration, services may depend on config-ui to provide settings via the web dashboard. Once configured, every service must auto-start independently on subsequent boots — resolving all configuration from env vars / `.env` files / JSON config without any dependency on config-ui. The only feature exclusive to config-ui is the Google Drive OAuth browser-redirect flow (one-time setup).
+
 ---
 
 ## Hard Constraints

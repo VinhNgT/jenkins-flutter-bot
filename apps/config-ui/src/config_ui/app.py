@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import html
 import json
 import os
 from dataclasses import dataclass
@@ -11,7 +10,9 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from .drive import DriveOAuthManager
 
@@ -23,6 +24,7 @@ BOT_SECRET_FIELDS = (
 )
 AGENT_SECRET_FIELDS = ("agent.secret",)
 STATIC_DIR = Path(__file__).parent / "static"
+TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 
 def _drive_token_path(bot_config_path: Path | None) -> Path:
@@ -186,75 +188,6 @@ def _drive_callback_url(request: Request) -> str:
     return str(request.url_for("drive_oauth_callback"))
 
 
-def _drive_callback_page(*, success: bool, message: str) -> HTMLResponse:
-    title = "Google Drive Connected" if success else "Google Drive Connection Failed"
-    safe_title = html.escape(title)
-    safe_message = html.escape(message)
-    payload = json.dumps(
-        {
-            "type": "drive-oauth-complete",
-            "success": success,
-            "message": message,
-        }
-    )
-    status_code = 200 if success else 400
-    return HTMLResponse(
-        f"""<!doctype html>
-<html lang=\"en\">
-    <head>
-        <meta charset=\"utf-8\">
-        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-        <title>{safe_title}</title>
-        <style>
-            body {{
-                margin: 0;
-                font-family: system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
-                background: #0f1115;
-                color: #e7eaf0;
-                display: grid;
-                place-items: center;
-                min-height: 100vh;
-                padding: 16px;
-            }}
-            main {{
-                width: min(460px, 100%);
-                background: #171a21;
-                border: 1px solid #2a3140;
-                border-radius: 10px;
-                padding: 20px;
-            }}
-            h1 {{
-                margin: 0 0 10px;
-                font-size: 1.2rem;
-            }}
-            p {{
-                margin: 0;
-                line-height: 1.5;
-                color: #c8d0db;
-            }}
-        </style>
-    </head>
-    <body>
-        <main>
-            <h1>{safe_title}</h1>
-            <p>{safe_message}</p>
-        </main>
-        <script>
-            const payload = {payload};
-            if (window.opener && !window.opener.closed) {{
-                window.opener.postMessage(payload, window.location.origin);
-            }}
-            if (payload.success) {{
-                setTimeout(() => window.close(), 1200);
-            }}
-        </script>
-    </body>
-</html>
-""",
-        status_code=status_code,
-    )
-
-
 def create_app() -> FastAPI:
     """Create and configure the config-ui FastAPI application."""
     app = FastAPI(title="config-ui")
@@ -264,7 +197,9 @@ def create_app() -> FastAPI:
     app.state.drive_oauth = DriveOAuthManager(
         _drive_token_path(settings.bot_config_path)
     )
+    app.state.templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
     _register_routes(app)
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     return app
 
 
@@ -330,29 +265,70 @@ def _register_routes(app: FastAPI) -> None:
         return status
 
     @app.get("/api/drive/oauth/callback")
-    async def drive_oauth_callback(request: Request) -> HTMLResponse:
+    async def drive_oauth_callback(request: Request) -> Any:
         drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
+        templates: Jinja2Templates = request.app.state.templates
         error = request.query_params.get("error")
+
         if error:
             description = request.query_params.get("error_description")
             message = "Google authorization was not completed."
             if description:
                 message = f"{message} {description}"
-            return _drive_callback_page(success=False, message=message)
+            return templates.TemplateResponse(
+                request=request,
+                name="oauth_callback.html",
+                context={
+                    "title": "Google Drive Connection Failed",
+                    "message": message,
+                    "payload_json": json.dumps(
+                        {"type": "drive-oauth-complete", "success": False, "message": message}
+                    ),
+                },
+                status_code=400,
+            )
 
         try:
             drive_oauth.exchange_callback(str(request.url))
         except RuntimeError as exc:
-            return _drive_callback_page(success=False, message=str(exc))
+            return templates.TemplateResponse(
+                request=request,
+                name="oauth_callback.html",
+                context={
+                    "title": "Google Drive Connection Failed",
+                    "message": str(exc),
+                    "payload_json": json.dumps(
+                        {"type": "drive-oauth-complete", "success": False, "message": str(exc)}
+                    ),
+                },
+                status_code=400,
+            )
         except Exception as exc:
-            return _drive_callback_page(
-                success=False,
-                message=f"Drive authorization failed: {exc}",
+            msg = f"Drive authorization failed: {exc}"
+            return templates.TemplateResponse(
+                request=request,
+                name="oauth_callback.html",
+                context={
+                    "title": "Google Drive Connection Failed",
+                    "message": msg,
+                    "payload_json": json.dumps(
+                        {"type": "drive-oauth-complete", "success": False, "message": msg}
+                    ),
+                },
+                status_code=400,
             )
 
-        return _drive_callback_page(
-            success=True,
-            message="Google Drive is connected. You can return to the dashboard.",
+        message = "Google Drive is connected. You can return to the dashboard."
+        return templates.TemplateResponse(
+            request=request,
+            name="oauth_callback.html",
+            context={
+                "title": "Google Drive Connected",
+                "message": message,
+                "payload_json": json.dumps(
+                    {"type": "drive-oauth-complete", "success": True, "message": message}
+                ),
+            },
         )
 
     @app.post("/api/drive/connect/start")

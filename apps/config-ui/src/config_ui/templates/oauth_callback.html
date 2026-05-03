@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: #0c0e12;
+        color: #e4e8f0;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 16px;
+      }
+      main {
+        width: min(460px, 100%);
+        background: #14171e;
+        border: 1px solid #252a36;
+        border-radius: 10px;
+        padding: 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.15rem;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        line-height: 1.5;
+        color: #8b95a5;
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>{{ title }}</h1>
+      <p>{{ message }}</p>
+    </main>
+    <script>
+      const payload = {{ payload_json | safe }};
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, window.location.origin);
+      }
+      if (payload.success) {
+        setTimeout(() => window.close(), 1200);
+      }
+    </script>
+  </body>
+</html>

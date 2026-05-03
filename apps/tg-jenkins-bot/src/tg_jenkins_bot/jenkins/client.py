@@ -63,15 +63,8 @@ class JenkinsClient:
             )
             return None
 
-    async def get_recent_builds(self, count: int = 5) -> list[dict]:
-        """Get recent build history for /recent command."""
-        url = (
-            f"{self.job_url}/api/json"
-            f"?tree=builds[number,result,timestamp,duration]"
-            f"{{0,{count}}}"
-        )
+    async def check_connection(self) -> bool:
+        """Check if the Jenkins job is reachable."""
+        url = f"{self.job_url}/api/json?tree=name"
         resp = await self._client.get(url)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("builds", [])
-        return []
+        return resp.status_code == 200

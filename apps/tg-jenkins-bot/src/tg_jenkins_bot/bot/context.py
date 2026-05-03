@@ -31,12 +31,25 @@ class PendingBuild:
     triggered_at: float
 
 
+@dataclass(frozen=True)
+class CompletedBuild:
+    """Tracks a successfully uploaded build artifact."""
+
+    drive_file_id: str
+    drive_link: str
+    filename: str
+    ref: str
+    completed_at: float
+
+
 class BotContext:
     """Shared context between Telegram handlers and the webhook server.
 
     Owns:
     - Pending build tracking (request_id → chat_id mapping)
+    - Completed build history (persisted to JSON, powers /recent)
     - Build result handling (Drive upload + Telegram notification)
+    - History retention enforcement (max_recent_builds + Drive cleanup)
     """
 
     def __init__(
@@ -52,6 +65,8 @@ class BotContext:
         self.bot = bot
         self._pending_path = Path("data/pending_builds.json")
         self._pending: dict[str, PendingBuild] = self._load_pending()
+        self._history_path = Path("data/build_history.json")
+        self._history: list[CompletedBuild] = self._load_history()
 
     # ------------------------------------------------------------------
     # Pending build tracking (persisted to JSON)
@@ -68,10 +83,7 @@ class BotContext:
             return {}
         try:
             data = json.loads(self._pending_path.read_text())
-            return {
-                k: PendingBuild(**v)
-                for k, v in data.items()
-            }
+            return {k: PendingBuild(**v) for k, v in data.items()}
         except Exception as exc:
             logger.warning("Failed to load pending builds: %s", exc)
             return {}
@@ -121,6 +133,95 @@ class BotContext:
             del self._pending[request_id]
         if expired:
             self._save_pending()
+
+    # ------------------------------------------------------------------
+    # Build history (persisted to JSON)
+    # ------------------------------------------------------------------
+
+    @property
+    def history_count(self) -> int:
+        """Number of completed builds in history."""
+        return len(self._history)
+
+    def _load_history(self) -> list[CompletedBuild]:
+        """Load completed build history from disk on startup."""
+        if not self._history_path.exists():
+            return []
+        try:
+            data = json.loads(self._history_path.read_text())
+            return [CompletedBuild(**entry) for entry in data]
+        except Exception as exc:
+            logger.warning("Failed to load build history: %s", exc)
+            return []
+
+    def _save_history(self) -> None:
+        """Persist build history to disk."""
+        self._history_path.parent.mkdir(parents=True, exist_ok=True)
+        data = [
+            {
+                "drive_file_id": b.drive_file_id,
+                "drive_link": b.drive_link,
+                "filename": b.filename,
+                "ref": b.ref,
+                "completed_at": b.completed_at,
+            }
+            for b in self._history
+        ]
+        self._history_path.write_text(json.dumps(data))
+
+    def record_build(
+        self,
+        drive_file_id: str,
+        drive_link: str,
+        filename: str,
+        ref: str,
+    ) -> None:
+        """Record a completed build in history."""
+        self._history.append(
+            CompletedBuild(
+                drive_file_id=drive_file_id,
+                drive_link=drive_link,
+                filename=filename,
+                ref=ref,
+                completed_at=time.time(),
+            )
+        )
+        self._save_history()
+
+    def recent_builds(self, count: int = 5) -> list[CompletedBuild]:
+        """Return the most recent completed builds."""
+        return list(reversed(self._history[-count:]))
+
+    async def enforce_history_limit(self) -> None:
+        """Evict oldest builds if history exceeds max_recent_builds.
+
+        Deletes Drive files for evicted builds on a best-effort basis.
+        Errors are logged but never propagated.
+        """
+        limit = self.config.max_recent_builds
+        if limit <= 0 or len(self._history) <= limit:
+            return
+
+        to_evict = self._history[: len(self._history) - limit]
+        self._history = self._history[len(self._history) - limit :]
+        self._save_history()
+
+        creds = self.drive.load_tokens()
+        for build in to_evict:
+            try:
+                if creds:
+                    await self.drive.delete_file(creds, build.drive_file_id)
+                logger.info(
+                    "Evicted old build: %s (%s)",
+                    build.filename,
+                    build.drive_file_id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to delete Drive file %s: %s",
+                    build.drive_file_id,
+                    exc,
+                )
 
     # ------------------------------------------------------------------
     # Build result handlers (called by webhook)
@@ -180,6 +281,15 @@ class BotContext:
                 f"🔗 [Download APK]({drive_link})",
                 parse_mode="Markdown",
             )
+
+            self.record_build(
+                drive_file_id=file_id,
+                drive_link=drive_link,
+                filename=filename,
+                ref=pending.ref,
+            )
+
+            await self.enforce_history_limit()
 
         except Exception as e:
             logger.exception("Failed to upload/notify for build %s", commit_hash)

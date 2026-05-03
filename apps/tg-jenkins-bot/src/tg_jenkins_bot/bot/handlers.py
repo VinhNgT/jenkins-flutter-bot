@@ -66,7 +66,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "▸ `/build <branch>` — Build latest on a branch\n"
         "▸ `/build <hash>` — Build a specific commit\n"
         "▸ `/status` — Bot readiness and pending build status\n"
-        "▸ `/recent` — Recent Jenkins history (not bot-scoped)",
+        "▸ `/recent` — Recent bot-triggered builds",
         parse_mode="Markdown",
     )
 
@@ -133,7 +133,7 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Query Jenkins for current build status."""
+    """Query bot readiness and status."""
     if not update.message or not update.effective_chat:
         return
     ctx = _get_ctx(context)
@@ -145,7 +145,6 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lines.append(
         f"▸ Job: `{ctx.config.jenkins_job_name}` (ID: `{ctx.config.jenkins_job_id}`)"
     )
-    lines.append("▸ Scope: only builds triggered from this bot are tracked")
 
     # Drive connection
     if ctx.drive.is_connected():
@@ -158,17 +157,19 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Pending builds
     lines.append(f"▸ Pending bot-triggered builds: {ctx.pending_count}")
 
-    # Jenkins connection check — try to get recent builds
+    # Bot build history
+    lines.append(f"▸ Completed builds tracked: {ctx.history_count}")
+    recent = ctx.recent_builds(count=1)
+    if recent:
+        lines.append(f"▸ Last bot build: `{recent[0].ref}` — `{recent[0].filename}`")
+
+    # Jenkins connection check
     try:
-        builds = await ctx.jenkins.get_recent_builds(count=1)
-        if builds:
-            last = builds[0]
-            result = last.get("result") or "IN PROGRESS"
+        reachable = await ctx.jenkins.check_connection()
+        if reachable:
             lines.append("▸ Jenkins: ✅ Connected")
-            lines.append(f"▸ Latest Jenkins build: #{last['number']} — {result}")
-            lines.append("▸ Note: latest Jenkins build may include manual runs")
         else:
-            lines.append("▸ Jenkins: ✅ Connected (no builds yet)")
+            lines.append("▸ Jenkins: ❌ Unreachable")
     except Exception as exc:
         lines.append(f"▸ Jenkins: ❌ Unreachable ({exc.__class__.__name__})")
 
@@ -181,7 +182,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Query Jenkins for recent build history."""
+    """Show recent bot-triggered builds from build history."""
     if not update.message or not update.effective_chat:
         return
     ctx = _get_ctx(context)
@@ -189,39 +190,22 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not await _ensure_authorized(update, context):
         return
 
-    try:
-        builds = await ctx.jenkins.get_recent_builds(count=5)
-    except Exception as e:
-        await update.message.reply_text(f"❌ Failed to query Jenkins: {e}")
-        return
+    builds = ctx.recent_builds(count=5)
 
     if not builds:
-        await update.message.reply_text("📭 No Jenkins builds found.")
+        await update.message.reply_text("📭 No bot-triggered builds yet.")
         return
 
     lines = [
-        "📦 *Recent Jenkins Builds*\n",
-        "_This history is not limited to bot-triggered builds._\n",
+        "📦 *Recent Bot Builds*\n",
     ]
     for b in builds:
-        number = b.get("number", "?")
-        result = b.get("result") or "IN PROGRESS"
-        ts = b.get("timestamp", 0)
-
-        icon = {
-            "SUCCESS": "✅",
-            "FAILURE": "❌",
-            "ABORTED": "⏹️",
-            "IN PROGRESS": "🔨",
-        }.get(result, "❓")
-
-        # Convert Jenkins timestamp (ms) to readable date
-        if ts:
-            dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
-            date_str = dt.strftime("%Y-%m-%d %H:%M UTC")
-        else:
-            date_str = "unknown"
-
-        lines.append(f"{icon} #{number} — {result} — {date_str}")
+        dt = datetime.fromtimestamp(b.completed_at, tz=timezone.utc)
+        date_str = dt.strftime("%Y-%m-%d %H:%M UTC")
+        lines.append(
+            f"✅ `{b.ref}` — {date_str}\n"
+            f"    📄 `{b.filename}`\n"
+            f"    🔗 [Download]({b.drive_link})"
+        )
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")

@@ -30,7 +30,7 @@ jenkins-flutter-bot/
 │   │       ├── config.py           Multi-layer config resolution
 │   │       ├── control.py          BotManager lifecycle + /control/* API
 │   │       ├── bot/
-│   │       │   ├── context.py      Pending build tracking, Drive upload, notification
+│   │       │   ├── context.py      Build tracking, history, Drive upload, notification
 │   │       │   └── handlers.py     /start, /build, /status, /recent handlers
 │   │       ├── jenkins/
 │   │       │   ├── client.py       Jenkins REST API wrapper
@@ -102,7 +102,7 @@ Jenkins UI    → jenkins:8080 (exposed) → flutter-agent:9091 (internal)
 
 4. **FastAPI Everywhere** — All service APIs use FastAPI: the bot, config-ui, and agent-control.
 
-5. **Bot-Scoped Tracking** — The bot only tracks builds it triggered. Jenkins may run builds from other sources; those are visible via `/recent` but not correlated to Telegram users.
+5. **Bot-Scoped Tracking** — The bot only tracks builds it triggered. It maintains its own build history and state independently of Jenkins — it never queries Jenkins to reconstruct what it has already tracked locally.
 
 6. **Consistent Packaging** — All three apps use uv with `src` layout, `pyproject.toml`, and `[project.scripts]` entry points. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12, so uv manages both Python and dependencies).
 
@@ -119,6 +119,7 @@ These are architectural boundaries. Do not violate them.
 5. **Do NOT use synchronous blocking I/O** in async code paths without wrapping with `asyncio.to_thread()`.
 6. **Do NOT store secrets in code or Dockerfiles** — use env vars, `.env`, or config-ui JSON files.
 7. **Do NOT replace deep merge with full overwrite** in config save logic.
+8. **Do NOT make the bot depend on Jenkins** beyond three interactions, all scoped to Telegram-triggered builds only: triggering builds (REST), checking their status (REST), and receiving their results (webhook callback). All bot-side state — build history, Drive file tracking, cleanup — is owned and persisted by the bot itself.
 
 ---
 

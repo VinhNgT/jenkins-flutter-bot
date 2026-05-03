@@ -23,6 +23,8 @@ The Jenkins pipeline runs on the flutter-agent. When it finishes:
 5. Jenkins POSTs to `tg-bot:9090/webhook/build-complete` (multipart form)
 6. Bot matches `request_id` to the pending build, uploads the APK to Google Drive
 7. Bot sends the Drive download link to the original Telegram chat
+8. Bot records the completed build in history (`data/build_history.json`)
+9. Bot enforces `max_recent_builds` — evicts oldest entries and deletes their Drive files if needed
 
 ---
 
@@ -99,6 +101,26 @@ The bot tracks builds it triggered using an in-memory dict with JSON persistence
 - `consume_pending()` is a pop — each `request_id` is consumed exactly once
 
 ---
+
+## Build History Tracking
+
+After a successful build upload and Telegram notification, the bot records a `CompletedBuild` entry:
+
+- Stored as `list[CompletedBuild]` in `BotContext`
+- Persisted to `data/build_history.json` for crash recovery
+- Each entry tracks: `drive_file_id`, `drive_link`, `filename`, `ref`, `completed_at`
+- Powers the `/recent` command (bot-scoped — only shows Telegram-triggered builds)
+
+---
+
+## Build History Cleanup
+
+When `max_recent_builds > 0`, the bot enforces a retention limit after each successful build:
+
+1. After `record_build()`, `enforce_history_limit()` is called
+2. If history exceeds the limit, oldest entries are evicted
+3. Drive files for evicted builds are deleted (best-effort via `DriveUploader.delete_file()`)
+4. Errors during deletion are logged but never propagated — user notification is never blocked
 
 ## BotManager Lifecycle
 

@@ -66,6 +66,7 @@ class Config:
 
     # Optional
     drive_folder_name: str = ""
+    max_recent_builds: int = 0
     config_ui_url: str = ""
 
     @classmethod
@@ -174,6 +175,13 @@ class Config:
                 "drive.folder_name",
                 "DRIVE_FOLDER_NAME",
                 default="",
+            ),
+            max_recent_builds=int(
+                get_value(
+                    "drive.max_recent_builds",
+                    "DRIVE_MAX_RECENT_BUILDS",
+                    default="0",
+                )
             ),
             config_ui_url=get_value(
                 "config_ui.url",

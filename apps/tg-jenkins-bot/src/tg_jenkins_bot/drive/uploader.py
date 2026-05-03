@@ -189,3 +189,13 @@ class DriveUploader:
         return await asyncio.to_thread(
             self._upload_file_sync, file_path, filename, creds, folder_id
         )
+
+    def _delete_file_sync(self, creds: Credentials, file_id: str) -> None:
+        """Delete a file from Google Drive (blocking)."""
+        service = self._get_drive_service(creds)
+        service.files().delete(fileId=file_id).execute()
+        logger.info("Deleted Drive file: %s", file_id)
+
+    async def delete_file(self, creds: Credentials, file_id: str) -> None:
+        """Delete a file from Google Drive."""
+        await asyncio.to_thread(self._delete_file_sync, creds, file_id)

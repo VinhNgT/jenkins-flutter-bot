@@ -1,4 +1,4 @@
-"""Google Drive integration — Desktop OAuth2 flow and file upload/management."""
+"""Google Drive integration — token loading and file upload/management."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build as build_service
 from googleapiclient.http import MediaFileUpload
 
@@ -20,12 +19,11 @@ TOKEN_PATH = Path("data/oauth.json")
 
 
 class DriveUploader:
-    """Handles Google OAuth2 (Desktop type) and Drive file operations.
+    """Handles Google Drive file operations using OAuth tokens from config-ui.
 
-    OAuth flow:
-    1. get_auth_url() — generates consent URL for the user
-    2. exchange_code() — exchanges the pasted auth code for tokens
-    3. Tokens are persisted to the configured token path and auto-refreshed
+    OAuth tokens are managed by config-ui and saved to a shared volume.
+    This class only reads and refreshes those tokens — it never initiates
+    the OAuth flow itself.
 
     All Drive API calls are offloaded to threads via asyncio.to_thread()
     to avoid blocking the event loop.
@@ -41,66 +39,6 @@ class DriveUploader:
         self._client_secret = client_secret
         self._token_path = token_path or TOKEN_PATH
         self._folder_id_cache: dict[str, str] = {}
-        self._pending_flow: InstalledAppFlow | None = None
-
-    def _client_config(self) -> dict:
-        """Build the Desktop (installed) OAuth client config."""
-        return {
-            "installed": {
-                "client_id": self._client_id,
-                "client_secret": self._client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": ["http://localhost"],
-            }
-        }
-
-    # ------------------------------------------------------------------
-    # OAuth flow (one-time setup coordinated by config-ui)
-    # ------------------------------------------------------------------
-
-    def get_auth_url(self) -> str:
-        """Generate the Google OAuth consent URL for Desktop flow."""
-        flow = InstalledAppFlow.from_client_config(
-            self._client_config(),
-            scopes=SCOPES,
-        )
-        flow.redirect_uri = "http://localhost"
-        auth_url, _ = flow.authorization_url(
-            access_type="offline",
-            prompt="consent",
-        )
-        # Keep the flow alive for exchange_code()
-        self._pending_flow = flow
-        return auth_url
-
-    def exchange_code(self, code: str) -> None:
-        """Exchange an authorization code for OAuth tokens and save them."""
-        flow = self._pending_flow
-        if flow is None:
-            raise RuntimeError(
-                "No pending OAuth flow — start authorization again from the config UI."
-            )
-        self._pending_flow = None
-
-        flow.fetch_token(code=code)
-        creds = flow.credentials
-
-        # Save tokens to disk
-        self._token_path.parent.mkdir(parents=True, exist_ok=True)
-        self._token_path.write_text(
-            json.dumps(
-                {
-                    "token": creds.token,
-                    "refresh_token": creds.refresh_token,
-                    "token_uri": creds.token_uri,
-                    "client_id": creds.client_id,
-                    "client_secret": creds.client_secret,
-                    "scopes": list(creds.scopes or []),
-                }
-            )
-        )
-        logger.info("OAuth tokens saved to %s", self._token_path)
 
     # ------------------------------------------------------------------
     # Token management

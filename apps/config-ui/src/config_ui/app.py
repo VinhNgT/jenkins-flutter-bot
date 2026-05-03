@@ -374,23 +374,6 @@ async def start_drive_connect(request: Request) -> dict[str, Any]:
     }
 
 
-@app.post("/api/drive/connect/exchange")
-async def finish_drive_connect(payload: dict[str, Any]) -> dict[str, Any]:
-    drive_oauth: DriveOAuthManager = app.state.drive_oauth
-    code = str(payload.get("code", "")).strip()
-    if not code:
-        raise HTTPException(
-            status_code=400,
-            detail="Authorization code is required.",
-        )
-
-    try:
-        drive_oauth.exchange_code(code)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return {"connected": True}
-
 
 @app.get("/api/services/status")
 async def get_service_status() -> dict[str, Any]:

@@ -1,4 +1,4 @@
-"""Google Drive OAuth helpers for config-ui."""
+"""Google Drive OAuth helpers for config-ui (browser-redirect flow)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +17,16 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
 class DriveOAuthManager:
-    """Own the config-ui side of the Google Drive OAuth flow."""
+    """Manage the Google Drive OAuth flow via browser redirect.
+
+    The flow is web-based: config-ui generates a consent URL, Google
+    redirects back to config-ui's callback URL after authorization,
+    and config-ui exchanges the response for tokens.
+    """
 
     def __init__(self, token_path: Path) -> None:
         self._token_path = token_path
-        self._pending_flow: InstalledAppFlow | None = None
+        self._pending_flow: Flow | None = None
 
     @property
     def token_path(self) -> Path:
@@ -38,7 +43,7 @@ class DriveOAuthManager:
         redirect_uri: str,
     ) -> dict[str, dict[str, Any]]:
         return {
-            "installed": {
+            "web": {
                 "client_id": client_id,
                 "client_secret": client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -52,8 +57,8 @@ class DriveOAuthManager:
         client_id: str,
         client_secret: str,
         redirect_uri: str,
-    ) -> InstalledAppFlow:
-        flow = InstalledAppFlow.from_client_config(
+    ) -> Flow:
+        flow = Flow.from_client_config(
             self._client_config(client_id, client_secret, redirect_uri),
             scopes=SCOPES,
         )
@@ -66,6 +71,7 @@ class DriveOAuthManager:
         client_secret: str,
         redirect_uri: str,
     ) -> str:
+        """Generate the OAuth consent URL and store the flow for callback."""
         flow = self._build_flow(client_id, client_secret, redirect_uri)
         auth_url, _ = flow.authorization_url(
             access_type="offline",
@@ -74,7 +80,7 @@ class DriveOAuthManager:
         self._pending_flow = flow
         return auth_url
 
-    def _consume_pending_flow(self) -> InstalledAppFlow:
+    def _consume_pending_flow(self) -> Flow:
         flow = self._pending_flow
         if flow is None:
             raise RuntimeError(
@@ -99,17 +105,14 @@ class DriveOAuthManager:
         )
         logger.info("Saved Drive OAuth tokens to %s", self._token_path)
 
-    def exchange_code(self, code: str) -> None:
-        flow = self._consume_pending_flow()
-        flow.fetch_token(code=code)
-        self._save_credentials(flow.credentials)
-
     def exchange_callback(self, authorization_response: str) -> None:
+        """Exchange the OAuth callback response for tokens and save them."""
         flow = self._consume_pending_flow()
         flow.fetch_token(authorization_response=authorization_response)
         self._save_credentials(flow.credentials)
 
     def load_tokens(self, client_id: str, client_secret: str) -> Credentials | None:
+        """Load saved OAuth tokens from disk, refreshing if needed."""
         if not self._token_path.exists():
             return None
 
@@ -136,6 +139,7 @@ class DriveOAuthManager:
         return creds if creds.valid else None
 
     def status(self, client_id: str, client_secret: str) -> dict[str, Any]:
+        """Return current OAuth connection status."""
         return {
             "connected": self.load_tokens(client_id, client_secret) is not None,
             "auth_pending": self.auth_pending,

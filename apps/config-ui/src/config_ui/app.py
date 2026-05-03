@@ -20,9 +20,9 @@ MASKED_VALUE = "********"
 BOT_SECRET_FIELDS = (
     "telegram.bot_token",
     "jenkins.api_token",
-    "drive.client_secret",
 )
 AGENT_SECRET_FIELDS = ("agent.secret",)
+UI_SECRET_FIELDS = ("drive.client_secret",)
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -93,16 +93,19 @@ class Settings:
     agent_control_url: str | None
     bot_config_path: Path | None
     agent_config_path: Path | None
+    ui_config_path: Path | None
 
     @classmethod
     def from_env(cls) -> Settings:
         bot_config_path = os.environ.get("BOT_CONFIG_PATH")
         agent_config_path = os.environ.get("AGENT_CONFIG_PATH")
+        ui_config_path = os.environ.get("UI_CONFIG_PATH")
         return cls(
             bot_control_url=os.environ.get("BOT_CONTROL_URL") or None,
             agent_control_url=os.environ.get("AGENT_CONTROL_URL") or None,
             bot_config_path=Path(bot_config_path) if bot_config_path else None,
             agent_config_path=Path(agent_config_path) if agent_config_path else None,
+            ui_config_path=Path(ui_config_path) if ui_config_path else None,
         )
 
 
@@ -174,10 +177,10 @@ def _write_json(path: Path | None, data: dict[str, Any]) -> None:
 
 
 def _drive_credentials(
-    bot_config: dict[str, Any],
+    ui_config: dict[str, Any],
 ) -> tuple[str | None, str | None]:
-    client_id = _nested_get(bot_config, "drive.client_id")
-    client_secret = _nested_get(bot_config, "drive.client_secret")
+    client_id = _nested_get(ui_config, "drive.client_id")
+    client_secret = _nested_get(ui_config, "drive.client_secret")
     return (
         str(client_id) if client_id not in (None, "") else None,
         str(client_secret) if client_secret not in (None, "") else None,
@@ -215,9 +218,11 @@ def _register_routes(app: FastAPI) -> None:
         settings: Settings = request.app.state.settings
         bot = _load_json(settings.bot_config_path)
         agent = _load_json(settings.agent_config_path)
+        ui = _load_json(settings.ui_config_path)
         return {
             "bot": _mask_secrets(bot, BOT_SECRET_FIELDS),
             "agent": _mask_secrets(agent, AGENT_SECRET_FIELDS),
+            "ui": _mask_secrets(ui, UI_SECRET_FIELDS),
         }
 
     @app.post("/api/config")
@@ -225,32 +230,43 @@ def _register_routes(app: FastAPI) -> None:
         settings: Settings = request.app.state.settings
         incoming_bot = payload.get("bot", {})
         incoming_agent = payload.get("agent", {})
+        incoming_ui = payload.get("ui", {})
 
-        if not isinstance(incoming_bot, dict) or not isinstance(incoming_agent, dict):
+        if (
+            not isinstance(incoming_bot, dict)
+            or not isinstance(incoming_agent, dict)
+            or not isinstance(incoming_ui, dict)
+        ):
             raise HTTPException(status_code=400, detail="Invalid config payload")
 
         existing_bot = _load_json(settings.bot_config_path)
         existing_agent = _load_json(settings.agent_config_path)
+        existing_ui = _load_json(settings.ui_config_path)
 
         merged_bot = _deep_merge(existing_bot, incoming_bot)
         merged_agent = _deep_merge(existing_agent, incoming_agent)
+        merged_ui = _deep_merge(existing_ui, incoming_ui)
         merged_bot = _restore_masked_secrets(
             merged_bot, incoming_bot, existing_bot, BOT_SECRET_FIELDS
         )
         merged_agent = _restore_masked_secrets(
             merged_agent, incoming_agent, existing_agent, AGENT_SECRET_FIELDS
         )
+        merged_ui = _restore_masked_secrets(
+            merged_ui, incoming_ui, existing_ui, UI_SECRET_FIELDS
+        )
 
         _write_json(settings.bot_config_path, merged_bot)
         _write_json(settings.agent_config_path, merged_agent)
+        _write_json(settings.ui_config_path, merged_ui)
         return {"saved": True}
 
     @app.get("/api/drive/status")
     async def get_drive_status(request: Request) -> dict[str, Any]:
         settings: Settings = request.app.state.settings
         drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
-        bot = _load_json(settings.bot_config_path)
-        client_id, client_secret = _drive_credentials(bot)
+        ui = _load_json(settings.ui_config_path)
+        client_id, client_secret = _drive_credentials(ui)
 
         if not client_id or not client_secret:
             return {
@@ -335,13 +351,13 @@ def _register_routes(app: FastAPI) -> None:
     async def start_drive_connect(request: Request) -> dict[str, Any]:
         settings: Settings = request.app.state.settings
         drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
-        bot = _load_json(settings.bot_config_path)
-        client_id, client_secret = _drive_credentials(bot)
+        ui = _load_json(settings.ui_config_path)
+        client_id, client_secret = _drive_credentials(ui)
 
         if not client_id or not client_secret:
             raise HTTPException(
                 status_code=400,
-                detail="Configure the bot Google Drive client ID and client secret first.",
+                detail="Configure the Drive client ID and client secret in Dashboard Config first.",
             )
 
         return {

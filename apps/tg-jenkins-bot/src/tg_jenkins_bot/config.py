@@ -55,9 +55,7 @@ class Config:
     jenkins_job_name: str
     jenkins_job_id: str
 
-    # Google Drive OAuth
-    google_client_id: str
-    google_client_secret: str
+    # Google Drive
     oauth_token_path: Path
 
     # Bot webhook (Jenkins calls this)
@@ -142,16 +140,6 @@ class Config:
                     default="flutter-build",
                 ),
             ),
-            google_client_id=get_value(
-                "drive.client_id",
-                "GOOGLE_CLIENT_ID",
-                required=True,
-            ),
-            google_client_secret=get_value(
-                "drive.client_secret",
-                "GOOGLE_CLIENT_SECRET",
-                required=True,
-            ),
             oauth_token_path=Path(
                 get_value(
                     "drive.oauth_token_path",
@@ -178,8 +166,8 @@ class Config:
             ),
             max_recent_builds=int(
                 get_value(
-                    "drive.max_recent_builds",
-                    "DRIVE_MAX_RECENT_BUILDS",
+                    "bot.max_recent_builds",
+                    "MAX_RECENT_BUILDS",
                     default="0",
                 )
             ),

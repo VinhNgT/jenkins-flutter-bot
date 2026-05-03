@@ -70,11 +70,7 @@ class BotManager:
                     api_token=config.jenkins_api_token,
                     job_name=config.jenkins_job_name,
                 )
-                drive = DriveUploader(
-                    client_id=config.google_client_id,
-                    client_secret=config.google_client_secret,
-                    token_path=config.oauth_token_path,
-                )
+                drive = DriveUploader(token_path=config.oauth_token_path)
 
                 placeholder_context = BotContext(
                     config=config,

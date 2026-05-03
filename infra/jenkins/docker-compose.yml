@@ -29,9 +29,11 @@ services:
       # so oauth.json lands at the same path in both containers.
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
+      UI_CONFIG_PATH: /config/ui/ui.json
     volumes:
       - bot-config:/config/bot
       - agent-config:/config/agent
+      - ui-config:/config/ui
     depends_on:
       - tg-bot
       - flutter-agent
@@ -82,6 +84,7 @@ volumes:
   jenkins-data:
   bot-config:
   agent-config:
+  ui-config:
   bot-data:
 
 networks:

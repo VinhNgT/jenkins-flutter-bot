@@ -29,14 +29,7 @@ class DriveUploader:
     to avoid blocking the event loop.
     """
 
-    def __init__(
-        self,
-        client_id: str,
-        client_secret: str,
-        token_path: Path,
-    ) -> None:
-        self._client_id = client_id
-        self._client_secret = client_secret
+    def __init__(self, token_path: Path) -> None:
         self._token_path = token_path
         self._folder_id_cache: dict[str, str] = {}
 
@@ -54,8 +47,8 @@ class DriveUploader:
             token=data.get("token"),
             refresh_token=data.get("refresh_token"),
             token_uri=data.get("token_uri", "https://oauth2.googleapis.com/token"),
-            client_id=data.get("client_id", self._client_id),
-            client_secret=data.get("client_secret", self._client_secret),
+            client_id=data.get("client_id"),
+            client_secret=data.get("client_secret"),
             scopes=data.get("scopes"),
         )
 

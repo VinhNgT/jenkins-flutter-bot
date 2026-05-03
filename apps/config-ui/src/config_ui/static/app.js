@@ -20,7 +20,7 @@ function nestedGet(target, dotted) {
 }
 
 function collectConfig() {
-  const payload = { bot: {}, agent: {} };
+  const payload = { bot: {}, agent: {}, ui: {} };
   document.querySelectorAll('input[name], select[name]').forEach((el) => {
     const [scope, dotted] = el.name.split(':');
     nestedSet(payload[scope], dotted, el.value);

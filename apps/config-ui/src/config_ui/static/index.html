@@ -68,14 +68,6 @@
               <input id="f-job-id" name="bot:jenkins.job_id" />
             </div>
             <div class="field">
-              <label for="f-drive-id">Drive client ID</label>
-              <input id="f-drive-id" name="bot:drive.client_id" />
-            </div>
-            <div class="field">
-              <label for="f-drive-secret">Drive client secret</label>
-              <input id="f-drive-secret" name="bot:drive.client_secret" />
-            </div>
-            <div class="field">
               <label for="f-drive-folder">Drive folder name</label>
               <input id="f-drive-folder" name="bot:drive.folder_name" />
             </div>
@@ -85,7 +77,7 @@
               >
               <input
                 id="f-max-builds"
-                name="bot:drive.max_recent_builds"
+                name="bot:bot.max_recent_builds"
                 type="number"
                 min="0"
               />
@@ -139,6 +131,26 @@
                 name="agent:agent.tunnel"
                 placeholder="host:port"
               />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <button
+            class="collapsible-toggle"
+            aria-expanded="true"
+            type="button"
+          >
+            Dashboard Config
+          </button>
+          <div class="collapsible-body">
+            <div class="field">
+              <label for="f-drive-id">Drive client ID</label>
+              <input id="f-drive-id" name="ui:drive.client_id" />
+            </div>
+            <div class="field">
+              <label for="f-drive-secret">Drive client secret</label>
+              <input id="f-drive-secret" name="ui:drive.client_secret" />
             </div>
           </div>
         </div>

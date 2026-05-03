@@ -24,14 +24,16 @@ A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram
 
 ## Getting Started
 
-### Full Stack (Recommended)
+📖 **See [docs/setup-guide.md](docs/setup-guide.md) for a complete step-by-step walkthrough** covering Jenkins setup, Telegram bot creation, Google Drive OAuth, and configuration.
+
+### Quick Start
 
 ```bash
 cd infra/jenkins
-docker compose up -d
+docker compose up -d --build
 ```
 
-This starts Jenkins, the Telegram bot, the config UI, and the Flutter build agent. Open the config UI at `http://localhost:9000` to configure the stack.
+This builds and starts all four services. Open the config UI at **http://localhost:9000** to configure the stack, then follow the [setup guide](docs/setup-guide.md) to complete Jenkins, Telegram, and Google Drive configuration.
 
 > **Note:** The `jenkins` service in docker-compose is a local development/testing convenience. In production, the stack can connect to an external Jenkins instance by pointing `JENKINS_URL` to it and removing the `jenkins` service from the compose file.
 

@@ -44,7 +44,8 @@ jenkins-flutter-bot/
 │   │   └── src/config_ui/
 │   │       ├── app.py              Config CRUD, service control, Drive OAuth
 │   │       ├── drive.py            DriveOAuthManager (browser-redirect flow)
-│   │       └── static/             Frontend assets (index.html)
+│   │       ├── static/             Frontend assets (index.html, style.css, app.js)
+│   │       └── templates/          Jinja2 templates (oauth_callback.html)
 │   │
 │   └── agent-control/              HTTP control wrapper for the Jenkins agent process
 │       ├── pyproject.toml

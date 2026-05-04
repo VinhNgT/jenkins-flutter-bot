@@ -32,7 +32,7 @@ The Jenkins pipeline runs on the flutter-agent. When it finishes:
 
 Jenkins POSTs to `/webhook/build-complete` with two multipart fields:
 
-- **`metadata`**: JSON string containing `request_id`, `job_id`, `status`, `commit_hash`, etc.
+- **`metadata`**: JSON string containing `request_id`, `job_id`, `status`, `commit_hash`, etc. Must be annotated with `Form()` in the FastAPI handler to correctly parse multipart form data.
 - **`artifact`** (optional): the built APK file, present only on success
 
 ### Security Model
@@ -88,6 +88,10 @@ The bot's `DriveUploader` only reads tokens — it calls `load_tokens()` to load
 ### `_pending_flow` Statefulness
 
 Config-ui stores the in-progress OAuth flow object in memory as `_pending_flow`. This object contains PKCE state that can't be serialized. If config-ui restarts between `start()` and `exchange_callback()`, the flow is lost and must be restarted from the dashboard. This is by design.
+
+### HTTP Development
+
+`DriveOAuthManager._allow_insecure_transport()` automatically sets `OAUTHLIB_INSECURE_TRANSPORT=1` when the redirect URI uses `http://`. No manual environment configuration is needed for local/Docker development.
 
 ---
 

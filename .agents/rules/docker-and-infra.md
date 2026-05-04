@@ -17,6 +17,7 @@ Triggered when editing Dockerfiles or docker-compose.yml. Covers volumes, networ
 | `jenkins-data` | Jenkins home directory | `jenkins` |
 | `bot-config` | Shared bot config + OAuth tokens | `config-ui`, `tg-bot` |
 | `agent-config` | Agent configuration JSON | `config-ui`, `flutter-agent` |
+| `ui-config` | UI configuration (Drive OAuth creds) | `config-ui` |
 | `bot-data` | Runtime data (pending builds) | `tg-bot` |
 
 ---
@@ -66,21 +67,14 @@ Key points:
 
 ### flutter-agent (Exception)
 
-The flutter-agent uses `jenkins/inbound-agent:jdk21` as its base image, which lacks Python 3.12. Instead of a separate builder stage, **uv is kept in the runtime image** and handles both Python installation and dependency resolution:
+The flutter-agent uses a **two-stage build**: Stage 1 (`sdk-builder`) downloads Android and Flutter SDKs; Stage 2 copies the pre-built SDKs into a clean runtime image with `COPY --chown` to avoid duplicating multi-GB layers.
 
-```dockerfile
-FROM jenkins/inbound-agent:jdk21
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+Key conventions:
 
-# agent-control installed via uv directly in the runtime
-WORKDIR /app
-COPY apps/agent-control/pyproject.toml apps/agent-control/uv.lock ./
-COPY apps/agent-control/src ./src
-RUN uv sync --frozen --no-dev --no-editable
-ENV PATH="/app/.venv/bin:$PATH"
-```
-
-This is an intentional exception — the image already contains ~2GB of Flutter and Android SDKs, so uv's overhead is negligible. The trade-off is worth it for consistent packaging across all apps.
+- **`COPY --chown`** instead of `RUN chown -R` — prevents massive intermediate layer duplication
+- **uv is kept in runtime** — the base image (`jenkins/inbound-agent:jdk21`) lacks Python 3.12, so uv manages both Python installation (`UV_PYTHON_INSTALL_DIR=/opt/uv-python`) and dependencies
+- **`platform: linux/amd64`** is set in docker-compose — Flutter does not support Android release builds on Linux ARM64; x86_64 emulation is required on Apple Silicon hosts
+- **Gradle memory tuning** via `GRADLE_OPTS` — daemon disabled, JVM heap capped, VFS watching disabled. See the Dockerfile comments for rationale.
 
 The flutter-agent's Docker Compose build context is the **repo root** (`../..` from `infra/jenkins/`) so the Dockerfile can access `apps/agent-control/`.
 
@@ -93,3 +87,4 @@ The `AgentManager` in agent-control wraps the Jenkins inbound agent as a child p
 - `start()` spawns `/usr/local/bin/jenkins-agent` via `subprocess.Popen`
 - `stop()` sends `SIGTERM`, waits 5 seconds, then `SIGKILL` if the process hasn't exited
 - `status()` uses `process.poll()` to check if the process is still running
+- `start()` passes a **filtered environment** to the subprocess — only `JENKINS_URL`, `JENKINS_AGENT_NAME`, `JENKINS_SECRET`, `JENKINS_WEB_SOCKET`, and `JENKINS_TUNNEL` are forwarded, preventing duplicate CLI arguments from the entrypoint script

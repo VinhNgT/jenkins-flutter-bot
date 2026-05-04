@@ -23,7 +23,9 @@ Both `Config.resolve()` (tg-bot) and `AgentConfig.resolve()` (agent-control) imp
 1. Check the JSON file at `CONFIG_PATH` for a dotted key (e.g., `"telegram.bot_token"`)
 2. Fall back to the corresponding env var (e.g., `TELEGRAM_BOT_TOKEN`)
 3. Fall back to `.env` file (loaded by `python-dotenv`)
-4. Use the hardcoded default, or raise `KeyError` if `required=True`
+4. Use the hardcoded default (typically `""`)
+
+Resolution is **infallible** — it always returns a value, never raises. Validation of required fields is the responsibility of the manager classes (`BotManager`, `AgentManager`), not the config layer.
 
 Do not bypass this chain. If you need a new config value, add it through `resolve()` with all four layers.
 
@@ -34,10 +36,11 @@ Do not bypass this chain. If you need a new config value, add it through `resolv
 | File | Volume | Mount Path | Written By | Read By |
 |------|--------|------------|------------|---------|
 | `bot.json` | `bot-config` | `/config/bot/` | config-ui | tg-bot, config-ui |
-| `agent.json` | `agent-config` | `/config/` | config-ui | agent-control, config-ui |
+| `agent.json` | `agent-config` | `/config/agent/` | config-ui | agent-control, config-ui |
+| `ui.json` | `ui-config` | `/config/ui/` | config-ui | config-ui |
 | `oauth.json` | `bot-config` | `/config/bot/` | config-ui (Drive OAuth) | tg-bot (DriveUploader) |
 
-Both `config-ui` and `tg-bot` mount `bot-config` at `/config/bot/`, so `oauth.json` is accessible from both containers at the same path.
+Both `config-ui` and `tg-bot` mount `bot-config` at `/config/bot/`, so `oauth.json` is accessible from both containers at the same path. Drive OAuth credentials (`client_id`, `client_secret`) live in `ui.json`, not `bot.json`.
 
 ---
 
@@ -45,8 +48,9 @@ Both `config-ui` and `tg-bot` mount `bot-config` at `/config/bot/`, so `oauth.js
 
 The config-ui masks sensitive fields before sending them to the browser:
 
-- **Bot secrets**: `telegram.bot_token`, `jenkins.api_token`, `drive.client_secret`
+- **Bot secrets**: `telegram.bot_token`, `jenkins.api_token`
 - **Agent secrets**: `agent.secret`
+- **UI secrets**: `drive.client_secret`
 
 The mask value is the literal string `"********"`. When saving, `_restore_masked_secrets()` checks: if the incoming value for a secret field equals `"********"`, the existing value is preserved. This prevents the mask from overwriting real secrets.
 
@@ -67,8 +71,9 @@ The config-ui `index.html` uses a naming convention for form inputs:
 ```html
 <input name="bot:telegram.bot_token" />
 <input name="agent:agent.secret" />
+<input name="ui:drive.client_id" />
 ```
 
-Format: `scope:dotted.key` where `scope` is `bot` or `agent`.
+Format: `scope:dotted.key` where `scope` is `bot`, `agent`, or `ui`.
 
 The `collectConfig()` JavaScript function splits on `:` to determine which config section the field belongs to, then uses `nestedSet()` to build the nested JSON payload. When adding new config fields to the UI, follow this same `scope:dotted.key` pattern on the input's `name` attribute.

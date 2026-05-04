@@ -85,7 +85,6 @@ class Config:
             env_key: str,
             *,
             default: str = "",
-            required: bool = False,
         ) -> str:
             file_value = _nested_get(file_data, file_key)
             if file_value not in (None, ""):
@@ -94,9 +93,6 @@ class Config:
             env_value = os.environ.get(env_key)
             if env_value not in (None, ""):
                 return env_value
-
-            if required and default == "":
-                raise KeyError(env_key)
 
             return default
 
@@ -108,23 +104,19 @@ class Config:
             telegram_token=get_value(
                 "telegram.bot_token",
                 "TELEGRAM_BOT_TOKEN",
-                required=True,
             ),
             allowed_chat_ids=_parse_allowed_chat_ids(allowed_chat_ids),
             jenkins_url=get_value(
                 "jenkins.url",
                 "JENKINS_URL",
-                required=True,
             ),
             jenkins_user=get_value(
                 "jenkins.user",
                 "JENKINS_USER",
-                required=True,
             ),
             jenkins_api_token=get_value(
                 "jenkins.api_token",
                 "JENKINS_API_TOKEN",
-                required=True,
             ),
             jenkins_job_name=get_value(
                 "jenkins.job_name",

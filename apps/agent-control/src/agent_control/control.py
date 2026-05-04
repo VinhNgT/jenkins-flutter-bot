@@ -30,6 +30,9 @@ class AgentManager:
         if self.running:
             return
 
+        if not config.secret:
+            raise ValueError("Missing required configuration: JENKINS_SECRET")
+
         command = [
             "/usr/local/bin/jenkins-agent",
             "-url",
@@ -92,13 +95,11 @@ def _get_manager(request: Request) -> AgentManager:
 async def start_agent(request: Request) -> dict[str, Any]:
     """Start the Jenkins agent if it is not already running."""
     manager = _get_manager(request)
-
+    config = AgentConfig.resolve()
     try:
-        config = AgentConfig.resolve()
+        manager.start(config)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    manager.start(config)
     return manager.status()
 
 
@@ -114,14 +115,12 @@ async def stop_agent(request: Request) -> dict[str, Any]:
 async def restart_agent(request: Request) -> dict[str, Any]:
     """Restart the Jenkins agent using the current resolved config."""
     manager = _get_manager(request)
-
+    config = AgentConfig.resolve()
     try:
-        config = AgentConfig.resolve()
+        manager.stop()
+        manager.start(config)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    manager.stop()
-    manager.start(config)
     return manager.status()
 
 

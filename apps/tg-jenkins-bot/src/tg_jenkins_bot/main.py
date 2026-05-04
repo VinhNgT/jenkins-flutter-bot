@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -22,21 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_listen_port() -> int:
-    """Pick the HTTP listen port without requiring a fully valid config."""
-    raw_port = os.environ.get("BOT_WEBHOOK_PORT", "9090")
-    try:
-        return int(raw_port)
-    except ValueError:
-        return 9090
+    """Resolve listen port through the full config precedence chain."""
+    return Config.resolve().bot_webhook_port
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage bot lifecycle on startup/shutdown."""
+    config = Config.resolve()
     try:
-        config = Config.resolve()
         await app.state.manager.start(config)
-    except Exception as exc:
+    except Exception:
         logger.exception("Bot not auto-started")
 
     yield

@@ -49,7 +49,6 @@ class AgentConfig:
             env_key: str,
             *,
             default: str = "",
-            required: bool = False,
         ) -> str:
             file_value = _nested_get(file_data, file_key)
             if file_value not in (None, ""):
@@ -58,9 +57,6 @@ class AgentConfig:
             env_value = os.environ.get(env_key)
             if env_value not in (None, ""):
                 return env_value
-
-            if required and default == "":
-                raise KeyError(env_key)
 
             return default
 
@@ -84,7 +80,6 @@ class AgentConfig:
             secret=get_value(
                 "agent.secret",
                 "JENKINS_SECRET",
-                required=True,
             ),
             web_socket=web_socket_raw.lower() not in {"0", "false", "no"},
             tunnel=get_value(

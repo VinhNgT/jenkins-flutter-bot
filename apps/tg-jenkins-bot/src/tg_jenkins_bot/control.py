@@ -63,6 +63,20 @@ class BotManager:
             if self.running:
                 return
 
+            missing = []
+            if not config.telegram_token:
+                missing.append("TELEGRAM_BOT_TOKEN")
+            if not config.jenkins_url:
+                missing.append("JENKINS_URL")
+            if not config.jenkins_user:
+                missing.append("JENKINS_USER")
+            if not config.jenkins_api_token:
+                missing.append("JENKINS_API_TOKEN")
+            if missing:
+                raise ValueError(
+                    f"Missing required configuration: {', '.join(missing)}"
+                )
+
             try:
                 jenkins = JenkinsClient(
                     url=config.jenkins_url,
@@ -155,13 +169,11 @@ def _get_manager(request: Request) -> BotManager:
 async def start_bot(request: Request) -> dict[str, Any]:
     """Start the Telegram bot if it is not already running."""
     manager = _get_manager(request)
-
+    config = Config.resolve()
     try:
-        config = Config.resolve()
+        await manager.start(config)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    await manager.start(config)
     return manager.status()
 
 
@@ -177,13 +189,11 @@ async def stop_bot(request: Request) -> dict[str, Any]:
 async def restart_bot(request: Request) -> dict[str, Any]:
     """Restart the Telegram bot using the current resolved config."""
     manager = _get_manager(request)
-
+    config = Config.resolve()
     try:
-        config = Config.resolve()
+        await manager.restart(config)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    await manager.restart(config)
     return manager.status()
 
 

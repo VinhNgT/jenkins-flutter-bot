@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 if TYPE_CHECKING:
     from ..bot.context import BotContext
@@ -34,7 +34,7 @@ async def handle_health(request: Request) -> dict[str, str]:
 @webhook_router.post("/webhook/build-complete")
 async def handle_build_complete(
     request: Request,
-    metadata: str,
+    metadata: str = Form(),
     artifact: UploadFile | None = File(default=None),
 ) -> dict[str, str]:
     """Handle Jenkins build completion callback.

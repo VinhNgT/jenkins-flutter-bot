@@ -238,6 +238,9 @@ The bot triggers Jenkins builds but does **not** manage the pipeline definition.
 3. Paste the pipeline script below and customize `url` and `credentialsId`
 4. The bot passes `BRANCH`, `BOT_CALLBACK_URL`, `BOT_REQUEST_ID`, and `BOT_JOB_ID` as build parameters — Jenkins handles everything else
 
+> [!IMPORTANT]
+> **Private repositories** require a Personal Access Token (PAT) stored as a Jenkins credential. Create a "Username with password" credential in **Manage Jenkins → Credentials** — use your Git hosting username and the PAT as the password. Note the credential **ID** (e.g., `gitlab-credentials`) for use in the `credentialsId` field below. See the [setup guide](../../docs/setup-guide.md#3d-add-repository-credentials-private-repos) for step-by-step instructions.
+
 <details>
 <summary>Reference pipeline script</summary>
 
@@ -363,6 +366,13 @@ apps/tg-jenkins-bot/
 
 - Ensure `JENKINS_URL`, `JENKINS_USER`, and `JENKINS_API_TOKEN` are correct.
 - Ensure the user has permissions to trigger `JENKINS_JOB_NAME`.
+
+### Build fails at checkout (authentication error)
+
+- Private repositories require a PAT stored as a Jenkins credential.
+- Verify the `credentialsId` in your Jenkinsfile matches the credential ID stored in Jenkins.
+- Check if the PAT has expired — generate a new one and update the credential in **Manage Jenkins → Credentials**.
+- Ensure the PAT has the correct scope (`read_repository` for GitLab, `Contents: Read-only` for GitHub).
 
 ### Drive OAuth flow fails
 

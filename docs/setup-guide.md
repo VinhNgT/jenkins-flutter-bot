@@ -13,7 +13,8 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
   - [3a. Initial Jenkins Setup](#3a-initial-jenkins-setup)
   - [3b. Create the Flutter Agent Node](#3b-create-the-flutter-agent-node)
   - [3c. Connect the Agent Secret](#3c-connect-the-agent-secret)
-  - [3d. Create the Pipeline Job](#3d-create-the-pipeline-job)
+  - [3d. Add Repository Credentials (Private Repos)](#3d-add-repository-credentials-private-repos)
+  - [3e. Create the Pipeline Job](#3e-create-the-pipeline-job)
 - [Step 4 — Create a Telegram Bot](#step-4--create-a-telegram-bot)
 - [Step 5 — Set Up Google Drive OAuth](#step-5--set-up-google-drive-oauth)
   - [5a. Create Google Cloud Credentials](#5a-create-google-cloud-credentials)
@@ -101,7 +102,43 @@ After saving the node, Jenkins will show the agent's **secret token**. You need 
 1. On the node status page, find the secret token (shown in the agent launch command, after `-secret`)
 2. Copy the secret — you'll enter it in the config-ui in [Step 6](#step-6--configure-the-stack-via-config-ui)
 
-### 3d. Create the Pipeline Job
+### 3d. Add Repository Credentials (Private Repos)
+
+If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbucket, etc.), Jenkins needs a Personal Access Token (PAT) to clone it. Public repositories can skip this step.
+
+#### Create a PAT on your Git hosting platform
+
+**GitLab:**
+1. Go to **User Settings → Access Tokens** (or **Project → Settings → Access Tokens** for project-scoped tokens)
+2. Create a token with the **`read_repository`** scope
+3. Set an expiration date and click **Create personal access token**
+4. Copy the token immediately — it won't be shown again
+
+**GitHub:**
+1. Go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+2. Create a token with **Contents: Read-only** permission for your repository
+3. Copy the token immediately
+
+#### Store the PAT in Jenkins
+
+1. Go to **Manage Jenkins → Credentials**
+2. Select the appropriate credential scope (e.g., **(global)** under **System**)
+3. Click **Add Credentials**
+4. Fill in:
+   - **Kind:** Username with password
+   - **Username:** your Git hosting username (or any non-empty string for GitLab PATs)
+   - **Password:** paste your PAT here
+   - **ID:** `gitlab-credentials` (or any ID you'll reference in your pipeline)
+   - **Description:** e.g., "GitLab PAT for flutter-app"
+5. Click **Create**
+
+> [!TIP]
+> For GitLab PATs, the username field can be any non-empty string (e.g., `gitlab-ci-token`) — GitLab authenticates using only the token itself. For GitHub PATs, use your GitHub username.
+
+> [!IMPORTANT]
+> PATs expire. When a token expires, Jenkins builds will fail at the checkout stage. Set a calendar reminder to rotate the token before expiration and update the Jenkins credential.
+
+### 3e. Create the Pipeline Job
 
 1. From the Jenkins dashboard, click **New Item**
 2. Enter the name: **`flutter-build`** (this is the default `JENKINS_JOB_NAME`)
@@ -117,6 +154,8 @@ After saving the node, Jenkins will show the agent's **secret token**. You need 
 
 5. Under **Pipeline**, paste a Jenkinsfile script. Here's a reference template:
 
+   **For private repositories** (using the credential from [Step 3d](#3d-add-repository-credentials-private-repos)):
+
    ```groovy
    pipeline {
        agent { label 'flutter' }
@@ -129,10 +168,15 @@ After saving the node, Jenkins will show the agent's **secret token**. You need 
        }
 
        stages {
-           stage('Clone') {
+           stage('Checkout') {
                steps {
-                   git branch: "${params.BRANCH}",
-                       url: 'https://github.com/YOUR_USER/YOUR_FLUTTER_PROJECT.git'
+                   checkout([$class: 'GitSCM',
+                       branches: [[name: "*/${params.BRANCH}"]],
+                       userRemoteConfigs: [[
+                           url: 'https://gitlab.com/your-org/your-flutter-app.git',
+                           credentialsId: 'gitlab-credentials'
+                       ]]
+                   ])
                }
            }
 
@@ -179,7 +223,19 @@ After saving the node, Jenkins will show the agent's **secret token**. You need 
    }
    ```
 
-   > **Adapt this pipeline** to your specific Flutter project. The key contract is the `post` block — it must POST a multipart form to `BOT_CALLBACK_URL` with a `metadata` JSON field (and an `artifact` file on success).
+   **For public repositories** (no credentials needed):
+
+   ```groovy
+   // Replace the Checkout stage above with:
+   stage('Clone') {
+       steps {
+           git branch: "${params.BRANCH}",
+               url: 'https://github.com/YOUR_USER/YOUR_FLUTTER_PROJECT.git'
+       }
+   }
+   ```
+
+   > **Adapt this pipeline** to your specific Flutter project. The key contract is the `post` block — it must POST a multipart form to `BOT_CALLBACK_URL` with a `metadata` JSON field (and an `artifact` file on success). Replace the `url` and `credentialsId` with your own values.
 
 6. Click **Save**
 
@@ -344,6 +400,13 @@ docker compose logs config-ui
 - Verify Jenkins username and API token in config-ui
 - Ensure the API token hasn't expired — generate a new one if needed
 - Check that the Jenkins job name matches (`flutter-build` by default)
+
+### Build fails at checkout ("authentication required" or 403)
+
+- This means Jenkins can't clone the repository — usually a missing or expired PAT
+- Verify the credential ID in your Jenkinsfile matches the one stored in Jenkins (e.g., `gitlab-credentials`)
+- Check if the PAT has expired — generate a new one and update the credential in **Manage Jenkins → Credentials**
+- Ensure the PAT has the correct scope (`read_repository` for GitLab, `Contents: Read-only` for GitHub)
 
 ### Build succeeds but no Telegram notification
 

@@ -38,6 +38,9 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 
 > **First-time build warning:** The `flutter-agent` image downloads Flutter SDK, Android SDK, and pre-caches artifacts during build. Expect the **first `docker compose build`** to take **15–30 minutes** depending on your internet speed. Subsequent builds use Docker layer caching.
 
+> [!WARNING]
+> **Apple Silicon (ARM64) users:** Flutter does not support building Android release APKs on Linux ARM64 hosts ([flutter#177936](https://github.com/flutter/flutter/issues/177936)). The `flutter-agent` service in `docker-compose.yml` is set to `platform: linux/amd64` to force x86_64 emulation. Builds will be slower under emulation — for production CI/CD, use a native x86_64 server.
+
 ---
 
 ## Step 1 — Clone the Repository
@@ -209,8 +212,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
                script {
                    if (params.BOT_CALLBACK_URL) {
                        def commitHash = sh(script: 'git rev-parse HEAD || echo unknown', returnStdout: true).trim()
-                       def logs = currentBuild.rawBuild.getLog(50).join('\\n')
-                       def metadata = """{"request_id":"${params.BOT_REQUEST_ID}","job_id":"${params.BOT_JOB_ID}","status":"failure","commit_hash":"${commitHash}","logs":"${logs}"}"""
+                       def metadata = """{"request_id":"${params.BOT_REQUEST_ID}","job_id":"${params.BOT_JOB_ID}","status":"failure","commit_hash":"${commitHash}"}"""
 
                        sh """
                            curl -X POST "${params.BOT_CALLBACK_URL}" \

@@ -63,6 +63,7 @@ services:
       - jenkins
 
   flutter-agent:
+    platform: linux/amd64
     build:
       context: ../..
       dockerfile: infra/jenkins/Dockerfile.flutter-agent

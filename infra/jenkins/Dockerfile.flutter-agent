@@ -69,10 +69,15 @@ ENV PATH="${FLUTTER_HOME}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID
 
 # Reduce Gradle memory pressure — critical for x86_64 emulation on ARM64:
 #   - Disable daemon: CI builds don't benefit from a persistent daemon process
-#   - Cap JVM heap: prevent unbounded memory growth during compilation
-#   - Kotlin in-process: avoid spawning a separate Kotlin daemon JVM
-ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g -Dkotlin.daemon.jvm.options=-Xmx1g -Dorg.gradle.vfs.watch=false"
+#   - -Xmx4g: with daemon=false, the client JVM IS the build JVM, so set heap directly
+#   - Disable VFS watching: inotify breaks under emulation (NativeException: error = 4)
+ENV GRADLE_OPTS="-Xmx4g -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false"
 ENV GRADLE_USER_HOME=/home/jenkins/.gradle
+
+# Force Kotlin compiler to run in-process instead of spawning a separate daemon.
+# The Kotlin daemon crashes on startup under x86_64 emulation (exit code 0).
+RUN mkdir -p ${GRADLE_USER_HOME} \
+    && echo "kotlin.compiler.execution.strategy=in-process" > ${GRADLE_USER_HOME}/gradle.properties
 
 # Agent control API — uv manages Python since the base image lacks it.
 # Install into /opt/uv-python (not /root/.local) so the jenkins runtime
@@ -85,7 +90,7 @@ COPY apps/agent-control/src ./src
 RUN uv sync --frozen --no-dev --no-editable --python 3.12
 ENV PATH="/app/.venv/bin:${PATH}"
 
-RUN chown -R jenkins:jenkins /app /opt/uv-python
+RUN chown -R jenkins:jenkins /app /opt/uv-python /home/jenkins/.gradle
 
 USER jenkins
 

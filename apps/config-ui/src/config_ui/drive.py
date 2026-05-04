@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -52,12 +53,25 @@ class DriveOAuthManager:
             }
         }
 
+    @staticmethod
+    def _allow_insecure_transport(redirect_uri: str) -> None:
+        """Allow OAuth over plain HTTP when the redirect target isn't HTTPS.
+
+        oauthlib rejects non-HTTPS redirect URIs by default. In local /
+        Docker development the config-ui callback is typically
+        ``http://localhost:9000/…``, so we need to opt out of that check.
+        The flag is only set when the URI is actually non-HTTPS.
+        """
+        if redirect_uri.startswith("http://"):
+            os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
     def _build_flow(
         self,
         client_id: str,
         client_secret: str,
         redirect_uri: str,
     ) -> Flow:
+        self._allow_insecure_transport(redirect_uri)
         flow = Flow.from_client_config(
             self._client_config(client_id, client_secret, redirect_uri),
             scopes=SCOPES,

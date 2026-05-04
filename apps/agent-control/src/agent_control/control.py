@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from typing import Any
 
@@ -11,6 +12,19 @@ from fastapi import APIRouter, HTTPException, Request
 from .config import AgentConfig
 
 logger = logging.getLogger(__name__)
+
+# The jenkins-agent entrypoint script reads these env vars and converts them
+# to CLI flags automatically. Since AgentManager passes all values as explicit
+# CLI arguments, we must strip these from the subprocess environment to avoid
+# duplicate flags (e.g. two -url values, which breaks WebSocket mode).
+_JENKINS_AGENT_ENV_VARS = {
+    "JENKINS_URL",
+    "JENKINS_SECRET",
+    "JENKINS_AGENT_NAME",
+    "JENKINS_TUNNEL",
+    "JENKINS_WEB_SOCKET",
+    "JENKINS_NAME",
+}
 
 
 class AgentManager:
@@ -47,9 +61,15 @@ class AgentManager:
         if config.tunnel:
             command.extend(["-tunnel", config.tunnel])
 
+        # Build a clean env so the jenkins-agent script doesn't duplicate our
+        # explicit CLI flags from its own env-var handling.
+        clean_env = {
+            k: v for k, v in os.environ.items() if k not in _JENKINS_AGENT_ENV_VARS
+        }
+
         logger.info("Starting Jenkins agent: %s", command)
         try:
-            self._process = subprocess.Popen(command, text=True)
+            self._process = subprocess.Popen(command, text=True, env=clean_env)
             self._config = config
             self._last_error = None
         except Exception as exc:

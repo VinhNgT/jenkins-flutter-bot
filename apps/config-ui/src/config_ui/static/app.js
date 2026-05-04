@@ -127,6 +127,9 @@ async function saveConfig() {
     body: JSON.stringify(collectConfig()),
   });
   const result = await res.json();
+  if (!res.ok) {
+    alert(result.detail || 'Failed to save configuration');
+  }
   setLog(result);
   await refreshAll();
 }
@@ -136,6 +139,9 @@ async function control(service, action) {
     method: 'POST',
   });
   const result = await res.json();
+  if (!res.ok) {
+    alert(result.detail || `Failed to ${action} ${service}`);
+  }
   setLog(result);
   await refreshAll();
 }
@@ -144,6 +150,7 @@ async function startDriveSetup() {
   const res = await fetch('/api/drive/connect/start', { method: 'POST' });
   const result = await res.json();
   if (!res.ok) {
+    alert(result.detail || 'Failed to start Drive connection');
     setLog(result);
     return;
   }

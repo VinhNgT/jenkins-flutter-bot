@@ -301,36 +301,20 @@ input:focus, select:focus {
 }
 
 /* === Secret fields === */
-.field--secret .secret-display {
+.field--secret .secret-row {
   display: flex;
+  gap: 6px;
   align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  min-height: 34px;
 }
 
-.field--secret .secret-placeholder {
+.field--secret .secret-row input {
   flex: 1;
-  color: var(--ink-tertiary);
-  font-size: 13px;
-  letter-spacing: 2px;
-  user-select: none;
 }
 
-.field--secret .secret-edit {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
+.field--secret .secret-row input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
-
-.field--secret .secret-edit input { flex: 1; }
-
-.field--secret[data-not-set] .secret-display { display: none; }
-.field--secret[data-not-set] .secret-edit { display: flex; }
-.field--secret[data-not-set] .secret-edit [data-action="cancel-secret"] { display: none; }
 
 /* === Buttons === */
 .btn {

@@ -64,13 +64,10 @@
               <div class="field field--secret" data-secret-key="telegram.bot_token">
                 <label>Bot Token</label>
                 <p class="field-desc">Authentication token for the Telegram bot</p>
-                <div class="secret-display">
-                  <span class="secret-placeholder">••••••••</span>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                </div>
-                <div class="secret-edit" hidden>
+                <div class="secret-row">
                   <input id="f-bot-token" type="password" name="bot:telegram.bot_token" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret">Cancel</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
                 </div>
               </div>
               <div class="field">
@@ -97,13 +94,10 @@
               <div class="field field--secret" data-secret-key="jenkins.api_token">
                 <label>Jenkins API Token</label>
                 <p class="field-desc">Token for triggering pipeline builds</p>
-                <div class="secret-display">
-                  <span class="secret-placeholder">••••••••</span>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                </div>
-                <div class="secret-edit" hidden>
+                <div class="secret-row">
                   <input id="f-jenkins-token" type="password" name="bot:jenkins.api_token" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret">Cancel</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
                 </div>
               </div>
               <div class="field">
@@ -169,13 +163,10 @@
               <div class="field field--secret" data-secret-key="agent.secret">
                 <label>Agent Secret</label>
                 <p class="field-desc">Authentication secret from the Jenkins node</p>
-                <div class="secret-display">
-                  <span class="secret-placeholder">••••••••</span>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                </div>
-                <div class="secret-edit" hidden>
+                <div class="secret-row">
                   <input id="f-agent-secret" type="password" name="agent:agent.secret" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret">Cancel</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
                 </div>
               </div>
               <div class="field">
@@ -213,13 +204,10 @@
               <div class="field field--secret" data-secret-key="drive.client_secret">
                 <label>Drive Client Secret</label>
                 <p class="field-desc">OAuth 2.0 client secret</p>
-                <div class="secret-display">
-                  <span class="secret-placeholder">••••••••</span>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                </div>
-                <div class="secret-edit" hidden>
+                <div class="secret-row">
                   <input id="f-drive-secret" type="password" name="ui:drive.client_secret" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret">Cancel</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
+                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
                 </div>
               </div>
             </div>

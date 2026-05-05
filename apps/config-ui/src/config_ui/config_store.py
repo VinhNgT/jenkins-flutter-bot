@@ -162,17 +162,24 @@ def strip_secrets(
 
 def secrets_set(
     data: dict[str, Any], secret_fields: tuple[str, ...]
-) -> dict[str, bool]:
-    """Return ``{dotted_key: bool}`` indicating which secrets have values.
+) -> dict[str, int | bool]:
+    """Return ``{dotted_key: int | False}`` for each secret field.
+
+    When a secret has a value, returns its character length so the UI can
+    render the correct number of mask dots.  Returns ``False`` when unset.
 
     Example::
 
-        {"telegram.bot_token": True, "jenkins.api_token": False}
+        {"telegram.bot_token": 46, "jenkins.api_token": False}
     """
-    return {
-        field: nested_get(data, field) not in (None, "")
-        for field in secret_fields
-    }
+    result: dict[str, int | bool] = {}
+    for field in secret_fields:
+        value = nested_get(data, field)
+        if value not in (None, ""):
+            result[field] = len(str(value))
+        else:
+            result[field] = False
+    return result
 
 
 def clean_secrets_from_payload(

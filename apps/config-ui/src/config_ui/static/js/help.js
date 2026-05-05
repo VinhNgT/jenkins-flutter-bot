@@ -128,9 +128,9 @@ function initHelpButtons() {
     if (!activePopover) return;
     if (e.target.closest('.field-help-popover')) return;
     if (e.target.closest('.help-btn')) return;
-    // Keep open if clicking the input or select within the owning field.
+    // Keep open if clicking interactive elements within the owning field.
     const ownerField = activePopover.closest('.field');
-    if (ownerField && (e.target.closest('input') || e.target.closest('select')) && ownerField.contains(e.target)) return;
+    if (ownerField && ownerField.contains(e.target) && e.target.closest('input, select, button, .secret-row')) return;
     closeActivePopover();
   });
 }

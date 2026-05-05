@@ -20,8 +20,8 @@ function nestedGet(target, dottedKey) {
 }
 
 /**
- * Collect form data for a single scope. Secret fields are only included
- * if the user explicitly clicked "Change" (marked by data-changed).
+ * Collect form data for a single scope. Disabled secret inputs (stored,
+ * unchanged) are skipped so existing values are preserved on the backend.
  * @param {string} scope - 'bot', 'agent', or 'ui'
  * @returns {Object}
  */
@@ -29,9 +29,8 @@ function nestedGet(target, dottedKey) {
 function collectScope(scope) {
   const data = {};
   document.querySelectorAll(`[data-scope="${scope}"] input[name], [data-scope="${scope}"] select[name]`).forEach((el) => {
-    // Skip secret fields that weren't explicitly edited
-    const secretField = el.closest('.field--secret');
-    if (secretField && !secretField.hasAttribute('data-changed')) return;
+    // Skip secret fields whose value is stored and unchanged (disabled)
+    if (el.closest('.field--secret') && el.disabled) return;
 
     const dottedKey = el.name.split(':')[1];
     if (dottedKey) {
@@ -56,19 +55,21 @@ function populateScope(scope, data, secretsSet, defaults) {
 
     const secretField = el.closest('.field--secret');
     if (secretField) {
-      // Reset secret field state
-      secretField.removeAttribute('data-changed');
-      const isSet = secretsSet && secretsSet[dottedKey];
-      if (isSet) {
-        secretField.removeAttribute('data-not-set');
-        secretField.querySelector('.secret-display').hidden = false;
-        secretField.querySelector('.secret-edit').hidden = true;
-      } else {
-        secretField.setAttribute('data-not-set', '');
-        secretField.querySelector('.secret-display').hidden = true;
-        secretField.querySelector('.secret-edit').hidden = false;
-      }
+      const secretLen = secretsSet && secretsSet[dottedKey];
+      const changeBtn = secretField.querySelector('[data-action="change-secret"]');
+      const cancelBtn = secretField.querySelector('[data-action="cancel-secret"]');
       el.value = '';
+      if (secretLen) {
+        el.disabled = true;
+        el.placeholder = '\u2022'.repeat(secretLen);
+        if (changeBtn) { changeBtn.textContent = 'Change'; changeBtn.hidden = false; }
+        if (cancelBtn) cancelBtn.hidden = true;
+      } else {
+        el.disabled = true;
+        el.placeholder = '';
+        if (changeBtn) { changeBtn.textContent = 'Set'; changeBtn.hidden = false; }
+        if (cancelBtn) cancelBtn.hidden = true;
+      }
     } else {
       const value = nestedGet(data || {}, dottedKey);
       const strValue = value !== null && value !== undefined ? String(value) : '';
@@ -125,8 +126,8 @@ function markRequired(scope, requiredKeys) {
 
 /**
  * Validate that all required fields for a scope have values.
- * For secret fields, a field counts as valid if it already has a stored
- * value (data-not-set is absent) even if the user hasn't typed a new one.
+ * For secret fields, a disabled input means the value is stored on the
+ * backend (valid).  An enabled input must contain a non-empty value.
  * @param {string} scope
  * @returns {{ valid: boolean, missing: string[] }}
  */
@@ -137,12 +138,10 @@ function validateScope(scope) {
     const input = field.querySelector('input[name], select[name]');
     if (!input) return;
 
-    const secretField = field.closest('.field--secret');
-    if (secretField) {
-      // Secret is valid if it's already stored OR the user entered a new value
-      const alreadySet = !secretField.hasAttribute('data-not-set');
-      const hasNewValue = secretField.hasAttribute('data-changed') && input.value.trim() !== '';
-      if (!alreadySet && !hasNewValue) {
+    if (input.closest('.field--secret')) {
+      // Disabled with a placeholder means the value is stored on the backend
+      const isStored = input.disabled && input.placeholder;
+      if (!isStored && !input.value.trim()) {
         missing.push(field.querySelector('label')?.textContent?.replace(' *', '') || input.name);
       }
     } else {
@@ -183,19 +182,24 @@ function initSecretFields() {
     const field = btn.closest('.field--secret');
     if (!field) return;
 
-    const action = btn.dataset.action;
-    if (action === 'change-secret') {
-      field.querySelector('.secret-display').hidden = true;
-      field.querySelector('.secret-edit').hidden = false;
-      field.setAttribute('data-changed', '');
-      const input = field.querySelector('.secret-edit input');
-      if (input) input.focus();
-    } else if (action === 'cancel-secret') {
-      field.querySelector('.secret-display').hidden = false;
-      field.querySelector('.secret-edit').hidden = true;
-      field.removeAttribute('data-changed');
-      const input = field.querySelector('.secret-edit input');
-      if (input) input.value = '';
+    const input = field.querySelector('input[name]');
+    const changeBtn = field.querySelector('[data-action="change-secret"]');
+    const cancelBtn = field.querySelector('[data-action="cancel-secret"]');
+
+    if (btn.dataset.action === 'change-secret') {
+      field.dataset.prevPlaceholder = input.placeholder;
+      input.disabled = false;
+      input.value = '';
+      input.placeholder = '';
+      input.focus();
+      if (changeBtn) changeBtn.hidden = true;
+      if (cancelBtn) cancelBtn.hidden = false;
+    } else if (btn.dataset.action === 'cancel-secret') {
+      input.disabled = true;
+      input.value = '';
+      input.placeholder = 'prevPlaceholder' in field.dataset ? field.dataset.prevPlaceholder : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+      if (changeBtn) changeBtn.hidden = false;
+      if (cancelBtn) cancelBtn.hidden = true;
     }
   });
 }

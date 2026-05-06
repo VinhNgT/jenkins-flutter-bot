@@ -45,7 +45,6 @@ async def get_drive_status(request: Request) -> dict[str, Any]:
         return {
             "configured": False,
             "connected": False,
-            "auth_pending": drive_oauth.auth_pending,
             "token_path": str(drive_oauth.token_path),
         }
 

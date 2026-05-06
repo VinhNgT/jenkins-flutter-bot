@@ -61,15 +61,11 @@ function renderDriveSummary(driveStatus) {
   const badge = driveStatus.connected
     ? '<span class="badge badge--connected">Connected</span>'
     : '<span class="badge badge--disconnected">Not Connected</span>';
-  const pending = driveStatus.auth_pending
-    ? '<p class="text-muted">Waiting for Google authorization callback…</p>'
-    : '';
   return `
     <div class="status-header">
       <h3>Google Drive</h3>
       ${badge}
     </div>
-    ${pending}
     <p class="text-muted">Token path: ${driveStatus.token_path}</p>`;
 }
 
@@ -108,8 +104,6 @@ async function refreshDriveTab() {
     el.textContent = 'Save Drive Client ID and Client Secret first, then connect.';
   } else if (drive.connected) {
     el.innerHTML = `<span class="text-success">Connected</span> — Token: ${drive.token_path}`;
-  } else if (drive.auth_pending) {
-    el.textContent = 'Waiting for Google authorization callback…';
   } else {
     el.textContent = 'Not connected. Click "Connect Google Drive" to authorize.';
   }

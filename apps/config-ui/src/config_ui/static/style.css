@@ -539,3 +539,82 @@ input:focus, select:focus {
   .form-grid { grid-template-columns: 1fr; }
   .status-grid { grid-template-columns: 1fr; }
 }
+
+/* === OAuth pending dialog === */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.oauth-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 28px 28px 22px;
+  min-width: 320px;
+  max-width: 400px;
+  color: var(--ink);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.oauth-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+
+.oauth-dialog-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.oauth-dialog-icon svg {
+  width: 40px;
+  height: 40px;
+  color: var(--accent);
+}
+
+.oauth-dialog-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink);
+}
+
+.oauth-dialog-msg {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  color: var(--ink-secondary);
+  text-align: center;
+  line-height: 1.55;
+}
+
+.oauth-dialog-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-tertiary);
+  margin-bottom: 20px;
+}
+
+.oauth-dialog-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}

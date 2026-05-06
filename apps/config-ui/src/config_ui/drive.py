@@ -33,10 +33,6 @@ class DriveOAuthManager:
     def token_path(self) -> Path:
         return self._token_path
 
-    @property
-    def auth_pending(self) -> bool:
-        return self._pending_flow is not None
-
     def _client_config(
         self,
         client_id: str,
@@ -156,6 +152,5 @@ class DriveOAuthManager:
         """Return current OAuth connection status."""
         return {
             "connected": self.load_tokens(client_id, client_secret) is not None,
-            "auth_pending": self.auth_pending,
             "token_path": str(self._token_path),
         }

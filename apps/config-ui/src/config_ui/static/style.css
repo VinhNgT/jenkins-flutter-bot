@@ -132,9 +132,26 @@ a:hover { text-decoration: underline; }
 }
 
 .panel-title {
-  margin: 0 0 14px;
+  margin: 0 0 6px;
   font-size: 16px;
   font-weight: 600;
+}
+
+.panel-desc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+  max-width: 620px;
+}
+
+.panel-desc code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
 }
 
 .tab-panel { display: none; }

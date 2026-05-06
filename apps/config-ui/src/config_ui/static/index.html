@@ -35,6 +35,7 @@
         <!-- ===== Dashboard ===== -->
         <section id="panel-dashboard" class="tab-panel active" role="tabpanel">
           <h2 class="panel-title">Service Status</h2>
+          <p class="panel-desc">Live status of the bot and agent services. Use the controls on each card to start, stop, or restart a service after saving its configuration.</p>
           <div class="status-grid" id="status-grid">
             <div class="card status-card" id="card-bot">
               <div class="status-header">
@@ -58,6 +59,7 @@
         <!-- ===== Telegram Bot Config ===== -->
         <section id="panel-bot" class="tab-panel" role="tabpanel" hidden>
           <h2 class="panel-title">Telegram Bot Configuration</h2>
+          <p class="panel-desc">Configures the Telegram bot that receives <code>/build</code> commands and delivers APK download links. Requires a Telegram bot token and a Jenkins server with a pipeline job ready to accept build triggers.</p>
           <div class="card">
             <h3>Telegram</h3>
             <div class="form-grid" data-scope="bot">
@@ -148,6 +150,7 @@
         <!-- ===== Jenkins Agent Config ===== -->
         <section id="panel-agent" class="tab-panel" role="tabpanel" hidden>
           <h2 class="panel-title">Jenkins Agent Configuration</h2>
+          <p class="panel-desc">Configures the Flutter build agent that connects to Jenkins as an inbound node. The agent runs inside Docker with Flutter and Android SDKs pre-installed. Obtain the agent secret from the node's status page in Jenkins after creating the node.</p>
           <div class="card">
             <div class="form-grid" data-scope="agent">
               <div class="field">
@@ -193,6 +196,7 @@
         <!-- ===== Google Drive Config ===== -->
         <section id="panel-drive" class="tab-panel" role="tabpanel" hidden>
           <h2 class="panel-title">Google Drive Configuration</h2>
+          <p class="panel-desc">Connects the bot to Google Drive so it can upload APKs and return shareable links in Telegram. Save your OAuth client credentials first, then click <strong>Connect Google Drive</strong> to authorize via a browser popup. Authorization is a one-time step — the token is stored in a shared volume.</p>
           <div class="card">
             <h3>OAuth Credentials</h3>
             <div class="form-grid" data-scope="ui">

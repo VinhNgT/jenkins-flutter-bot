@@ -304,7 +304,7 @@ Open **http://localhost:9000** in your browser. The dashboard has sections for b
 
 Fill in the following fields:
 
-### Bot Configuration
+### Bot Configuration (Telegram Bot tab)
 
 | Field                | Value                                            |
 | -------------------- | ------------------------------------------------ |
@@ -313,12 +313,13 @@ Fill in the following fields:
 | Jenkins URL          | `http://jenkins:8080` (internal Docker network)   |
 | Jenkins User         | Your Jenkins admin username                       |
 | Jenkins API Token    | The API token from [Step 3](#create-a-jenkins-api-token)                        |
-| Jenkins Job Name     | `flutter-build` (or your custom job name)         |
-| Drive Client ID      | From Google Cloud ([Step 5a](#5a-create-google-cloud-credentials))                    |
-| Drive Client Secret  | From Google Cloud ([Step 5a](#5a-create-google-cloud-credentials))                    |
+| Pipeline Job Name    | `flutter-build` (or your custom job name)         |
+| Jenkins Job ID       | Same as Pipeline Job Name in the common case (e.g. `flutter-build`) |
 | Drive Folder Name    | _(optional)_ e.g., `my-app-builds` (default: `flutter-builds`) |
 
-### Agent Configuration
+Click **Save Bot Config**.
+
+### Agent Configuration (Jenkins Agent tab)
 
 | Field          | Value                                             |
 | -------------- | ------------------------------------------------- |
@@ -326,7 +327,16 @@ Fill in the following fields:
 
 > **Jenkins URL and Agent Name** are pre-configured in docker-compose and usually don't need to be changed via the UI.
 
-Click **Save Configuration**.
+Click **Save Agent Config**.
+
+### Google Drive Credentials (Google Drive tab)
+
+| Field               | Value                                                           |
+| ------------------- | --------------------------------------------------------------- |
+| Drive Client ID     | From Google Cloud ([Step 5a](#5a-create-google-cloud-credentials)) |
+| Drive Client Secret | From Google Cloud ([Step 5a](#5a-create-google-cloud-credentials)) |
+
+Click **Save Drive Config**.
 
 ### Connect Google Drive
 

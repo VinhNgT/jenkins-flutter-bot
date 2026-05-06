@@ -56,7 +56,7 @@ Collect this checklist before you start:
 | `JENKINS_JOB_ID`       | Usually  | Your own logical identifier | Usually set equal to `JENKINS_JOB_NAME`             |
 | `GOOGLE_CLIENT_ID`     | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
 | `GOOGLE_CLIENT_SECRET` | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
-| `BOT_CALLBACK_HOST`    | Optional | Your deployment topology    | Defaults to `http://tg-bot:9090` in Docker          |
+| `BOT_CALLBACK_BASE_URL` | Optional | Your deployment topology    | Defaults to `http://tg-bot:9090` in Docker         |
 | `BOT_WEBHOOK_PORT`     | Optional | Your deployment topology    | Defaults to `9090`                                  |
 | `CONFIG_UI_URL`        | Optional | Your deployment topology    | Public config UI URL shown in bot guidance          |
 | `DRIVE_FOLDER_NAME`    | Optional | Your choice                 | Destination folder name in Google Drive             |
@@ -129,20 +129,20 @@ This step is required to upload built artifacts to Google Drive and bypass Teleg
 8. Copy the **Client ID** and **Client Secret**. These are `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 9. Save these values in the config UI dashboard before starting the Drive connection flow.
 
-### 5. Bot Callback Host and Port
+### 5. Bot Callback URL and Port
 
 Jenkins must be able to call the bot back when a build finishes.
 
-1. Set `BOT_CALLBACK_HOST` to the base URL Jenkins can reach for the bot service.
+1. Set `BOT_CALLBACK_BASE_URL` to the base URL Jenkins can reach for the bot service.
 2. Do **not** append `/webhook/build-complete`; the bot adds that path automatically.
-3. Use a host that is reachable from the Jenkins server, not just from your browser.
+3. Use a URL that is reachable from the Jenkins server, not just from your browser.
 4. Keep `BOT_WEBHOOK_PORT=9090` unless you run the bot on a different port.
 
 Examples:
 
 ```text
-BOT_CALLBACK_HOST=http://192.168.1.50:9090
-BOT_CALLBACK_HOST=http://tg-jenkins-bot:9090
+BOT_CALLBACK_BASE_URL=http://192.168.1.50:9090
+BOT_CALLBACK_BASE_URL=http://tg-jenkins-bot:9090
 ```
 
 ### 6. Optional Values
@@ -188,7 +188,7 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 
 # Required — Bot Webhook
 # Jenkins will POST build results to this address
-BOT_CALLBACK_HOST=http://192.168.1.50:9090
+BOT_CALLBACK_BASE_URL=http://192.168.1.50:9090
 BOT_WEBHOOK_PORT=9090
 
 # Optional
@@ -383,7 +383,7 @@ apps/tg-jenkins-bot/
 
 ### Webhook not receiving callbacks
 
-- Ensure `BOT_CALLBACK_HOST` is accessible from the Jenkins server.
+- Ensure `BOT_CALLBACK_BASE_URL` is accessible from the Jenkins server.
 - Verify `BOT_WEBHOOK_PORT` is not blocked by a firewall.
 
 

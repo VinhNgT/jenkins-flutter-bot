@@ -86,13 +86,17 @@ class BotManager:
                 )
                 drive = DriveUploader(token_path=config.oauth_token_path)
 
-                placeholder_context = BotContext(
+                # Two-step construction: application.bot is only available
+                # after _build_application() runs, so we build a bootstrap
+                # context with bot=None first, then replace it with the real
+                # context once the application object exists.
+                bootstrap_context = BotContext(
                     config=config,
                     jenkins=jenkins,
                     drive=drive,
                     bot=None,  # type: ignore[arg-type]
                 )
-                application = _build_application(placeholder_context)
+                application = _build_application(bootstrap_context)
                 bot_context = BotContext(
                     config=config,
                     jenkins=jenkins,

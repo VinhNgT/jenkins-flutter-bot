@@ -101,7 +101,7 @@
                 </div>
               </div>
               <div class="field">
-                <label>Jenkins Job Name</label>
+                <label>Pipeline Job Name</label>
                 <p class="field-desc">Must match the pipeline job name in Jenkins</p>
                 <input id="f-job-name" name="bot:jenkins.job_name" />
               </div>
@@ -127,9 +127,9 @@
                 <input id="f-max-builds" name="bot:bot.max_recent_builds" type="number" min="0" />
               </div>
               <div class="field">
-                <label>Bot Callback Host</label>
-                <p class="field-desc">URL where Jenkins POSTs build results (e.g. http://tg-bot:9090)</p>
-                <input id="f-callback-host" name="bot:bot.callback_host" />
+                <label>Bot Callback URL</label>
+                <p class="field-desc">Base URL where Jenkins POSTs build results (e.g. http://tg-bot:9090)</p>
+                <input id="f-callback-url" name="bot:bot.callback_url" />
               </div>
               <div class="field">
                 <label>Bot Webhook Port</label>

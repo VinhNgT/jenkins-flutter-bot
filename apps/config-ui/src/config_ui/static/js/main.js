@@ -112,13 +112,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Track completion via custom event (set by message listener below)
     const onComplete = () => { oauthCompleted = true; };
-    window.addEventListener('_driveOAuthDone', onComplete, { once: true });
+    window.addEventListener('drive-oauth-done', onComplete, { once: true });
 
     // Poll for Google tab close — reset UI if user abandoned the flow
     const poll = setInterval(() => {
       if (popup.closed) {
         clearInterval(poll);
-        window.removeEventListener('_driveOAuthDone', onComplete);
+        window.removeEventListener('drive-oauth-done', onComplete);
         if (!oauthCompleted) {
           oauthDialog.close();
           refreshDriveTab();
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (event.origin !== window.location.origin) return;
     if (event.data?.type !== 'drive-oauth-complete') return;
     // Signal completion FIRST so poller sees oauthCompleted = true
-    window.dispatchEvent(new Event('_driveOAuthDone'));
+    window.dispatchEvent(new Event('drive-oauth-done'));
     oauthDialog.close();
     const type = event.data.success ? 'success' : 'error';
     Toast.show(event.data.message, type);

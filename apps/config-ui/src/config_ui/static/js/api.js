@@ -36,27 +36,6 @@ const API = {
     }
   },
 
-  /**
-   * Save all scopes at once (used by wizard).
-   * @param {Object} data - { bot: {...}, agent: {...}, ui: {...} }
-   * @returns {Promise<Object|null>}
-   */
-  async saveAll(data) {
-    try {
-      const res = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
-      return result;
-    } catch (err) {
-      Toast.show(`Failed to save config: ${err.message}`, 'error');
-      return null;
-    }
-  },
-
   /** @returns {Promise<Object|null>} */
   async getServiceStatus() {
     try {

@@ -59,7 +59,7 @@ class Config:
     oauth_token_path: Path
 
     # Bot webhook (Jenkins calls this)
-    bot_callback_host: str  # e.g. "http://tg-bot:9090"
+    bot_callback_base_url: str  # base URL, e.g. "http://tg-bot:9090" — path appended by bot_callback_url property
     bot_webhook_port: int = 9090
 
     # Optional
@@ -139,9 +139,9 @@ class Config:
                     default=str(_default_oauth_token_path(resolved_path)),
                 )
             ),
-            bot_callback_host=get_value(
-                "bot.callback_host",
-                "BOT_CALLBACK_HOST",
+            bot_callback_base_url=get_value(
+                "bot.callback_url",
+                "BOT_CALLBACK_BASE_URL",
                 default="http://tg-bot:9090",
             ),
             bot_webhook_port=int(
@@ -173,4 +173,4 @@ class Config:
     @property
     def bot_callback_url(self) -> str:
         """Full webhook URL that Jenkins calls on build completion."""
-        return f"{self.bot_callback_host.rstrip('/')}/webhook/build-complete"
+        return f"{self.bot_callback_base_url.rstrip('/')}/webhook/build-complete"

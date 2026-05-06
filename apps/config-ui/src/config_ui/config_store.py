@@ -32,7 +32,7 @@ SCOPE_DEFAULTS: dict[str, dict[str, str]] = {
         "jenkins.job_id": "flutter-build",
         "drive.folder_name": "flutter-builds",
         "bot.max_recent_builds": "0",
-        "bot.callback_host": "http://tg-bot:9090",
+        "bot.callback_url": "http://tg-bot:9090",
         "bot.webhook_port": "9090",
     },
     "agent": {

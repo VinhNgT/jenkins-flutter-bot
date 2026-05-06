@@ -103,7 +103,7 @@ async def save_scoped_config(
 async def save_all_config(
     request: Request, payload: dict[str, Any]
 ) -> dict[str, Any]:
-    """Save all scopes at once (used by the setup wizard).
+    """Save all scopes at once.
 
     Payload shape: ``{"bot": {...}, "agent": {...}, "ui": {...}}``
     """

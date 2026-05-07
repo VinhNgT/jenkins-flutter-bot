@@ -60,6 +60,7 @@ Collect this checklist before you start:
 | `BOT_WEBHOOK_PORT`     | Optional | Your deployment topology    | Defaults to `9090`                                  |
 | `CONFIG_UI_URL`        | Optional | Your deployment topology    | Public config UI URL shown in bot guidance          |
 | `DRIVE_FOLDER_NAME`    | Optional | Your choice                 | Destination folder name in Google Drive             |
+| `APP_NAME`             | Optional | Your choice                 | Display name shown in bot messages (e.g. "MyApp"); defaults to `DRIVE_FOLDER_NAME` |
 
 ### 1. Telegram Bot Token
 
@@ -73,8 +74,9 @@ Collect this checklist before you start:
 > ```
 > start - Show help and available commands
 > build - Build latest commit (or specify branch/hash)
-> status - Current build status and config
-> recent - Recent build history
+> status - Current build status and service health
+> recent - Recent build history with download links
+> cancel - Cancel a build in progress
 > ```
 
 ### 2. Finding Your Telegram Chat ID
@@ -196,6 +198,7 @@ BOT_WEBHOOK_PORT=9090
 # CONFIG_UI_URL=http://localhost:9000
 # BOT_OAUTH_TOKEN_PATH=/app/config/oauth.json
 # DRIVE_FOLDER_NAME=flutter-builds
+# APP_NAME=MyApp
 ```
 
 ---
@@ -319,8 +322,10 @@ pipeline {
 | `/build`          | Build latest commit on `main`            |
 | `/build <branch>` | Build latest commit on a specific branch |
 | `/build <hash>`   | Build a specific commit                  |
-| `/status`         | Show build status and connections        |
-| `/recent`         | List recent Jenkins builds               |
+| `/status`         | Show service health and build status     |
+| `/recent`         | List recent builds with download links   |
+| `/cancel`         | Cancel the current build in progress     |
+| `/cancel <branch>`| Cancel a specific branch's build         |
 
 ---
 

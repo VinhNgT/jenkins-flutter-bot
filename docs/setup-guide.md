@@ -264,6 +264,16 @@ The bot needs API credentials to trigger builds:
    - Send any message to your new bot
    - Visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
    - Look for `"chat":{"id": XXXXXXXXX}` — this is your chat ID
+4. **Register your bot's commands** (optional but recommended):
+   - In BotFather, send `/setcommands`
+   - Select your bot, then paste:
+     ```
+     start - Show help and available commands
+     build - Build latest commit (or specify branch)
+     status - Current build status and service health
+     recent - Recent build history with download links
+     cancel - Cancel a build in progress
+     ```
    - Multiple chat IDs can be allowed (comma-separated)
 
 ---
@@ -315,6 +325,7 @@ Fill in the following fields:
 | Jenkins API Token    | The API token from [Step 3](#create-a-jenkins-api-token)                        |
 | Pipeline Job Name    | `flutter-build` (or your custom job name)         |
 | Jenkins Job ID       | Same as Pipeline Job Name in the common case (e.g. `flutter-build`) |
+| App Name             | _(optional)_ Your app's display name, e.g. `Tendoo Mall` — shown in bot messages |
 | Drive Folder Name    | _(optional)_ e.g., `my-app-builds` (default: `flutter-builds`) |
 
 Click **Save Bot Config**.
@@ -367,9 +378,9 @@ docker compose restart
 
 1. **Jenkins:** Go to http://localhost:8080 → Nodes — the `flutter-agent` should show as **online**
 2. **Telegram:** Send `/status` to your bot — it should report:
-   - Drive: ✅ Connected
-   - Jenkins: ✅ Connected
-   - Ready to build: ✅ Yes
+   - Jenkins: ✅ (your job name)
+   - Google Drive: ✅ (your folder name)
+   - Headline: 🟢 Ready to build \<App Name\>
 
 ---
 
@@ -377,10 +388,11 @@ docker compose restart
 
 1. Open your Telegram chat with the bot
 2. Send `/build main` (or `/build <branch-name>`)
-3. The bot will reply "Build triggered" with a request ID
+3. The bot replies with a "Building..." confirmation including the branch and start time
 4. Wait for Jenkins to complete the build (watch progress at http://localhost:8080)
-5. On success, the bot will upload the APK to Google Drive and send you a download link
-6. Send `/recent` to see your build history
+5. On success, the bot uploads the APK to Google Drive and sends a download link
+6. Send `/recent` to see your build history with download links
+7. Use `/cancel` to stop a build in progress
 
 ---
 

@@ -72,8 +72,19 @@ class DriveUploader:
         """Build an authenticated Drive API service."""
         return build_service("drive", "v3", credentials=creds)
 
-    def _ensure_folder_sync(self, creds: Credentials, folder_name: str) -> str:
-        """Find or create a Drive folder by name. Returns folder ID."""
+    @staticmethod
+    def _folder_link(folder_id: str) -> str:
+        """Return the public Google Drive folder browse URL."""
+        return f"https://drive.google.com/drive/folders/{folder_id}"
+
+    def _ensure_folder_sync(
+        self, creds: Credentials, folder_name: str
+    ) -> tuple[str, str]:
+        """Find or create a Drive folder by name. Returns (folder_id, folder_link).
+
+        The folder is made publicly accessible (anyone with the link can view)
+        so all uploaded files are immediately accessible without login.
+        """
         service = self._get_drive_service(creds)
 
         query = (
@@ -108,18 +119,29 @@ class DriveUploader:
                 folder_id,
             )
 
-        return folder_id
+        # Make the folder public — propagates to all files inside.
+        # Idempotent: Drive silently updates an existing 'anyone' permission.
+        service.permissions().create(
+            fileId=folder_id,
+            body={"type": "anyone", "role": "reader"},
+            fields="id",
+        ).execute()
 
-    async def ensure_folder(self, creds: Credentials, folder_name: str) -> str:
-        """Find or create a Drive folder by name. Returns folder ID."""
+        return folder_id, self._folder_link(folder_id)
+
+    async def ensure_folder(
+        self, creds: Credentials, folder_name: str
+    ) -> tuple[str, str]:
+        """Find or create a Drive folder by name. Returns (folder_id, folder_link)."""
         if folder_name in self._folder_id_cache:
-            return self._folder_id_cache[folder_name]
+            cached_id = self._folder_id_cache[folder_name]
+            return cached_id, self._folder_link(cached_id)
 
-        folder_id = await asyncio.to_thread(
+        folder_id, folder_link = await asyncio.to_thread(
             self._ensure_folder_sync, creds, folder_name
         )
         self._folder_id_cache[folder_name] = folder_id
-        return folder_id
+        return folder_id, folder_link
 
     def _upload_file_sync(
         self,
@@ -154,15 +176,6 @@ class DriveUploader:
         )
 
         file_id = file["id"]
-
-        # Make file viewable by anyone with the link
-        service.permissions().create(
-            fileId=file_id,
-            body={"type": "anyone", "role": "reader"},
-        ).execute()
-
-        # Re-fetch to get the updated link
-        file = service.files().get(fileId=file_id, fields="webViewLink").execute()
         web_link = file.get("webViewLink", "")
 
         logger.info("Uploaded: %s -> %s", filename, web_link)

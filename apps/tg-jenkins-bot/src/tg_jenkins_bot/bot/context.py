@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import time
@@ -29,6 +30,7 @@ class PendingBuild:
     chat_id: int
     ref: str
     triggered_at: float
+    queue_id: int | None = None  # stored at trigger time; used to cancel via Jenkins API
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,61 @@ class CompletedBuild:
     filename: str
     ref: str
     completed_at: float
+    commit_hash: str = ""  # short hash for display; empty for legacy builds
+
+
+def _escape(text: str) -> str:
+    """Escape user-supplied text for safe inclusion in HTML messages."""
+    return html.escape(text, quote=False)
+
+
+def _format_time(ts: float) -> str:
+    """Format a Unix timestamp as HH:MM in UTC."""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%H:%M")
+
+
+def _format_duration(start: float, end: float) -> str:
+    """Format a duration between two timestamps as human-readable string."""
+    delta = int(end - start)
+    if delta < 60:
+        return f"{delta}s"
+    minutes = delta // 60
+    return f"{minutes} min"
+
+
+def _summarize_logs(logs: str) -> str:
+    """Extract the first meaningful error line from raw build logs.
+
+    Skips blank lines and common boilerplate to find the most useful
+    error message for display in a Telegram notification.
+    """
+    skip_prefixes = (
+        "[INFO]",
+        "Downloading",
+        "Download",
+        "Note:",
+        "> Task",
+        "BUILD SUCCESSFUL",
+        "Picked up",
+        "Running ",
+        "Starting ",
+        "Cloning ",
+        "Checking out",
+        "using credential",
+    )
+
+    for line in logs.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if any(stripped.startswith(prefix) for prefix in skip_prefixes):
+            continue
+        # Return the first meaningful line, capped at 200 chars
+        if len(stripped) > 200:
+            return stripped[:197] + "..."
+        return stripped
+
+    return "No details available."
 
 
 class BotContext:
@@ -96,20 +153,38 @@ class BotContext:
                 "chat_id": v.chat_id,
                 "ref": v.ref,
                 "triggered_at": v.triggered_at,
+                "queue_id": v.queue_id,
             }
             for k, v in self._pending.items()
         }
         self._pending_path.write_text(json.dumps(data))
 
-    def add_pending(self, request_id: str, chat_id: int, ref: str) -> None:
+    def add_pending(
+        self,
+        request_id: str,
+        chat_id: int,
+        ref: str,
+        *,
+        queue_id: int | None = None,
+    ) -> None:
         """Track a Telegram-triggered build."""
         self._cleanup_expired()
         self._pending[request_id] = PendingBuild(
             chat_id=chat_id,
             ref=ref,
             triggered_at=time.time(),
+            queue_id=queue_id,
         )
         self._save_pending()
+
+    def get_pending(self, request_id: str) -> PendingBuild:
+        """Look up a pending build by request_id. Raises KeyError if not found."""
+        return self._pending[request_id]
+
+    def list_pending(self) -> dict[str, PendingBuild]:
+        """Return a snapshot of all pending builds."""
+        self._cleanup_expired()
+        return dict(self._pending)
 
     def consume_pending(self, request_id: str | None) -> PendingBuild | None:
         """Look up and remove a pending build. Returns None if not found."""
@@ -120,6 +195,27 @@ class BotContext:
         if result:
             self._save_pending()
         return result
+
+    async def cancel_pending(self, request_id: str) -> None:
+        """Cancel a pending build — stop Jenkins and remove from tracking.
+
+        Best-effort Jenkins cancellation: errors are logged but never
+        propagated, so the bot-side tracking is always cleaned up.
+        """
+        pending = self._pending.pop(request_id, None)
+        if not pending:
+            return
+        self._save_pending()
+
+        # Attempt to cancel the Jenkins build
+        if pending.queue_id is not None:
+            try:
+                await self.jenkins.cancel_build(pending.queue_id)
+            except Exception:
+                logger.exception(
+                    "Failed to cancel Jenkins build (queue_id=%d)",
+                    pending.queue_id,
+                )
 
     def _cleanup_expired(self) -> None:
         """Remove pending builds older than TTL."""
@@ -164,6 +260,7 @@ class BotContext:
                 "filename": b.filename,
                 "ref": b.ref,
                 "completed_at": b.completed_at,
+                "commit_hash": b.commit_hash,
             }
             for b in self._history
         ]
@@ -175,6 +272,8 @@ class BotContext:
         drive_link: str,
         filename: str,
         ref: str,
+        *,
+        commit_hash: str = "",
     ) -> None:
         """Record a completed build in history."""
         self._history.append(
@@ -184,6 +283,7 @@ class BotContext:
                 filename=filename,
                 ref=ref,
                 completed_at=time.time(),
+                commit_hash=commit_hash,
             )
         )
         self._save_history()
@@ -235,6 +335,10 @@ class BotContext:
         """Handle successful build — upload to Drive and notify user."""
         commit_hash = metadata.get("commit_hash", "unknown")
         short_hash = commit_hash[:7]
+        now = time.time()
+        started = _format_time(pending.triggered_at)
+        finished = _format_time(now)
+        duration = _format_duration(pending.triggered_at, now)
 
         if not self.bot:
             logger.error("Cannot notify — bot instance is not available")
@@ -244,29 +348,24 @@ class BotContext:
         try:
             creds = self.drive.load_tokens()
             if not creds:
-                ui_hint = ""
-                if self.config.config_ui_url:
-                    ui_hint = (
-                        f"\nSet up Google Drive in the "
-                        f"[config dashboard]({self.config.config_ui_url})."
-                    )
                 await self.bot.send_message(
                     pending.chat_id,
-                    f"✅ Build successful (`{short_hash}`) but Google Drive "
-                    f"is not connected.{ui_hint}",
-                    parse_mode="Markdown",
+                    "⚠️ <b>Build succeeded, but Google Drive isn't connected.</b>\n"
+                    "\n"
+                    f"Branch:  <code>{_escape(pending.ref)}</code>\n"
+                    f"Commit:  <code>{_escape(short_hash)}</code>\n"
+                    "\n"
+                    "Contact your admin to set up file delivery.",
+                    parse_mode="HTML",
                 )
                 return
 
-            await self.bot.send_message(
-                pending.chat_id,
-                "☁️ Build complete! Uploading to Google Drive...",
-            )
-
             # Generate filename
-            now = datetime.now(timezone.utc)
+            dt_now = datetime.now(timezone.utc)
             folder_name = self.config.drive_folder_name or "flutter-builds"
-            filename = f"{folder_name}-{now.strftime('%Y%m%d-%H%M')}-{short_hash}.apk"
+            filename = (
+                f"{folder_name}-{dt_now.strftime('%Y%m%d-%H%M')}-{short_hash}.apk"
+            )
 
             folder_id = await self.drive.ensure_folder(creds, folder_name)
             file_id, drive_link = await self.drive.upload_file(
@@ -275,10 +374,15 @@ class BotContext:
 
             await self.bot.send_message(
                 pending.chat_id,
-                f"✅ Build successful!\n\n"
-                f"📦 `{filename}`\n"
-                f"🔗 [Download APK]({drive_link})",
-                parse_mode="Markdown",
+                "✅ <b>Your app is ready!</b>\n"
+                "\n"
+                f"Branch:  <code>{_escape(pending.ref)}</code>\n"
+                f"Commit:  <code>{_escape(short_hash)}</code>\n"
+                f"Built:   {started} → {finished} ({duration})\n"
+                f"File:    <code>{_escape(filename)}</code>\n"
+                "\n"
+                f'📲 <a href="{_escape(drive_link)}">Download APK</a>',
+                parse_mode="HTML",
             )
 
             self.record_build(
@@ -286,16 +390,22 @@ class BotContext:
                 drive_link=drive_link,
                 filename=filename,
                 ref=pending.ref,
+                commit_hash=short_hash,
             )
 
             await self.enforce_history_limit()
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to upload/notify for build %s", commit_hash)
             await self.bot.send_message(
                 pending.chat_id,
-                f"✅ Build succeeded (`{short_hash}`) but upload failed: {e}",
-                parse_mode="Markdown",
+                "⚠️ <b>Build succeeded, but the download couldn't be prepared.</b>\n"
+                "\n"
+                f"Branch:  <code>{_escape(pending.ref)}</code>\n"
+                f"Commit:  <code>{_escape(short_hash)}</code>\n"
+                "\n"
+                "Contact your admin.",
+                parse_mode="HTML",
             )
 
         finally:
@@ -309,12 +419,22 @@ class BotContext:
 
         commit_hash = metadata.get("commit_hash", "unknown")
         short_hash = commit_hash[:7]
-        logs = metadata.get("logs", "No logs available")
+        logs = metadata.get("logs", "")
+        error_summary = _escape(_summarize_logs(logs))
+        now = time.time()
+        started = _format_time(pending.triggered_at)
+        finished = _format_time(now)
 
         await self.bot.send_message(
             pending.chat_id,
-            f"❌ Build failed for `{short_hash}`\n\n"
-            f"```\n{logs[:500]}\n```\n\n"
-            f"Check Jenkins console for full logs.",
-            parse_mode="Markdown",
+            "❌ <b>Build failed</b>\n"
+            "\n"
+            f"Branch:  <code>{_escape(pending.ref)}</code>\n"
+            f"Commit:  <code>{_escape(short_hash)}</code>\n"
+            f"Time:    {started} → {finished}\n"
+            "\n"
+            f"Error: {error_summary}\n"
+            "\n"
+            "Check Jenkins for the full log, or contact your admin.",
+            parse_mode="HTML",
         )

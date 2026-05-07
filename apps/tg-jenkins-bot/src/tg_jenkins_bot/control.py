@@ -16,6 +16,7 @@ from telegram.ext import (
 from .bot.context import BotContext
 from .bot.handlers import (
     build_handler,
+    cancel_handler,
     recent_handler,
     start_handler,
     status_handler,
@@ -36,6 +37,7 @@ def _build_application(bot_context: BotContext) -> Application:
     application.add_handler(CommandHandler("build", build_handler))
     application.add_handler(CommandHandler("status", status_handler))
     application.add_handler(CommandHandler("recent", recent_handler))
+    application.add_handler(CommandHandler("cancel", cancel_handler))
     return application
 
 

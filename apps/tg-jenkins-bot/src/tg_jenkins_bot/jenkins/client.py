@@ -68,3 +68,55 @@ class JenkinsClient:
         url = f"{self.job_url}/api/json?tree=name"
         resp = await self._client.get(url)
         return resp.status_code == 200
+
+    async def cancel_build(self, queue_id: int) -> None:
+        """Cancel a Jenkins build by queue ID.
+
+        Tries cancelling from the queue first (if still waiting),
+        then falls back to stopping a running build.
+        """
+        # 1. Try to cancel from the queue
+        cancel_url = f"{self.base_url}/queue/cancelItem?id={queue_id}"
+        resp = await self._client.post(cancel_url)
+        if resp.status_code in (200, 204, 302):
+            logger.info("Cancelled queued build: queue_id=%d", queue_id)
+            return
+
+        # 2. If already running, resolve the build number and stop it
+        queue_info_url = f"{self.base_url}/queue/item/{queue_id}/api/json"
+        resp = await self._client.get(queue_info_url)
+        if resp.status_code != 200:
+            logger.error(
+                "Could not resolve queue item %d: %d — %s",
+                queue_id,
+                resp.status_code,
+                resp.text[:200],
+            )
+            return
+
+        data = resp.json()
+        executable = data.get("executable")
+        if not executable or "number" not in executable:
+            logger.error(
+                "Queue item %d has no executable yet — cannot stop",
+                queue_id,
+            )
+            return
+
+        build_number = executable["number"]
+        stop_url = f"{self.job_url}/{build_number}/stop"
+        resp = await self._client.post(stop_url)
+        if resp.status_code in (200, 302):
+            logger.info(
+                "Stopped running build: %s #%d",
+                self.job_name,
+                build_number,
+            )
+        else:
+            logger.error(
+                "Failed to stop build %s #%d: %d — %s",
+                self.job_name,
+                build_number,
+                resp.status_code,
+                resp.text[:200],
+            )

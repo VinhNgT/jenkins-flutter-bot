@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import logging
 import secrets
 from datetime import datetime, timezone
@@ -19,11 +20,20 @@ def _get_ctx(context: ContextTypes.DEFAULT_TYPE) -> BotContext:
     return context.bot_data["bot_context"]
 
 
-def _config_ui_hint(ctx: BotContext) -> str:
-    """Point users at the config UI when Drive setup is required."""
-    if ctx.config.config_ui_url:
-        return f"Open {ctx.config.config_ui_url} to complete Drive setup."
-    return "Open the config UI dashboard to complete Drive setup."
+def _escape(text: str) -> str:
+    """Escape user-supplied text for safe inclusion in HTML messages."""
+    return html.escape(text, quote=False)
+
+
+def _format_time(ts: float) -> str:
+    """Format a Unix timestamp as HH:MM in UTC."""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%H:%M")
+
+
+def _format_date(ts: float) -> str:
+    """Format a Unix timestamp as '6 May at 14:30' in UTC."""
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    return dt.strftime("%-d %b at %H:%M")
 
 
 async def _ensure_authorized(
@@ -36,7 +46,7 @@ async def _ensure_authorized(
     chat_id = update.effective_chat.id
     if chat_id not in _get_ctx(context).config.allowed_chat_ids:
         await update.message.reply_text(
-            "❌ This chat is not allowed to use the build bot."
+            "❌ This chat isn't authorized. Contact your admin to get access."
         )
         return False
 
@@ -44,30 +54,26 @@ async def _ensure_authorized(
 
 
 # ------------------------------------------------------------------
-# /start
+# /start and /help
 # ------------------------------------------------------------------
 
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command — welcome message."""
+    """Handle /start and /help commands — welcome message."""
     if not update.message:
         return
-    ctx = _get_ctx(context)
     await update.message.reply_text(
-        "🤖 *Flutter Build Bot*\n\n"
-        "This bot triggers Jenkins builds, tracks only the builds started "
-        "from Telegram, and delivers finished APKs through Google Drive.\n\n"
-        "Before using `/build`:\n"
-        f"1. {_config_ui_hint(ctx)}\n"
-        "2. Check `/status` to confirm the bot is ready\n\n"
-        "Available commands:\n"
-        "▸ `/help` — Show this message\n"
-        "▸ `/build` — Build latest commit on main\n"
-        "▸ `/build <branch>` — Build latest on a branch\n"
-        "▸ `/build <hash>` — Build a specific commit\n"
-        "▸ `/status` — Bot readiness and pending build status\n"
-        "▸ `/recent` — Recent bot-triggered builds",
-        parse_mode="Markdown",
+        "👋 Hi! I'll build your app and send you a download link "
+        "when it's ready.\n"
+        "\n"
+        "<b>Commands:</b>\n"
+        "• /build — Build the latest version (main branch)\n"
+        "• /build &lt;branch&gt; — Build a specific branch\n"
+        "• /status — Check if the bot is ready\n"
+        "• /recent — View recent builds\n"
+        "• /cancel — Cancel a build in progress\n"
+        "• /help — Show this message",
+        parse_mode="HTML",
     )
 
 
@@ -94,10 +100,7 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Check Drive connection
     if not ctx.drive.is_connected():
         await update.message.reply_text(
-            "❌ Google Drive setup is required before builds can run.\n"
-            f"{_config_ui_hint(ctx)}\n"
-            "Run /status again after setup finishes.",
-            parse_mode="Markdown",
+            "❌ The bot isn't fully set up yet. Contact your admin."
         )
         return
 
@@ -112,18 +115,21 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if queue_id is None:
         await update.message.reply_text(
-            "❌ Failed to trigger Jenkins build.\nCheck bot logs for details."
+            "❌ Couldn't start the build. Try again, or contact your admin."
         )
         return
 
-    ctx.add_pending(request_id, chat_id, ref)
+    ctx.add_pending(request_id, chat_id, ref, queue_id=queue_id)
 
+    started = _format_time(ctx.get_pending(request_id).triggered_at)
     await update.message.reply_text(
-        f"🚀 Build triggered for `{ref}`\n"
-        f"🆔 Request: `{request_id[:8]}`\n"
-        f"☁️ Delivery: Google Drive\n"
-        f"⏳ You'll be notified here when Jenkins completes.",
-        parse_mode="Markdown",
+        "🔨 <b>Building your app...</b>\n"
+        "\n"
+        f"Branch:  <code>{_escape(ref)}</code>\n"
+        f"Started: {started}\n"
+        "\n"
+        "I'll notify you here when it's done.",
+        parse_mode="HTML",
     )
 
 
@@ -141,39 +147,68 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not await _ensure_authorized(update, context):
         return
 
-    lines = ["📊 *Bot Status*\n"]
-    lines.append(
-        f"▸ Job: `{ctx.config.jenkins_job_name}` (ID: `{ctx.config.jenkins_job_id}`)"
-    )
-
-    # Drive connection
-    if ctx.drive.is_connected():
-        lines.append("▸ Drive: ✅ Connected")
-        lines.append("▸ Ready to build: ✅ Yes")
-    else:
-        lines.append("▸ Drive: ❌ Setup required in config UI")
-        lines.append("▸ Ready to build: ❌ No")
-
-    # Pending builds
-    lines.append(f"▸ Pending bot-triggered builds: {ctx.pending_count}")
-
-    # Bot build history
-    lines.append(f"▸ Completed builds tracked: {ctx.history_count}")
-    recent = ctx.recent_builds(count=1)
-    if recent:
-        lines.append(f"▸ Last bot build: `{recent[0].ref}` — `{recent[0].filename}`")
+    drive_ok = ctx.drive.is_connected()
 
     # Jenkins connection check
     try:
-        reachable = await ctx.jenkins.check_connection()
-        if reachable:
-            lines.append("▸ Jenkins: ✅ Connected")
-        else:
-            lines.append("▸ Jenkins: ❌ Unreachable")
-    except Exception as exc:
-        lines.append(f"▸ Jenkins: ❌ Unreachable ({exc.__class__.__name__})")
+        jenkins_ok = await ctx.jenkins.check_connection()
+    except Exception:
+        logger.exception("Jenkins connection check failed")
+        jenkins_ok = False
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    ready = drive_ok and jenkins_ok
+    pending = ctx.pending_count
+
+    # Headline
+    if pending > 0:
+        headline = f"🟡 <b>Build in progress ({pending} active)</b>"
+    elif ready:
+        headline = "🟢 <b>Ready to build</b>"
+    else:
+        headline = "🔴 <b>Not ready</b>"
+
+    job_name = _escape(ctx.config.jenkins_job_name)
+    folder_name = _escape(ctx.config.drive_folder_name or "flutter-builds")
+    lines = [headline, ""]
+
+    # Service status
+    if jenkins_ok:
+        lines.append(f"Jenkins       ✅  {job_name}")
+    else:
+        lines.append("Jenkins       ❌  Not responding")
+
+    if drive_ok:
+        lines.append(f"Google Drive  ✅  {folder_name}")
+    else:
+        lines.append("Google Drive  ❌  Setup required")
+
+    # Pending build branches (when active)
+    if pending > 0:
+        pending_builds = ctx.list_pending()
+        lines.append("")
+        lines.append("In progress:")
+        for p in pending_builds.values():
+            lines.append(f"  • <code>{_escape(p.ref)}</code> (since {_format_time(p.triggered_at)})")
+
+    # Last build
+    recent = ctx.recent_builds(count=1)
+    if recent:
+        b = recent[0]
+        short_hash = b.commit_hash[:7] if b.commit_hash else ""
+        date_str = _format_date(b.completed_at)
+        parts = [_escape(b.ref)]
+        if short_hash:
+            parts.append(f"<code>{_escape(short_hash)}</code>")
+        parts.append(date_str)
+        lines.append("")
+        lines.append(f"Last build: {' · '.join(parts)}")
+
+    # Not-ready hint
+    if not ready:
+        lines.append("")
+        lines.append("Contact your admin to complete setup.")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
 # ------------------------------------------------------------------
@@ -193,19 +228,81 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     builds = ctx.recent_builds(count=5)
 
     if not builds:
-        await update.message.reply_text("📭 No bot-triggered builds yet.")
+        await update.message.reply_text("📭 No builds yet.")
         return
 
-    lines = [
-        "📦 *Recent Bot Builds*\n",
-    ]
+    lines = ["📦 <b>Recent Builds</b>\n"]
     for b in builds:
-        dt = datetime.fromtimestamp(b.completed_at, tz=timezone.utc)
-        date_str = dt.strftime("%Y-%m-%d %H:%M UTC")
-        lines.append(
-            f"✅ `{b.ref}` — {date_str}\n"
-            f"    📄 `{b.filename}`\n"
-            f"    🔗 [Download]({b.drive_link})"
-        )
+        short_hash = b.commit_hash[:7] if b.commit_hash else ""
+        date_str = _format_date(b.completed_at)
+        parts = [f"<code>{_escape(b.ref)}</code>"]
+        if short_hash:
+            parts.append(f"<code>{_escape(short_hash)}</code>")
+        parts.append(date_str)
+        entry = " · ".join(parts)
+        lines.append(f'• {entry}    <a href="{_escape(b.drive_link)}">Download</a>')
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+
+# ------------------------------------------------------------------
+# /cancel
+# ------------------------------------------------------------------
+
+
+async def cancel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel a pending build."""
+    if not update.message or not update.effective_chat:
+        return
+    ctx = _get_ctx(context)
+
+    if not await _ensure_authorized(update, context):
+        return
+
+    pending = ctx.list_pending()
+
+    if not pending:
+        await update.message.reply_text("No build is currently in progress.")
+        return
+
+    # If a branch argument is provided, cancel that specific one
+    target_branch = context.args[0] if context.args else None
+
+    if target_branch is None and len(pending) > 1:
+        # Multiple pending — list them for the user to pick
+        lines = ["Multiple builds in progress:\n"]
+        for rid, p in pending.items():
+            started = _format_time(p.triggered_at)
+            lines.append(f"• {_escape(p.ref)} (started {started})")
+        lines.append("")
+        lines.append("Use /cancel &lt;branch&gt; to cancel one.")
+        await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+        return
+
+    # Find the build to cancel
+    if target_branch:
+        # Find by branch name — if multiple, cancel the most recent
+        matches = [
+            (rid, p)
+            for rid, p in pending.items()
+            if p.ref == target_branch
+        ]
+        if not matches:
+            await update.message.reply_text(
+                f"No build in progress for branch "
+                f"<code>{_escape(target_branch)}</code>.",
+                parse_mode="HTML",
+            )
+            return
+        matches.sort(key=lambda x: x[1].triggered_at, reverse=True)
+        request_id, build = matches[0]
+    else:
+        # Exactly one pending — cancel it
+        request_id, build = next(iter(pending.items()))
+
+    await ctx.cancel_pending(request_id)
+
+    await update.message.reply_text(
+        f"✅ Cancelled build for branch <code>{_escape(build.ref)}</code>.",
+        parse_mode="HTML",
+    )

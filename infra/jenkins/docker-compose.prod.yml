@@ -1,0 +1,17 @@
+# Production override — pulls pre-built images from GHCR instead of building locally.
+# Usage: ./compose.sh prod [args]
+#
+# Pin a specific release:  IMAGE_TAG=v1.2.3 ./compose.sh prod up -d
+
+services:
+  config-ui:
+    build: !reset null
+    image: ghcr.io/vinhNgT/jenkins-flutter-bot/config-ui:${IMAGE_TAG:-latest}
+
+  tg-bot:
+    build: !reset null
+    image: ghcr.io/vinhNgT/jenkins-flutter-bot/tg-bot:${IMAGE_TAG:-latest}
+
+  flutter-agent:
+    build: !reset null
+    image: ghcr.io/vinhNgT/jenkins-flutter-bot/flutter-agent:${IMAGE_TAG:-latest}

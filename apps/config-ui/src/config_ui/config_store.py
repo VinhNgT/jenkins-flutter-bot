@@ -27,7 +27,6 @@ SCOPE_SECRET_FIELDS: dict[str, tuple[str, ...]] = {
 # in the JSON config file.  Shown as placeholder hints in the UI.
 SCOPE_DEFAULTS: dict[str, dict[str, str]] = {
     "bot": {
-        "jenkins.url": "http://jenkins:8080",
         "jenkins.job_name": "flutter-build",
         "jenkins.job_id": "flutter-build",
         "drive.folder_name": "flutter-builds",
@@ -36,7 +35,6 @@ SCOPE_DEFAULTS: dict[str, dict[str, str]] = {
         "bot.webhook_port": "9090",
     },
     "agent": {
-        "jenkins.url": "http://jenkins:8080",
         "agent.name": "flutter-agent",
         "agent.web_socket": "true",
     },
@@ -50,10 +48,12 @@ SCOPE_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
     "bot": (
         "telegram.bot_token",
         "telegram.allowed_chat_ids",
+        "jenkins.url",
         "jenkins.user",
         "jenkins.api_token",
     ),
     "agent": (
+        "jenkins.url",
         "agent.secret",
     ),
     "ui": (

@@ -20,16 +20,21 @@ jobs:
           - name: tg-bot
             context: apps/tg-jenkins-bot
             dockerfile: apps/tg-jenkins-bot/Dockerfile
+            platforms: linux/amd64,linux/arm64
 
           - name: config-ui
             context: apps/config-ui
             dockerfile: apps/config-ui/Dockerfile
+            platforms: linux/amd64,linux/arm64
 
           # Build context must be repo root so the Dockerfile can reach
           # apps/agent-control/ — mirrors the docker-compose setup.
+          # linux/amd64 only — Flutter does not support Android release
+          # builds on Linux ARM64.
           - name: flutter-agent
             context: .
             dockerfile: infra/jenkins/Dockerfile.flutter-agent
+            platforms: linux/amd64
 
     steps:
       - name: Checkout
@@ -62,7 +67,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64
+          platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

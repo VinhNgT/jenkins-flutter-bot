@@ -39,7 +39,7 @@ Do not expose bot or agent ports to the host.
 
 ## Dev vs Production Compose
 
-Two compose modes are provided via `compose.sh` in `infra/jenkins/`:
+Two compose modes are provided via `compose.sh` in `infra/`:
 
 ```bash
 ./compose.sh [args]          # Dev — builds images locally from source
@@ -129,7 +129,7 @@ Key conventions:
 - **`platform: linux/amd64`** is set in docker-compose — Flutter does not support Android release builds on Linux ARM64; x86_64 emulation is required on Apple Silicon hosts
 - **Gradle memory tuning** via `GRADLE_OPTS` — daemon disabled, JVM heap capped, VFS watching disabled. See the Dockerfile comments for rationale.
 
-The flutter-agent's Docker Compose build context is the **repo root** (`../..` from `infra/jenkins/`) — same as all other services, since all need access to the workspace root and shared library.
+The flutter-agent's Docker Compose build context is the **repo root** (`..` from `infra/`) — same as all other services, since all need access to the workspace root and shared library.
 
 ---
 

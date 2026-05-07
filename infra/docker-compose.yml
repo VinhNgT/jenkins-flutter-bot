@@ -16,7 +16,7 @@ services:
 
   config-ui:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/config-ui/Dockerfile
     container_name: config-ui
     restart: on-failure
@@ -42,7 +42,7 @@ services:
 
   tg-bot:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/tg-jenkins-bot/Dockerfile
     container_name: tg-bot
     restart: on-failure
@@ -65,8 +65,8 @@ services:
   flutter-agent:
     platform: linux/amd64
     build:
-      context: ../..
-      dockerfile: infra/jenkins/Dockerfile.flutter-agent
+      context: ..
+      dockerfile: infra/Dockerfile.flutter-agent
     container_name: flutter-agent
     restart: on-failure
     environment:

@@ -59,14 +59,14 @@ cd jenkins-flutter-bot
 ### Development Mode (build locally)
 
 ```bash
-cd infra/jenkins
+cd infra
 ./compose.sh up -d --build
 ```
 
 Or equivalently, without the helper script:
 
 ```bash
-cd infra/jenkins
+cd infra
 docker compose up -d --build
 ```
 
@@ -77,7 +77,7 @@ Builds all images from source. Use this for active development or testing local 
 Pre-built images are published to GitHub Container Registry on every version tag. No local build required:
 
 ```bash
-cd infra/jenkins
+cd infra
 ./compose.sh prod up -d
 ```
 
@@ -433,7 +433,7 @@ Use the **Service Control** section in the config-ui dashboard:
 Alternatively, restart the entire stack to pick up all configuration:
 
 ```bash
-cd infra/jenkins
+cd infra
 docker compose restart
 ```
 
@@ -509,7 +509,7 @@ docker compose logs config-ui
 ### Resetting everything
 
 ```bash
-cd infra/jenkins
+cd infra
 docker compose down -v    # ⚠️ This deletes all volumes (config, data, Jenkins home)
 docker compose up -d --build
 ```

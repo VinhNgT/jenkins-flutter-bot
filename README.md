@@ -16,7 +16,7 @@ A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram
 │   └── config-schema/          Python — Declarative configuration schema framework
 │
 └── infra/                      Infrastructure & CI/CD
-    └── jenkins/                Docker Compose stack, agent Dockerfile, controller Dockerfile
+    └── (Docker Compose stack, agent Dockerfile, controller Dockerfile)
 ```
 
 ## Apps
@@ -34,7 +34,7 @@ A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram
 ### Quick Start
 
 ```bash
-cd infra/jenkins
+cd infra
 docker compose up -d --build
 ```
 

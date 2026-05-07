@@ -8,32 +8,7 @@ This is the single source of truth for the UI-owned config fields.  It drives:
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any
-
-# ---------------------------------------------------------------------------
-# Field definition
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class FieldDef:
-    """Declarative definition for a single configuration field."""
-
-    key: str  # Dotted JSON key: "drive.client_id"
-    env_var: str  # Env var fallback (unused for UI scope, kept for consistency)
-    attr: str  # Python attribute name (unused for UI scope)
-    label: str  # UI label: "Drive Client ID"
-    group: str  # UI card grouping
-    description: str = ""  # Short text below the label
-    help_html: str = ""  # Rich HTML for ? popover
-    default: str = ""  # Hardcoded default
-    secret: bool = False  # Mask in UI, strip from API responses
-    required: bool = False
-    field_type: str = "text"  # "text", "password", "number", "select"
-    choices: tuple[tuple[str, str], ...] = ()  # For select: (value, label)
-    value_type: str = "str"  # "str", "int", "bool", "list[int]"
-
+from config_schema import FieldDef, serialize_schema  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # UI field declarations
@@ -83,25 +58,3 @@ UI_FIELDS: tuple[FieldDef, ...] = (
         field_type="password",
     ),
 )
-
-# ---------------------------------------------------------------------------
-# Schema serialization (for GET /api/config/schema)
-# ---------------------------------------------------------------------------
-
-_BACKEND_ONLY_KEYS = {"attr", "value_type", "env_var"}
-
-
-def serialize_schema(
-    fields: tuple[FieldDef, ...],
-    title: str,
-    description: str,
-) -> dict[str, Any]:
-    """Serialize module schema to a JSON-ready dict for the HTTP endpoint."""
-    return {
-        "title": title,
-        "description": description,
-        "fields": [
-            {k: v for k, v in asdict(f).items() if k not in _BACKEND_ONLY_KEYS}
-            for f in fields
-        ],
-    }

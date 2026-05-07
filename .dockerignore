@@ -1,0 +1,19 @@
+# Large/irrelevant directories
+.git/
+.github/
+.agents/
+.vscode/
+.ruff_cache/
+__pycache__/
+.venv/
+docs/
+scripts/
+
+# Build artifacts
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# OS files
+.DS_Store

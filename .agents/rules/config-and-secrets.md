@@ -12,12 +12,13 @@ Triggered when editing config-related files. Covers the declarative schema syste
 
 ## Declarative Configuration Schema
 
-Configuration is defined **declaratively** in per-module `schema.py` files. Each field is a `FieldDef` dataclass containing all metadata: JSON key, env var, default, label, description, help text, secret/required flags, field type, and value type.
+Configuration is defined **declaratively** in per-module `schema.py` files. Each field is a `FieldDef` dataclass (defined in `libs/config-schema/`) containing all metadata: JSON key, env var, default, label, description, help text, secret/required flags, field type, and value type.
 
 ### Key Files
 
 | Module | Schema File | Config File | Schema Endpoint |
 |--------|------------|-------------|-----------------|
+| shared | `config_schema/schema.py` | — | — |
 | `tg-bot` | `tg_jenkins_bot/schema.py` | `tg_jenkins_bot/config.py` | `GET /control/schema` |
 | `agent-control` | `agent_control/schema.py` | `agent_control/config.py` | `GET /control/schema` |
 | `config-ui` | `config_ui/schema.py` | — (config-ui only reads/writes JSON) | `GET /api/config/schema` |
@@ -42,7 +43,7 @@ schema.py (FieldDef declarations)
 
 ### `resolve_fields()` and `_coerce()`
 
-Each module's `schema.py` provides a generic `resolve_fields(fields, config_path)` function that implements the precedence chain. Values are automatically coerced to their declared `value_type` (`str`, `int`, `bool`, `list[int]`) via the `_coerce()` helper.
+`resolve_fields(fields, config_path)` and `_coerce()` live in `libs/config-schema/src/config_schema/schema.py`. All modules import them from `config_schema`. Values are automatically coerced to their declared `value_type` (`str`, `int`, `bool`, `list[int]`) via the `_coerce()` helper.
 
 ### `post_resolve()` (bot only)
 
@@ -58,7 +59,7 @@ All services resolve configuration in the same strict order:
 JSON Config File (Web UI)  >  Environment Variable  >  .env file  >  Hardcoded Default
 ```
 
-Both `Config.resolve()` (tg-bot) and `AgentConfig.resolve()` (agent-control) delegate to `resolve_fields()` in their `schema.py`, which implements this chain identically:
+Both `Config.resolve()` (tg-bot) and `AgentConfig.resolve()` (agent-control) delegate to `resolve_fields()` from `config_schema`, which implements this chain:
 
 1. Check the JSON file at `CONFIG_PATH` for a dotted key (e.g., `"telegram.bot_token"`)
 2. Fall back to the corresponding env var (e.g., `TELEGRAM_BOT_TOKEN`)

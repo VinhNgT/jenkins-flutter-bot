@@ -85,9 +85,12 @@ RUN mkdir -p ${GRADLE_USER_HOME} \
 # its own Python.
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
 WORKDIR /app
-COPY apps/agent-control/pyproject.toml apps/agent-control/uv.lock ./
-COPY apps/agent-control/src ./src
-RUN uv sync --frozen --no-dev --no-editable --python 3.12
+COPY pyproject.toml uv.lock ./
+COPY libs/config-schema/pyproject.toml libs/config-schema/
+COPY libs/config-schema/src libs/config-schema/src
+COPY apps/agent-control/pyproject.toml apps/agent-control/
+COPY apps/agent-control/src apps/agent-control/src
+RUN uv sync --frozen --no-dev --no-editable --package agent-control --python 3.12
 ENV PATH="/app/.venv/bin:${PATH}"
 
 RUN chown -R jenkins:jenkins /app /opt/uv-python /home/jenkins/.gradle

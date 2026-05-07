@@ -21,6 +21,8 @@ A self-hosted CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins
 
 ```text
 jenkins-flutter-bot/
+├── pyproject.toml                  uv workspace root (virtual — not installable)
+├── uv.lock                         Single lockfile for all workspace members
 ├── apps/                           Deployable Python applications
 │   ├── tg-jenkins-bot/             Telegram bot — trigger layer + webhook receiver
 │   │   ├── Dockerfile
@@ -28,7 +30,7 @@ jenkins-flutter-bot/
 │   │   └── src/tg_jenkins_bot/
 │   │       ├── main.py             FastAPI entry point, lifespan hook
 │   │       ├── config.py           Config dataclass (delegates to schema.py)
-│   │       ├── schema.py           Declarative field definitions + resolve_fields()
+│   │       ├── schema.py           Bot field declarations (imports from config_schema)
 │   │       ├── control.py          BotManager lifecycle + /control/* API
 │   │       ├── bot/
 │   │       │   ├── context.py      Build tracking, history, Drive upload, notification
@@ -44,7 +46,7 @@ jenkins-flutter-bot/
 │   │   ├── pyproject.toml
 │   │   └── src/config_ui/
 │   │       ├── app.py              Config CRUD, service control, Drive OAuth
-│   │       ├── schema.py           Declarative UI field definitions
+│   │       ├── schema.py           UI field declarations (imports from config_schema)
 │   │       ├── drive.py            DriveOAuthManager (browser-redirect flow)
 │   │       ├── static/             Frontend assets (index.html, style.css, JS modules)
 │   │       └── templates/          Jinja2 templates (oauth_callback.html)
@@ -54,8 +56,15 @@ jenkins-flutter-bot/
 │       └── src/agent_control/
 │           ├── main.py             FastAPI app factory, lifespan, CLI entry
 │           ├── config.py           AgentConfig dataclass (delegates to schema.py)
-│           ├── schema.py           Declarative field definitions + resolve_fields()
+│           ├── schema.py           Agent field declarations (imports from config_schema)
 │           └── control.py          AgentManager + /control/* routes
+│
+├── libs/                           Shared workspace libraries
+│   └── config-schema/              Declarative configuration schema framework
+│       ├── pyproject.toml
+│       └── src/config_schema/
+│           ├── __init__.py         Public API: FieldDef, resolve_fields, serialize_schema
+│           └── schema.py           FieldDef, nested_get, _coerce, resolve_fields, serialize_schema
 │
 ├── .github/
 │   └── workflows/
@@ -75,9 +84,9 @@ jenkins-flutter-bot/
 
 ### Naming Conventions
 
-- **Directory names**: `kebab-case` (e.g., `tg-jenkins-bot`, `config-ui`, `agent-control`).
-- **Python packages**: `snake_case` matching the directory name (e.g., `tg_jenkins_bot`, `config_ui`, `agent_control`).
-- **Source layout**: All apps use PyPA `src` layout — code lives under `src/<package_name>/`.
+- **Directory names**: `kebab-case` (e.g., `tg-jenkins-bot`, `config-ui`, `agent-control`, `config-schema`).
+- **Python packages**: `snake_case` matching the directory name (e.g., `tg_jenkins_bot`, `config_ui`, `agent_control`, `config_schema`).
+- **Source layout**: All apps and libraries use PyPA `src` layout — code lives under `src/<package_name>/`.
 
 ---
 
@@ -114,7 +123,7 @@ Jenkins UI    → jenkins:8080 (exposed) → flutter-agent:9091 (internal)
 
 5. **Bot-Scoped Tracking** — The bot only tracks builds it triggered. It maintains its own build history and state independently of Jenkins — it never queries Jenkins to reconstruct what it has already tracked locally.
 
-6. **Consistent Packaging** — All three apps use uv with `src` layout, `pyproject.toml`, and `[project.scripts]` entry points. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12, so uv manages both Python and dependencies).
+6. **uv Workspace** — The repo is structured as a uv workspace with a root `pyproject.toml` and a single `uv.lock`. All workspace members (`apps/*` and `libs/*`) share a unified lockfile for consistent dependency versions. Shared code lives in `libs/config-schema/` — a workspace library that all apps depend on. Dev tools (`mypy`, `ruff`) are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12, so uv manages both Python and dependencies).
 
 7. **Config-UI is Setup-Only** — The config-ui dashboard is a convenience for initial configuration and operational control. On first boot with missing configuration, services may depend on config-ui to provide settings via the web dashboard. Once configured, every service must auto-start independently on subsequent boots — resolving all configuration from env vars / `.env` files / JSON config without any dependency on config-ui. The only feature exclusive to config-ui is the Google Drive OAuth browser-redirect flow (one-time setup).
 
@@ -143,3 +152,4 @@ The architecture supports these evolutions without structural changes:
 - **Multiple agents** — add more agent services with different `JENKINS_AGENT_NAME` values.
 - **Additional build targets** — iOS, web, etc. The bot just needs the artifact file and metadata from the webhook.
 - **Notification channels** — the `on_build_success` / `on_build_failure` handlers can extend to Slack, email, etc.
+- **Additional shared libraries** — add new packages under `libs/` and they are automatically picked up by the workspace via the `libs/*` member glob.

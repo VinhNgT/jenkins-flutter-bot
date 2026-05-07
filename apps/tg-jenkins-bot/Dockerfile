@@ -4,10 +4,18 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
+# Workspace root
 COPY pyproject.toml uv.lock ./
-COPY src ./src
 
-RUN uv sync --frozen --no-dev --no-editable
+# Shared library
+COPY libs/config-schema/pyproject.toml libs/config-schema/
+COPY libs/config-schema/src libs/config-schema/src
+
+# This app
+COPY apps/tg-jenkins-bot/pyproject.toml apps/tg-jenkins-bot/
+COPY apps/tg-jenkins-bot/src apps/tg-jenkins-bot/src
+
+RUN uv sync --frozen --no-dev --no-editable --package tg-jenkins-bot
 
 FROM python:3.12-slim
 

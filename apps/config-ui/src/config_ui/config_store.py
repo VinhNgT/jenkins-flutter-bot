@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from config_schema import nested_get
 from .schema import UI_FIELDS
 
 # ---------------------------------------------------------------------------
@@ -43,20 +44,6 @@ def extract_required_fields(schema: dict[str, Any] | None) -> tuple[str, ...]:
     if not schema or "fields" not in schema:
         return ()
     return tuple(f["key"] for f in schema["fields"] if f.get("required"))
-
-# ---------------------------------------------------------------------------
-# Nested dict helpers
-# ---------------------------------------------------------------------------
-
-
-def nested_get(data: dict[str, Any], dotted_key: str) -> Any:
-    """Read a value from a nested dict using a dotted key path."""
-    current: Any = data
-    for part in dotted_key.split("."):
-        if not isinstance(current, dict) or part not in current:
-            return None
-        current = current[part]
-    return current
 
 
 def nested_set(data: dict[str, Any], dotted_key: str, value: Any) -> None:

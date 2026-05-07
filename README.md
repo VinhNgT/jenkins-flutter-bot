@@ -12,6 +12,9 @@ A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram
 │   ├── config-ui/              Python — Web dashboard for stack configuration
 │   └── agent-control/          Python — HTTP control wrapper for the Jenkins agent
 │
+├── libs/                       Shared workspace libraries
+│   └── config-schema/          Python — Declarative configuration schema framework
+│
 └── infra/                      Infrastructure & CI/CD
     └── jenkins/                Docker Compose stack, agent Dockerfile, controller Dockerfile
 ```
@@ -41,12 +44,16 @@ This builds and starts all four services. Open the config UI at **http://localho
 
 ### Local Development
 
-Each app is self-contained with its own dependencies:
+The repo uses a **uv workspace** with a single lockfile at the root:
 
 ```bash
-cd apps/tg-jenkins-bot
+# Install all workspace members
 uv sync
-uv run tg-jenkins-bot
+
+# Run a specific app
+uv run --package tg-jenkins-bot tg-jenkins-bot
+uv run --package config-ui config-ui
+uv run --package agent-control agent-control
 ```
 
 ## License

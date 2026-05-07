@@ -89,7 +89,7 @@ git push origin v1.2.3
 
 ### tg-jenkins-bot and config-ui
 
-Both follow the same two-stage pattern:
+Both follow the same two-stage pattern. Build context is the **repo root** for all services (required to access the shared `libs/config-schema/` library):
 
 ```dockerfile
 # Stage 1: uv builder
@@ -97,21 +97,26 @@ FROM python:3.12-slim AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-COPY src ./src
-RUN uv sync --frozen --no-dev --no-editable
+COPY libs/config-schema/pyproject.toml libs/config-schema/
+COPY libs/config-schema/src libs/config-schema/src
+COPY apps/<app-name>/pyproject.toml apps/<app-name>/
+COPY apps/<app-name>/src apps/<app-name>/src
+RUN uv sync --frozen --no-dev --no-editable --package <package-name>
 
 # Stage 2: slim runtime (no uv, no build tools)
 FROM python:3.12-slim
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
-ENTRYPOINT ["<project-scripts-entry>"]
+CMD ["<project-scripts-entry>"]
 ```
 
 Key points:
 - `uv sync --frozen` uses the lockfile for reproducible installs
+- `--package <name>` installs only the target app + its workspace dependencies
 - `--no-dev` excludes mypy, ruff, etc.
 - `--no-editable` installs the package properly (not as an editable link)
 - The final image has no `uv`, no build caches, no dev deps
+- `.dockerignore` at repo root excludes `.git/`, `.venv/`, `__pycache__/`, etc.
 
 ### flutter-agent (Exception)
 
@@ -124,7 +129,7 @@ Key conventions:
 - **`platform: linux/amd64`** is set in docker-compose — Flutter does not support Android release builds on Linux ARM64; x86_64 emulation is required on Apple Silicon hosts
 - **Gradle memory tuning** via `GRADLE_OPTS` — daemon disabled, JVM heap capped, VFS watching disabled. See the Dockerfile comments for rationale.
 
-The flutter-agent's Docker Compose build context is the **repo root** (`../..` from `infra/jenkins/`) so the Dockerfile can access `apps/agent-control/`.
+The flutter-agent's Docker Compose build context is the **repo root** (`../..` from `infra/jenkins/`) — same as all other services, since all need access to the workspace root and shared library.
 
 ---
 

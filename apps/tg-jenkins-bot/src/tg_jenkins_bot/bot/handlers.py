@@ -247,10 +247,6 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         entry = " · ".join(parts)
         lines.append(f'• {entry}    <a href="{_escape(b.drive_link)}">Download</a>')
 
-    if ctx.drive_folder_link:
-        lines.append("")
-        lines.append(f'📂 <a href="{_escape(ctx.drive_folder_link)}">Browse all builds on Google Drive</a>')
-
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 

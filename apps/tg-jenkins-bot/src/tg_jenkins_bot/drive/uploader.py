@@ -82,8 +82,9 @@ class DriveUploader:
     ) -> tuple[str, str]:
         """Find or create a Drive folder by name. Returns (folder_id, folder_link).
 
-        The folder is made publicly accessible (anyone with the link can view)
-        so all uploaded files are immediately accessible without login.
+        The folder itself is private. Public access is granted per-file in
+        _upload_file_sync so each APK gets its own random, unguessable URL
+        and the folder cannot be browsed by someone who finds a single link.
         """
         service = self._get_drive_service(creds)
 
@@ -119,14 +120,6 @@ class DriveUploader:
                 folder_id,
             )
 
-        # Make the folder public — propagates to all files inside.
-        # Idempotent: Drive silently updates an existing 'anyone' permission.
-        service.permissions().create(
-            fileId=folder_id,
-            body={"type": "anyone", "role": "reader"},
-            fields="id",
-        ).execute()
-
         return folder_id, self._folder_link(folder_id)
 
     async def ensure_folder(
@@ -151,6 +144,10 @@ class DriveUploader:
         folder_id: str,
     ) -> tuple[str, str]:
         """Upload a file to Google Drive (blocking).
+
+        Each file is made individually public (anyone with the link can view)
+        so the download URL works without a Google login. The folder itself
+        is kept private — individual file IDs are random and unguessable.
 
         Returns (file_id, web_view_link).
         """
@@ -177,6 +174,14 @@ class DriveUploader:
 
         file_id = file["id"]
         web_link = file.get("webViewLink", "")
+
+        # Grant public read access to this file only.
+        # Idempotent: Drive silently updates an existing 'anyone' permission.
+        service.permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"},
+            fields="id",
+        ).execute()
 
         logger.info("Uploaded: %s -> %s", filename, web_link)
         return file_id, web_link

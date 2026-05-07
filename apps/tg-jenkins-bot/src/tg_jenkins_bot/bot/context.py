@@ -133,7 +133,6 @@ class BotContext:
         self.jenkins = jenkins
         self.drive = drive
         self.bot = bot
-        self.drive_folder_link: str | None = None  # set after first upload
         self._pending_path = Path("data/pending_builds.json")
         self._pending: dict[str, PendingBuild] = self._load_pending()
         self._history_path = Path("data/build_history.json")
@@ -383,8 +382,7 @@ class BotContext:
                 f"{file_prefix}-{dt_now.strftime('%Y%m%d-%H%M')}-{short_hash}.apk"
             )
 
-            folder_id, folder_link = await self.drive.ensure_folder(creds, folder_name)
-            self.drive_folder_link = folder_link
+            folder_id, _ = await self.drive.ensure_folder(creds, folder_name)
             file_id, drive_link = await self.drive.upload_file(
                 artifact_path, filename, creds, folder_id
             )

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 
 if TYPE_CHECKING:
     from ..bot.context import BotContext
@@ -54,7 +55,17 @@ async def handle_build_complete(
     # ------------------------------------------------------------------
     # 1. Parse and validate metadata BEFORE writing artifact to disk
     # ------------------------------------------------------------------
-    metadata_obj = json.loads(metadata)
+    # strict=False allows literal control characters (e.g. bare newlines in
+    # log strings) that Jenkins pipelines may embed without escaping.
+    try:
+        metadata_obj = json.loads(metadata, strict=False)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to parse webhook metadata: %s", exc)
+        return JSONResponse(
+            status_code=422,
+            content={"status": "error", "detail": f"Invalid metadata JSON: {exc}"},
+        )
+
     request_id = metadata_obj.get("request_id")
     job_id = metadata_obj.get("job_id")
     status = metadata_obj.get("status", "unknown")

@@ -54,9 +54,15 @@ jenkins-flutter-bot/
 │           ├── config.py           AgentConfig resolution
 │           └── control.py          AgentManager + /control/* routes
 │
+├── .github/
+│   └── workflows/
+│       └── build-images.yml        CI — builds & pushes Docker images to GHCR on version tags
+│
 ├── infra/                          Infrastructure & CI/CD
 │   └── jenkins/
 │       ├── docker-compose.yml      Stack orchestration (4 services; jenkins is dev-only)
+│       ├── docker-compose.prod.yml Production override — pulls pre-built images from GHCR
+│       ├── compose.sh              Helper: `./compose.sh [prod] <args>`
 │       ├── Dockerfile              Jenkins controller (dev/testing convenience)
 │       ├── Dockerfile.flutter-agent  Multi-stage (SDKs + agent-control via uv)
 │       └── .env.example            Reference env vars

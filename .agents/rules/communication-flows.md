@@ -32,8 +32,26 @@ The Jenkins pipeline runs on the flutter-agent. When it finishes:
 
 Jenkins POSTs to `/webhook/build-complete` with two multipart fields:
 
-- **`metadata`**: JSON string containing `request_id`, `job_id`, `status`, `commit_hash`, etc. Must be annotated with `Form()` in the FastAPI handler to correctly parse multipart form data.
+- **`metadata`**: JSON string containing `request_id`, `job_id`, `status`, `commit_hash`, and optionally `logs` (on failure only). Must be annotated with `Form()` in the FastAPI handler to correctly parse multipart form data.
 - **`artifact`** (optional): the built APK file, present only on success
+
+### Metadata JSON Schema
+
+```json
+{
+  "request_id": "<128-bit hex token>",
+  "job_id": "<jenkins job name>",
+  "status": "success" | "failure",
+  "commit_hash": "<full or short git hash>",
+  "logs": "<last N lines of build output>"  // failure only, optional
+}
+```
+
+The `logs` field is only sent on failure. The bot reads it via `metadata.get("logs", "")` and passes it to `_summarize_logs()` to extract the first meaningful error line for the Telegram notification.
+
+### JSON Parsing — `strict=False`
+
+The metadata JSON is parsed with `json.loads(metadata, strict=False)`. Jenkins pipelines may embed literal control characters (bare newlines, tabs) inside string values — e.g., when log output is inlined into the JSON. The `strict=False` flag allows these without raising a `JSONDecodeError`.
 
 ### Security Model
 
@@ -51,6 +69,25 @@ The handler validates metadata **before** writing any artifact to disk. This pre
 3. Look up `request_id` in pending builds — reject if not found, no file I/O occurs
 4. Only after validation: write artifact to temp file and process
 5. Always clean up temporary files regardless of outcome
+
+---
+
+## Build Failure Notifications
+
+When a build fails, the bot sends a Telegram message with a one-line error summary extracted from the `logs` metadata field using `_summarize_logs()`:
+
+```python
+def _summarize_logs(logs: str) -> str:
+    """Extract the first meaningful error line from raw build logs."""
+```
+
+The function iterates through log lines and skips:
+- Blank lines
+- Lines starting with common boilerplate prefixes: `[INFO]`, `Downloading`, `Download`, `Note:`, `> Task`, `BUILD SUCCESSFUL`, `Picked up`, `Running `, `Starting `, `Cloning `, `Checking out`, `using credential`
+
+The first non-skipped line is returned, capped at 200 characters. If no meaningful line is found, it returns `"No details available."`.
+
+The Jenkinsfile is responsible for capturing and forwarding logs. The bot itself only summarizes — it never queries Jenkins for build logs.
 
 ---
 
@@ -76,10 +113,21 @@ OAuth is handled exclusively by config-ui via a **browser-redirect flow**. The b
 
 1. Admin clicks "Connect Google Drive" in the config-ui dashboard
 2. Config-ui's `DriveOAuthManager.start()` generates a consent URL with `/api/drive/oauth/callback` as the `redirect_uri`
-3. Admin authorizes in a popup window → Google redirects back to config-ui's callback
-4. Config-ui exchanges the authorization response for tokens via `exchange_callback()`
-5. Tokens are saved to `oauth.json` on the shared `bot-config` volume
-6. The callback page uses `window.opener.postMessage()` to signal the dashboard that auth completed, then auto-closes
+3. A popup window opens (`window.open()` — **without `noopener`**, so the callback page can reach `window.opener`)
+4. Admin authorizes in the popup → Google redirects back to config-ui's callback
+5. Config-ui exchanges the authorization response for tokens via `exchange_callback()`
+6. Tokens are saved to `oauth.json` on the shared `bot-config` volume
+7. The callback page uses `window.opener.postMessage()` to signal the dashboard that auth completed, then auto-closes
+
+### Frontend "Connecting" State
+
+The "Connecting" state is managed **entirely by the frontend** — there is no `auth_pending` backend flag. The dashboard shows a `<dialog>` modal (spinner + Cancel button) that:
+- Opens before `window.open()` so the user always sees it first
+- Polls `popup.closed` at 500ms intervals with an `oauthCompleted` guard flag to avoid race conditions
+- Closes automatically when the popup closes (either from success, Cancel button, or user closing the tab)
+- Suppresses the Escape key (`cancel` event `preventDefault()`) to prevent accidental dismissal
+
+Do NOT add a backend `auth_pending` property to `DriveOAuthManager` — the design intentionally keeps this state in the frontend only.
 
 ### Token Consumption
 
@@ -92,6 +140,19 @@ Config-ui stores the in-progress OAuth flow object in memory as `_pending_flow`.
 ### HTTP Development
 
 `DriveOAuthManager._allow_insecure_transport()` automatically sets `OAUTHLIB_INSECURE_TRANSPORT=1` when the redirect URI uses `http://`. No manual environment configuration is needed for local/Docker development.
+
+---
+
+## Google Drive File Access
+
+Each uploaded APK is made individually public by calling `permissions().create()` on the **file** (not the folder) with `{"type": "anyone", "role": "reader"}` immediately after upload:
+
+- The Drive folder itself is **private** — it cannot be browsed by someone who finds a single download link
+- Each file gets its own unique, random 33-character file ID — effectively unguessable
+- The `webViewLink` returned by the upload API is the canonical download link sent to Telegram
+- `delete_file()` cleans up both the file and its permissions atomically
+
+Do NOT set `anyone/reader` on the folder — this would expose the entire build history to anyone with the folder link.
 
 ---
 
@@ -112,7 +173,7 @@ After a successful build upload and Telegram notification, the bot records a `Co
 
 - Stored as `list[CompletedBuild]` in `BotContext`
 - Persisted to `data/build_history.json` for crash recovery
-- Each entry tracks: `drive_file_id`, `drive_link`, `filename`, `ref`, `completed_at`
+- Each entry tracks: `drive_file_id`, `drive_link`, `filename`, `ref`, `completed_at`, `commit_hash`
 - Powers the `/recent` command (bot-scoped — only shows Telegram-triggered builds)
 
 ---

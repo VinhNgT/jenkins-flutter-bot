@@ -9,6 +9,8 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 - [Prerequisites](#prerequisites)
 - [Step 1 — Clone the Repository](#step-1--clone-the-repository)
 - [Step 2 — Start the Docker Stack](#step-2--start-the-docker-stack)
+  - [Development Mode (build locally)](#development-mode-build-locally)
+  - [Production Mode (pull from GHCR)](#production-mode-pull-from-ghcr)
 - [Step 3 — Set Up Jenkins](#step-3--set-up-jenkins)
   - [3a. Initial Jenkins Setup](#3a-initial-jenkins-setup)
   - [3b. Create the Flutter Agent Node](#3b-create-the-flutter-agent-node)
@@ -54,12 +56,47 @@ cd jenkins-flutter-bot
 
 ## Step 2 — Start the Docker Stack
 
+### Development Mode (build locally)
+
+```bash
+cd infra/jenkins
+./compose.sh up -d --build
+```
+
+Or equivalently, without the helper script:
+
 ```bash
 cd infra/jenkins
 docker compose up -d --build
 ```
 
-This builds and starts all four services:
+Builds all images from source. Use this for active development or testing local changes.
+
+### Production Mode (pull from GHCR)
+
+Pre-built images are published to GitHub Container Registry on every version tag. No local build required:
+
+```bash
+cd infra/jenkins
+./compose.sh prod up -d
+```
+
+To pin a specific release:
+
+```bash
+IMAGE_TAG=v1.2.3 ./compose.sh prod up -d
+```
+
+To release a new version, push a version tag — GitHub Actions handles building and pushing:
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+> **Note:** The `jenkins` service has no pre-built image — it's a local development convenience. In production, remove the `jenkins` service from the compose stack and point `JENKINS_URL` to your external Jenkins instance.
+
+This starts all four services:
 
 | Service          | URL                    | Purpose                                    |
 | ---------------- | ---------------------- | ------------------------------------------ |
@@ -196,12 +233,22 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
                script {
                    if (params.BOT_CALLBACK_URL) {
                        def apkPath = 'build/app/outputs/flutter-apk/app-release.apk'
-                       def commitHash = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                       def metadata = """{"request_id":"${params.BOT_REQUEST_ID}","job_id":"${params.BOT_JOB_ID}","status":"success","commit_hash":"${commitHash}"}"""
+                       def commitHash = ''
+                       try {
+                           commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
+                       } catch (e) {
+                           commitHash = 'unknown'
+                       }
+                       def metadata = groovy.json.JsonOutput.toJson([
+                           request_id : params.BOT_REQUEST_ID,
+                           job_id     : params.BOT_JOB_ID,
+                           status     : 'success',
+                           commit_hash: commitHash,
+                       ])
 
                        sh """
-                           curl -X POST "${params.BOT_CALLBACK_URL}" \
-                               -F 'metadata=${metadata}' \
+                           curl -X POST "${params.BOT_CALLBACK_URL}" \\
+                               -F 'metadata=${metadata}' \\
                                -F "artifact=@${apkPath}"
                        """
                    }
@@ -211,11 +258,23 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
            failure {
                script {
                    if (params.BOT_CALLBACK_URL) {
-                       def commitHash = sh(script: 'git rev-parse HEAD || echo unknown', returnStdout: true).trim()
-                       def metadata = """{"request_id":"${params.BOT_REQUEST_ID}","job_id":"${params.BOT_JOB_ID}","status":"failure","commit_hash":"${commitHash}"}"""
+                       def commitHash = ''
+                       try {
+                           commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
+                       } catch (e) {
+                           commitHash = 'unknown'
+                       }
+                       def logs = currentBuild.rawBuild.getLog(50).join('\n')
+                       def metadata = groovy.json.JsonOutput.toJson([
+                           request_id : params.BOT_REQUEST_ID,
+                           job_id     : params.BOT_JOB_ID,
+                           status     : 'failure',
+                           commit_hash: commitHash,
+                           logs       : logs,
+                       ])
 
                        sh """
-                           curl -X POST "${params.BOT_CALLBACK_URL}" \
+                           curl -X POST "${params.BOT_CALLBACK_URL}" \\
                                -F 'metadata=${metadata}'
                        """
                    }
@@ -238,6 +297,8 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
    ```
 
    > **Adapt this pipeline** to your specific Flutter project. The key contract is the `post` block — it must POST a multipart form to `BOT_CALLBACK_URL` with a `metadata` JSON field (and an `artifact` file on success). Replace the `url` and `credentialsId` with your own values.
+   >
+   > `groovy.json.JsonOutput.toJson()` is used for metadata serialization — it correctly handles any special characters in commit hashes or log output. Do not use Groovy string interpolation to build JSON manually.
 
 6. Click **Save**
 
@@ -357,6 +418,8 @@ After saving the Drive credentials:
 2. A popup window will open asking you to authorize with your Google account
 3. Select your account and grant the requested permissions
 4. The popup will auto-close on success and the dashboard will show "Connected"
+
+> **Note:** Each APK upload gets its own unique, unguessable download link. The Drive folder itself is private — the shared link only grants access to the specific file, not the entire build history.
 
 ---
 

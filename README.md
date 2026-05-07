@@ -1,5 +1,7 @@
 # 🏗️ Jenkins Flutter Bot — Monorepo
 
+[![Build & Push Docker Images](https://github.com/VinhNgT/jenkins-flutter-bot/actions/workflows/build-images.yml/badge.svg)](https://github.com/VinhNgT/jenkins-flutter-bot/actions/workflows/build-images.yml)
+
 A monorepo for the Jenkins-based Flutter CI/CD ecosystem, including the Telegram bot trigger layer, config UI dashboard, agent control wrapper, and supporting infrastructure.
 
 ## Repository Structure

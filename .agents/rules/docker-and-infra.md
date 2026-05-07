@@ -1,12 +1,12 @@
 ---
 trigger: glob
-globs: **/Dockerfile*, **/docker-compose.yml
-description: Docker volumes, networking, multi-stage build patterns, and agent Dockerfile specifics.
+globs: **/Dockerfile*, **/docker-compose*.yml, **/compose.sh
+description: Docker volumes, networking, multi-stage build patterns, agent Dockerfile specifics, and CI/CD image pipeline.
 ---
 
 # Docker & Infrastructure
 
-Triggered when editing Dockerfiles or docker-compose.yml. Covers volumes, networking, image build patterns, and the flutter-agent's uv exception.
+Triggered when editing Dockerfiles, docker-compose files, or compose.sh. Covers volumes, networking, image build patterns, the flutter-agent's uv exception, and the CI/CD image release pipeline.
 
 ---
 
@@ -34,6 +34,54 @@ All services share a single Docker bridge network (`jenkins`). Only two ports ar
 | 9091 | flutter-agent | Internal only | Agent control API |
 
 Do not expose bot or agent ports to the host.
+
+---
+
+## Dev vs Production Compose
+
+Two compose modes are provided via `compose.sh` in `infra/jenkins/`:
+
+```bash
+./compose.sh [args]          # Dev — builds images locally from source
+./compose.sh prod [args]     # Prod — pulls pre-built images from GHCR
+```
+
+**Dev mode** (`docker-compose.yml` only):
+- Builds all images from local source on every `--build`
+- Use for active development and testing changes
+
+**Production mode** (`docker-compose.yml` + `docker-compose.prod.yml`):
+- The prod override sets `build: null` and points each service to a GHCR image
+- Images are pulled from `ghcr.io/vinhngt/jenkins-flutter-bot/<name>:<tag>`
+- Defaults to `latest`; pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`
+- The `jenkins` service has **no** prod override — it's a dev/testing convenience only. Remove it from the stack for production deployments pointing at an external Jenkins.
+
+`IMAGE_TAG` is a compose-invocation variable only — it is not set inside any container.
+
+---
+
+## CI/CD Image Pipeline
+
+Defined in `.github/workflows/build-images.yml`. Triggers on version tags matching `v*.*.*`.
+
+Three images are built and pushed to GHCR:
+
+| Image | Platforms | Registry Path |
+|-------|-----------|---------------|
+| `tg-bot` | `linux/amd64`, `linux/arm64` | `ghcr.io/vinhngt/jenkins-flutter-bot/tg-bot` |
+| `config-ui` | `linux/amd64`, `linux/arm64` | `ghcr.io/vinhngt/jenkins-flutter-bot/config-ui` |
+| `flutter-agent` | `linux/amd64` only | `ghcr.io/vinhngt/jenkins-flutter-bot/flutter-agent` |
+
+Each image is tagged with both the exact version (e.g., `v1.2.3`) and `latest`.
+
+`flutter-agent` is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
+
+**To release a new version:** push a `v*.*.*` tag. GitHub Actions handles the rest.
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
 
 ---
 

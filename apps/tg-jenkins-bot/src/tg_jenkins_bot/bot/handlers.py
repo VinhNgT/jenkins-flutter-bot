@@ -62,8 +62,10 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Handle /start and /help commands — welcome message."""
     if not update.message:
         return
+    ctx = _get_ctx(context)
+    app_name = _escape(ctx.config.app_name)
     await update.message.reply_text(
-        "👋 Hi! I'll build your app and send you a download link "
+        f"👋 Hi! I'll build <b>{app_name}</b> and send you a download link "
         "when it's ready.\n"
         "\n"
         "<b>Commands:</b>\n"
@@ -121,9 +123,10 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     ctx.add_pending(request_id, chat_id, ref, queue_id=queue_id)
 
+    app_name = _escape(ctx.config.app_name)
     started = _format_time(ctx.get_pending(request_id).triggered_at)
     await update.message.reply_text(
-        "🔨 <b>Building your app...</b>\n"
+        f"🔨 <b>Building {app_name}...</b>\n"
         "\n"
         f"Branch:  <code>{_escape(ref)}</code>\n"
         f"Started: {started}\n"
@@ -160,12 +163,13 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     pending = ctx.pending_count
 
     # Headline
+    app_name = _escape(ctx.config.app_name)
     if pending > 0:
-        headline = f"🟡 <b>Build in progress ({pending} active)</b>"
+        headline = f"🟡 <b>Building {app_name} ({pending} active)</b>"
     elif ready:
-        headline = "🟢 <b>Ready to build</b>"
+        headline = f"🟢 <b>Ready to build {app_name}</b>"
     else:
-        headline = "🔴 <b>Not ready</b>"
+        headline = f"🔴 <b>{app_name} — Not ready</b>"
 
     job_name = _escape(ctx.config.jenkins_job_name)
     folder_name = _escape(ctx.config.drive_folder_name or "flutter-builds")
@@ -231,7 +235,8 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("📭 No builds yet.")
         return
 
-    lines = ["📦 <b>Recent Builds</b>\n"]
+    app_name = _escape(ctx.config.app_name)
+    lines = [f"📦 <b>Recent {app_name} Builds</b>\n"]
     for b in builds:
         short_hash = b.commit_hash[:7] if b.commit_hash else ""
         date_str = _format_date(b.completed_at)

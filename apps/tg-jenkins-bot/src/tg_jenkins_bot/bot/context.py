@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -21,6 +22,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 PENDING_BUILD_TTL = 3600  # 1 hour
+
+
+def _slugify(text: str) -> str:
+    """Convert a display name to a safe filename prefix.
+
+    'Tendoo Mall' -> 'tendoo-mall'
+    'my_app'      -> 'my-app'
+    """
+    slug = text.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = slug.strip("-")
+    return slug or "build"
 
 
 @dataclass(frozen=True)
@@ -348,9 +361,10 @@ class BotContext:
         try:
             creds = self.drive.load_tokens()
             if not creds:
+                app_name = _escape(self.config.app_name)
                 await self.bot.send_message(
                     pending.chat_id,
-                    "⚠️ <b>Build succeeded, but Google Drive isn't connected.</b>\n"
+                    f"⚠️ <b>{app_name} built successfully, but Google Drive isn't connected.</b>\n"
                     "\n"
                     f"Branch:  <code>{_escape(pending.ref)}</code>\n"
                     f"Commit:  <code>{_escape(short_hash)}</code>\n"
@@ -360,11 +374,12 @@ class BotContext:
                 )
                 return
 
-            # Generate filename
+            # Generate filename — slugify app_name for a clean, space-free prefix
             dt_now = datetime.now(timezone.utc)
             folder_name = self.config.drive_folder_name or "flutter-builds"
+            file_prefix = _slugify(self.config.app_name)
             filename = (
-                f"{folder_name}-{dt_now.strftime('%Y%m%d-%H%M')}-{short_hash}.apk"
+                f"{file_prefix}-{dt_now.strftime('%Y%m%d-%H%M')}-{short_hash}.apk"
             )
 
             folder_id = await self.drive.ensure_folder(creds, folder_name)
@@ -372,9 +387,10 @@ class BotContext:
                 artifact_path, filename, creds, folder_id
             )
 
+            app_name = _escape(self.config.app_name)
             await self.bot.send_message(
                 pending.chat_id,
-                "✅ <b>Your app is ready!</b>\n"
+                f"✅ <b>{app_name} is ready!</b>\n"
                 "\n"
                 f"Branch:  <code>{_escape(pending.ref)}</code>\n"
                 f"Commit:  <code>{_escape(short_hash)}</code>\n"
@@ -397,9 +413,10 @@ class BotContext:
 
         except Exception:
             logger.exception("Failed to upload/notify for build %s", commit_hash)
+            app_name = _escape(self.config.app_name)
             await self.bot.send_message(
                 pending.chat_id,
-                "⚠️ <b>Build succeeded, but the download couldn't be prepared.</b>\n"
+                f"⚠️ <b>{app_name} built successfully, but the download couldn't be prepared.</b>\n"
                 "\n"
                 f"Branch:  <code>{_escape(pending.ref)}</code>\n"
                 f"Commit:  <code>{_escape(short_hash)}</code>\n"
@@ -425,9 +442,10 @@ class BotContext:
         started = _format_time(pending.triggered_at)
         finished = _format_time(now)
 
+        app_name = _escape(self.config.app_name)
         await self.bot.send_message(
             pending.chat_id,
-            "❌ <b>Build failed</b>\n"
+            f"❌ <b>{app_name} build failed</b>\n"
             "\n"
             f"Branch:  <code>{_escape(pending.ref)}</code>\n"
             f"Commit:  <code>{_escape(short_hash)}</code>\n"
@@ -435,6 +453,6 @@ class BotContext:
             "\n"
             f"Error: {error_summary}\n"
             "\n"
-            "Check Jenkins for the full log, or contact your admin.",
+            "Contact your admin for the full log.",
             parse_mode="HTML",
         )

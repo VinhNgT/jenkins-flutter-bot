@@ -64,6 +64,7 @@ class Config:
 
     # Optional
     drive_folder_name: str = ""
+    app_name: str = "your app"
     max_recent_builds: int = 0
     config_ui_url: str = ""
 
@@ -155,6 +156,11 @@ class Config:
                 "drive.folder_name",
                 "DRIVE_FOLDER_NAME",
                 default="",
+            ),
+            app_name=(
+                get_value("bot.app_name", "APP_NAME", default="")
+                or get_value("drive.folder_name", "DRIVE_FOLDER_NAME", default="")
+                or "your app"
             ),
             max_recent_builds=int(
                 get_value(

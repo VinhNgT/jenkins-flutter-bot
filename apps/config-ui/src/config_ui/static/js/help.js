@@ -15,6 +15,9 @@ const FIELD_HELP = {
   'bot:jenkins.api_token':
     'In Jenkins: click your username (top-right) → <strong>Configure</strong> → <strong>API Token</strong> → <strong>Add new Token</strong> → copy the generated token.',
 
+  'bot:bot.app_name':
+    'Name shown to users in bot messages, e.g. "MyApp". Defaults to the Drive folder name if not set, then "your app".',
+
   // ── Jenkins Agent ──
   'agent:agent.name':
     'Must exactly match the node name in Jenkins. Create the node: <strong>Manage Jenkins</strong> → <strong>Nodes</strong> → <strong>New Node</strong> → name it (e.g. <code>flutter-agent</code>).',

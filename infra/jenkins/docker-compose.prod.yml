@@ -6,12 +6,12 @@
 services:
   config-ui:
     build: !reset null
-    image: ghcr.io/vinhNgT/jenkins-flutter-bot/config-ui:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/config-ui:${IMAGE_TAG:-latest}
 
   tg-bot:
     build: !reset null
-    image: ghcr.io/vinhNgT/jenkins-flutter-bot/tg-bot:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-bot:${IMAGE_TAG:-latest}
 
   flutter-agent:
     build: !reset null
-    image: ghcr.io/vinhNgT/jenkins-flutter-bot/flutter-agent:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/flutter-agent:${IMAGE_TAG:-latest}

@@ -56,174 +56,24 @@
           </div>
         </section>
 
-        <!-- ===== Telegram Bot Config ===== -->
+        <!-- ===== Telegram Bot Config (dynamic) ===== -->
         <section id="panel-bot" class="tab-panel" role="tabpanel" hidden>
-          <h2 class="panel-title">Telegram Bot Configuration</h2>
-          <p class="panel-desc">Configures the Telegram bot that receives <code>/build</code> commands and delivers APK download links. Requires a Telegram bot token and a Jenkins server with a pipeline job ready to accept build triggers.</p>
-          <div class="card">
-            <h3>Telegram</h3>
-            <div class="form-grid" data-scope="bot">
-              <div class="field field--secret" data-secret-key="telegram.bot_token">
-                <label>Bot Token</label>
-                <p class="field-desc">Authentication token for the Telegram bot</p>
-                <div class="secret-row">
-                  <input id="f-bot-token" type="password" name="bot:telegram.bot_token" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
-                </div>
-              </div>
-              <div class="field">
-                <label>Allowed Chat IDs</label>
-                <p class="field-desc">Users authorized to trigger builds</p>
-                <input id="f-chat-ids" name="bot:telegram.allowed_chat_ids" />
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>Jenkins Connection</h3>
-            <div class="form-grid" data-scope="bot">
-              <div class="field">
-                <label>Jenkins URL</label>
-                <p class="field-desc">Internal Docker network URL (e.g. http://jenkins:8080)</p>
-                <input id="f-jenkins-url" name="bot:jenkins.url" />
-              </div>
-              <div class="field">
-                <label>Jenkins User</label>
-                <p class="field-desc">Jenkins account with permission to trigger builds</p>
-                <input id="f-jenkins-user" name="bot:jenkins.user" />
-              </div>
-              <div class="field field--secret" data-secret-key="jenkins.api_token">
-                <label>Jenkins API Token</label>
-                <p class="field-desc">Token for triggering pipeline builds</p>
-                <div class="secret-row">
-                  <input id="f-jenkins-token" type="password" name="bot:jenkins.api_token" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
-                </div>
-              </div>
-              <div class="field">
-                <label>Pipeline Job Name</label>
-                <p class="field-desc">Must match the pipeline job name in Jenkins</p>
-                <input id="f-job-name" name="bot:jenkins.job_name" />
-              </div>
-              <div class="field">
-                <label>Jenkins Job ID</label>
-                <p class="field-desc">URL-encoded job ID, visible in Jenkins URL as /job/&lt;id&gt;/</p>
-                <input id="f-job-id" name="bot:jenkins.job_id" />
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>Build Settings</h3>
-            <div class="form-grid" data-scope="bot">
-              <div class="field">
-                <label>App Name</label>
-                <p class="field-desc">Display name shown in bot messages (e.g. "MyApp")</p>
-                <input id="f-app-name" name="bot:bot.app_name" />
-              </div>
-              <div class="field">
-                <label>Drive Folder Name</label>
-                <p class="field-desc">Drive folder for APKs (auto-created if missing)</p>
-                <input id="f-drive-folder" name="bot:drive.folder_name" />
-              </div>
-              <div class="field">
-                <label>Max Recent Builds</label>
-                <p class="field-desc">Build history limit (0 = unlimited)</p>
-                <input id="f-max-builds" name="bot:bot.max_recent_builds" type="number" min="0" />
-              </div>
-              <div class="field">
-                <label>Bot Callback URL</label>
-                <p class="field-desc">Base URL where Jenkins POSTs build results (e.g. http://tg-bot:9090)</p>
-                <input id="f-callback-url" name="bot:bot.callback_url" />
-              </div>
-              <div class="field">
-                <label>Bot Webhook Port</label>
-                <p class="field-desc">Port for the webhook receiver</p>
-                <input id="f-webhook-port" name="bot:bot.webhook_port" type="number" />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-actions">
-            <button class="btn btn-accent" id="save-bot" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M5.5 3A1.5 1.5 0 004 4.5v11A1.5 1.5 0 005.5 17h9a1.5 1.5 0 001.5-1.5V6.621a1.5 1.5 0 00-.44-1.06l-2.12-2.122A1.5 1.5 0 0012.378 3H5.5zM10 13a2 2 0 100-4 2 2 0 000 4zM7 5.5A.5.5 0 017.5 5h4a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-4a.5.5 0 01-.5-.5v-1z"/></svg>Save Bot Config</button>
-            <button class="btn btn-secondary" id="reload-bot" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0110.472-4.001L12.5 8H18V2l-2.052 2.052A8 8 0 1018 10h-2a6 6 0 01-12 0z"/></svg>Reload</button>
+          <div id="schema-container-bot">
+            <p class="text-muted">Loading bot schema…</p>
           </div>
         </section>
 
-        <!-- ===== Jenkins Agent Config ===== -->
+        <!-- ===== Jenkins Agent Config (dynamic) ===== -->
         <section id="panel-agent" class="tab-panel" role="tabpanel" hidden>
-          <h2 class="panel-title">Jenkins Agent Configuration</h2>
-          <p class="panel-desc">Configures the Flutter build agent that connects to Jenkins as an inbound node. The agent runs inside Docker with Flutter and Android SDKs pre-installed. Obtain the agent secret from the node's status page in Jenkins after creating the node.</p>
-          <div class="card">
-            <div class="form-grid" data-scope="agent">
-              <div class="field">
-                <label>Jenkins URL</label>
-                <p class="field-desc">Same Jenkins controller URL used for the agent's inbound connection</p>
-                <input id="f-agent-jenkins-url" name="agent:jenkins.url" />
-              </div>
-              <div class="field">
-                <label>Agent Name</label>
-                <p class="field-desc">Must match the node name in Jenkins</p>
-                <input id="f-agent-name" name="agent:agent.name" />
-              </div>
-              <div class="field field--secret" data-secret-key="agent.secret">
-                <label>Agent Secret</label>
-                <p class="field-desc">Authentication secret from the Jenkins node</p>
-                <div class="secret-row">
-                  <input id="f-agent-secret" type="password" name="agent:agent.secret" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
-                </div>
-              </div>
-              <div class="field">
-                <label>WebSocket Mode</label>
-                <p class="field-desc">WebSocket recommended; disable only for direct TCP tunnels</p>
-                <select id="f-ws-mode" name="agent:agent.web_socket">
-                  <option value="true" selected>Enabled (default)</option>
-                  <option value="false">Disabled (TCP)</option>
-                </select>
-              </div>
-              <div class="field">
-                <label>Tunnel</label>
-                <p class="field-desc">TCP tunnel endpoint (only when WebSocket is disabled)</p>
-                <input id="f-tunnel" name="agent:agent.tunnel" placeholder="host:port" />
-              </div>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-accent" id="save-agent" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M5.5 3A1.5 1.5 0 004 4.5v11A1.5 1.5 0 005.5 17h9a1.5 1.5 0 001.5-1.5V6.621a1.5 1.5 0 00-.44-1.06l-2.12-2.122A1.5 1.5 0 0012.378 3H5.5zM10 13a2 2 0 100-4 2 2 0 000 4zM7 5.5A.5.5 0 017.5 5h4a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-4a.5.5 0 01-.5-.5v-1z"/></svg>Save Agent Config</button>
-            <button class="btn btn-secondary" id="reload-agent" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0110.472-4.001L12.5 8H18V2l-2.052 2.052A8 8 0 1018 10h-2a6 6 0 01-12 0z"/></svg>Reload</button>
+          <div id="schema-container-agent">
+            <p class="text-muted">Loading agent schema…</p>
           </div>
         </section>
 
-        <!-- ===== Google Drive Config ===== -->
+        <!-- ===== Google Drive Config (dynamic + static connection card) ===== -->
         <section id="panel-drive" class="tab-panel" role="tabpanel" hidden>
-          <h2 class="panel-title">Google Drive Configuration</h2>
-          <p class="panel-desc">Connects the bot to Google Drive so it can upload APKs and return shareable links in Telegram. Save your OAuth client credentials first, then click <strong>Connect Google Drive</strong> to authorize via a browser popup. Authorization is a one-time step — the token is stored in a shared volume.</p>
-          <div class="card">
-            <h3>OAuth Credentials</h3>
-            <div class="form-grid" data-scope="ui">
-              <div class="field">
-                <label>Drive Client ID</label>
-                <p class="field-desc">OAuth 2.0 client ID from Google Cloud Console</p>
-                <input id="f-drive-id" name="ui:drive.client_id" />
-              </div>
-              <div class="field field--secret" data-secret-key="drive.client_secret">
-                <label>Drive Client Secret</label>
-                <p class="field-desc">OAuth 2.0 client secret</p>
-                <div class="secret-row">
-                  <input id="f-drive-secret" type="password" name="ui:drive.client_secret" autocomplete="off" />
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="change-secret">Change</button>
-                  <button type="button" class="btn btn-sm btn-secondary" data-action="cancel-secret" hidden>Reset</button>
-                </div>
-              </div>
-            </div>
-            <div class="form-actions">
-              <button class="btn btn-accent" id="save-ui" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M5.5 3A1.5 1.5 0 004 4.5v11A1.5 1.5 0 005.5 17h9a1.5 1.5 0 001.5-1.5V6.621a1.5 1.5 0 00-.44-1.06l-2.12-2.122A1.5 1.5 0 0012.378 3H5.5zM10 13a2 2 0 100-4 2 2 0 000 4zM7 5.5A.5.5 0 017.5 5h4a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-4a.5.5 0 01-.5-.5v-1z"/></svg>Save Drive Config</button>
-              <button class="btn btn-secondary" id="reload-drive" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0110.472-4.001L12.5 8H18V2l-2.052 2.052A8 8 0 1018 10h-2a6 6 0 01-12 0z"/></svg>Reload</button>
-            </div>
+          <div id="schema-container-ui">
+            <p class="text-muted">Loading drive schema…</p>
           </div>
           <div class="card" id="drive-connection">
             <h3>Drive Connection</h3>
@@ -266,6 +116,7 @@
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/tabs.js"></script>
     <script src="/static/js/help.js"></script>
+    <script src="/static/js/schema-renderer.js"></script>
     <script src="/static/js/main.js"></script>
   </body>
 </html>

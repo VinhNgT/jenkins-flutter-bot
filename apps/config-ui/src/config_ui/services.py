@@ -71,3 +71,17 @@ class ServiceClient:
     async def restart(self, service: str) -> dict[str, Any]:
         """Restart a service."""
         return await self._control(service, "restart")
+
+    async def schema(self, service: str) -> dict[str, Any] | None:
+        """Fetch the config field schema from a service."""
+        url = self._service_url(service)
+        if not url:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{url}/control/schema")
+                response.raise_for_status()
+                return response.json()
+        except Exception:
+            logger.exception("Failed to fetch schema from %s", service)
+            return None

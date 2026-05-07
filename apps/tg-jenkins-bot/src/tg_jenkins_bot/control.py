@@ -207,3 +207,11 @@ async def restart_bot(request: Request) -> dict[str, Any]:
 async def bot_status(request: Request) -> dict[str, Any]:
     """Report whether the Telegram bot is configured and running."""
     return _get_manager(request).status()
+
+
+@control_router.get("/schema")
+async def get_schema() -> dict[str, Any]:
+    """Return the bot module's config field schema."""
+    from .schema import BOT_FIELDS, MODULE_DESCRIPTION, MODULE_TITLE, serialize_schema
+
+    return serialize_schema(BOT_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)

@@ -1,43 +1,11 @@
-"""Flat environment-based configuration."""
+"""Bot configuration resolved from declarative schema."""
 
 from __future__ import annotations
 
-import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-from dotenv import load_dotenv
-
-DATA_DIR = Path("data")
-OAUTH_TOKEN_PATH = DATA_DIR / "oauth.json"
-
-
-def _default_oauth_token_path(config_path: Path | None) -> Path:
-    """Keep OAuth tokens next to the active config file when possible."""
-    if config_path is not None:
-        return config_path.parent / "oauth.json"
-    return OAUTH_TOKEN_PATH
-
-
-def _nested_get(data: dict[str, Any], dotted_key: str) -> Any:
-    """Read a dotted key from nested dict data."""
-    current: Any = data
-    for part in dotted_key.split("."):
-        if not isinstance(current, dict) or part not in current:
-            return None
-        current = current[part]
-    return current
-
-
-def _parse_allowed_chat_ids(raw: Any) -> list[int]:
-    """Normalize allowed chat IDs from JSON or env-style values."""
-    if isinstance(raw, list):
-        return [int(value) for value in raw]
-    if isinstance(raw, str):
-        return [int(value.strip()) for value in raw.split(",") if value.strip()]
-    raise ValueError("ALLOWED_CHAT_IDS must be a list or CSV string")
+from .schema import BOT_FIELDS, post_resolve, resolve_fields
 
 
 @dataclass(frozen=True)
@@ -59,122 +27,21 @@ class Config:
     oauth_token_path: Path
 
     # Bot webhook (Jenkins calls this)
-    bot_callback_base_url: str  # base URL, e.g. "http://tg-bot:9090" — path appended by bot_callback_url property
-    bot_webhook_port: int = 9090
+    bot_callback_base_url: str
+    bot_webhook_port: int
 
     # Optional
-    drive_folder_name: str = ""
-    app_name: str = "your app"
-    max_recent_builds: int = 0
-    config_ui_url: str = ""
+    drive_folder_name: str
+    app_name: str
+    max_recent_builds: int
+    config_ui_url: str
 
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> Config:
         """Build config with priority: file > env > .env > defaults."""
-        load_dotenv()
-
-        resolved_path = config_path
-        if resolved_path is None and os.environ.get("CONFIG_PATH"):
-            resolved_path = Path(os.environ["CONFIG_PATH"])
-
-        file_data: dict[str, Any] = {}
-        if resolved_path and resolved_path.exists():
-            file_data = json.loads(resolved_path.read_text())
-
-        def get_value(
-            file_key: str,
-            env_key: str,
-            *,
-            default: str = "",
-        ) -> str:
-            file_value = _nested_get(file_data, file_key)
-            if file_value not in (None, ""):
-                return str(file_value)
-
-            env_value = os.environ.get(env_key)
-            if env_value not in (None, ""):
-                return env_value
-
-            return default
-
-        allowed_chat_ids = _nested_get(file_data, "telegram.allowed_chat_ids")
-        if allowed_chat_ids is None:
-            allowed_chat_ids = os.environ.get("ALLOWED_CHAT_IDS", "")
-
-        return cls(
-            telegram_token=get_value(
-                "telegram.bot_token",
-                "TELEGRAM_BOT_TOKEN",
-            ),
-            allowed_chat_ids=_parse_allowed_chat_ids(allowed_chat_ids),
-            jenkins_url=get_value(
-                "jenkins.url",
-                "JENKINS_URL",
-            ),
-            jenkins_user=get_value(
-                "jenkins.user",
-                "JENKINS_USER",
-            ),
-            jenkins_api_token=get_value(
-                "jenkins.api_token",
-                "JENKINS_API_TOKEN",
-            ),
-            jenkins_job_name=get_value(
-                "jenkins.job_name",
-                "JENKINS_JOB_NAME",
-                default="flutter-build",
-            ),
-            jenkins_job_id=get_value(
-                "jenkins.job_id",
-                "JENKINS_JOB_ID",
-                default=get_value(
-                    "jenkins.job_name",
-                    "JENKINS_JOB_NAME",
-                    default="flutter-build",
-                ),
-            ),
-            oauth_token_path=Path(
-                get_value(
-                    "drive.oauth_token_path",
-                    "BOT_OAUTH_TOKEN_PATH",
-                    default=str(_default_oauth_token_path(resolved_path)),
-                )
-            ),
-            bot_callback_base_url=get_value(
-                "bot.callback_url",
-                "BOT_CALLBACK_BASE_URL",
-                default="http://tg-bot:9090",
-            ),
-            bot_webhook_port=int(
-                get_value(
-                    "bot.webhook_port",
-                    "BOT_WEBHOOK_PORT",
-                    default="9090",
-                )
-            ),
-            drive_folder_name=get_value(
-                "drive.folder_name",
-                "DRIVE_FOLDER_NAME",
-                default="",
-            ),
-            app_name=(
-                get_value("bot.app_name", "APP_NAME", default="")
-                or get_value("drive.folder_name", "DRIVE_FOLDER_NAME", default="")
-                or "your app"
-            ),
-            max_recent_builds=int(
-                get_value(
-                    "bot.max_recent_builds",
-                    "MAX_RECENT_BUILDS",
-                    default="0",
-                )
-            ),
-            config_ui_url=get_value(
-                "config_ui.url",
-                "CONFIG_UI_URL",
-                default="",
-            ),
-        )
+        values = resolve_fields(BOT_FIELDS, config_path)
+        values = post_resolve(values, config_path)
+        return cls(**values)
 
     @property
     def bot_callback_url(self) -> str:

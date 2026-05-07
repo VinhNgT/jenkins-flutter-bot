@@ -44,11 +44,10 @@ function collectScope(scope) {
  * Populate form fields for a scope from API response data.
  * @param {string} scope
  * @param {Object} data - config data for this scope
- * @param {Object} secretsSet - { "dotted.key": bool } for this scope
- * @param {Object} [defaults] - { "dotted.key": "default_value" } for this scope
+ * @param {Object} secretsSet - { "dotted.key": int|false } for this scope
  */
 // eslint-disable-next-line no-unused-vars
-function populateScope(scope, data, secretsSet, defaults) {
+function populateScope(scope, data, secretsSet) {
   document.querySelectorAll(`[data-scope="${scope}"] input[name], [data-scope="${scope}"] select[name]`).forEach((el) => {
     const dottedKey = el.name.split(':')[1];
     if (!dottedKey) return;
@@ -75,51 +74,13 @@ function populateScope(scope, data, secretsSet, defaults) {
       const strValue = value !== null && value !== undefined ? String(value) : '';
 
       if (el.tagName === 'SELECT') {
-        // For selects: use the config value if set, otherwise fall back to default
         if (strValue) {
           el.value = strValue;
-        } else {
-          const defaultValue = defaults && defaults[dottedKey];
-          if (defaultValue) {
-            el.value = defaultValue;
-          }
         }
+        // Selects already have default set via placeholder attribute or first option
       } else {
         el.value = strValue;
       }
-
-      // Set placeholder from defaults (shows hint when field is empty)
-      if (defaults && defaults[dottedKey]) {
-        el.placeholder = defaults[dottedKey];
-      }
-    }
-  });
-}
-
-/**
- * Mark required fields within a scope by adding an asterisk to their label
- * and a data-required attribute to the .field container.
- * @param {string} scope
- * @param {string[]} requiredKeys - dotted keys that are required
- */
-function markRequired(scope, requiredKeys) {
-  if (!requiredKeys || !requiredKeys.length) return;
-  const keySet = new Set(requiredKeys);
-  document.querySelectorAll(`[data-scope="${scope}"] input[name], [data-scope="${scope}"] select[name]`).forEach((el) => {
-    const dottedKey = el.name.split(':')[1];
-    if (!dottedKey || !keySet.has(dottedKey)) return;
-
-    const field = el.closest('.field');
-    if (!field) return;
-    field.setAttribute('data-required', '');
-
-    // Add asterisk to label if not already present
-    const label = field.querySelector('label');
-    if (label && !label.querySelector('.required-marker')) {
-      const marker = document.createElement('span');
-      marker.className = 'required-marker';
-      marker.textContent = ' *';
-      label.appendChild(marker);
     }
   });
 }
@@ -151,23 +112,6 @@ function validateScope(scope) {
     }
   });
   return { valid: missing.length === 0, missing };
-}
-
-/**
- * Populate all scopes from the full GET /api/config response.
- * @param {Object} response - { bot, agent, ui, _secrets_set, _defaults, _required }
- */
-// eslint-disable-next-line no-unused-vars
-function populateAll(response) {
-  if (!response) return;
-  const defaults = response._defaults || {};
-  const required = response._required || {};
-  populateScope('bot', response.bot, response._secrets_set?.bot, defaults.bot);
-  populateScope('agent', response.agent, response._secrets_set?.agent, defaults.agent);
-  populateScope('ui', response.ui, response._secrets_set?.ui, defaults.ui);
-  markRequired('bot', required.bot);
-  markRequired('agent', required.agent);
-  markRequired('ui', required.ui);
 }
 
 /**

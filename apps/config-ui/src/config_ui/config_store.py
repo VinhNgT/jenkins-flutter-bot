@@ -8,59 +8,41 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from .schema import UI_FIELDS
+
 # ---------------------------------------------------------------------------
-# Secret field definitions
+# UI scope constants — derived from the local schema
 # ---------------------------------------------------------------------------
 
-BOT_SECRET_FIELDS = ("telegram.bot_token", "jenkins.api_token")
-AGENT_SECRET_FIELDS = ("agent.secret",)
-UI_SECRET_FIELDS = ("drive.client_secret",)
+UI_SECRET_FIELDS = tuple(f.key for f in UI_FIELDS if f.secret)
+UI_DEFAULTS = {f.key: f.default for f in UI_FIELDS if f.default}
+UI_REQUIRED_FIELDS = tuple(f.key for f in UI_FIELDS if f.required)
 
-SCOPE_SECRET_FIELDS: dict[str, tuple[str, ...]] = {
-    "bot": BOT_SECRET_FIELDS,
-    "agent": AGENT_SECRET_FIELDS,
-    "ui": UI_SECRET_FIELDS,
-}
 
-# Known defaults from the config resolution chains in tg-bot and agent-control.
-# These are the hardcoded/env-var defaults that apply when a field is not set
-# in the JSON config file.  Shown as placeholder hints in the UI.
-SCOPE_DEFAULTS: dict[str, dict[str, str]] = {
-    "bot": {
-        "jenkins.job_name": "flutter-build",
-        "jenkins.job_id": "flutter-build",
-        "drive.folder_name": "flutter-builds",
-        "bot.max_recent_builds": "0",
-        "bot.callback_url": "http://tg-bot:9090",
-        "bot.webhook_port": "9090",
-    },
-    "agent": {
-        "agent.name": "flutter-agent",
-        "agent.web_socket": "true",
-    },
-    "ui": {},
-}
+# ---------------------------------------------------------------------------
+# Helpers for extracting metadata from fetched remote schemas
+# ---------------------------------------------------------------------------
 
-# Fields that have no meaningful default and must be provided for the service
-# to start.  The frontend uses this to show a required marker (*) and to
-# block saving when any required field is still empty.
-SCOPE_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
-    "bot": (
-        "telegram.bot_token",
-        "telegram.allowed_chat_ids",
-        "jenkins.url",
-        "jenkins.user",
-        "jenkins.api_token",
-    ),
-    "agent": (
-        "jenkins.url",
-        "agent.secret",
-    ),
-    "ui": (
-        "drive.client_id",
-        "drive.client_secret",
-    ),
-}
+
+def extract_secret_fields(schema: dict[str, Any] | None) -> tuple[str, ...]:
+    """Extract secret field keys from a serialized schema response."""
+    if not schema or "fields" not in schema:
+        return ()
+    return tuple(f["key"] for f in schema["fields"] if f.get("secret"))
+
+
+def extract_defaults(schema: dict[str, Any] | None) -> dict[str, str]:
+    """Extract default values from a serialized schema response."""
+    if not schema or "fields" not in schema:
+        return {}
+    return {f["key"]: f["default"] for f in schema["fields"] if f.get("default")}
+
+
+def extract_required_fields(schema: dict[str, Any] | None) -> tuple[str, ...]:
+    """Extract required field keys from a serialized schema response."""
+    if not schema or "fields" not in schema:
+        return ()
+    return tuple(f["key"] for f in schema["fields"] if f.get("required"))
 
 # ---------------------------------------------------------------------------
 # Nested dict helpers

@@ -1,12 +1,52 @@
 ---
 trigger: glob
-globs: **/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json
-description: Configuration precedence, secret masking, deep merge, and frontend form patterns.
+globs: **/config*.py, **/schema*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/schema-renderer.js
+description: Declarative configuration schema, secret masking, deep merge, and dynamic UI rendering.
 ---
 
 # Configuration & Secrets
 
-Triggered when editing config-related files. Covers the configuration precedence chain, secret handling, and the config-ui frontend conventions.
+Triggered when editing config-related files. Covers the declarative schema system, configuration precedence chain, secret handling, and the config-ui frontend conventions.
+
+---
+
+## Declarative Configuration Schema
+
+Configuration is defined **declaratively** in per-module `schema.py` files. Each field is a `FieldDef` dataclass containing all metadata: JSON key, env var, default, label, description, help text, secret/required flags, field type, and value type.
+
+### Key Files
+
+| Module | Schema File | Config File | Schema Endpoint |
+|--------|------------|-------------|-----------------|
+| `tg-bot` | `tg_jenkins_bot/schema.py` | `tg_jenkins_bot/config.py` | `GET /control/schema` |
+| `agent-control` | `agent_control/schema.py` | `agent_control/config.py` | `GET /control/schema` |
+| `config-ui` | `config_ui/schema.py` | — (config-ui only reads/writes JSON) | `GET /api/config/schema` |
+
+### Adding a New Config Field
+
+To add a new config field, you only need to edit **one file** — the owning module's `schema.py`:
+
+1. Add a `FieldDef` entry to the module's field tuple (`BOT_FIELDS`, `AGENT_FIELDS`, or `UI_FIELDS`)
+2. Add the corresponding attribute to the module's `Config` / `AgentConfig` dataclass in `config.py`
+
+Everything else — UI rendering, help text, defaults, required markers, secret masking — is derived automatically from the schema.
+
+### Schema Flow
+
+```
+schema.py (FieldDef declarations)
+    → config.py (resolve_fields() → typed Config dataclass)
+    → control.py (GET /control/schema → serialized JSON)
+    → config-ui (fetches schema via HTTP → schema-renderer.js renders forms)
+```
+
+### `resolve_fields()` and `_coerce()`
+
+Each module's `schema.py` provides a generic `resolve_fields(fields, config_path)` function that implements the precedence chain. Values are automatically coerced to their declared `value_type` (`str`, `int`, `bool`, `list[int]`) via the `_coerce()` helper.
+
+### `post_resolve()` (bot only)
+
+The bot module has a `post_resolve()` hook for business logic that can't be expressed declaratively: `app_name` fallback chain, `job_id` defaulting to `job_name`, and `oauth_token_path` derivation.
 
 ---
 
@@ -18,16 +58,16 @@ All services resolve configuration in the same strict order:
 JSON Config File (Web UI)  >  Environment Variable  >  .env file  >  Hardcoded Default
 ```
 
-Both `Config.resolve()` (tg-bot) and `AgentConfig.resolve()` (agent-control) implement this identically:
+Both `Config.resolve()` (tg-bot) and `AgentConfig.resolve()` (agent-control) delegate to `resolve_fields()` in their `schema.py`, which implements this chain identically:
 
 1. Check the JSON file at `CONFIG_PATH` for a dotted key (e.g., `"telegram.bot_token"`)
 2. Fall back to the corresponding env var (e.g., `TELEGRAM_BOT_TOKEN`)
 3. Fall back to `.env` file (loaded by `python-dotenv`)
-4. Use the hardcoded default (typically `""`)
+4. Use the hardcoded default from the `FieldDef`
 
 Resolution is **infallible** — it always returns a value, never raises. Validation of required fields is the responsibility of the manager classes (`BotManager`, `AgentManager`), not the config layer.
 
-Do not bypass this chain. If you need a new config value, add it through `resolve()` with all four layers.
+Do not bypass this chain. If you need a new config value, add a `FieldDef` to the owning module's `schema.py`.
 
 ---
 
@@ -46,27 +86,38 @@ Both `config-ui` and `tg-bot` mount `bot-config` at `/config/bot/`, so `oauth.js
 
 ## Secret Masking
 
-The config-ui masks sensitive fields before sending them to the browser:
+Secret fields are identified dynamically from the schema (`secret: True` on the `FieldDef`). The config-ui:
 
-- **Bot secrets**: `telegram.bot_token`, `jenkins.api_token`
-- **Agent secrets**: `agent.secret`
-- **UI secrets**: `drive.client_secret`
+1. Fetches schemas from bot/agent services via `ServiceClient.schema()`
+2. Extracts secret field keys with `extract_secret_fields(schema)`
+3. Strips secret values before sending to the browser (replaced with `None`)
+4. Tracks which secrets are set via `secrets_set()` (returns character length or `False`)
 
-The mask value is the literal string `"********"`. When saving, `_restore_masked_secrets()` checks: if the incoming value for a secret field equals `"********"`, the existing value is preserved. This prevents the mask from overwriting real secrets.
+When saving, `clean_secrets_from_payload()` removes `None`/empty secret fields from the incoming payload — `deep_merge()` then preserves existing values.
 
 ---
 
 ## Deep Merge on Save
 
-Config saves use `_deep_merge()` for recursive dict merging. Sending `{"telegram": {"bot_token": "new"}}` updates only that key — all other fields in the JSON file are preserved.
+Config saves use `deep_merge()` for recursive dict merging. Sending `{"telegram": {"bot_token": "new"}}` updates only that key — all other fields in the JSON file are preserved.
 
 This is critical for the config-ui workflow. Do not replace deep merge with a full overwrite.
 
 ---
 
-## Frontend Form Convention
+## Dynamic UI Rendering
 
-The config-ui `index.html` uses a naming convention for form inputs:
+The config-ui renders forms dynamically from module schemas:
+
+1. `main.js` calls `API.getSchema()` → `GET /api/config/schema`
+2. Config-ui aggregates schemas: fetches bot/agent via HTTP, merges with local UI schema
+3. `schema-renderer.js` calls `renderSchemaForm()` for each scope
+4. Each `FieldDef` generates: label, description, help button (if `help_html`), required marker, and the appropriate input element (text/password/number/select)
+5. Save/reload buttons use `data-save` / `data-reload` data attributes with event delegation
+
+### Frontend Form Convention
+
+Dynamic form inputs follow the `scope:dotted.key` naming convention:
 
 ```html
 <input name="bot:telegram.bot_token" />
@@ -76,4 +127,4 @@ The config-ui `index.html` uses a naming convention for form inputs:
 
 Format: `scope:dotted.key` where `scope` is `bot`, `agent`, or `ui`.
 
-The `collectConfig()` JavaScript function splits on `:` to determine which config section the field belongs to, then uses `nestedSet()` to build the nested JSON payload. When adding new config fields to the UI, follow this same `scope:dotted.key` pattern on the input's `name` attribute.
+The `collectScope()` JavaScript function splits on `:` to determine which config section the field belongs to, then uses `nestedSet()` to build the nested JSON payload.

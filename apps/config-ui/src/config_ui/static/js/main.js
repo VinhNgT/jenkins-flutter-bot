@@ -1,78 +1,69 @@
 /* Entry point — initialize all modules and wire event listeners. */
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize modules
+  // Initialize global modules
   initSecretFields();
-  initHelpButtons();
+  initHelpPopovers();
 
-  // Per-tab save buttons
-  document.getElementById('save-bot').addEventListener('click', async () => {
-    const { valid, missing } = validateScope('bot');
-    if (!valid) {
-      Toast.show(`Missing required fields: ${missing.join(', ')}`, 'error');
+  // ─── Schema-first rendering ───────────────────────────────────
+  // Fetch schemas from all modules, render forms, then populate values.
+  const [schemas, config] = await Promise.all([
+    API.getSchema(),
+    API.getConfig(),
+  ]);
+
+  // Render dynamic forms from schemas
+  if (schemas) {
+    if (schemas.bot) renderSchemaForm('schema-container-bot', 'bot', schemas.bot);
+    if (schemas.agent) renderSchemaForm('schema-container-agent', 'agent', schemas.agent);
+    if (schemas.ui) renderSchemaForm('schema-container-ui', 'ui', schemas.ui);
+  }
+
+  // Populate values into rendered forms
+  if (config) {
+    populateScope('bot', config.bot, config._secrets_set?.bot);
+    populateScope('agent', config.agent, config._secrets_set?.agent);
+    populateScope('ui', config.ui, config._secrets_set?.ui);
+  }
+
+  // ─── Delegated save/reload handlers ───────────────────────────
+  // Uses event delegation on dynamic buttons created by schema-renderer.js
+  document.addEventListener('click', async (e) => {
+    // Save buttons: data-save="bot|agent|ui"
+    const saveBtn = e.target.closest('[data-save]');
+    if (saveBtn) {
+      const scope = saveBtn.dataset.save;
+      const { valid, missing } = validateScope(scope);
+      if (!valid) {
+        Toast.show(`Missing required fields: ${missing.join(', ')}`, 'error');
+        return;
+      }
+      const data = collectScope(scope);
+      const result = await API.saveScope(scope, data);
+      if (result) {
+        const label = { bot: 'Bot', agent: 'Agent', ui: 'Drive' }[scope] || scope;
+        Toast.show(`${label} config saved`, 'success');
+        const freshConfig = await API.getConfig();
+        if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
+        if (scope === 'ui') await refreshDriveTab();
+      }
       return;
     }
-    const data = collectScope('bot');
-    const result = await API.saveScope('bot', data);
-    if (result) {
-      Toast.show('Bot config saved', 'success');
-      const config = await API.getConfig();
-      if (config) populateScope('bot', config.bot, config._secrets_set?.bot);
-    }
-  });
 
-  document.getElementById('save-agent').addEventListener('click', async () => {
-    const { valid, missing } = validateScope('agent');
-    if (!valid) {
-      Toast.show(`Missing required fields: ${missing.join(', ')}`, 'error');
+    // Reload buttons: data-reload="bot|agent|ui"
+    const reloadBtn = e.target.closest('[data-reload]');
+    if (reloadBtn) {
+      const scope = reloadBtn.dataset.reload;
+      const freshConfig = await API.getConfig();
+      if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
+      if (scope === 'ui') await refreshDriveTab();
+      const label = { bot: 'Bot', agent: 'Agent', ui: 'Drive' }[scope] || scope;
+      Toast.show(`${label} config reloaded`, 'info');
       return;
     }
-    const data = collectScope('agent');
-    const result = await API.saveScope('agent', data);
-    if (result) {
-      Toast.show('Agent config saved', 'success');
-      const config = await API.getConfig();
-      if (config) populateScope('agent', config.agent, config._secrets_set?.agent);
-    }
   });
 
-  document.getElementById('save-ui').addEventListener('click', async () => {
-    const { valid, missing } = validateScope('ui');
-    if (!valid) {
-      Toast.show(`Missing required fields: ${missing.join(', ')}`, 'error');
-      return;
-    }
-    const data = collectScope('ui');
-    const result = await API.saveScope('ui', data);
-    if (result) {
-      Toast.show('Drive config saved', 'success');
-      const config = await API.getConfig();
-      if (config) populateScope('ui', config.ui, config._secrets_set?.ui);
-      await refreshDriveTab();
-    }
-  });
-
-  // Reload buttons
-  document.getElementById('reload-bot').addEventListener('click', async () => {
-    const config = await API.getConfig();
-    if (config) populateScope('bot', config.bot, config._secrets_set?.bot);
-    Toast.show('Bot config reloaded', 'info');
-  });
-
-  document.getElementById('reload-agent').addEventListener('click', async () => {
-    const config = await API.getConfig();
-    if (config) populateScope('agent', config.agent, config._secrets_set?.agent);
-    Toast.show('Agent config reloaded', 'info');
-  });
-
-  document.getElementById('reload-drive').addEventListener('click', async () => {
-    const config = await API.getConfig();
-    if (config) populateScope('ui', config.ui, config._secrets_set?.ui);
-    await refreshDriveTab();
-    Toast.show('Drive config reloaded', 'info');
-  });
-
-  // OAuth dialog elements
+  // ─── OAuth dialog ─────────────────────────────────────────────
   const oauthDialog = document.getElementById('oauth-dialog');
   const oauthCancelBtn = document.getElementById('oauth-cancel-btn');
   const driveConnectBtn = document.getElementById('drive-connect');
@@ -142,10 +133,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       await refreshDashboard();
     }
   });
-
-  // Load initial config
-  const config = await API.getConfig();
-  if (config) populateAll(config);
 
   // Initialize tabs last (starts polling if on dashboard)
   initTabs();

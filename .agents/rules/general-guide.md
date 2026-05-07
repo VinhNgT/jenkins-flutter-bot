@@ -27,7 +27,8 @@ jenkins-flutter-bot/
 │   │   ├── pyproject.toml
 │   │   └── src/tg_jenkins_bot/
 │   │       ├── main.py             FastAPI entry point, lifespan hook
-│   │       ├── config.py           Multi-layer config resolution
+│   │       ├── config.py           Config dataclass (delegates to schema.py)
+│   │       ├── schema.py           Declarative field definitions + resolve_fields()
 │   │       ├── control.py          BotManager lifecycle + /control/* API
 │   │       ├── bot/
 │   │       │   ├── context.py      Build tracking, history, Drive upload, notification
@@ -43,15 +44,17 @@ jenkins-flutter-bot/
 │   │   ├── pyproject.toml
 │   │   └── src/config_ui/
 │   │       ├── app.py              Config CRUD, service control, Drive OAuth
+│   │       ├── schema.py           Declarative UI field definitions
 │   │       ├── drive.py            DriveOAuthManager (browser-redirect flow)
-│   │       ├── static/             Frontend assets (index.html, style.css, app.js)
+│   │       ├── static/             Frontend assets (index.html, style.css, JS modules)
 │   │       └── templates/          Jinja2 templates (oauth_callback.html)
 │   │
 │   └── agent-control/              HTTP control wrapper for the Jenkins agent process
 │       ├── pyproject.toml
 │       └── src/agent_control/
 │           ├── main.py             FastAPI app factory, lifespan, CLI entry
-│           ├── config.py           AgentConfig resolution
+│           ├── config.py           AgentConfig dataclass (delegates to schema.py)
+│           ├── schema.py           Declarative field definitions + resolve_fields()
 │           └── control.py          AgentManager + /control/* routes
 │
 ├── .github/
@@ -103,7 +106,7 @@ Jenkins UI    → jenkins:8080 (exposed) → flutter-agent:9091 (internal)
 
 1. **Thin Trigger Layer** — The bot owns zero build logic. It triggers Jenkins via REST, registers a `request_id`, and waits for a webhook callback.
 
-2. **HTTP Signal Architecture** — Services coordinate via internal HTTP control APIs (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`). No Docker socket mounting.
+2. **HTTP Signal Architecture** — Services coordinate via internal HTTP control APIs (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`, `/control/schema`). No Docker socket mounting.
 
 3. **No Docker-out-of-Docker** — `docker.sock` is never mounted into any container. This is intentional for security and portability.
 

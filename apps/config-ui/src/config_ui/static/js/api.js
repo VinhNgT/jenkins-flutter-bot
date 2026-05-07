@@ -14,6 +14,18 @@ const API = {
     }
   },
 
+  /** @returns {Promise<Object|null>} */
+  async getSchema() {
+    try {
+      const res = await fetch('/api/config/schema');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      Toast.show(`Failed to load schema: ${err.message}`, 'error');
+      return null;
+    }
+  },
+
   /**
    * Save config for a single scope.
    * @param {'bot'|'agent'|'ui'} scope
@@ -23,7 +35,7 @@ const API = {
   async saveScope(scope, data) {
     try {
       const res = await fetch(`/api/config/${scope}`, {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });

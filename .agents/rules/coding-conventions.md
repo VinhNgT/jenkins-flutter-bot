@@ -55,12 +55,14 @@ apps/<app-name>/
 └── src/<package_name>/
     ├── __init__.py
     ├── main.py             # FastAPI app factory, lifespan, CLI entry
-    ├── config.py           # Config/settings resolution
-    └── control.py          # Manager class + control routes
+    ├── schema.py           # Declarative FieldDef declarations + resolve_fields()
+    ├── config.py           # Typed Config dataclass (delegates to schema.py)
+    └── control.py          # Manager class + control routes + GET /control/schema
 ```
 
 - **`pyproject.toml`** declares a `[project.scripts]` entry point used as the Docker `ENTRYPOINT`.
 - **`main.py`** creates the FastAPI app via a factory function, wires up the lifespan, and includes routers.
+- **`schema.py`** is the single source of truth for all config field metadata. Adding a field here automatically propagates to the backend resolver, the HTTP schema endpoint, and the config-ui frontend.
 - **Routers** are defined in their respective modules as `APIRouter` instances and included in `main.py`.
 
 ---

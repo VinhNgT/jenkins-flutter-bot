@@ -91,7 +91,7 @@ The Jenkinsfile is responsible for capturing and forwarding logs. The bot itself
 
 ---
 
-## Config UI → Service Control
+## Config UI → Service Communication
 
 The config-ui proxies control commands to services via HTTP:
 
@@ -102,6 +102,20 @@ Browser → POST /api/services/bot/restart → config-ui
 ```
 
 This pattern applies to both `bot` and `agent` services with `start`, `stop`, and `restart` actions.
+
+### Schema Fetching
+
+The config-ui fetches field definitions from each module to dynamically render config forms:
+
+```
+Browser → GET /api/config/schema → config-ui
+    → GET http://tg-bot:9090/control/schema → bot schema
+    → GET http://flutter-agent:9091/control/schema → agent schema
+    → Merge with local UI schema
+    → Return aggregated schemas to browser
+```
+
+If a service is down, its schema returns `null` and the frontend shows "Loading..." for that tab.
 
 ---
 

@@ -316,13 +316,16 @@ class BotContext:
         )
         self._save_tracked()
 
-    def recent_builds(self, count: int = 5) -> list[TrackedBuild]:
+    def recent_builds(self, count: int = 5, *, success_only: bool = False) -> list[TrackedBuild]:
         """Return the most recent tracked builds, newest first.
 
         Served entirely from local state — always works, even when
         Jenkins is unreachable.
         """
-        return list(reversed(self._tracked[-count:]))
+        builds = self._tracked
+        if success_only:
+            builds = [b for b in builds if b.result == "success"]
+        return list(reversed(builds[-count:]))
 
     # ------------------------------------------------------------------
     # Pending build validation against Jenkins

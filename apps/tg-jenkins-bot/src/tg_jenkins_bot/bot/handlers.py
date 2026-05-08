@@ -260,7 +260,7 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not await _ensure_authorized(update, context):
         return
 
-    builds = ctx.recent_builds(count=5)
+    builds = ctx.recent_builds(count=5, success_only=True)
 
     if not builds:
         await update.message.reply_text("📭 No builds yet.")

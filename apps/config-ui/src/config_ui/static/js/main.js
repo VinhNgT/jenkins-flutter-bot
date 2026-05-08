@@ -66,8 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ─── OAuth dialog ─────────────────────────────────────────────
   const oauthDialog = document.getElementById('oauth-dialog');
   const oauthCancelBtn = document.getElementById('oauth-cancel-btn');
-  const driveConnectBtn = document.getElementById('drive-connect');
-  const driveChangeBtn = document.getElementById('drive-change-account');
+  const driveToggleBtn = document.getElementById('drive-connect-toggle');
 
   // Prevent Escape from closing the dialog (would leave Google tab orphaned)
   oauthDialog.addEventListener('cancel', (e) => e.preventDefault());
@@ -119,11 +118,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 500);
   }
 
-  // Connect button (shown when not connected)
-  driveConnectBtn.addEventListener('click', () => startOAuthFlow(driveConnectBtn));
-
-  // Change Account — opens OAuth without touching old token; token is overwritten only on success
-  driveChangeBtn.addEventListener('click', () => startOAuthFlow(driveChangeBtn));
+  // Toggle button — "Connect Google Drive" when disconnected, "Change Account" when connected
+  driveToggleBtn.addEventListener('click', () => startOAuthFlow(driveToggleBtn));
 
   // Disconnect — deletes the token file without re-authorizing
   const driveDisconnectBtn = document.getElementById('drive-disconnect');

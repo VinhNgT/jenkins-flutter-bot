@@ -237,7 +237,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
                        try {
                            commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
                        } catch (e) {
-                           commitHash = 'unknown'
+                           commitHash = ''
                        }
                        def metadata = groovy.json.JsonOutput.toJson([
                            request_id : params.BOT_REQUEST_ID,
@@ -262,7 +262,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
                        try {
                            commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
                        } catch (e) {
-                           commitHash = 'unknown'
+                           commitHash = ''
                        }
                        def logs = currentBuild.rawBuild.getLog(50).join('\n')
                        def metadata = groovy.json.JsonOutput.toJson([

@@ -424,7 +424,7 @@ class BotContext:
         request_id: str = "",
     ) -> None:
         """Handle successful build — upload to Drive and notify user."""
-        commit_hash = metadata.get("commit_hash", "unknown")
+        commit_hash = metadata.get("commit_hash", "")
         short_hash = commit_hash[:7]
         now = time.time()
         started = _format_time(pending.triggered_at)
@@ -532,7 +532,7 @@ class BotContext:
             logger.error("Cannot notify — bot instance is not available")
             return
 
-        commit_hash = metadata.get("commit_hash", "unknown")
+        commit_hash = metadata.get("commit_hash", "")
         short_hash = commit_hash[:7]
         logs = metadata.get("logs", "")
         error_summary = _escape(_summarize_logs(logs))

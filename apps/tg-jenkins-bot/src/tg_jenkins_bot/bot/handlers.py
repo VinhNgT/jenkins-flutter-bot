@@ -223,14 +223,13 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 f" (since {_format_time(p.triggered_at)})"
             )
 
-    # Last completed build — from local tracked data
-    recent = ctx.recent_builds(count=1)
+    # Last successful build — from local tracked data
+    recent = ctx.recent_builds(count=1, success_only=True)
     if recent:
         b = recent[0]
         short_hash = b.commit_hash[:7] if b.commit_hash else ""
         date_str = _format_date(b.completed_at) if b.completed_at else ""
-        result_icon = "✅" if b.result == "success" else "❌"
-        parts = [f"{result_icon} {_escape(b.ref or 'unknown')}"]
+        parts = [f"✅ {_escape(b.ref or 'unknown')}"]
         if short_hash:
             parts.append(f"<code>{_escape(short_hash)}</code>")
         if date_str:

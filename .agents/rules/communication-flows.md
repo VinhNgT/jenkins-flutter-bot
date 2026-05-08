@@ -181,23 +181,36 @@ The bot tracks builds it triggered using an in-memory dict with JSON persistence
 
 ---
 
-## Build History Tracking
+## Tracked Build Registry
 
-After a successful build upload and Telegram notification, the bot records a `CompletedBuild` entry:
+After a webhook completes (success or failure), the bot records a slim `TrackedBuild` entry:
 
-- Stored as `list[CompletedBuild]` in `BotContext`
-- Persisted to `data/build_history.json` for crash recovery
-- Each entry tracks: `drive_file_id`, `drive_link`, `filename`, `ref`, `completed_at`, `commit_hash`
-- Powers the `/recent` command (bot-scoped — only shows Telegram-triggered builds)
+- Stored as `list[TrackedBuild]` in `BotContext`
+- Persisted to `data/tracked_builds.json` for crash recovery
+- Each entry tracks only: `request_id`, `drive_file_id`, `drive_link`
+- Used to filter Jenkins queries (match `BOT_REQUEST_ID`) and manage Drive file cleanup
+- Jenkins owns all build metadata (status, duration, branch, commit)
 
 ---
 
-## Build History Cleanup
+## Jenkins Build Queries
 
-When `max_recent_builds > 0`, the bot enforces a retention limit after each successful build:
+The bot queries Jenkins REST API for live build details, strictly filtered to its own triggered builds:
 
-1. After `record_build()`, `enforce_history_limit()` is called
-2. If history exceeds the limit, oldest entries are evicted
+- `JenkinsClient.get_builds(count)` fetches recent builds with parameters via `GET /job/{name}/api/json?tree=builds[...]`
+- `BotContext.get_recent_builds()` filters Jenkins results by matching `BOT_REQUEST_ID` against the local `TrackedBuild` registry
+- `BotContext.get_active_builds()` returns only currently-building bot-triggered builds
+- Drive download links are merged from local `TrackedBuild` records (Jenkins doesn't know about Drive)
+- No Jenkins build numbers, non-bot build counts, or other metadata from manual triggers are ever exposed to Telegram
+
+---
+
+## Drive File Cleanup
+
+When `max_recent_builds > 0`, the bot enforces a Drive file retention limit after each successful build:
+
+1. After `track_build()`, `enforce_drive_limit()` is called
+2. If the tracked list exceeds the limit, oldest entries are evicted
 3. Drive files for evicted builds are deleted (best-effort via `DriveUploader.delete_file()`)
 4. Errors during deletion are logged but never propagated — user notification is never blocked
 

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from .context import BotContext
+from .context import BotContext, _format_duration
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Query bot readiness and status."""
+    """Show bot readiness, active builds, and last build info."""
     if not update.message or not update.effective_chat:
         return
     ctx = _get_ctx(context)
@@ -160,12 +160,39 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         jenkins_ok = False
 
     ready = drive_ok and jenkins_ok
-    pending = ctx.pending_count
+
+    # Validate pending builds against Jenkins (detect cancelled/deleted)
+    stale_builds: list = []
+    if jenkins_ok and ctx.pending_count > 0:
+        try:
+            stale_builds = await ctx.validate_pending_builds()
+        except Exception:
+            logger.exception("Failed to validate pending builds")
+
+    # Notify users about cancelled builds (best-effort)
+    if stale_builds and ctx.bot:
+        for _rid, stale_pending in stale_builds:
+            try:
+                app_name = _escape(ctx.config.app_name)
+                await ctx.bot.send_message(
+                    stale_pending.chat_id,
+                    f"⚠️ <b>{app_name} build cancelled</b>\n"
+                    "\n"
+                    f"Branch:  <code>{_escape(stale_pending.ref)}</code>\n"
+                    "\n"
+                    "The build was cancelled or removed on Jenkins.",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                logger.exception("Failed to notify about cancelled build")
+
+    # Current pending builds (after validation cleanup)
+    pending = ctx.list_pending()
 
     # Headline
     app_name = _escape(ctx.config.app_name)
-    if pending > 0:
-        headline = f"🟡 <b>Building {app_name} ({pending} active)</b>"
+    if pending:
+        headline = f"🟡 <b>Building {app_name} ({len(pending)} active)</b>"
     elif ready:
         headline = f"🟢 <b>Ready to build {app_name}</b>"
     else:
@@ -186,24 +213,28 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         lines.append("Google Drive  ❌  Setup required")
 
-    # Pending build branches (when active)
-    if pending > 0:
-        pending_builds = ctx.list_pending()
+    # Pending builds
+    if pending:
         lines.append("")
         lines.append("In progress:")
-        for p in pending_builds.values():
-            lines.append(f"  • <code>{_escape(p.ref)}</code> (since {_format_time(p.triggered_at)})")
+        for p in pending.values():
+            lines.append(
+                f"  • <code>{_escape(p.ref)}</code>"
+                f" (since {_format_time(p.triggered_at)})"
+            )
 
-    # Last build
+    # Last completed build — from local tracked data
     recent = ctx.recent_builds(count=1)
     if recent:
         b = recent[0]
         short_hash = b.commit_hash[:7] if b.commit_hash else ""
-        date_str = _format_date(b.completed_at)
-        parts = [_escape(b.ref)]
+        date_str = _format_date(b.completed_at) if b.completed_at else ""
+        result_icon = "✅" if b.result == "success" else "❌"
+        parts = [f"{result_icon} {_escape(b.ref or 'unknown')}"]
         if short_hash:
             parts.append(f"<code>{_escape(short_hash)}</code>")
-        parts.append(date_str)
+        if date_str:
+            parts.append(date_str)
         lines.append("")
         lines.append(f"Last build: {' · '.join(parts)}")
 
@@ -221,7 +252,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show recent bot-triggered builds from build history."""
+    """Show recent bot-triggered builds from local state."""
     if not update.message or not update.effective_chat:
         return
     ctx = _get_ctx(context)
@@ -238,14 +269,27 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     app_name = _escape(ctx.config.app_name)
     lines = [f"📦 <b>Recent {app_name} Builds</b>\n"]
     for b in builds:
+        result_icon = "✅" if b.result == "success" else "❌"
         short_hash = b.commit_hash[:7] if b.commit_hash else ""
-        date_str = _format_date(b.completed_at)
-        parts = [f"<code>{_escape(b.ref)}</code>"]
+        date_str = _format_date(b.completed_at) if b.completed_at else ""
+        duration = _format_duration(b.triggered_at, b.completed_at)
+
+        parts = [f"<code>{_escape(b.ref or 'unknown')}</code>"]
         if short_hash:
             parts.append(f"<code>{_escape(short_hash)}</code>")
-        parts.append(date_str)
+        if date_str:
+            parts.append(date_str)
+        if duration:
+            parts.append(duration)
+
         entry = " · ".join(parts)
-        lines.append(f'• {entry}    <a href="{_escape(b.drive_link)}">Download</a>')
+
+        if b.drive_link:
+            lines.append(
+                f'• {result_icon} {entry}    <a href="{_escape(b.drive_link)}">Download</a>'
+            )
+        else:
+            lines.append(f"• {result_icon} {entry}")
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 

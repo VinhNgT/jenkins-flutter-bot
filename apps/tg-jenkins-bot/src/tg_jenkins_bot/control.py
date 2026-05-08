@@ -159,6 +159,7 @@ class BotManager:
                 bot_context.drive.is_connected() if bot_context else False
             ),
             "pending_builds": (bot_context.pending_count if bot_context else 0),
+            "tracked_builds": (bot_context.tracked_count if bot_context else 0),
             "last_error": self._last_error,
             "job_id": self._config.jenkins_job_id if self._config else None,
         }

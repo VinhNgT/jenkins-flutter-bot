@@ -3,10 +3,39 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_params(build: dict[str, Any]) -> dict[str, str]:
+    """Extract build parameters from Jenkins actions array.
+
+    Jenkins stores parameters inside an actions array as:
+    [{"parameters": [{"name": "BRANCH", "value": "main"}, ...]}, ...]
+    """
+    for action in build.get("actions", []):
+        params = action.get("parameters")
+        if params:
+            return {p["name"]: p["value"] for p in params}
+    return {}
+
+
+@dataclass(frozen=True)
+class JenkinsBuild:
+    """Parsed build info from Jenkins REST API."""
+
+    number: int
+    result: str  # "SUCCESS", "FAILURE", "ABORTED", or "" if still building
+    building: bool
+    timestamp: float  # Unix seconds
+    duration_ms: int  # milliseconds (0 if still building)
+    branch: str
+    commit_hash: str
+    request_id: str
 
 
 class JenkinsClient:
@@ -25,6 +54,50 @@ class JenkinsClient:
     async def close(self) -> None:
         """Close the underlying HTTP client."""
         await self._client.aclose()
+
+    async def get_builds(self, count: int = 20) -> list[JenkinsBuild]:
+        """Fetch recent builds from Jenkins with their parameters.
+
+        Returns up to `count` builds. Caller is responsible for filtering
+        to only bot-triggered builds (by matching request_id).
+        """
+        tree = (
+            "builds[number,result,building,timestamp,duration,"
+            f"actions[parameters[name,value]]]{{0,{count}}}"
+        )
+        url = f"{self.job_url}/api/json?tree={tree}"
+
+        try:
+            resp = await self._client.get(url)
+            if resp.status_code != 200:
+                logger.error(
+                    "Jenkins get_builds failed: %d — %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+                return []
+
+            data = resp.json()
+            builds: list[JenkinsBuild] = []
+            for raw in data.get("builds", []):
+                params = _extract_params(raw)
+                builds.append(
+                    JenkinsBuild(
+                        number=raw.get("number", 0),
+                        result=raw.get("result") or "",
+                        building=raw.get("building", False),
+                        timestamp=raw.get("timestamp", 0) / 1000,  # ms → s
+                        duration_ms=raw.get("duration", 0),
+                        branch=params.get("BRANCH", ""),
+                        commit_hash=params.get("BOT_COMMIT_HASH", ""),
+                        request_id=params.get("BOT_REQUEST_ID", ""),
+                    )
+                )
+            return builds
+
+        except Exception:
+            logger.exception("Failed to query Jenkins builds")
+            return []
 
     async def trigger_build(
         self,

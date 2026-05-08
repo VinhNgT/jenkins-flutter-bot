@@ -122,9 +122,13 @@ async def handle_build_complete(
     # 3. Process the validated, Telegram-triggered build result
     # ------------------------------------------------------------------
     if status == "success" and artifact_path:
-        await ctx.on_build_success(pending, metadata_obj, artifact_path)
+        await ctx.on_build_success(
+            pending, metadata_obj, artifact_path, request_id=request_id or ""
+        )
     else:
-        await ctx.on_build_failure(pending, metadata_obj)
+        await ctx.on_build_failure(
+            pending, metadata_obj, request_id=request_id or ""
+        )
         if artifact_path:
             Path(artifact_path).unlink(missing_ok=True)
 

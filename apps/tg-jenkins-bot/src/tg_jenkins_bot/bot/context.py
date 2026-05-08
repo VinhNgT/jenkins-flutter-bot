@@ -47,15 +47,22 @@ class PendingBuild:
 
 
 @dataclass(frozen=True)
-class CompletedBuild:
-    """Tracks a successfully uploaded build artifact."""
+class TrackedBuild:
+    """Record of a bot-triggered build, stored locally for /recent and Drive cleanup.
 
-    drive_file_id: str
-    drive_link: str
-    filename: str
+    All fields are captured at webhook time — the data originates from Jenkins
+    (via webhook callback) but is persisted locally so the bot can serve
+    /recent and /status even when Jenkins is unreachable.
+    """
+
+    request_id: str
     ref: str
+    commit_hash: str
+    result: str  # "success" or "failure"
+    triggered_at: float
     completed_at: float
-    commit_hash: str = ""  # short hash for display; empty for legacy builds
+    drive_file_id: str = ""
+    drive_link: str = ""
 
 
 def _escape(text: str) -> str:
@@ -117,9 +124,10 @@ class BotContext:
 
     Owns:
     - Pending build tracking (request_id → chat_id mapping)
-    - Completed build history (persisted to JSON, powers /recent)
+    - Tracked build registry (enriched with webhook metadata for /recent)
     - Build result handling (Drive upload + Telegram notification)
-    - History retention enforcement (max_recent_builds + Drive cleanup)
+    - Drive file retention enforcement (max_recent_builds)
+    - Pending build validation against Jenkins (detect cancelled/deleted builds)
     """
 
     def __init__(
@@ -135,8 +143,8 @@ class BotContext:
         self.bot = bot
         self._pending_path = Path("data/pending_builds.json")
         self._pending: dict[str, PendingBuild] = self._load_pending()
-        self._history_path = Path("data/build_history.json")
-        self._history: list[CompletedBuild] = self._load_history()
+        self._tracked_path = Path("data/tracked_builds.json")
+        self._tracked: list[TrackedBuild] = self._load_tracked()
 
     # ------------------------------------------------------------------
     # Pending build tracking (persisted to JSON)
@@ -244,89 +252,154 @@ class BotContext:
             self._save_pending()
 
     # ------------------------------------------------------------------
-    # Build history (persisted to JSON)
+    # Tracked build registry (persisted to JSON)
     # ------------------------------------------------------------------
 
     @property
-    def history_count(self) -> int:
-        """Number of completed builds in history."""
-        return len(self._history)
+    def tracked_count(self) -> int:
+        """Number of tracked builds."""
+        return len(self._tracked)
 
-    def _load_history(self) -> list[CompletedBuild]:
-        """Load completed build history from disk on startup."""
-        if not self._history_path.exists():
+    def _load_tracked(self) -> list[TrackedBuild]:
+        """Load tracked builds from disk on startup."""
+        if not self._tracked_path.exists():
             return []
         try:
-            data = json.loads(self._history_path.read_text())
-            return [CompletedBuild(**entry) for entry in data]
+            data = json.loads(self._tracked_path.read_text())
+            return [TrackedBuild(**entry) for entry in data]
         except Exception:
-            logger.exception("Failed to load build history")
+            logger.exception("Failed to load tracked builds")
             return []
 
-    def _save_history(self) -> None:
-        """Persist build history to disk."""
-        self._history_path.parent.mkdir(parents=True, exist_ok=True)
+    def _save_tracked(self) -> None:
+        """Persist tracked builds to disk."""
+        self._tracked_path.parent.mkdir(parents=True, exist_ok=True)
         data = [
             {
-                "drive_file_id": b.drive_file_id,
-                "drive_link": b.drive_link,
-                "filename": b.filename,
-                "ref": b.ref,
-                "completed_at": b.completed_at,
-                "commit_hash": b.commit_hash,
+                "request_id": t.request_id,
+                "ref": t.ref,
+                "commit_hash": t.commit_hash,
+                "result": t.result,
+                "triggered_at": t.triggered_at,
+                "completed_at": t.completed_at,
+                "drive_file_id": t.drive_file_id,
+                "drive_link": t.drive_link,
             }
-            for b in self._history
+            for t in self._tracked
         ]
-        self._history_path.write_text(json.dumps(data))
+        self._tracked_path.write_text(json.dumps(data))
 
-    def record_build(
+    def track_build(
         self,
-        drive_file_id: str,
-        drive_link: str,
-        filename: str,
-        ref: str,
+        request_id: str,
         *,
-        commit_hash: str = "",
+        ref: str,
+        commit_hash: str,
+        result: str,
+        triggered_at: float,
+        completed_at: float,
+        drive_file_id: str = "",
+        drive_link: str = "",
     ) -> None:
-        """Record a completed build in history."""
-        self._history.append(
-            CompletedBuild(
+        """Record a bot-triggered build with all metadata from the webhook."""
+        self._tracked.append(
+            TrackedBuild(
+                request_id=request_id,
+                ref=ref,
+                commit_hash=commit_hash,
+                result=result,
+                triggered_at=triggered_at,
+                completed_at=completed_at,
                 drive_file_id=drive_file_id,
                 drive_link=drive_link,
-                filename=filename,
-                ref=ref,
-                completed_at=time.time(),
-                commit_hash=commit_hash,
             )
         )
-        self._save_history()
+        self._save_tracked()
 
-    def recent_builds(self, count: int = 5) -> list[CompletedBuild]:
-        """Return the most recent completed builds."""
-        return list(reversed(self._history[-count:]))
+    def recent_builds(self, count: int = 5) -> list[TrackedBuild]:
+        """Return the most recent tracked builds, newest first.
 
-    async def enforce_history_limit(self) -> None:
-        """Evict oldest builds if history exceeds max_recent_builds.
+        Served entirely from local state — always works, even when
+        Jenkins is unreachable.
+        """
+        return list(reversed(self._tracked[-count:]))
+
+    # ------------------------------------------------------------------
+    # Pending build validation against Jenkins
+    # ------------------------------------------------------------------
+
+    async def validate_pending_builds(self) -> list[tuple[str, PendingBuild]]:
+        """Cross-reference pending builds with Jenkins to detect stale entries.
+
+        Checks if any pending builds have been cancelled or deleted on Jenkins
+        by looking for completed builds matching our request_ids. Returns a list
+        of (request_id, PendingBuild) tuples that were cleaned up.
+
+        Gracefully returns an empty list if Jenkins is unreachable — the bot
+        falls back to TTL-based cleanup in that case.
+        """
+        if not self._pending:
+            return []
+
+        try:
+            jenkins_builds = await self.jenkins.get_builds(count=20)
+        except Exception:
+            logger.exception("Failed to validate pending builds against Jenkins")
+            return []
+
+        if not jenkins_builds:
+            return []
+
+        # Build a lookup: request_id → JenkinsBuild for completed builds
+        completed_on_jenkins = {
+            jb.request_id: jb
+            for jb in jenkins_builds
+            if not jb.building and jb.request_id
+        }
+
+        stale: list[tuple[str, PendingBuild]] = []
+        for request_id, pending in list(self._pending.items()):
+            if request_id in completed_on_jenkins:
+                # Build completed on Jenkins but webhook never arrived
+                stale.append((request_id, pending))
+                del self._pending[request_id]
+
+        if stale:
+            self._save_pending()
+            logger.info(
+                "Cleaned up %d stale pending build(s) detected via Jenkins",
+                len(stale),
+            )
+
+        return stale
+
+    # ------------------------------------------------------------------
+    # Drive file retention (max_recent_builds)
+    # ------------------------------------------------------------------
+
+    async def enforce_drive_limit(self) -> None:
+        """Evict oldest tracked builds if count exceeds max_recent_builds.
 
         Deletes Drive files for evicted builds on a best-effort basis.
         Errors are logged but never propagated.
         """
         limit = self.config.max_recent_builds
-        if limit <= 0 or len(self._history) <= limit:
+        if limit <= 0 or len(self._tracked) <= limit:
             return
 
-        to_evict = self._history[: len(self._history) - limit]
-        self._history = self._history[len(self._history) - limit :]
-        self._save_history()
+        to_evict = self._tracked[: len(self._tracked) - limit]
+        self._tracked = self._tracked[len(self._tracked) - limit :]
+        self._save_tracked()
 
         creds = self.drive.load_tokens()
         for build in to_evict:
+            if not build.drive_file_id:
+                continue
             try:
                 if creds:
                     await self.drive.delete_file(creds, build.drive_file_id)
                 logger.info(
-                    "Evicted old build: %s (%s)",
-                    build.filename,
+                    "Evicted old build Drive file: %s",
                     build.drive_file_id,
                 )
             except Exception:
@@ -344,6 +417,8 @@ class BotContext:
         pending: PendingBuild,
         metadata: dict,
         artifact_path: str,
+        *,
+        request_id: str = "",
     ) -> None:
         """Handle successful build — upload to Drive and notify user."""
         commit_hash = metadata.get("commit_hash", "unknown")
@@ -372,6 +447,16 @@ class BotContext:
                     "Contact your admin to set up file delivery.",
                     parse_mode="HTML",
                 )
+                # Still track the build even without Drive upload
+                if request_id:
+                    self.track_build(
+                        request_id,
+                        ref=pending.ref,
+                        commit_hash=commit_hash,
+                        result="success",
+                        triggered_at=pending.triggered_at,
+                        completed_at=now,
+                    )
                 return
 
             # Generate filename — slugify app_name for a clean, space-free prefix
@@ -401,15 +486,19 @@ class BotContext:
                 parse_mode="HTML",
             )
 
-            self.record_build(
-                drive_file_id=file_id,
-                drive_link=drive_link,
-                filename=filename,
-                ref=pending.ref,
-                commit_hash=short_hash,
-            )
+            if request_id:
+                self.track_build(
+                    request_id,
+                    ref=pending.ref,
+                    commit_hash=commit_hash,
+                    result="success",
+                    triggered_at=pending.triggered_at,
+                    completed_at=now,
+                    drive_file_id=file_id,
+                    drive_link=drive_link,
+                )
 
-            await self.enforce_history_limit()
+            await self.enforce_drive_limit()
 
         except Exception:
             logger.exception("Failed to upload/notify for build %s", commit_hash)
@@ -428,7 +517,13 @@ class BotContext:
         finally:
             Path(artifact_path).unlink(missing_ok=True)
 
-    async def on_build_failure(self, pending: PendingBuild, metadata: dict) -> None:
+    async def on_build_failure(
+        self,
+        pending: PendingBuild,
+        metadata: dict,
+        *,
+        request_id: str = "",
+    ) -> None:
         """Handle failed build — notify user."""
         if not self.bot:
             logger.error("Cannot notify — bot instance is not available")
@@ -456,3 +551,14 @@ class BotContext:
             "Contact your admin for the full log.",
             parse_mode="HTML",
         )
+
+        # Track failed builds too so /recent shows them
+        if request_id:
+            self.track_build(
+                request_id,
+                ref=pending.ref,
+                commit_hash=commit_hash,
+                result="failure",
+                triggered_at=pending.triggered_at,
+                completed_at=now,
+            )

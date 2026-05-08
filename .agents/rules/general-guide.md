@@ -33,7 +33,7 @@ jenkins-flutter-bot/
 │   │       ├── schema.py           Bot field declarations (imports from config_schema)
 │   │       ├── control.py          BotManager lifecycle + /control/* API
 │   │       ├── bot/
-│   │       │   ├── context.py      Build tracking, history, Drive upload, notification
+│   │       │   ├── context.py      Build tracking, Drive upload, notification
 │   │       │   └── handlers.py     /start, /build, /status, /recent handlers
 │   │       ├── jenkins/
 │   │       │   ├── client.py       Jenkins REST API wrapper
@@ -120,7 +120,7 @@ Jenkins UI    → jenkins:8080 (exposed) → flutter-agent:9091 (internal)
 
 4. **FastAPI Everywhere** — All service APIs use FastAPI: the bot, config-ui, and agent-control.
 
-5. **Bot-Scoped Tracking** — The bot only tracks builds it triggered. It maintains its own build history and state independently of Jenkins — it never queries Jenkins to reconstruct what it has already tracked locally.
+5. **Jenkins-Synced, Bot-Scoped** — The bot queries Jenkins REST API for live build details (status, duration, branch, commit) but only for builds it triggered. It maintains a slim local registry of its own triggered builds (`TrackedBuild`: request_id + Drive file info) — Jenkins owns all build metadata. No information about non-bot-triggered builds is ever exposed to Telegram.
 
 6. **uv Workspace** — The repo is structured as a uv workspace with a root `pyproject.toml` and a single `uv.lock`. All workspace members (`apps/*` and `libs/*`) share a unified lockfile for consistent dependency versions. Shared code lives in `libs/config-schema/` — a workspace library that all apps depend on. Dev tools (`mypy`, `ruff`) are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12, so uv manages both Python and dependencies).
 
@@ -139,7 +139,7 @@ These are architectural boundaries. Do not violate them.
 5. **Do NOT use synchronous blocking I/O** in async code paths without wrapping with `asyncio.to_thread()`.
 6. **Do NOT store secrets in code or Dockerfiles** — use env vars, `.env`, or config-ui JSON files.
 7. **Do NOT replace deep merge with full overwrite** in config save logic.
-8. **Do NOT make the bot depend on Jenkins** beyond three interactions, all scoped to Telegram-triggered builds only: triggering builds (REST), checking their status (REST), and receiving their results (webhook callback). All bot-side state — build history, Drive file tracking, cleanup — is owned and persisted by the bot itself.
+8. **Do NOT leak non-bot build info to Telegram** — the bot queries Jenkins for build details but strictly filters to its own triggered builds (matched by `BOT_REQUEST_ID` parameter). No build counts, build numbers, or metadata from manual Jenkins triggers may appear in Telegram messages. The bot's local state is limited to a pending-build map (for webhook matching) and a tracked-build registry (for Jenkins cross-referencing + Drive cleanup).
 
 ---
 

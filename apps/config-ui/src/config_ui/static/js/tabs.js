@@ -26,8 +26,6 @@ function switchTab(tabId) {
   Poller.stop();
   if (tabId === 'dashboard') {
     Poller.start(refreshDashboard);
-  } else if (tabId === 'drive') {
-    Poller.start(refreshDriveTab);
   }
 
   sessionStorage.setItem('activeTab', tabId);

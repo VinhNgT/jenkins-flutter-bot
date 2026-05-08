@@ -50,9 +50,12 @@
               </div>
             </div>
           </div>
-          <div class="card" id="drive-summary">
+          <div class="card" id="drive-connection">
             <h3>Google Drive</h3>
-            <p class="text-muted">Checking status…</p>
+            <p class="text-muted" id="drive-status-detail">Checking…</p>
+            <div class="form-actions" id="drive-connect-actions" style="display:none">
+              <button class="btn btn-accent" id="drive-connect" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M10 3.5a6.5 6.5 0 00-6.397 5.349A4.5 4.5 0 004.5 17h11a4.5 4.5 0 00.897-8.151A6.5 6.5 0 0010 3.5z"/></svg>Connect Google Drive</button>
+            </div>
           </div>
         </section>
 
@@ -70,18 +73,12 @@
           </div>
         </section>
 
-        <!-- ===== Google Drive Config (dynamic + static connection card) ===== -->
+        <!-- ===== Google Drive Config (dynamic) ===== -->
         <section id="panel-drive" class="tab-panel" role="tabpanel" hidden>
           <div id="schema-container-ui">
             <p class="text-muted">Loading drive schema…</p>
           </div>
-          <div class="card" id="drive-connection">
-            <h3>Drive Connection</h3>
-            <p class="text-muted" id="drive-status-detail">Checking…</p>
-            <div class="form-actions">
-              <button class="btn btn-accent" id="drive-connect" type="button"><svg class="icon" viewBox="0 0 20 20"><path d="M10 3.5a6.5 6.5 0 00-6.397 5.349A4.5 4.5 0 004.5 17h11a4.5 4.5 0 00.897-8.151A6.5 6.5 0 0010 3.5z"/></svg>Connect Google Drive</button>
-            </div>
-          </div>
+
         </section>
       </main>
     </div>

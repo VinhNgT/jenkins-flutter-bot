@@ -50,31 +50,32 @@ function renderServiceCard(name, key, status) {
     </div>`;
 }
 
-function renderDriveSummary(driveStatus) {
-  if (!driveStatus) return '<p class="text-muted">Unable to check Drive status</p>';
-  if (!driveStatus.configured) {
-    return `
-      <h3>Google Drive</h3>
-      <p class="text-muted">OAuth credentials not configured.
-        Go to the <strong>Google Drive</strong> tab to set up.</p>`;
+// eslint-disable-next-line no-unused-vars
+async function refreshDriveCard() {
+  const drive = await API.getDriveStatus();
+  const el = document.getElementById('drive-status-detail');
+  const actionsEl = document.getElementById('drive-connect-actions');
+  if (!drive) {
+    el.textContent = 'Unable to check Drive status.';
+    actionsEl.style.display = 'none';
+    return;
   }
-  const badge = driveStatus.connected
-    ? '<span class="badge badge--connected">Connected</span>'
-    : '<span class="badge badge--disconnected">Not Connected</span>';
-  return `
-    <div class="status-header">
-      <h3>Google Drive</h3>
-      ${badge}
-    </div>
-    <p class="text-muted">Token path: ${driveStatus.token_path}</p>`;
+
+  if (!drive.configured) {
+    el.textContent = 'OAuth credentials not configured. Go to the Google Drive tab to set up.';
+    actionsEl.style.display = 'none';
+  } else if (drive.connected) {
+    el.innerHTML = `<span class="text-success">Connected</span> — Token: ${drive.token_path}`;
+    actionsEl.style.display = 'none';
+  } else {
+    el.textContent = 'Not connected. Click "Connect Google Drive" to authorize.';
+    actionsEl.style.display = '';
+  }
 }
 
 // eslint-disable-next-line no-unused-vars
 async function refreshDashboard() {
-  const [status, drive] = await Promise.all([
-    API.getServiceStatus(),
-    API.getDriveStatus(),
-  ]);
+  const status = await API.getServiceStatus();
 
   if (status) {
     document.getElementById('status-grid').innerHTML =
@@ -82,7 +83,7 @@ async function refreshDashboard() {
       renderServiceCard('Jenkins Agent', 'agent', status.agent);
   }
 
-  document.getElementById('drive-summary').innerHTML = renderDriveSummary(drive);
+  await refreshDriveCard();
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -91,21 +92,6 @@ async function controlService(service, action) {
   if (result) {
     Toast.show(`${service}: ${action} command sent`, 'info');
     await refreshDashboard();
-  }
-}
-
-// eslint-disable-next-line no-unused-vars
-async function refreshDriveTab() {
-  const drive = await API.getDriveStatus();
-  if (!drive) return;
-
-  const el = document.getElementById('drive-status-detail');
-  if (!drive.configured) {
-    el.textContent = 'Save Drive Client ID and Client Secret first, then connect.';
-  } else if (drive.connected) {
-    el.innerHTML = `<span class="text-success">Connected</span> — Token: ${drive.token_path}`;
-  } else {
-    el.textContent = 'Not connected. Click "Connect Google Drive" to authorize.';
   }
 }
 

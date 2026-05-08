@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         Toast.show(`${label} config saved`, 'success');
         const freshConfig = await API.getConfig();
         if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
-        if (scope === 'ui') await refreshDriveTab();
+        if (scope === 'ui') await refreshDriveCard();
       }
       return;
     }
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const scope = reloadBtn.dataset.reload;
       const freshConfig = await API.getConfig();
       if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
-      if (scope === 'ui') await refreshDriveTab();
+      if (scope === 'ui') await refreshDriveCard();
       const label = { bot: 'Bot', agent: 'Agent', ui: 'Drive' }[scope] || scope;
       Toast.show(`${label} config reloaded`, 'info');
       return;
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.removeEventListener('drive-oauth-done', onComplete);
         if (!oauthCompleted) {
           oauthDialog.close();
-          refreshDriveTab();
+          refreshDriveCard();
         }
       }
     }, 500);
@@ -127,11 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     oauthDialog.close();
     const type = event.data.success ? 'success' : 'error';
     Toast.show(event.data.message, type);
-    await refreshDriveTab();
-    // Also refresh dashboard if it's active
-    if (sessionStorage.getItem('activeTab') === 'dashboard') {
-      await refreshDashboard();
-    }
+    await refreshDriveCard();
   });
 
   // Initialize tabs last (starts polling if on dashboard)

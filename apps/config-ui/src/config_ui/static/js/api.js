@@ -103,4 +103,17 @@ const API = {
       return null;
     }
   },
+
+  /** @returns {Promise<Object|null>} */
+  async disconnectDrive() {
+    try {
+      const res = await fetch('/api/drive/token', { method: 'DELETE' });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
+      return result;
+    } catch (err) {
+      Toast.show(`Failed to disconnect Drive: ${err.message}`, 'error');
+      return null;
+    }
+  },
 };

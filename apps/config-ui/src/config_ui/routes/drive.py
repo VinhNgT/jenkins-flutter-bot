@@ -165,3 +165,20 @@ async def drive_oauth_callback(request: Request) -> Any:
             ),
         },
     )
+
+
+@router.delete("/token")
+async def disconnect_drive(request: Request) -> dict[str, Any]:
+    """Delete the saved OAuth token, disconnecting the current Google account."""
+    drive_oauth = request.app.state.drive_oauth
+    token_path = drive_oauth.token_path
+    if not token_path.exists():
+        return {"disconnected": False, "detail": "No token file found."}
+    try:
+        token_path.unlink()
+        logger.info("Removed Drive OAuth token at %s", token_path)
+        return {"disconnected": True}
+    except Exception:
+        logger.exception("Failed to remove Drive OAuth token at %s", token_path)
+        raise HTTPException(status_code=500, detail="Failed to remove token file.")
+

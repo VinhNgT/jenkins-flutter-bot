@@ -55,6 +55,10 @@ async function refreshDriveCard() {
   const drive = await API.getDriveStatus();
   const el = document.getElementById('drive-status-detail');
   const actionsEl = document.getElementById('drive-connect-actions');
+  const connectBtn = document.getElementById('drive-connect');
+  const changeBtn = document.getElementById('drive-change-account');
+  const disconnectBtn = document.getElementById('drive-disconnect');
+
   if (!drive) {
     el.textContent = 'Unable to check Drive status.';
     actionsEl.style.display = 'none';
@@ -64,12 +68,21 @@ async function refreshDriveCard() {
   if (!drive.configured) {
     el.textContent = 'OAuth credentials not configured. Go to the Google Drive tab to set up.';
     actionsEl.style.display = 'none';
+    connectBtn.style.display = 'none';
+    changeBtn.style.display = 'none';
+    disconnectBtn.style.display = 'none';
   } else if (drive.connected) {
     el.innerHTML = `<span class="text-success">Connected</span> — Token: ${drive.token_path}`;
-    actionsEl.style.display = 'none';
+    actionsEl.style.display = '';
+    connectBtn.style.display = 'none';
+    changeBtn.style.display = '';
+    disconnectBtn.style.display = '';
   } else {
     el.textContent = 'Not connected. Click "Connect Google Drive" to authorize.';
     actionsEl.style.display = '';
+    connectBtn.style.display = '';
+    changeBtn.style.display = 'none';
+    disconnectBtn.style.display = 'none';
   }
 }
 

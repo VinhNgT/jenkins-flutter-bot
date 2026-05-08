@@ -67,17 +67,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const oauthDialog = document.getElementById('oauth-dialog');
   const oauthCancelBtn = document.getElementById('oauth-cancel-btn');
   const driveConnectBtn = document.getElementById('drive-connect');
+  const driveChangeBtn = document.getElementById('drive-change-account');
 
   // Prevent Escape from closing the dialog (would leave Google tab orphaned)
   oauthDialog.addEventListener('cancel', (e) => e.preventDefault());
 
-  // Drive connect button
-  driveConnectBtn.addEventListener('click', async () => {
-    driveConnectBtn.disabled = true;
+  // Shared OAuth popup flow — called by both Connect and Change Account
+  async function startOAuthFlow(triggerBtn) {
+    triggerBtn.disabled = true;
 
     const result = await API.startDriveConnect();
     if (!result?.auth_url) {
-      driveConnectBtn.disabled = false;
+      triggerBtn.disabled = false;
       return;
     }
 
@@ -87,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // No 'noopener' — we need window.opener for postMessage callback
     // and the reference for popup.closed polling
     const popup = window.open(result.auth_url, '_blank');
-    driveConnectBtn.disabled = false;
+    triggerBtn.disabled = false;
 
     // Handle popup blocked by browser
     if (!popup) {
@@ -116,6 +117,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
     }, 500);
+  }
+
+  // Connect button (shown when not connected)
+  driveConnectBtn.addEventListener('click', () => startOAuthFlow(driveConnectBtn));
+
+  // Change Account — opens OAuth without touching old token; token is overwritten only on success
+  driveChangeBtn.addEventListener('click', () => startOAuthFlow(driveChangeBtn));
+
+  // Disconnect — deletes the token file without re-authorizing
+  const driveDisconnectBtn = document.getElementById('drive-disconnect');
+  driveDisconnectBtn.addEventListener('click', async () => {
+    driveDisconnectBtn.disabled = true;
+    const result = await API.disconnectDrive();
+    driveDisconnectBtn.disabled = false;
+    if (result) {
+      Toast.show('Google Drive disconnected', 'info');
+      await refreshDriveCard();
+    }
   });
 
   // Drive OAuth callback via postMessage from oauth_callback.html

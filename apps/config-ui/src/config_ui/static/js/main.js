@@ -145,6 +145,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     await refreshDriveCard();
   });
 
+  // ─── Jenkinsfile generator ──────────────────────────────────────
+  const jenkinsfileOutput = document.getElementById('jenkinsfile-output');
+  const jenkinsfileWarnings = document.getElementById('jenkinsfile-warnings');
+  const jenkinsfileCopyBtn = document.getElementById('jenkinsfile-copy');
+
+  document.getElementById('jenkinsfile-generate').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    jenkinsfileOutput.value = 'Generating…';
+
+    const result = await API.getJenkinsfile();
+    btn.disabled = false;
+
+    if (!result) {
+      jenkinsfileOutput.value = '';
+      return;
+    }
+
+    jenkinsfileOutput.value = result.script;
+    jenkinsfileCopyBtn.disabled = false;
+
+    // Show warnings if any
+    if (result.warnings?.length) {
+      jenkinsfileWarnings.innerHTML = result.warnings
+        .map(w => `<p>⚠️ ${w}</p>`)
+        .join('');
+      jenkinsfileWarnings.hidden = false;
+    } else {
+      jenkinsfileWarnings.hidden = true;
+    }
+
+    Toast.show('Jenkinsfile generated', 'success');
+  });
+
+  jenkinsfileCopyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(jenkinsfileOutput.value);
+      Toast.show('Copied to clipboard', 'success');
+    } catch {
+      // Fallback: select all text for manual copy
+      jenkinsfileOutput.select();
+      Toast.show('Press Ctrl+C to copy', 'info');
+    }
+  });
+
   // Initialize tabs last (starts polling if on dashboard)
   initTabs();
 });

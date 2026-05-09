@@ -101,7 +101,9 @@ class JenkinsClient:
                         timestamp=raw.get("timestamp", 0) / 1000,  # ms → s
                         duration_ms=raw.get("duration", 0),
                         branch=params.get("BRANCH", ""),
-                        commit_hash=params.get("BOT_COMMIT_HASH", ""),
+                        # commit_hash comes from webhook metadata, not Jenkins
+                        # build parameters — always empty when queried via API.
+                        commit_hash="",
                         request_id=params.get("BOT_REQUEST_ID", ""),
                     )
                 )

@@ -77,42 +77,40 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
     ),
     # ── Git Repository ──
     FieldDef(
-        key="git.project_id",
-        env_var="GIT_PROJECT_ID",
-        attr="git_project_id",
-        label="GitLab Project",
+        key="git.repo_url",
+        env_var="GIT_REPO_URL",
+        attr="git_repo_url",
+        label="Repository URL",
         group="Git Repository",
-        description='Project path or numeric ID (e.g. "my-group/my-flutter-app")',
+        description="Git clone URL for the Flutter project",
         help_html=(
-            "Found on your GitLab project page under"
-            " <strong>Settings → General</strong>."
-            " Enables duplicate build detection by checking"
-            " the latest commit before building."
+            "The HTTPS clone URL of your repository, e.g."
+            " <code>https://gitlab.com/my-group/my-flutter-app.git</code>"
+            "<br><br>"
+            "Used for two purposes:"
+            "<ul>"
+            "<li>Generating the Jenkins pipeline script</li>"
+            "<li>Checking the latest commit to detect duplicate builds"
+            " (GitLab only)</li>"
+            "</ul>"
         ),
     ),
     FieldDef(
         key="git.access_token",
         env_var="GIT_ACCESS_TOKEN",
         attr="git_access_token",
-        label="GitLab Access Token",
+        label="Access Token",
         group="Git Repository",
-        description="Token with read_api scope for checking branch commits",
+        description="GitLab token with read_api scope (enables duplicate build detection)",
         help_html=(
             "Create a <strong>Project Access Token</strong> in"
             " GitLab → Settings → Access Tokens."
-            " Select the <code>read_api</code> scope."
+            " Select the <code>read_api</code> scope.<br><br>"
+            "Optional — only needed if you want the bot to skip"
+            " redundant builds when the branch HEAD hasn't changed."
         ),
         secret=True,
         field_type="password",
-    ),
-    FieldDef(
-        key="git.base_url",
-        env_var="GIT_BASE_URL",
-        attr="git_base_url",
-        label="GitLab URL",
-        group="Git Repository",
-        description="Base URL for your GitLab instance",
-        default="https://gitlab.com",
     ),
     # ── Jenkins Connection ──
     FieldDef(
@@ -166,6 +164,28 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         group="Jenkins Connection",
         description="URL-encoded job ID, visible in Jenkins URL as /job/<id>/",
         # Default is handled in post_resolve (defaults to job_name)
+    ),
+    FieldDef(
+        key="jenkins.credentials_id",
+        env_var="JENKINS_CREDENTIALS_ID",
+        attr="jenkins_credentials_id",
+        label="Repo Credentials ID",
+        group="Jenkins Connection",
+        description="Jenkins credential ID for cloning private repos (leave empty for public repos)",
+        help_html=(
+            "If your Flutter project is in a <strong>private repository</strong>,"
+            " Jenkins needs stored credentials to clone it.<br><br>"
+            "<strong>To find or create a credential ID:</strong><br>"
+            "1. Go to <strong>Manage Jenkins → Credentials</strong><br>"
+            "2. Select the appropriate scope (e.g. <strong>(global)</strong>)<br>"
+            "3. If you already have a credential, note its <strong>ID</strong>"
+            " column value<br>"
+            "4. To create one: click <strong>Add Credentials</strong> →"
+            " Kind: <strong>Username with password</strong> →"
+            " paste your Git PAT as the password →"
+            " set an ID like <code>gitlab-credentials</code><br><br>"
+            "Leave empty for public repositories — no credentials needed."
+        ),
     ),
     # ── Build Settings ──
     FieldDef(
@@ -250,9 +270,15 @@ def post_resolve(
     values: dict[str, Any], config_path: Path | None = None
 ) -> dict[str, Any]:
     """Apply bot-specific resolution logic after generic field resolution."""
-    # app_name fallback: app_name → drive_folder_name → "your app"
+    # app_name fallback: app_name → drive_folder_name → repo name → "your app"
     if not values.get("app_name"):
-        values["app_name"] = values.get("drive_folder_name") or "your app"
+        repo_name = ""
+        repo_url = values.get("git_repo_url", "")
+        if repo_url:
+            repo_name = repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
+        values["app_name"] = (
+            values.get("drive_folder_name") or repo_name or "your app"
+        )
 
     # job_id defaults to job_name
     if not values.get("jenkins_job_id"):

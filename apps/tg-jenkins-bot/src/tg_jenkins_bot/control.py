@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request
 from telegram.ext import (
@@ -90,14 +91,16 @@ class BotManager:
                 drive = DriveUploader(token_path=config.oauth_token_path)
                 git_remote: GitRemoteClient | None = None
                 if config.commit_check_enabled:
+                    parsed = urlparse(config.git_repo_url)
+                    base_url = f"{parsed.scheme}://{parsed.netloc}"
+                    project_id = parsed.path.strip("/").removesuffix(".git")
                     git_remote = GitRemoteClient(
-                        base_url=config.git_base_url,
-                        project_id=config.git_project_id,
+                        base_url=base_url,
+                        project_id=project_id,
                         token=config.git_access_token,
                     )
                     logger.info(
-                        "Commit check enabled for project: %s",
-                        config.git_project_id,
+                        "Commit check enabled for project: %s", project_id
                     )
 
                 # Two-step construction: application.bot is only available

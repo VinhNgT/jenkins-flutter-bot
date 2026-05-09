@@ -22,6 +22,7 @@ class Config:
     jenkins_api_token: str
     jenkins_job_name: str
     jenkins_job_id: str
+    jenkins_credentials_id: str
 
     # Google Drive
     oauth_token_path: Path
@@ -39,14 +40,13 @@ class Config:
     config_ui_url: str
 
     # Git repository (optional — enables commit comparison)
-    git_project_id: str
+    git_repo_url: str
     git_access_token: str
-    git_base_url: str
 
     @property
     def commit_check_enabled(self) -> bool:
         """Whether duplicate commit detection is configured."""
-        return bool(self.git_project_id)
+        return bool(self.git_repo_url)
 
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> Config:

@@ -116,4 +116,17 @@ const API = {
       return null;
     }
   },
+
+  /** @returns {Promise<{script: string, warnings: string[]}|null>} */
+  async getJenkinsfile() {
+    try {
+      const res = await fetch('/api/jenkinsfile');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
+      return result;
+    } catch (err) {
+      Toast.show(`Failed to generate Jenkinsfile: ${err.message}`, 'error');
+      return null;
+    }
+  },
 };

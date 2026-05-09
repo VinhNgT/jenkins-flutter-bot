@@ -190,6 +190,73 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // ─── Export .env generator ─────────────────────────────────────
+  const exportOutput = document.getElementById('export-output');
+  const exportWarnings = document.getElementById('export-warnings');
+  const exportCopyBtn = document.getElementById('export-copy');
+  const exportDownloadBtn = document.getElementById('export-download');
+
+  document.getElementById('export-generate').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    exportOutput.value = 'Generating…';
+
+    const result = await API.getExportEnv();
+    btn.disabled = false;
+
+    if (!result) {
+      exportOutput.value = '';
+      return;
+    }
+
+    exportOutput.value = result.env_content;
+    exportCopyBtn.disabled = false;
+    exportDownloadBtn.disabled = false;
+
+    // Show warnings if any
+    if (result.warnings?.length) {
+      exportWarnings.innerHTML = result.warnings
+        .map(w => `<p>⚠️ ${w}</p>`)
+        .join('');
+      exportWarnings.hidden = false;
+    } else {
+      exportWarnings.hidden = true;
+    }
+
+    Toast.show('.env file generated', 'success');
+  });
+
+  exportCopyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(exportOutput.value);
+      Toast.show('Copied to clipboard', 'success');
+    } catch {
+      exportOutput.select();
+      Toast.show('Press Ctrl+C to copy', 'info');
+    }
+  });
+
+  exportDownloadBtn.addEventListener('click', () => {
+    const blob = new Blob([exportOutput.value], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '.env';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    Toast.show('.env file downloaded', 'success');
+  });
+
+  document.getElementById('export-oauth-download').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const ok = await API.downloadOAuth();
+    btn.disabled = false;
+    if (ok) Toast.show('oauth.json downloaded', 'success');
+  });
+
   // Initialize tabs last (starts polling if on dashboard)
   initTabs();
 });

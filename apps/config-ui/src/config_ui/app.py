@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from .drive import DriveOAuthManager
 from .routes.config import router as config_router
 from .routes.drive import router as drive_router
+from .routes.export import router as export_router
 from .routes.jenkinsfile import router as jenkinsfile_router
 from .routes.pages import router as pages_router
 from .routes.services import router as services_router
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(pages_router)
     app.include_router(config_router)
     app.include_router(drive_router)
+    app.include_router(export_router)
     app.include_router(jenkinsfile_router)
     app.include_router(services_router)
 

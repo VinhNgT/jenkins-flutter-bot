@@ -130,7 +130,7 @@ def resolve_fields(
 # ---------------------------------------------------------------------------
 
 # Fields excluded from the serialized schema — they are backend-only concerns.
-_BACKEND_ONLY_KEYS = {"attr", "value_type", "env_var"}
+_BACKEND_ONLY_KEYS = {"attr"}
 
 
 def serialize_schema(

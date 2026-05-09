@@ -129,4 +129,45 @@ const API = {
       return null;
     }
   },
+
+  /** @returns {Promise<{env_content: string, warnings: string[]}|null>} */
+  async getExportEnv() {
+    try {
+      const res = await fetch('/api/export/env');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
+      return result;
+    } catch (err) {
+      Toast.show(`Failed to generate .env: ${err.message}`, 'error');
+      return null;
+    }
+  },
+
+  /**
+   * Download the OAuth token file. Returns true on success.
+   * @returns {Promise<boolean>}
+   */
+  async downloadOAuth() {
+    try {
+      const res = await fetch('/api/export/oauth');
+      if (!res.ok) {
+        const result = await res.json();
+        throw new Error(result.detail || `HTTP ${res.status}`);
+      }
+      // Trigger a browser download
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'oauth.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (err) {
+      Toast.show(`Failed to download oauth.json: ${err.message}`, 'error');
+      return false;
+    }
+  },
 };

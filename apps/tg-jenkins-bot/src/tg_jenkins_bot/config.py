@@ -31,6 +31,8 @@ class Config:
     # Optional
     drive_folder_name: str
     app_name: str
+    branch_list: list[str]
+    session_ttl: int
     max_recent_builds: int
     build_timeout: int
     admin_contact: str

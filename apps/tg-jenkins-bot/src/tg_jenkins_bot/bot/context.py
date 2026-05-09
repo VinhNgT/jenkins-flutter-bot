@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from telegram import Bot
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 if TYPE_CHECKING:
     from ..config import Config
@@ -35,6 +35,24 @@ def _slugify(text: str) -> str:
     return slug or "build"
 
 
+
+
+@dataclass
+class BuildSession:
+    """Ephemeral session for the branch-picking phase.
+
+    Prevents two users from using the build flow simultaneously
+    in a group chat.  Not persisted — expires on restart.
+    """
+
+    chat_id: int
+    user_id: int
+    user_name: str
+    message_id: int
+    started_at: float
+    state: str  # "picking" | "awaiting_text"
+
+
 @dataclass(frozen=True)
 class PendingBuild:
     """Tracks a build triggered via Telegram."""
@@ -45,6 +63,7 @@ class PendingBuild:
     queue_id: int | None = (
         None  # stored at trigger time; used to cancel via Jenkins API
     )
+    message_id: int | None = None  # for editing the build message inline
 
 
 @dataclass(frozen=True)
@@ -163,6 +182,7 @@ class BotContext:
         self._pending: dict[str, PendingBuild] = self._load_pending()
         self._tracked_path = Path("data/tracked_builds.json")
         self._tracked: list[TrackedBuild] = self._load_tracked()
+        self._sessions: dict[int, BuildSession] = {}
 
     # ------------------------------------------------------------------
     # Admin contact helper
@@ -174,6 +194,43 @@ class BotContext:
         if contact:
             return f"Contact your admin ({_escape(contact)})."
         return "Contact your admin."
+
+    # ------------------------------------------------------------------
+    # Build session (interactive lock for branch picking)
+    # ------------------------------------------------------------------
+
+    def start_session(
+        self,
+        chat_id: int,
+        user_id: int,
+        user_name: str,
+        message_id: int,
+    ) -> BuildSession:
+        """Start a new branch-picking session for a chat."""
+        session = BuildSession(
+            chat_id=chat_id,
+            user_id=user_id,
+            user_name=user_name,
+            message_id=message_id,
+            started_at=time.time(),
+            state="picking",
+        )
+        self._sessions[chat_id] = session
+        return session
+
+    def get_session(self, chat_id: int) -> BuildSession | None:
+        """Return the active session for a chat, or None if expired/missing."""
+        session = self._sessions.get(chat_id)
+        if session is None:
+            return None
+        if time.time() - session.started_at > self.config.session_ttl:
+            del self._sessions[chat_id]
+            return None
+        return session
+
+    def clear_session(self, chat_id: int) -> None:
+        """Remove the session for a chat."""
+        self._sessions.pop(chat_id, None)
 
     # ------------------------------------------------------------------
     # Pending build tracking (persisted to JSON)
@@ -204,6 +261,7 @@ class BotContext:
                 "ref": v.ref,
                 "triggered_at": v.triggered_at,
                 "queue_id": v.queue_id,
+                "message_id": v.message_id,
             }
             for k, v in self._pending.items()
         }
@@ -216,6 +274,7 @@ class BotContext:
         ref: str,
         *,
         queue_id: int | None = None,
+        message_id: int | None = None,
     ) -> None:
         """Track a Telegram-triggered build."""
         self._cleanup_expired()
@@ -224,6 +283,7 @@ class BotContext:
             ref=ref,
             triggered_at=time.time(),
             queue_id=queue_id,
+            message_id=message_id,
         )
         self._save_pending()
 
@@ -295,14 +355,28 @@ class BotContext:
         for _rid, pending in expired:
             try:
                 app_name = _escape(self.config.app_name)
-                await self.bot.send_message(
-                    pending.chat_id,
+                text = (
                     f"⏰ <b>{app_name} build timed out</b>\n"
                     "\n"
-                    f"Branch:  <code>{_escape(pending.ref)}</code>\n"
-                    "\n"
-                    f"The build didn't complete within {timeout_min} minutes.\n"
-                    f"{self._admin_hint()}",
+                    f"The build on <code>{_escape(pending.ref)}</code>"
+                    f" didn't complete within {timeout_min} minutes.\n"
+                    f"{self._admin_hint()}"
+                )
+                # Edit the build message if we have one
+                if pending.message_id:
+                    try:
+                        await self.bot.edit_message_text(
+                            text,
+                            chat_id=pending.chat_id,
+                            message_id=pending.message_id,
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        logger.exception("Failed to edit timed-out build message")
+                # Always send a new message for mobile notification
+                await self.bot.send_message(
+                    pending.chat_id,
+                    text,
                     parse_mode="HTML",
                 )
             except Exception:
@@ -491,6 +565,29 @@ class BotContext:
     # Build result handlers (called by webhook)
     # ------------------------------------------------------------------
 
+    async def _edit_build_message(
+        self,
+        pending: PendingBuild,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> None:
+        """Edit the in-chat build message if we have its ID.
+
+        Best-effort — failures are logged but never propagated.
+        """
+        if not self.bot or not pending.message_id:
+            return
+        try:
+            await self.bot.edit_message_text(
+                text,
+                chat_id=pending.chat_id,
+                message_id=pending.message_id,
+                parse_mode="HTML",
+                reply_markup=reply_markup,
+            )
+        except Exception:
+            logger.exception("Failed to edit build message %d", pending.message_id)
+
     async def on_build_success(
         self,
         pending: PendingBuild,
@@ -503,8 +600,6 @@ class BotContext:
         commit_hash = metadata.get("commit_hash", "")
         short_hash = commit_hash[:7]
         now = time.time()
-        started = _format_time(pending.triggered_at)
-        finished = _format_time(now)
         duration = _format_duration(pending.triggered_at, now)
 
         if not self.bot:
@@ -516,19 +611,15 @@ class BotContext:
             creds = self.drive.load_tokens()
             if not creds:
                 app_name = _escape(self.config.app_name)
-                lines = [
-                    f"⚠️ <b>{app_name} built successfully, but Google Drive isn't connected.</b>",
-                    "",
-                    f"Branch:  <code>{_escape(pending.ref)}</code>",
-                ]
-                if short_hash:
-                    lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
-                lines.append("")
-                lines.append(f"{self._admin_hint()}")
-
+                text = (
+                    f"⚠️ <b>{app_name} built successfully, but Google Drive"
+                    f" isn't connected.</b>\n"
+                    f"\n{self._admin_hint()}"
+                )
+                await self._edit_build_message(pending, text)
                 await self.bot.send_message(
                     pending.chat_id,
-                    "\n".join(lines),
+                    text,
                     parse_mode="HTML",
                 )
                 # Still track the build even without Drive upload
@@ -557,22 +648,26 @@ class BotContext:
             )
 
             app_name = _escape(self.config.app_name)
-            lines = [
-                f"✅ <b>{app_name} is ready!</b>",
-                "",
-                f"Branch:  <code>{_escape(pending.ref)}</code>",
-            ]
-            if short_hash:
-                lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
-            lines.append(f"Built:   {started} → {finished} ({duration})")
-            lines.append(f"File:    <code>{_escape(filename)}</code>")
-            lines.append("")
-            lines.append(f'📲 <a href="{_escape(drive_link)}">Download APK</a>')
+            text = (
+                f"✅ <b>{app_name} is ready!</b>\n"
+                f"\n"
+                f"Built from <code>{_escape(pending.ref)}</code> in {duration}."
+            )
+            download_button = InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("📲 Download APK", url=drive_link)],
+                ]
+            )
 
+            # Edit the build message to "done" state
+            await self._edit_build_message(pending, text, download_button)
+
+            # Send a new message to trigger mobile notification
             await self.bot.send_message(
                 pending.chat_id,
-                "\n".join(lines),
+                text,
                 parse_mode="HTML",
+                reply_markup=download_button,
             )
 
             if request_id:
@@ -592,20 +687,15 @@ class BotContext:
         except Exception:
             logger.exception("Failed to upload/notify for build %s", commit_hash)
             app_name = _escape(self.config.app_name)
-            lines = [
-                f"⚠️ <b>{app_name} built successfully, but the file couldn't be uploaded to Google Drive.</b>",
-                "",
-                f"Branch:  <code>{_escape(pending.ref)}</code>",
-            ]
-            if short_hash:
-                lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
-            lines.append("")
-            lines.append("The app was built but couldn't be delivered.")
-            lines.append(self._admin_hint())
-
+            text = (
+                f"⚠️ <b>{app_name} built successfully, but the file"
+                f" couldn't be uploaded to Google Drive.</b>\n"
+                f"\n{self._admin_hint()}"
+            )
+            await self._edit_build_message(pending, text)
             await self.bot.send_message(
                 pending.chat_id,
-                "\n".join(lines),
+                text,
                 parse_mode="HTML",
             )
 
@@ -625,33 +715,27 @@ class BotContext:
             return
 
         commit_hash = metadata.get("commit_hash", "")
-        short_hash = commit_hash[:7]
-        logs = metadata.get("logs", "")
-        error_summary = _escape(_summarize_logs(logs))
         now = time.time()
-        duration = _format_duration(pending.triggered_at, now)
 
         app_name = _escape(self.config.app_name)
-        lines = [
-            f"❌ <b>{app_name} build failed</b>",
-            "",
-            f"Branch:  <code>{_escape(pending.ref)}</code>",
-        ]
-        if short_hash:
-            lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
-        lines.append(f"Duration: {duration}")
-        lines.append("")
-        lines.append(f"⚠️ Build error:\n<code>{error_summary}</code>")
-        lines.append("")
-        lines.append(f"{self._admin_hint()}")
+        text = (
+            f"❌ <b>{app_name} build failed</b>\n"
+            f"\n"
+            f"Something went wrong on <code>{_escape(pending.ref)}</code>.\n"
+            f"{self._admin_hint()}"
+        )
 
+        # Edit the build message to "failed" state
+        await self._edit_build_message(pending, text)
+
+        # Send a new message to trigger mobile notification
         await self.bot.send_message(
             pending.chat_id,
-            "\n".join(lines),
+            text,
             parse_mode="HTML",
         )
 
-        # Track failed builds too so /recent shows them
+        # Track failed builds too
         if request_id:
             self.track_build(
                 request_id,
@@ -672,18 +756,14 @@ class BotContext:
         if not self.bot:
             return
 
-        app_name = _escape(self.config.app_name)
-        if by_user:
-            reason = "The build was cancelled."
-        else:
-            reason = "This build was stopped outside the bot."
+        text = f"🚫 Build on <code>{_escape(pending.ref)}</code> was cancelled."
 
+        # Edit the build message to "cancelled" state
+        await self._edit_build_message(pending, text)
+
+        # Send a new message to trigger mobile notification
         await self.bot.send_message(
             pending.chat_id,
-            f"⚠️ <b>{app_name} build cancelled</b>\n"
-            "\n"
-            f"Branch:  <code>{_escape(pending.ref)}</code>\n"
-            "\n"
-            f"{reason}",
+            text,
             parse_mode="HTML",
         )

@@ -83,6 +83,13 @@ def _coerce(raw: Any, value_type: str) -> Any:
             return [int(v.strip()) for v in raw.split(",") if v.strip()]
         return []
 
+    if value_type == "list[str]":
+        if isinstance(raw, list):
+            return [str(v) for v in raw]
+        if isinstance(raw, str) and raw:
+            return [v.strip() for v in raw.split(",") if v.strip()]
+        return []
+
     return raw
 
 

@@ -8,19 +8,24 @@ from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request
+from telegram import MenuButtonCommands
 from telegram.ext import (
     Application,
     ApplicationBuilder,
+    CallbackQueryHandler,
     CommandHandler,
+    MessageHandler,
+    filters,
 )
 
+from .bot.callbacks import callback_router
 from .bot.context import BotContext
 from .bot.handlers import (
-    build_handler,
-    cancel_handler,
-    recent_handler,
+    keyboard_build_handler,
+    keyboard_recent_handler,
     start_handler,
     status_handler,
+    text_branch_handler,
 )
 from .config import Config
 from .drive.uploader import DriveUploader
@@ -31,15 +36,31 @@ logger = logging.getLogger(__name__)
 
 
 def _build_application(bot_context: BotContext) -> Application:
-    """Create a Telegram application wired with the existing handlers."""
+    """Create a Telegram application wired with the new handler architecture."""
     application = ApplicationBuilder().token(bot_context.config.telegram_token).build()
     application.bot_data["bot_context"] = bot_context
+
+    # Slash commands (kept)
     application.add_handler(CommandHandler("start", start_handler))
     application.add_handler(CommandHandler("help", start_handler))
-    application.add_handler(CommandHandler("build", build_handler))
     application.add_handler(CommandHandler("status", status_handler))
-    application.add_handler(CommandHandler("recent", recent_handler))
-    application.add_handler(CommandHandler("cancel", cancel_handler))
+
+    # Keyboard buttons (new)
+    application.add_handler(
+        MessageHandler(filters.Regex("^🔨 Build$"), keyboard_build_handler)
+    )
+    application.add_handler(
+        MessageHandler(filters.Regex("^📦 Recent$"), keyboard_recent_handler)
+    )
+
+    # Free-text branch name (new)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, text_branch_handler)
+    )
+
+    # Inline button callbacks (new)
+    application.add_handler(CallbackQueryHandler(callback_router))
+
     return application
 
 
@@ -99,9 +120,7 @@ class BotManager:
                         project_id=project_id,
                         token=config.git_access_token,
                     )
-                    logger.info(
-                        "Commit check enabled for project: %s", project_id
-                    )
+                    logger.info("Commit check enabled for project: %s", project_id)
 
                 # Two-step construction: application.bot is only available
                 # after _build_application() runs, so we build a bootstrap
@@ -129,6 +148,19 @@ class BotManager:
                 if not application.updater:
                     raise RuntimeError("Application.updater is None after start")
                 await application.updater.start_polling(drop_pending_updates=True)
+
+                # Register visible commands (replaces BotFather /setcommands)
+                await application.bot.set_my_commands(
+                    [
+                        ("status", "Check build system health"),
+                        ("help", "How to use this bot"),
+                    ]
+                )
+
+                # Replace "/" icon with "📋 Menu" label
+                await application.bot.set_chat_menu_button(
+                    menu_button=MenuButtonCommands(),
+                )
 
                 self._application = application
                 self._bot_context = bot_context

@@ -195,6 +195,38 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         ),
     ),
     FieldDef(
+        key="bot.branch_list",
+        env_var="BRANCH_LIST",
+        attr="branch_list",
+        label="Branch List",
+        group="Build Settings",
+        description="Branches shown as quick-pick buttons (comma-separated)",
+        help_html=(
+            "These branches appear as tap-to-build buttons in Telegram."
+            " Users can always type a custom branch name."
+            "<br><br>"
+            "Example: <code>main, develop, staging</code>"
+        ),
+        default="main",
+        value_type="list[str]",
+    ),
+    FieldDef(
+        key="bot.session_ttl",
+        env_var="SESSION_TTL",
+        attr="session_ttl",
+        label="Session Timeout",
+        group="Build Settings",
+        description="Seconds before the branch picker expires",
+        help_html=(
+            "How long users have to pick a branch before the session"
+            " auto-expires. Prevents stale build prompts in group chats."
+            "<br><br>"
+            "Default: <code>30</code> seconds"
+        ),
+        default="30",
+        value_type="int",
+    ),
+    FieldDef(
         key="drive.folder_name",
         env_var="DRIVE_FOLDER_NAME",
         attr="drive_folder_name",

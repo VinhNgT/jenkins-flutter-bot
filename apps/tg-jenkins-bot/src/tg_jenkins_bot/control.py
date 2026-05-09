@@ -23,6 +23,7 @@ from .bot.handlers import (
 )
 from .config import Config
 from .drive.uploader import DriveUploader
+from .git.remote import GitRemoteClient
 from .jenkins.client import JenkinsClient
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,17 @@ class BotManager:
                     job_name=config.jenkins_job_name,
                 )
                 drive = DriveUploader(token_path=config.oauth_token_path)
+                git_remote: GitRemoteClient | None = None
+                if config.commit_check_enabled:
+                    git_remote = GitRemoteClient(
+                        base_url=config.git_base_url,
+                        project_id=config.git_project_id,
+                        token=config.git_access_token,
+                    )
+                    logger.info(
+                        "Commit check enabled for project: %s",
+                        config.git_project_id,
+                    )
 
                 # Two-step construction: application.bot is only available
                 # after _build_application() runs, so we build a bootstrap
@@ -97,6 +109,7 @@ class BotManager:
                     jenkins=jenkins,
                     drive=drive,
                     bot=None,  # type: ignore[arg-type]
+                    git_remote=git_remote,
                 )
                 application = _build_application(bootstrap_context)
                 bot_context = BotContext(
@@ -104,6 +117,7 @@ class BotManager:
                     jenkins=jenkins,
                     drive=drive,
                     bot=application.bot,
+                    git_remote=git_remote,
                 )
                 application.bot_data["bot_context"] = bot_context
 
@@ -136,9 +150,11 @@ class BotManager:
             await application.stop()
             await application.shutdown()
 
-            # Close the reusable httpx client
+            # Close reusable HTTP clients
             if self._bot_context:
                 await self._bot_context.jenkins.close()
+                if self._bot_context.git_remote:
+                    await self._bot_context.git_remote.close()
 
             self._application = None
             self._bot_context = None

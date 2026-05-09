@@ -17,6 +17,7 @@ from telegram import Bot
 if TYPE_CHECKING:
     from ..config import Config
     from ..drive.uploader import DriveUploader
+    from ..git.remote import GitRemoteClient
     from ..jenkins.client import JenkinsClient
 
 logger = logging.getLogger(__name__)
@@ -151,11 +152,13 @@ class BotContext:
         jenkins: JenkinsClient,
         drive: DriveUploader,
         bot: Bot | None,
+        git_remote: GitRemoteClient | None = None,
     ) -> None:
         self.config = config
         self.jenkins = jenkins
         self.drive = drive
         self.bot = bot
+        self.git_remote = git_remote
         self._pending_path = Path("data/pending_builds.json")
         self._pending: dict[str, PendingBuild] = self._load_pending()
         self._tracked_path = Path("data/tracked_builds.json")
@@ -382,6 +385,23 @@ class BotContext:
         if success_only:
             builds = [b for b in builds if b.result == "success"]
         return list(reversed(builds[-count:]))
+
+    def find_pending_for_branch(self, ref: str) -> tuple[str, PendingBuild] | None:
+        """Find a pending build for the given branch.
+
+        Returns ``(request_id, pending_build)`` or ``None``.
+        """
+        for request_id, pending in self._pending.items():
+            if pending.ref == ref:
+                return request_id, pending
+        return None
+
+    def last_successful_build_for_branch(self, ref: str) -> TrackedBuild | None:
+        """Find the most recent successful tracked build for a branch."""
+        for build in reversed(self._tracked):
+            if build.ref == ref and build.result == "success":
+                return build
+        return None
 
     # ------------------------------------------------------------------
     # Pending build validation against Jenkins

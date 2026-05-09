@@ -75,6 +75,45 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         group="Telegram",
         description='Shown in "contact your admin" messages (e.g. "@john_doe")',
     ),
+    # ── Git Repository ──
+    FieldDef(
+        key="git.project_id",
+        env_var="GIT_PROJECT_ID",
+        attr="git_project_id",
+        label="GitLab Project",
+        group="Git Repository",
+        description='Project path or numeric ID (e.g. "my-group/my-flutter-app")',
+        help_html=(
+            "Found on your GitLab project page under"
+            " <strong>Settings → General</strong>."
+            " Enables duplicate build detection by checking"
+            " the latest commit before building."
+        ),
+    ),
+    FieldDef(
+        key="git.access_token",
+        env_var="GIT_ACCESS_TOKEN",
+        attr="git_access_token",
+        label="GitLab Access Token",
+        group="Git Repository",
+        description="Token with read_api scope for checking branch commits",
+        help_html=(
+            "Create a <strong>Project Access Token</strong> in"
+            " GitLab → Settings → Access Tokens."
+            " Select the <code>read_api</code> scope."
+        ),
+        secret=True,
+        field_type="password",
+    ),
+    FieldDef(
+        key="git.base_url",
+        env_var="GIT_BASE_URL",
+        attr="git_base_url",
+        label="GitLab URL",
+        group="Git Repository",
+        description="Base URL for your GitLab instance",
+        default="https://gitlab.com",
+    ),
     # ── Jenkins Connection ──
     FieldDef(
         key="jenkins.url",

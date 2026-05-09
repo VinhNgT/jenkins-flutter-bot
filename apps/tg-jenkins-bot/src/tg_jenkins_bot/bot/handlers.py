@@ -76,6 +76,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "<b>Commands:</b>\n"
         "• /build — Build the latest version (main branch)\n"
         "• /build &lt;branch&gt; — Build a specific branch\n"
+        "• /build --force — Force a fresh build (cancels any in-progress build)\n"
         "• /status — Bot status, active builds, and last build\n"
         "• /recent — View recent builds\n"
         "• /cancel — Cancel a build in progress\n"
@@ -102,8 +103,14 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     chat_id = update.effective_chat.id
 
-    is_default = not context.args
-    ref = context.args[0] if context.args else "main"
+    # Parse arguments: support --force flag
+    raw_args = list(context.args) if context.args else []
+    force = "--force" in raw_args
+    if force:
+        raw_args.remove("--force")
+
+    is_default = not raw_args
+    ref = raw_args[0] if raw_args else "main"
 
     # Check Drive connection
     if not ctx.drive.is_connected():
@@ -113,6 +120,40 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             parse_mode="HTML",
         )
         return
+
+    if not force:
+        # ----------------------------------------------------------
+        # Layer 1: Pending duplicate guard
+        # ----------------------------------------------------------
+        match = ctx.find_pending_for_branch(ref)
+        if match:
+            _, existing_pending = match
+            await update.message.reply_text(
+                f"⚠️ A build for <code>{_escape(ref)}</code>"
+                f" is already in progress"
+                f" (started {_format_elapsed(existing_pending.triggered_at)}).\n"
+                "\n"
+                f"Use /build {_escape(ref)} --force to cancel it and start a new build.",
+                parse_mode="HTML",
+            )
+            return
+
+        # ----------------------------------------------------------
+        # Layer 2: Commit comparison via GitLab API
+        # ----------------------------------------------------------
+        if config.commit_check_enabled and ctx.git_remote:
+            skipped = await _check_already_built(
+                update, ctx, ref
+            )
+            if skipped:
+                return
+    else:
+        # --force: cancel any pending build for this branch first
+        match = ctx.find_pending_for_branch(ref)
+        if match:
+            old_rid, old_pending = match
+            await ctx.cancel_pending(old_rid)
+            await ctx.on_build_cancelled(old_pending, by_user=True)
 
     # Trigger Jenkins build
     request_id = secrets.token_hex(16)
@@ -144,6 +185,58 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "I'll notify you here when it's done.",
         parse_mode="HTML",
     )
+
+
+async def _check_already_built(
+    update: Update,
+    ctx: BotContext,
+    ref: str,
+) -> bool:
+    """Check if the branch HEAD matches the last successful build.
+
+    Returns True if the build was blocked (user shown existing download),
+    False if the build should proceed.
+    """
+    assert update.message is not None
+    assert ctx.git_remote is not None
+
+    last_build = ctx.last_successful_build_for_branch(ref)
+    if not last_build or not last_build.commit_hash:
+        return False
+
+    remote_head = await ctx.git_remote.get_branch_head(ref)
+    if not remote_head:
+        # API failed — proceed with build (fail-open)
+        return False
+
+    if remote_head != last_build.commit_hash:
+        # New commits exist — proceed with build
+        return False
+
+    # Same commit — offer existing download
+    short_hash = last_build.commit_hash[:7]
+    duration_ago = _format_elapsed(last_build.completed_at)
+
+    lines = [
+        f"📦 <code>{_escape(ref)}</code> is already at the latest"
+        f" version (<code>{_escape(short_hash)}</code>,"
+        f" built {duration_ago}).",
+    ]
+    if last_build.drive_link:
+        lines.append("")
+        lines.append(
+            f'📲 <a href="{_escape(last_build.drive_link)}">Download APK</a>'
+        )
+    lines.append("")
+    lines.append(
+        f"Use /build {_escape(ref)} --force to rebuild anyway."
+    )
+
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="HTML",
+    )
+    return True
 
 
 # ------------------------------------------------------------------

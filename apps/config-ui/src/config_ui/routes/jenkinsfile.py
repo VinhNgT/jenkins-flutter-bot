@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from string import Template
 from typing import Any
 
 from config_schema import nested_get
@@ -15,113 +16,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["jenkinsfile"])
 
 # ---------------------------------------------------------------------------
-# Groovy template fragments
+# Groovy templates — loaded from external .groovy files at import time.
 #
-# Use str.format() with {{/}} for literal Groovy braces and {name} for
-# Python substitution.  Triple single-quotes (''') avoid conflicts with
-# Groovy triple double-quotes (""").
+# Uses string.Template ($var substitution) so Groovy braces don't need
+# escaping.  The template files are valid Groovy and can be edited with
+# full IDE syntax support.
 # ---------------------------------------------------------------------------
 
-_CHECKOUT_PRIVATE = '''\
-        stage('Checkout') {{
-            steps {{
-                checkout([$class: 'GitSCM',
-                    branches: [[name: "*/${{params.BRANCH}}"]],
-                    userRemoteConfigs: [[
-                        url: '{repo_url}',
-                        credentialsId: '{credentials_id}'
-                    ]]
-                ])
-            }}
-        }}'''
+_TEMPLATE_DIR = Path(__file__).parent / "templates"
 
-_CHECKOUT_PUBLIC = '''\
-        stage('Clone') {{
-            steps {{
-                git branch: "${{params.BRANCH}}",
-                    url: '{repo_url}'
-            }}
-        }}'''
-
-# NOTE: Groovy triple-double-quotes (""") appear literally in this template.
-# Python triple-single-quotes (''') delimit the string so there's no conflict.
-_PIPELINE_TEMPLATE = '''\
-pipeline {{
-    agent {{ label 'flutter' }}
-
-    parameters {{
-        string(name: 'BRANCH', defaultValue: 'main')
-        string(name: 'BOT_CALLBACK_URL', defaultValue: '')
-        string(name: 'BOT_REQUEST_ID', defaultValue: '')
-        string(name: 'BOT_JOB_ID', defaultValue: '')
-    }}
-
-    stages {{
-{checkout}
-
-        stage('Build APK') {{
-            steps {{
-                sh 'flutter pub get'
-                sh 'flutter build apk --release'
-            }}
-        }}
-    }}
-
-    post {{
-        success {{
-            script {{
-                if (params.BOT_CALLBACK_URL) {{
-                    def apkPath = 'build/app/outputs/flutter-apk/app-release.apk'
-                    def commitHash = ''
-                    try {{
-                        commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
-                    }} catch (e) {{
-                        commitHash = ''
-                    }}
-                    def metadata = groovy.json.JsonOutput.toJson([
-                        request_id : params.BOT_REQUEST_ID,
-                        job_id     : params.BOT_JOB_ID,
-                        status     : 'success',
-                        commit_hash: commitHash,
-                    ])
-
-                    sh """
-                        curl -X POST "${{params.BOT_CALLBACK_URL}}" \\\\
-                            -F 'metadata=${{metadata}}' \\\\
-                            -F "artifact=@${{apkPath}}"
-                    """
-                }}
-            }}
-        }}
-
-        failure {{
-            script {{
-                if (params.BOT_CALLBACK_URL) {{
-                    def commitHash = ''
-                    try {{
-                        commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
-                    }} catch (e) {{
-                        commitHash = ''
-                    }}
-                    def logs = currentBuild.rawBuild.getLog(50).join('\\n')
-                    def metadata = groovy.json.JsonOutput.toJson([
-                        request_id : params.BOT_REQUEST_ID,
-                        job_id     : params.BOT_JOB_ID,
-                        status     : 'failure',
-                        commit_hash: commitHash,
-                        logs       : logs,
-                    ])
-
-                    sh """
-                        curl -X POST "${{params.BOT_CALLBACK_URL}}" \\\\
-                            -F 'metadata=${{metadata}}'
-                    """
-                }}
-            }}
-        }}
-    }}
-}}
-'''
+_PIPELINE_TEMPLATE = Template((_TEMPLATE_DIR / "pipeline.groovy").read_text())
+_CHECKOUT_PRIVATE = Template(
+    (_TEMPLATE_DIR / "checkout_private.groovy").read_text()
+)
+_CHECKOUT_PUBLIC = Template(
+    (_TEMPLATE_DIR / "checkout_public.groovy").read_text()
+)
 
 
 # ---------------------------------------------------------------------------
@@ -142,13 +52,13 @@ def _read_bot_config(config_path: Path | None) -> dict[str, Any]:
 def _generate_jenkinsfile(repo_url: str, credentials_id: str) -> str:
     """Generate a complete Jenkinsfile pipeline script."""
     if credentials_id:
-        checkout = _CHECKOUT_PRIVATE.format(
+        checkout = _CHECKOUT_PRIVATE.substitute(
             repo_url=repo_url, credentials_id=credentials_id
         )
     else:
-        checkout = _CHECKOUT_PUBLIC.format(repo_url=repo_url)
+        checkout = _CHECKOUT_PUBLIC.substitute(repo_url=repo_url)
 
-    return _PIPELINE_TEMPLATE.format(checkout=checkout)
+    return _PIPELINE_TEMPLATE.substitute(checkout=checkout)
 
 
 # ---------------------------------------------------------------------------

@@ -409,7 +409,6 @@ async def _on_back_to_building(
             logger.exception("Failed to edit stale cancel back")
         return
 
-    app_name = _escape(ctx.config.app_name)
     cancel_button = InlineKeyboardMarkup(
         [
             [
@@ -423,7 +422,7 @@ async def _on_back_to_building(
 
     try:
         await update.callback_query.edit_message_text(
-            f"🔨 <b>Building {app_name}...</b>\n\nI'll let you know when it's ready.",
+            ctx._msg_building(),
             parse_mode="HTML",
             reply_markup=cancel_button,
         )

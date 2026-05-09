@@ -195,6 +195,11 @@ class BotContext:
             return f"Contact your admin ({_escape(contact)})."
         return "Contact your admin."
 
+    def _msg_building(self) -> str:
+        """The 'build in progress' message shown while Jenkins is working."""
+        app_name = _escape(self.config.app_name)
+        return f"🔨 <b>Building {app_name}...</b>\n\nI'll let you know when it's ready."
+
     # ------------------------------------------------------------------
     # Build session (interactive lock for branch picking)
     # ------------------------------------------------------------------

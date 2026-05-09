@@ -48,14 +48,14 @@ function renderServiceCard(name, key, status) {
           onclick="controlService('${key}','${status.running ? 'restart' : 'start'}')"
           ${(!status.configured || status.available === false) ? 'disabled' : ''}>
           ${status.running
-            ? `<svg class="icon" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0110.472-4.001L12.5 8H18V2l-2.052 2.052A8 8 0 1018 10h-2a6 6 0 01-12 0z"/></svg>Restart`
-            : `<svg class="icon" viewBox="0 0 20 20"><path d="M6.5 4.5v11l9-5.5z"/></svg>Start`}
+            ? `${Icons.restart}Restart`
+            : `${Icons.play}Start`}
         </button>
         <button
           class="btn btn-danger btn-sm"
           onclick="controlService('${key}','stop')"
           ${(!status.running || status.available === false) ? 'disabled' : ''}>
-          <svg class="icon" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1"/></svg>Stop
+          ${Icons.stop}Stop
         </button>
       </div>
     </div>`;
@@ -77,17 +77,17 @@ async function refreshDriveCard() {
 
   if (!drive.configured) {
     el.textContent = 'OAuth credentials not configured. Go to the Google Drive tab to set up.';
-    toggleBtn.innerHTML = `<svg class="icon" viewBox="0 0 20 20"><path d="M10 3.5a6.5 6.5 0 00-6.397 5.349A4.5 4.5 0 004.5 17h11a4.5 4.5 0 00.897-8.151A6.5 6.5 0 0010 3.5z"/></svg>Connect Google Drive`;
+    toggleBtn.innerHTML = `${Icons.cloud}Connect Google Drive`;
     toggleBtn.disabled = true;
     disconnectBtn.disabled = true;
   } else if (drive.connected) {
     el.innerHTML = `<span class="text-success">Connected</span> — Token: ${drive.token_path}`;
-    toggleBtn.innerHTML = `<svg class="icon" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0110.472-4.001L12.5 8H18V2l-2.052 2.052A8 8 0 1018 10h-2a6 6 0 01-12 0z"/></svg>Change Account`;
+    toggleBtn.innerHTML = `${Icons.restart}Change Account`;
     toggleBtn.disabled = false;
     disconnectBtn.disabled = false;
   } else {
     el.textContent = 'Not connected. Click "Connect Google Drive" to authorize.';
-    toggleBtn.innerHTML = `<svg class="icon" viewBox="0 0 20 20"><path d="M10 3.5a6.5 6.5 0 00-6.397 5.349A4.5 4.5 0 004.5 17h11a4.5 4.5 0 00.897-8.151A6.5 6.5 0 0010 3.5z"/></svg>Connect Google Drive`;
+    toggleBtn.innerHTML = `${Icons.cloud}Connect Google Drive`;
     toggleBtn.disabled = false;
     disconnectBtn.disabled = true;
   }

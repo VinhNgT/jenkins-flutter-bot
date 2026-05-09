@@ -503,7 +503,6 @@ async def _trigger_build(
         return
 
     # Send/edit the building message with cancel button
-    app_name = _escape(ctx.config.app_name)
     cancel_button = InlineKeyboardMarkup(
         [
             [
@@ -514,9 +513,7 @@ async def _trigger_build(
             ],
         ]
     )
-    building_text = (
-        f"🔨 <b>Building {app_name}...</b>\n\nI'll let you know when it's ready."
-    )
+    building_text = ctx._msg_building()
 
     if picker_message_id:
         try:

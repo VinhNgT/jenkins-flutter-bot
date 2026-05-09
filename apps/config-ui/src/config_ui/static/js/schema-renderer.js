@@ -1,8 +1,6 @@
 /* Dynamic config form rendering from module schemas. */
 
-// SVG icons reused by the renderer (same as current hardcoded HTML)
-const SAVE_ICON = '<svg class="icon" viewBox="0 0 20 20"><path d="M5.5 3A1.5 1.5 0 004 4.5v11A1.5 1.5 0 005.5 17h9a1.5 1.5 0 001.5-1.5V6.621a1.5 1.5 0 00-.44-1.06l-2.12-2.122A1.5 1.5 0 0012.378 3H5.5zM10 13a2 2 0 100-4 2 2 0 000 4zM7 5.5A.5.5 0 017.5 5h4a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-4a.5.5 0 01-.5-.5v-1z"/></svg>';
-const RELOAD_ICON = '<svg class="icon" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0110.472-4.001L12.5 8H18V2l-2.052 2.052A8 8 0 1018 10h-2a6 6 0 01-12 0z"/></svg>';
+
 
 const SCOPE_LABELS = { bot: 'Bot', agent: 'Agent', ui: 'Drive' };
 
@@ -63,8 +61,8 @@ function renderSchemaForm(containerId, scope, schema) {
   const actions = document.createElement('div');
   actions.className = 'form-actions';
   actions.innerHTML = `
-    <button class="btn btn-accent" data-save="${scope}" type="button">${SAVE_ICON}Save ${label} Config</button>
-    <button class="btn btn-secondary" data-reload="${scope}" type="button">${RELOAD_ICON}Reload</button>
+    <button class="btn btn-accent" data-save="${scope}" type="button">${Icons.save}Save ${label} Config</button>
+    <button class="btn btn-secondary" data-reload="${scope}" type="button">${Icons.restart}Reload</button>
   `;
   container.appendChild(actions);
 }

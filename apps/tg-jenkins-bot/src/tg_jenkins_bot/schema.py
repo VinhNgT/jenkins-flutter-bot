@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+
 from config_schema import FieldDef, resolve_fields, serialize_schema  # noqa: F401
 
 # ---------------------------------------------------------------------------
@@ -156,15 +157,7 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         description="Must match the pipeline job name in Jenkins",
         default="flutter-build",
     ),
-    FieldDef(
-        key="jenkins.job_id",
-        env_var="JENKINS_JOB_ID",
-        attr="jenkins_job_id",
-        label="Jenkins Job ID",
-        group="Jenkins Connection",
-        description="URL-encoded job ID, visible in Jenkins URL as /job/<id>/",
-        # Default is handled in post_resolve (defaults to job_name)
-    ),
+
     FieldDef(
         key="jenkins.credentials_id",
         env_var="JENKINS_CREDENTIALS_ID",
@@ -232,33 +225,15 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         value_type="int",
     ),
     FieldDef(
-        key="bot.callback_url",
-        env_var="BOT_CALLBACK_BASE_URL",
-        attr="bot_callback_base_url",
-        label="Bot Callback URL",
+        key="bot.service_url",
+        env_var="BOT_SERVICE_URL",
+        attr="bot_service_url",
+        label="Bot Service URL",
         group="Build Settings",
-        description="Base URL where Jenkins POSTs build results (e.g. http://tg-bot:9090)",
+        description="Internal URL for this service (Jenkins POSTs results here, port is derived automatically)",
         default="http://tg-bot:9090",
     ),
-    FieldDef(
-        key="bot.webhook_port",
-        env_var="BOT_WEBHOOK_PORT",
-        attr="bot_webhook_port",
-        label="Bot Webhook Port",
-        group="Build Settings",
-        description="Port for the webhook receiver",
-        default="9090",
-        field_type="number",
-        value_type="int",
-    ),
-    FieldDef(
-        key="config_ui.url",
-        env_var="CONFIG_UI_URL",
-        attr="config_ui_url",
-        label="Config UI URL",
-        group="Build Settings",
-        description="Host-facing URL for the config dashboard (shown in Telegram messages)",
-    ),
+
 )
 
 # ---------------------------------------------------------------------------
@@ -279,10 +254,6 @@ def post_resolve(
         values["app_name"] = (
             values.get("drive_folder_name") or repo_name or "your app"
         )
-
-    # job_id defaults to job_name
-    if not values.get("jenkins_job_id"):
-        values["jenkins_job_id"] = values.get("jenkins_job_name", "flutter-build")
 
     # oauth_token_path — keep tokens next to the config file when possible
     resolved_path = config_path

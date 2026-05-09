@@ -53,12 +53,9 @@ Collect this checklist before you start:
 | `JENKINS_USER`         | Yes      | Jenkins user directory      | Prefer a dedicated service account                  |
 | `JENKINS_API_TOKEN`    | Yes      | Jenkins user security page  | Copy once when generated                            |
 | `JENKINS_JOB_NAME`     | Yes      | Existing Jenkins job        | Current client expects a top-level job path segment |
-| `JENKINS_JOB_ID`       | Usually  | Your own logical identifier | Usually set equal to `JENKINS_JOB_NAME`             |
 | `GOOGLE_CLIENT_ID`     | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
 | `GOOGLE_CLIENT_SECRET` | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
-| `BOT_CALLBACK_BASE_URL` | Optional | Your deployment topology    | Defaults to `http://tg-bot:9090` in Docker         |
-| `BOT_WEBHOOK_PORT`     | Optional | Your deployment topology    | Defaults to `9090`                                  |
-| `CONFIG_UI_URL`        | Optional | Your deployment topology    | Public config UI URL shown in bot guidance          |
+| `BOT_SERVICE_URL`      | Optional | Your deployment topology    | Internal URL for this service; port is derived automatically. Defaults to `http://tg-bot:9090` in Docker |
 | `DRIVE_FOLDER_NAME`    | Optional | Your choice                 | Destination folder name in Google Drive             |
 | `APP_NAME`             | Optional | Your choice                 | Display name shown in bot messages (e.g. "MyApp"); defaults to `DRIVE_FOLDER_NAME` |
 
@@ -90,7 +87,7 @@ Collect this checklist before you start:
 > [!TIP]
 > `@userinfobot` or `@RawDataBot` can also reveal chat IDs without using `getUpdates`.
 
-### 3. Jenkins URL, User, API Token, Job Name, and Job ID
+### 3. Jenkins URL, User, API Token, and Job Name
 
 The bot needs access to a Jenkins server to trigger builds and monitor status.
 
@@ -99,7 +96,6 @@ The bot needs access to a Jenkins server to trigger builds and monitor status.
 3. Grant that user at least `Overall/Read`, `Job/Read`, and `Job/Build`. Some Jenkins setups also require `View/Read`.
 4. Open the Jenkins user menu, go to **Security**, and create an **API Token**. Copy it immediately; this is `JENKINS_API_TOKEN`.
 5. Copy the exact Jenkins job name that the bot should trigger. This becomes `JENKINS_JOB_NAME`.
-6. Set `JENKINS_JOB_ID` to a stable identifier used only by the bot for callback scoping. In the common case, set it equal to `JENKINS_JOB_NAME` and keep it unchanged.
 
 > [!IMPORTANT]
 > The current Jenkins client builds URLs as `${JENKINS_URL}/job/${JENKINS_JOB_NAME}`. If your pipeline lives inside nested Jenkins folders, you will need to adapt the job path or the client implementation.
@@ -131,20 +127,19 @@ This step is required to upload built artifacts to Google Drive and bypass Teleg
 8. Copy the **Client ID** and **Client Secret**. These are `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 9. Save these values in the config UI dashboard before starting the Drive connection flow.
 
-### 5. Bot Callback URL and Port
+### 5. Bot Service URL
 
 Jenkins must be able to call the bot back when a build finishes.
 
-1. Set `BOT_CALLBACK_BASE_URL` to the base URL Jenkins can reach for the bot service.
+1. Set `BOT_SERVICE_URL` to the internal URL Jenkins can reach for the bot service. The listen port is derived automatically from the URL.
 2. Do **not** append `/webhook/build-complete`; the bot adds that path automatically.
 3. Use a URL that is reachable from the Jenkins server, not just from your browser.
-4. Keep `BOT_WEBHOOK_PORT=9090` unless you run the bot on a different port.
 
 Examples:
 
 ```text
-BOT_CALLBACK_BASE_URL=http://192.168.1.50:9090
-BOT_CALLBACK_BASE_URL=http://tg-jenkins-bot:9090
+BOT_SERVICE_URL=http://192.168.1.50:9090
+BOT_SERVICE_URL=http://tg-jenkins-bot:9090
 ```
 
 ### 6. Optional Values
@@ -153,7 +148,6 @@ Use these only when your deployment needs them:
 
 | Setting                | When to use it                                                                         | How to get it                                                                        |
 | ---------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `CONFIG_UI_URL`        | You want the bot to point users to the dashboard URL                                   | Use the full external URL of the config UI, for example `https://config.example.com` |
 | `DRIVE_FOLDER_NAME`    | You want uploads grouped in a specific Drive folder                                    | Choose any folder name you want the uploader to create or reuse                      |
 | `BOT_OAUTH_TOKEN_PATH` | You want the Drive OAuth token stored outside the default config directory             | Choose a writable path shared by the config UI and bot                               |
 
@@ -182,20 +176,17 @@ JENKINS_URL=http://192.168.1.50:8080
 JENKINS_USER=build-bot
 JENKINS_API_TOKEN=your-jenkins-api-token
 JENKINS_JOB_NAME=flutter-build
-JENKINS_JOB_ID=flutter-build
 
 # Required — Google Drive OAuth client for the config UI callback flow
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-client-secret
 
-# Required — Bot Webhook
-# Jenkins will POST build results to this address
-BOT_CALLBACK_BASE_URL=http://192.168.1.50:9090
-BOT_WEBHOOK_PORT=9090
+# Required — Bot Service URL
+# Jenkins will POST build results to this address (port is derived automatically)
+BOT_SERVICE_URL=http://192.168.1.50:9090
 
 # Optional
 # CONFIG_PATH=/app/config/bot.json
-# CONFIG_UI_URL=http://localhost:9000
 # BOT_OAUTH_TOKEN_PATH=/app/config/oauth.json
 # DRIVE_FOLDER_NAME=flutter-builds
 # APP_NAME=MyApp
@@ -388,8 +379,7 @@ apps/tg-jenkins-bot/
 
 ### Webhook not receiving callbacks
 
-- Ensure `BOT_CALLBACK_BASE_URL` is accessible from the Jenkins server.
-- Verify `BOT_WEBHOOK_PORT` is not blocked by a firewall.
+- Ensure `BOT_SERVICE_URL` is accessible from the Jenkins server.
 
 
 ---

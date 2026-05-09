@@ -50,11 +50,7 @@ services:
     restart: on-failure
     environment:
       CONFIG_PATH: /config/bot/bot.json
-      BOT_CALLBACK_BASE_URL: "http://tg-bot:9090"
-      # Host-facing URL shown in Telegram messages so users can open it
-      # in their browser. Not used for internal service communication.
-      CONFIG_UI_URL: http://localhost:9000
-      BOT_WEBHOOK_PORT: "9090"
+      BOT_SERVICE_URL: "http://tg-bot:9090"
     expose:
       - "9090"
     volumes:

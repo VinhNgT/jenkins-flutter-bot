@@ -21,15 +21,12 @@ class Config:
     jenkins_user: str
     jenkins_api_token: str
     jenkins_job_name: str
-    jenkins_job_id: str
     jenkins_credentials_id: str
 
     # Google Drive
     oauth_token_path: Path
 
-    # Bot webhook (Jenkins calls this)
-    bot_callback_base_url: str
-    bot_webhook_port: int
+    bot_service_url: str
 
     # Optional
     drive_folder_name: str
@@ -37,7 +34,6 @@ class Config:
     max_recent_builds: int
     build_timeout: int
     admin_contact: str
-    config_ui_url: str
 
     # Git repository (optional — enables commit comparison)
     git_repo_url: str
@@ -56,6 +52,15 @@ class Config:
         return cls(**values)
 
     @property
+    def bot_webhook_port(self) -> int:
+        """Listen port derived from bot_service_url."""
+        from urllib.parse import urlparse
+
+        return urlparse(self.bot_service_url).port or 9090
+
+    @property
     def bot_callback_url(self) -> str:
         """Full webhook URL that Jenkins calls on build completion."""
-        return f"{self.bot_callback_base_url.rstrip('/')}/webhook/build-complete"
+        return f"{self.bot_service_url.rstrip('/')}/webhook/build-complete"
+
+

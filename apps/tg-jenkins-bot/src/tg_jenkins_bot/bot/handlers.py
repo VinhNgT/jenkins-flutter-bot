@@ -162,7 +162,7 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             branch=ref,
             callback_url=config.bot_callback_url,
             request_id=request_id,
-            job_id=config.jenkins_job_id,
+            job_id=config.jenkins_job_name,
         )
     except JenkinsTriggerError as exc:
         await update.message.reply_text(

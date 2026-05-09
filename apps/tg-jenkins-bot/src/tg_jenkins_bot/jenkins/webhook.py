@@ -83,11 +83,11 @@ async def handle_build_complete(
     )
 
     # Reject mismatched job_id early — no artifact written
-    if job_id and job_id != ctx.config.jenkins_job_id:
+    if job_id and job_id != ctx.config.jenkins_job_name:
         logger.info(
             "Ignoring callback for job_id=%s (expected %s)",
             job_id,
-            ctx.config.jenkins_job_id,
+            ctx.config.jenkins_job_name,
         )
         return {"status": "ignored", "reason": "different job_id"}
 

@@ -167,13 +167,15 @@ class DriveUploader:
             .create(
                 body=file_metadata,
                 media_body=media,
-                fields="id, webViewLink",
+                fields="id",
             )
             .execute()
         )
 
         file_id = file["id"]
-        web_link = file.get("webViewLink", "")
+        # Direct download URL — bypasses Drive's web viewer so mobile
+        # users get an immediate file download instead of a preview page.
+        web_link = f"https://drive.google.com/uc?export=download&id={file_id}"
 
         # Grant public read access to this file only.
         # Idempotent: Drive silently updates an existing 'anyone' permission.

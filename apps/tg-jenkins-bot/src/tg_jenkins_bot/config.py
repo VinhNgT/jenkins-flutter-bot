@@ -34,6 +34,8 @@ class Config:
     drive_folder_name: str
     app_name: str
     max_recent_builds: int
+    build_timeout: int
+    admin_contact: str
     config_ui_url: str
 
     @classmethod

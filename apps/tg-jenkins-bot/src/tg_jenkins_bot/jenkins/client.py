@@ -11,6 +11,18 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+class JenkinsTriggerError(Exception):
+    """Raised when a Jenkins build trigger fails.
+
+    Carries both a technical `detail` for logs and a jargon-free
+    `user_message` suitable for display in Telegram messages.
+    """
+
+    def __init__(self, detail: str, user_message: str) -> None:
+        super().__init__(detail)
+        self.user_message = user_message
+
+
 def _extract_params(build: dict[str, Any]) -> dict[str, str]:
     """Extract build parameters from Jenkins actions array.
 
@@ -105,10 +117,12 @@ class JenkinsClient:
         callback_url: str,
         request_id: str,
         job_id: str,
-    ) -> int | None:
+    ) -> int:
         """Trigger a parameterized Jenkins build.
 
-        Returns the queue item ID, or None on failure.
+        Returns the queue item ID on success.
+
+        Raises JenkinsTriggerError with a user-friendly message on failure.
         """
         url = f"{self.job_url}/buildWithParameters"
         params = {
@@ -118,23 +132,66 @@ class JenkinsClient:
             "BOT_JOB_ID": job_id,
         }
 
-        resp = await self._client.post(url, params=params)
+        try:
+            resp = await self._client.post(url, params=params)
+        except httpx.ConnectError as exc:
+            logger.exception("Jenkins unreachable during build trigger")
+            raise JenkinsTriggerError(
+                detail=f"Connection failed: {exc}",
+                user_message=(
+                    "The build server isn't responding. Try again in a few minutes."
+                ),
+            ) from exc
+        except Exception as exc:
+            logger.exception("Unexpected error triggering Jenkins build")
+            raise JenkinsTriggerError(
+                detail=f"Unexpected error: {exc}",
+                user_message=(
+                    "Couldn't start the build. Try again, or contact your admin."
+                ),
+            ) from exc
+
         if resp.status_code == 201:
             queue_url = resp.headers.get("Location", "")
             try:
                 queue_id = int(queue_url.rstrip("/").split("/")[-1])
                 logger.info("Build queued: queue_id=%d", queue_id)
                 return queue_id
-            except (ValueError, IndexError):
-                logger.error("Could not parse queue ID from: %s", queue_url)
-                return None
-        else:
+            except (ValueError, IndexError) as exc:
+                logger.exception("Could not parse queue ID from: %s", queue_url)
+                raise JenkinsTriggerError(
+                    detail=f"Bad queue URL: {queue_url}",
+                    user_message=(
+                        "The build was queued but something went wrong. "
+                        "Try again, or contact your admin."
+                    ),
+                ) from exc
+
+        if resp.status_code in (401, 403):
             logger.error(
-                "Jenkins trigger failed: %d — %s",
+                "Jenkins auth failure on trigger: %d — %s",
                 resp.status_code,
                 resp.text[:200],
             )
-            return None
+            raise JenkinsTriggerError(
+                detail=f"Auth failure: {resp.status_code}",
+                user_message=(
+                    "The build server rejected the request. "
+                    "Contact your admin to check credentials."
+                ),
+            )
+
+        logger.error(
+            "Jenkins trigger failed: %d — %s",
+            resp.status_code,
+            resp.text[:200],
+        )
+        raise JenkinsTriggerError(
+            detail=f"HTTP {resp.status_code}",
+            user_message=(
+                "Couldn't start the build. Try again, or contact your admin."
+            ),
+        )
 
     async def check_connection(self) -> bool:
         """Check if the Jenkins job is reachable."""

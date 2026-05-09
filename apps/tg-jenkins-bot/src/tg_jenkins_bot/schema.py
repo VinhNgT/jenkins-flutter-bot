@@ -61,11 +61,19 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         help_html=(
             "Send any message to your bot, then open"
             " <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>"
-            " in a browser. Look for <code>\"chat\":{\"id\":…}</code>."
+            ' in a browser. Look for <code>"chat":{"id":…}</code>.'
             " Comma-separate multiple IDs."
         ),
         required=True,
         value_type="list[int]",
+    ),
+    FieldDef(
+        key="telegram.admin_contact",
+        env_var="ADMIN_CONTACT",
+        attr="admin_contact",
+        label="Admin Contact",
+        group="Telegram",
+        description='Shown in "contact your admin" messages (e.g. "@john_doe")',
     ),
     # ── Jenkins Connection ──
     FieldDef(
@@ -150,6 +158,17 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         group="Build Settings",
         description="Build history limit (0 = unlimited)",
         default="0",
+        field_type="number",
+        value_type="int",
+    ),
+    FieldDef(
+        key="bot.build_timeout",
+        env_var="BUILD_TIMEOUT",
+        attr="build_timeout",
+        label="Build Timeout",
+        group="Build Settings",
+        description="Minutes before a build is considered timed out (0 = never)",
+        default="30",
         field_type="number",
         value_type="int",
     ),

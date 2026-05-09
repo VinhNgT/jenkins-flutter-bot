@@ -21,8 +21,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-PENDING_BUILD_TTL = 3600  # 1 hour
-
 
 def _slugify(text: str) -> str:
     """Convert a display name to a safe filename prefix.
@@ -43,7 +41,9 @@ class PendingBuild:
     chat_id: int
     ref: str
     triggered_at: float
-    queue_id: int | None = None  # stored at trigger time; used to cancel via Jenkins API
+    queue_id: int | None = (
+        None  # stored at trigger time; used to cancel via Jenkins API
+    )
 
 
 @dataclass(frozen=True)
@@ -84,11 +84,23 @@ def _format_duration(start: float, end: float) -> str:
     return f"{minutes} min"
 
 
-def _summarize_logs(logs: str) -> str:
-    """Extract the first meaningful error line from raw build logs.
+def _format_elapsed(ts: float) -> str:
+    """Format elapsed time since a timestamp as a human-readable string."""
+    delta = int(time.time() - ts)
+    if delta < 60:
+        return "just now"
+    minutes = delta // 60
+    if minutes == 1:
+        return "1 min ago"
+    return f"{minutes} min ago"
+
+
+def _summarize_logs(logs: str, *, max_lines: int = 3) -> str:
+    """Extract the first meaningful error lines from raw build logs.
 
     Skips blank lines and common boilerplate to find the most useful
-    error message for display in a Telegram notification.
+    error messages for display in a Telegram notification.
+    Returns up to `max_lines` meaningful lines.
     """
     skip_prefixes = (
         "[INFO]",
@@ -105,18 +117,21 @@ def _summarize_logs(logs: str) -> str:
         "using credential",
     )
 
+    meaningful: list[str] = []
     for line in logs.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
         if any(stripped.startswith(prefix) for prefix in skip_prefixes):
             continue
-        # Return the first meaningful line, capped at 200 chars
+        # Cap each line at 200 chars
         if len(stripped) > 200:
-            return stripped[:197] + "..."
-        return stripped
+            stripped = stripped[:197] + "..."
+        meaningful.append(stripped)
+        if len(meaningful) >= max_lines:
+            break
 
-    return "No details available."
+    return "\n".join(meaningful) if meaningful else "No details available."
 
 
 class BotContext:
@@ -145,6 +160,17 @@ class BotContext:
         self._pending: dict[str, PendingBuild] = self._load_pending()
         self._tracked_path = Path("data/tracked_builds.json")
         self._tracked: list[TrackedBuild] = self._load_tracked()
+
+    # ------------------------------------------------------------------
+    # Admin contact helper
+    # ------------------------------------------------------------------
+
+    def _admin_hint(self) -> str:
+        """Return a 'contact your admin' string, personalised if configured."""
+        contact = self.config.admin_contact
+        if contact:
+            return f"Contact your admin ({_escape(contact)})."
+        return "Contact your admin."
 
     # ------------------------------------------------------------------
     # Pending build tracking (persisted to JSON)
@@ -238,18 +264,46 @@ class BotContext:
                     pending.queue_id,
                 )
 
-    def _cleanup_expired(self) -> None:
-        """Remove pending builds older than TTL."""
+    def _cleanup_expired(self) -> list[tuple[str, PendingBuild]]:
+        """Remove pending builds older than TTL. Returns expired builds."""
+        timeout_seconds = self.config.build_timeout * 60
+        if timeout_seconds <= 0:
+            return []
+
         now = time.time()
         expired = [
-            request_id
+            (request_id, pending)
             for request_id, pending in self._pending.items()
-            if now - pending.triggered_at > PENDING_BUILD_TTL
+            if now - pending.triggered_at > timeout_seconds
         ]
-        for request_id in expired:
+        for request_id, _pending in expired:
             del self._pending[request_id]
         if expired:
             self._save_pending()
+        return expired
+
+    async def cleanup_expired_with_notification(self) -> None:
+        """Remove expired pending builds and notify users about timeouts."""
+        expired = self._cleanup_expired()
+        if not expired or not self.bot:
+            return
+
+        timeout_min = self.config.build_timeout
+        for _rid, pending in expired:
+            try:
+                app_name = _escape(self.config.app_name)
+                await self.bot.send_message(
+                    pending.chat_id,
+                    f"⏰ <b>{app_name} build timed out</b>\n"
+                    "\n"
+                    f"Branch:  <code>{_escape(pending.ref)}</code>\n"
+                    "\n"
+                    f"The build didn't complete within {timeout_min} minutes.\n"
+                    f"{self._admin_hint()}",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                logger.exception("Failed to notify about timed-out build")
 
     # ------------------------------------------------------------------
     # Tracked build registry (persisted to JSON)
@@ -316,7 +370,9 @@ class BotContext:
         )
         self._save_tracked()
 
-    def recent_builds(self, count: int = 5, *, success_only: bool = False) -> list[TrackedBuild]:
+    def recent_builds(
+        self, count: int = 5, *, success_only: bool = False
+    ) -> list[TrackedBuild]:
         """Return the most recent tracked builds, newest first.
 
         Served entirely from local state — always works, even when
@@ -440,14 +496,19 @@ class BotContext:
             creds = self.drive.load_tokens()
             if not creds:
                 app_name = _escape(self.config.app_name)
+                lines = [
+                    f"⚠️ <b>{app_name} built successfully, but Google Drive isn't connected.</b>",
+                    "",
+                    f"Branch:  <code>{_escape(pending.ref)}</code>",
+                ]
+                if short_hash:
+                    lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
+                lines.append("")
+                lines.append(f"{self._admin_hint()}")
+
                 await self.bot.send_message(
                     pending.chat_id,
-                    f"⚠️ <b>{app_name} built successfully, but Google Drive isn't connected.</b>\n"
-                    "\n"
-                    f"Branch:  <code>{_escape(pending.ref)}</code>\n"
-                    f"Commit:  <code>{_escape(short_hash)}</code>\n"
-                    "\n"
-                    "Contact your admin to set up file delivery.",
+                    "\n".join(lines),
                     parse_mode="HTML",
                 )
                 # Still track the build even without Drive upload
@@ -476,16 +537,21 @@ class BotContext:
             )
 
             app_name = _escape(self.config.app_name)
+            lines = [
+                f"✅ <b>{app_name} is ready!</b>",
+                "",
+                f"Branch:  <code>{_escape(pending.ref)}</code>",
+            ]
+            if short_hash:
+                lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
+            lines.append(f"Built:   {started} → {finished} ({duration})")
+            lines.append(f"File:    <code>{_escape(filename)}</code>")
+            lines.append("")
+            lines.append(f'📲 <a href="{_escape(drive_link)}">Download APK</a>')
+
             await self.bot.send_message(
                 pending.chat_id,
-                f"✅ <b>{app_name} is ready!</b>\n"
-                "\n"
-                f"Branch:  <code>{_escape(pending.ref)}</code>\n"
-                f"Commit:  <code>{_escape(short_hash)}</code>\n"
-                f"Built:   {started} → {finished} ({duration})\n"
-                f"File:    <code>{_escape(filename)}</code>\n"
-                "\n"
-                f'📲 <a href="{_escape(drive_link)}">Download APK</a>',
+                "\n".join(lines),
                 parse_mode="HTML",
             )
 
@@ -506,14 +572,20 @@ class BotContext:
         except Exception:
             logger.exception("Failed to upload/notify for build %s", commit_hash)
             app_name = _escape(self.config.app_name)
+            lines = [
+                f"⚠️ <b>{app_name} built successfully, but the file couldn't be uploaded to Google Drive.</b>",
+                "",
+                f"Branch:  <code>{_escape(pending.ref)}</code>",
+            ]
+            if short_hash:
+                lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
+            lines.append("")
+            lines.append("The app was built but couldn't be delivered.")
+            lines.append(self._admin_hint())
+
             await self.bot.send_message(
                 pending.chat_id,
-                f"⚠️ <b>{app_name} built successfully, but the download couldn't be prepared.</b>\n"
-                "\n"
-                f"Branch:  <code>{_escape(pending.ref)}</code>\n"
-                f"Commit:  <code>{_escape(short_hash)}</code>\n"
-                "\n"
-                "Contact your admin.",
+                "\n".join(lines),
                 parse_mode="HTML",
             )
 
@@ -537,21 +609,25 @@ class BotContext:
         logs = metadata.get("logs", "")
         error_summary = _escape(_summarize_logs(logs))
         now = time.time()
-        started = _format_time(pending.triggered_at)
-        finished = _format_time(now)
+        duration = _format_duration(pending.triggered_at, now)
 
         app_name = _escape(self.config.app_name)
+        lines = [
+            f"❌ <b>{app_name} build failed</b>",
+            "",
+            f"Branch:  <code>{_escape(pending.ref)}</code>",
+        ]
+        if short_hash:
+            lines.append(f"Commit:  <code>{_escape(short_hash)}</code>")
+        lines.append(f"Duration: {duration}")
+        lines.append("")
+        lines.append(f"⚠️ Build error:\n<code>{error_summary}</code>")
+        lines.append("")
+        lines.append(f"{self._admin_hint()}")
+
         await self.bot.send_message(
             pending.chat_id,
-            f"❌ <b>{app_name} build failed</b>\n"
-            "\n"
-            f"Branch:  <code>{_escape(pending.ref)}</code>\n"
-            f"Commit:  <code>{_escape(short_hash)}</code>\n"
-            f"Time:    {started} → {finished}\n"
-            "\n"
-            f"Error: {error_summary}\n"
-            "\n"
-            "Contact your admin for the full log.",
+            "\n".join(lines),
             parse_mode="HTML",
         )
 
@@ -565,3 +641,29 @@ class BotContext:
                 triggered_at=pending.triggered_at,
                 completed_at=now,
             )
+
+    async def on_build_cancelled(
+        self,
+        pending: PendingBuild,
+        *,
+        by_user: bool = True,
+    ) -> None:
+        """Notify the build's chat that a build was cancelled."""
+        if not self.bot:
+            return
+
+        app_name = _escape(self.config.app_name)
+        if by_user:
+            reason = "The build was cancelled."
+        else:
+            reason = "This build was stopped outside the bot."
+
+        await self.bot.send_message(
+            pending.chat_id,
+            f"⚠️ <b>{app_name} build cancelled</b>\n"
+            "\n"
+            f"Branch:  <code>{_escape(pending.ref)}</code>\n"
+            "\n"
+            f"{reason}",
+            parse_mode="HTML",
+        )

@@ -126,9 +126,7 @@ async def handle_build_complete(
             pending, metadata_obj, artifact_path, request_id=request_id or ""
         )
     else:
-        await ctx.on_build_failure(
-            pending, metadata_obj, request_id=request_id or ""
-        )
+        await ctx.on_build_failure(pending, metadata_obj, request_id=request_id or "")
         if artifact_path:
             Path(artifact_path).unlink(missing_ok=True)
 

@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from config_schema import deep_merge
 from fastapi import APIRouter, Request
 
 from ..config_store import (
     UI_SECRET_FIELDS,
     clean_secrets_from_payload,
-    deep_merge,
     extract_secret_fields,
     load_json,
     secrets_set,
@@ -17,7 +17,7 @@ from ..config_store import (
     write_json,
 )
 from ..schema import MODULE_DESCRIPTION, MODULE_TITLE, UI_FIELDS, serialize_schema
-from ..services import ServiceClient
+from stack_manager import ServiceClient
 from ..settings import Settings
 
 router = APIRouter(prefix="/api/config", tags=["config"])

@@ -36,6 +36,11 @@ jobs:
             dockerfile: infra/jenkins/Dockerfile.flutter-agent
             platforms: linux/amd64
 
+          - name: tg-admin-bot
+            context: .
+            dockerfile: apps/tg-admin-bot/Dockerfile
+            platforms: linux/amd64,linux/arm64
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6

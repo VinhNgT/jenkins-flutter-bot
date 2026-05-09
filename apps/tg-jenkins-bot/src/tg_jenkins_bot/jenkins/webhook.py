@@ -32,7 +32,7 @@ async def handle_health(request: Request) -> dict[str, str]:
     return {"status": "OK"}
 
 
-@webhook_router.post("/webhook/build-complete")
+@webhook_router.post("/webhook/build-complete", response_model=None)
 async def handle_build_complete(
     request: Request,
     metadata: str = Form(),

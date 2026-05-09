@@ -7,22 +7,25 @@ from typing import Any
 
 import httpx
 
-from .settings import Settings
-
 logger = logging.getLogger(__name__)
 
 
 class ServiceClient:
-    """Call bot and agent control endpoints over the internal network."""
+    """Call bot and agent control endpoints over the internal network.
 
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
+    Decoupled from any framework — constructor takes raw URLs instead of
+    a settings object.
+    """
+
+    def __init__(self, bot_url: str | None, agent_url: str | None) -> None:
+        self._bot_url = bot_url
+        self._agent_url = agent_url
 
     def _service_url(self, service: str) -> str | None:
         if service == "bot":
-            return self._settings.bot_control_url
+            return self._bot_url
         if service == "agent":
-            return self._settings.agent_control_url
+            return self._agent_url
         raise ValueError(f"Unknown service: {service}")
 
     async def _control(

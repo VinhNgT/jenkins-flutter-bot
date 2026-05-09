@@ -1,3 +1,6 @@
+        // Checkout from a private repository using Jenkins credentials.
+        // The credentialsId must match a credential configured in
+        // Jenkins > Manage Jenkins > Credentials.
         stage('Checkout') {
             steps {
                 checkout([$class: 'GitSCM',

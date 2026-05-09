@@ -1,15 +1,31 @@
-"""JSON config file I/O, secret handling, and deep merge utilities."""
+"""JSON config file I/O, secret handling for config-ui.
+
+Core I/O functions (load_json, write_json, deep_merge, nested_set, etc.)
+are imported from shared libraries.  This module adds the config-ui-specific
+secret masking and form handling layer on top.
+"""
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
+from config_schema import nested_get, nested_set
 from fastapi import HTTPException
+from stack_manager import load_json
+from stack_manager import write_json as _write_json
+from stack_manager.config_store import (
+    extract_defaults as extract_defaults,
+    extract_required_fields as extract_required_fields,
+    extract_secret_fields as extract_secret_fields,
+)
 
-from config_schema import nested_get
 from .schema import UI_FIELDS
+
+# Re-export shared functions so existing intra-package imports keep working.
+load_json = load_json
+nested_get = nested_get
+nested_set = nested_set
 
 # ---------------------------------------------------------------------------
 # UI scope constants — derived from the local schema
@@ -21,42 +37,21 @@ UI_REQUIRED_FIELDS = tuple(f.key for f in UI_FIELDS if f.required)
 
 
 # ---------------------------------------------------------------------------
-# Helpers for extracting metadata from fetched remote schemas
+# Framework bridge — catches ValueError from stack_manager.write_json
 # ---------------------------------------------------------------------------
 
 
-def extract_secret_fields(schema: dict[str, Any] | None) -> tuple[str, ...]:
-    """Extract secret field keys from a serialized schema response."""
-    if not schema or "fields" not in schema:
-        return ()
-    return tuple(f["key"] for f in schema["fields"] if f.get("secret"))
+def write_json(path: Any, data: dict[str, Any]) -> None:
+    """Write JSON, converting ValueError to HTTPException."""
+    try:
+        _write_json(path, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-def extract_defaults(schema: dict[str, Any] | None) -> dict[str, str]:
-    """Extract default values from a serialized schema response."""
-    if not schema or "fields" not in schema:
-        return {}
-    return {f["key"]: f["default"] for f in schema["fields"] if f.get("default")}
-
-
-def extract_required_fields(schema: dict[str, Any] | None) -> tuple[str, ...]:
-    """Extract required field keys from a serialized schema response."""
-    if not schema or "fields" not in schema:
-        return ()
-    return tuple(f["key"] for f in schema["fields"] if f.get("required"))
-
-
-def nested_set(data: dict[str, Any], dotted_key: str, value: Any) -> None:
-    """Set a value in a nested dict using a dotted key path."""
-    current = data
-    parts = dotted_key.split(".")
-    for part in parts[:-1]:
-        next_value = current.get(part)
-        if not isinstance(next_value, dict):
-            next_value = {}
-            current[part] = next_value
-        current = next_value
-    current[parts[-1]] = value
+# ---------------------------------------------------------------------------
+# Nested dict helpers (kept locally — only used by secret handling)
+# ---------------------------------------------------------------------------
 
 
 def _nested_remove(data: dict[str, Any], dotted_key: str) -> None:
@@ -72,41 +67,6 @@ def _nested_remove(data: dict[str, Any], dotted_key: str) -> None:
             return
         current = next_value
     current.pop(parts[-1], None)
-
-
-# ---------------------------------------------------------------------------
-# Deep merge
-# ---------------------------------------------------------------------------
-
-
-def deep_merge(existing: Any, incoming: Any) -> Any:
-    """Recursively merge incoming dict into existing, preserving absent keys."""
-    if isinstance(existing, dict) and isinstance(incoming, dict):
-        merged = {**existing}
-        for key, value in incoming.items():
-            merged[key] = deep_merge(merged.get(key), value)
-        return merged
-    return incoming
-
-
-# ---------------------------------------------------------------------------
-# JSON file I/O
-# ---------------------------------------------------------------------------
-
-
-def load_json(path: Path | None) -> dict[str, Any]:
-    """Load a JSON config file, returning {} if missing."""
-    if path is None or not path.exists():
-        return {}
-    return json.loads(path.read_text())
-
-
-def write_json(path: Path | None, data: dict[str, Any]) -> None:
-    """Write a dict as pretty-printed JSON, creating parent dirs."""
-    if path is None:
-        raise HTTPException(status_code=500, detail="Config path not set")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True))
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,5 @@
 FROM python:3.12-slim AS builder
-
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
 WORKDIR /app
 
 # Workspace root
@@ -14,17 +12,12 @@ COPY libs/stack-manager/pyproject.toml libs/stack-manager/
 COPY libs/stack-manager/src libs/stack-manager/src
 
 # This app
-COPY apps/config-ui/pyproject.toml apps/config-ui/
-COPY apps/config-ui/src apps/config-ui/src
+COPY apps/tg-admin-bot/pyproject.toml apps/tg-admin-bot/
+COPY apps/tg-admin-bot/src apps/tg-admin-bot/src
 
-RUN uv sync --frozen --no-dev --no-editable --package config-ui
+RUN uv sync --frozen --no-dev --no-editable --package tg-admin-bot
 
 FROM python:3.12-slim
-
-WORKDIR /app
-
 COPY --from=builder /app/.venv /app/.venv
-
 ENV PATH="/app/.venv/bin:$PATH"
-
-CMD ["config-ui"]
+CMD ["tg-admin-bot"]

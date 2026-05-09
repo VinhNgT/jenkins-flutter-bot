@@ -6,116 +6,14 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from config_schema import nested_get
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
-
-from ..config_store import load_json
-from ..drive import DriveOAuthManager
-from ..services import ServiceClient
+from stack_manager import DriveOAuth, ServiceClient, generate_env, load_json
 from ..settings import Settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/export", tags=["export"])
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _needs_quoting(value: str) -> bool:
-    """Check if a value needs quoting in a .env file."""
-    special = set(" #\"'$`\\!&|;()")
-    return bool(special & set(value))
-
-
-def _serialize_value(raw: Any, value_type: str) -> str:
-    """Serialize a config value to its .env string representation."""
-    if raw is None:
-        return ""
-
-    if value_type == "bool":
-        if isinstance(raw, bool):
-            return "true" if raw else "false"
-        return str(raw).lower()
-
-    if value_type in ("list[int]", "list[str]"):
-        if isinstance(raw, list):
-            return ",".join(str(v) for v in raw)
-        return str(raw)
-
-    return str(raw)
-
-
-def _build_env_lines(
-    schema: dict[str, Any] | None,
-    config_data: dict[str, Any],
-    section_label: str,
-) -> tuple[list[str], list[str]]:
-    """Build .env lines from a schema and its corresponding config data.
-
-    Returns (lines, warnings).
-    """
-    if not schema or "fields" not in schema:
-        return [], [f"{section_label} schema not available — is the service running?"]
-
-    lines: list[str] = []
-    warnings: list[str] = []
-
-    # Group fields by their group label for readability
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for field in schema["fields"]:
-        env_var = field.get("env_var", "")
-        if not env_var:
-            continue
-        group = field.get("group", "General")
-        groups.setdefault(group, []).append(field)
-
-    if not groups:
-        return [], []
-
-    lines.append(f"# {'─' * 40}")
-    lines.append(f"# {section_label}")
-    lines.append(f"# {'─' * 40}")
-
-    for group_name, fields in groups.items():
-        lines.append(f"# ── {group_name} ──")
-
-        for field in fields:
-            env_var = field["env_var"]
-            key = field["key"]
-            default = field.get("default", "")
-            required = field.get("required", False)
-            value_type = field.get("value_type", "str")
-            label = field.get("label", key)
-
-            raw = nested_get(config_data, key)
-
-            # Skip fields with no value set that have a default
-            if raw in (None, "", []) and default:
-                lines.append(f"# {env_var}=  # {label} (default: {default})")
-                continue
-
-            # Warn about missing required fields
-            if raw in (None, "", []) and required:
-                warnings.append(f"Required field '{label}' ({env_var}) is not set")
-                lines.append(f"# {env_var}=  # ⚠ REQUIRED — {label}")
-                continue
-
-            # Skip empty optional fields
-            if raw in (None, "", []):
-                continue
-
-            value = _serialize_value(raw, value_type)
-            if _needs_quoting(value):
-                value = f'"{value}"'
-
-            lines.append(f"{env_var}={value}")
-
-        lines.append("")
-
-    return lines, warnings
 
 
 # ---------------------------------------------------------------------------
@@ -128,9 +26,9 @@ async def export_env(request: Request) -> dict[str, Any]:
     """Generate a production .env file from the current saved configuration."""
     settings: Settings = request.app.state.settings
     client: ServiceClient = request.app.state.service_client
-    drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
+    drive_oauth: DriveOAuth = request.app.state.drive_oauth
 
-    # Fetch schemas (which now include env_var)
+    # Fetch schemas (which include env_var)
     bot_schema = await client.schema("bot")
     agent_schema = await client.schema("agent")
 
@@ -138,89 +36,20 @@ async def export_env(request: Request) -> dict[str, Any]:
     bot_data = load_json(settings.bot_config_path)
     agent_data = load_json(settings.agent_config_path)
 
-    all_lines: list[str] = []
-    all_warnings: list[str] = []
-
-    # Header
-    all_lines.append(
-        "# ============================================="
-        "================================="
+    env_content, warnings = generate_env(
+        bot_config=bot_data,
+        agent_config=agent_data,
+        bot_schema=bot_schema,
+        agent_schema=agent_schema,
+        oauth_exists=drive_oauth.token_path.exists(),
     )
-    all_lines.append(
-        "# Jenkins Flutter Bot — Production Environment"
-    )
-    all_lines.append(
-        "# Generated by config-ui Export tool"
-    )
-    all_lines.append(
-        "# ============================================="
-        "================================="
-    )
-    all_lines.append(
-        "# Place this file at infra/.env on your"
-        " production server."
-    )
-    all_lines.append(
-        "# All values below were extracted from the"
-        " config-ui JSON files."
-    )
-    all_lines.append(
-        "# In production (without config-ui), services"
-        " read these env vars directly."
-    )
-    all_lines.append("")
-
-    # Bot section
-    bot_lines, bot_warnings = _build_env_lines(
-        bot_schema, bot_data, "Telegram Bot"
-    )
-    all_lines.extend(bot_lines)
-    all_warnings.extend(bot_warnings)
-
-    # Agent section
-    agent_lines, agent_warnings = _build_env_lines(
-        agent_schema, agent_data, "Jenkins Agent"
-    )
-    all_lines.extend(agent_lines)
-    all_warnings.extend(agent_warnings)
-
-    # OAuth token note
-    oauth_exists = drive_oauth.token_path.exists()
-    all_lines.append(f"# {'─' * 40}")
-    all_lines.append("# Google Drive OAuth Token")
-    all_lines.append(f"# {'─' * 40}")
-    if oauth_exists:
-        all_lines.append(
-            "# oauth.json exists — download it from the"
-            " Export tab and place at"
-        )
-        all_lines.append(
-            "# /config/bot/oauth.json on your production"
-            " server."
-        )
-    else:
-        all_lines.append(
-            "# oauth.json not found — complete the Drive"
-            " OAuth setup in the Dashboard"
-        )
-        all_lines.append(
-            "# tab first, then re-export."
-        )
-        all_warnings.append(
-            "Google Drive OAuth token (oauth.json) not"
-            " found — Drive uploads won't work in"
-            " production"
-        )
-    all_lines.append("")
-
-    env_content = "\n".join(all_lines)
-    return {"env_content": env_content, "warnings": all_warnings}
+    return {"env_content": env_content, "warnings": warnings}
 
 
-@router.get("/oauth")
+@router.get("/oauth", response_model=None)
 async def export_oauth(request: Request) -> FileResponse | JSONResponse:
     """Download the oauth.json token file."""
-    drive_oauth: DriveOAuthManager = request.app.state.drive_oauth
+    drive_oauth: DriveOAuth = request.app.state.drive_oauth
     token_path: Path = drive_oauth.token_path
 
     if not token_path.exists():

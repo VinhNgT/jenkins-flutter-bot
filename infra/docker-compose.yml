@@ -79,6 +79,27 @@ services:
     networks:
       - jenkins
 
+  tg-admin-bot:
+    build:
+      context: ..
+      dockerfile: apps/tg-admin-bot/Dockerfile
+    container_name: tg-admin-bot
+    restart: on-failure
+    environment:
+      ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN}
+      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID}
+      BOT_CONTROL_URL: http://tg-bot:9090
+      AGENT_CONTROL_URL: http://flutter-agent:9091
+      BOT_CONFIG_PATH: /config/bot/bot.json
+      AGENT_CONFIG_PATH: /config/agent/agent.json
+      UI_CONFIG_PATH: /config/ui/ui.json
+    volumes:
+      - bot-config:/config/bot
+      - agent-config:/config/agent
+      - ui-config:/config/ui
+    networks:
+      - jenkins
+
 volumes:
   jenkins-data:
   bot-config:

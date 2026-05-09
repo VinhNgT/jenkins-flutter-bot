@@ -8,14 +8,14 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .drive import DriveOAuthManager
+from stack_manager import DriveOAuth, ServiceClient
+
 from .routes.config import router as config_router
 from .routes.drive import router as drive_router
 from .routes.export import router as export_router
-from .routes.jenkinsfile import router as jenkinsfile_router
+from .routes.jenkins_pipeline import router as jenkinsfile_router
 from .routes.pages import router as pages_router
 from .routes.services import router as services_router
-from .services import ServiceClient
 from .settings import Settings
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -36,8 +36,11 @@ def create_app() -> FastAPI:
     # --- Resolve settings and wire up shared state ---
     settings = Settings.from_env()
     app.state.settings = settings
-    app.state.service_client = ServiceClient(settings)
-    app.state.drive_oauth = DriveOAuthManager(
+    app.state.service_client = ServiceClient(
+        bot_url=settings.bot_control_url,
+        agent_url=settings.agent_control_url,
+    )
+    app.state.drive_oauth = DriveOAuth(
         _drive_token_path(settings.bot_config_path)
     )
     app.state.templates = Jinja2Templates(directory=str(TEMPLATE_DIR))

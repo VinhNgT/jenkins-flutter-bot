@@ -5,6 +5,8 @@ framework used by all services in the stack.  It provides:
 
   - ``FieldDef``          — frozen dataclass describing one config field
   - ``nested_get()``      — read a value from a nested dict by dotted key
+  - ``nested_set()``      — write a value into a nested dict by dotted key
+  - ``deep_merge()``      — recursively merge dicts, preserving absent keys
   - ``resolve_fields()``  — resolve config with priority: file > env > .env > default
   - ``serialize_schema()``— convert field definitions to a JSON-ready dict
 """
@@ -56,6 +58,37 @@ def nested_get(data: dict[str, Any], dotted_key: str) -> Any:
             return None
         current = current[part]
     return current
+
+
+def nested_set(data: dict[str, Any], dotted_key: str, value: Any) -> None:
+    """Set a value in a nested dict using a dotted key path.
+
+    Intermediate dicts are created automatically if they don't exist.
+    """
+    current = data
+    parts = dotted_key.split(".")
+    for part in parts[:-1]:
+        next_value = current.get(part)
+        if not isinstance(next_value, dict):
+            next_value = {}
+            current[part] = next_value
+        current = next_value
+    current[parts[-1]] = value
+
+
+def deep_merge(existing: Any, incoming: Any) -> Any:
+    """Recursively merge *incoming* dict into *existing*, preserving absent keys.
+
+    Non-dict values in *incoming* overwrite *existing*.  Dict values are
+    merged recursively so that sending ``{"a": {"b": 1}}`` only touches
+    the ``a.b`` path without clobbering sibling keys.
+    """
+    if isinstance(existing, dict) and isinstance(incoming, dict):
+        merged = {**existing}
+        for key, value in incoming.items():
+            merged[key] = deep_merge(merged.get(key), value)
+        return merged
+    return incoming
 
 
 # ---------------------------------------------------------------------------

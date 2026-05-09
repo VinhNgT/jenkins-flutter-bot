@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..services import ServiceClient
+from stack_manager import ServiceClient
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 

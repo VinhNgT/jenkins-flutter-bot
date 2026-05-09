@@ -1,9 +1,11 @@
-"""Self-documenting .env export and validated .env import."""
+"""Self-documenting .env export/import with tarball packaging."""
 
 from __future__ import annotations
 
+import io
 import logging
 import re
+import tarfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -45,7 +47,7 @@ def _serialize_value(raw: Any, value_type: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Export
+# Per-service env file generation
 # ---------------------------------------------------------------------------
 
 
@@ -132,81 +134,115 @@ def _build_env_lines(
     return lines, warnings
 
 
-def generate_env(
+def generate_env_files(
     bot_config: dict[str, Any],
     agent_config: dict[str, Any],
     bot_schema: dict[str, Any] | None,
     agent_schema: dict[str, Any] | None,
-    oauth_exists: bool,
-) -> tuple[str, list[str]]:
-    """Generate a complete self-documenting .env file.
+) -> tuple[dict[str, str], list[str]]:
+    """Generate per-service env file contents.
 
-    Returns ``(env_content, warnings)``.
+    Returns ``({"bot.env": "...", "agent.env": "..."}, warnings)``.
     """
-    all_lines: list[str] = []
+    files: dict[str, str] = {}
     all_warnings: list[str] = []
 
-    # Header
-    all_lines.append(
-        "# ═══════════════════════════════════════════"
-        "═══════════════════════════════════"
+    # Bot env file
+    bot_lines, bot_warnings = _build_env_lines(
+        bot_schema, bot_config, "Telegram Bot"
     )
-    all_lines.append("# Jenkins Flutter Bot — Production Environment")
-    all_lines.append(
-        "# ═══════════════════════════════════════════"
-        "═══════════════════════════════════"
-    )
-    all_lines.append("#")
-    all_lines.append("# Place this file at infra/.env on your production server.")
-    all_lines.append(
-        "# In production (without config-ui), services read these env vars directly."
-    )
-    all_lines.append("#")
-    all_lines.append("# Required fields are uncommented with empty values (KEY=).")
-    all_lines.append("# Optional fields are commented out (# KEY=).")
-    all_lines.append("#")
-    all_lines.append(
-        "# See: https://github.com/VinhNgT/jenkins-flutter-bot"
-    )
-    all_lines.append("")
-
-    # Bot section
-    bot_lines, bot_warnings = _build_env_lines(bot_schema, bot_config, "Telegram Bot")
-    all_lines.extend(bot_lines)
+    files["bot.env"] = "\n".join(bot_lines)
     all_warnings.extend(bot_warnings)
 
-    # Agent section
+    # Agent env file
     agent_lines, agent_warnings = _build_env_lines(
         agent_schema, agent_config, "Jenkins Agent"
     )
-    all_lines.extend(agent_lines)
+    files["agent.env"] = "\n".join(agent_lines)
     all_warnings.extend(agent_warnings)
 
-    # OAuth token note
-    all_lines.append(f"# {'─' * 40}")
-    all_lines.append("# Google Drive OAuth Token")
-    all_lines.append(f"# {'─' * 40}")
-    if oauth_exists:
-        all_lines.append(
-            "# oauth.json exists — download it from the Export tab and place at"
-        )
-        all_lines.append("# /config/bot/oauth.json on your production server.")
-    else:
-        all_lines.append(
-            "# oauth.json not found — complete the Drive OAuth setup first,"
-        )
-        all_lines.append("# then re-export.")
-        all_warnings.append(
-            "Google Drive OAuth token (oauth.json) not found"
-            " — Drive uploads won't work in production"
-        )
-    all_lines.append("")
-
-    return "\n".join(all_lines), all_warnings
+    return files, all_warnings
 
 
 # ---------------------------------------------------------------------------
-# Import
+# Compose-compatible env var output
+# ---------------------------------------------------------------------------
+
+
+def generate_compose_vars(
+    config_data: dict[str, Any],
+    schema: dict[str, Any] | None,
+    section_label: str,
+) -> str:
+    """Generate compose-compatible environment block for one service.
+
+    Returns lines suitable for pasting into a ``docker-compose.yml``
+    ``environment:`` block::
+
+        TELEGRAM_BOT_TOKEN: "your-token"
+        ALLOWED_CHAT_IDS: "123,456"
+    """
+    if not schema or "fields" not in schema:
+        return f"# {section_label} schema not available\n"
+
+    lines: list[str] = [f"# {section_label}"]
+    for field_def in schema["fields"]:
+        env_var = field_def.get("env_var", "")
+        if not env_var:
+            continue
+
+        key = field_def["key"]
+        value_type = field_def.get("value_type", "str")
+        raw = nested_get(config_data, key)
+
+        if raw not in (None, "", []):
+            value = _serialize_value(raw, value_type)
+            lines.append(f'{env_var}: "{value}"')
+        elif field_def.get("required"):
+            lines.append(f"{env_var}: \"\"  # required")
+        else:
+            default = field_def.get("default", "")
+            if default:
+                lines.append(f"# {env_var}: \"{default}\"")
+            else:
+                lines.append(f"# {env_var}: \"\"")
+
+    return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Tarball export
+# ---------------------------------------------------------------------------
+
+
+def build_export_tarball(
+    env_files: dict[str, str],
+    oauth_token_path: Path | None = None,
+) -> bytes:
+    """Build a ``.tar.gz`` containing env files and oauth.json (if present).
+
+    Tarball structure::
+
+        env/bot.env
+        env/agent.env
+        env/oauth.json  (if oauth_token_path exists)
+    """
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for filename, content in env_files.items():
+            data = content.encode("utf-8")
+            info = tarfile.TarInfo(name=f"env/{filename}")
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+
+        if oauth_token_path and oauth_token_path.exists():
+            tar.add(str(oauth_token_path), arcname="env/oauth.json")
+
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Import (tarball)
 # ---------------------------------------------------------------------------
 
 # Matches: KEY=VALUE  or  KEY="VALUE"  or  KEY='VALUE'
@@ -229,13 +265,14 @@ _ENV_LINE_RE = re.compile(
 
 @dataclass(frozen=True)
 class ImportResult:
-    """Structured feedback from a .env import operation."""
+    """Structured feedback from a config import operation."""
 
     applied: list[str] = field(default_factory=list)
     skipped_empty: list[str] = field(default_factory=list)
     unrecognized: list[str] = field(default_factory=list)
     parse_errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    oauth_imported: bool = False
 
 
 def _build_env_lookup(
@@ -247,29 +284,20 @@ def _build_env_lookup(
     return {f["env_var"]: f for f in schema["fields"] if f.get("env_var")}
 
 
-def parse_and_import(
+def _parse_env_content(
     content: str,
-    bot_schema: dict[str, Any] | None,
-    agent_schema: dict[str, Any] | None,
-    bot_config_path: Path | None,
-    agent_config_path: Path | None,
-) -> ImportResult:
-    """Parse .env content, validate against schemas, and write to JSON configs.
+    bot_lookup: dict[str, dict[str, Any]],
+    agent_lookup: dict[str, dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any], list[str], list[str], list[str], list[str]]:
+    """Parse env file content and route values to bot/agent patches.
 
-    Returns a structured ``ImportResult`` with detailed feedback for every
-    line — applied changes, skipped empties, unrecognized vars, and parse
-    errors.
+    Returns (bot_patch, agent_patch, applied, skipped_empty,
+             unrecognized, parse_errors).
     """
-    bot_lookup = _build_env_lookup(bot_schema)
-    agent_lookup = _build_env_lookup(agent_schema)
-
     applied: list[str] = []
     skipped_empty: list[str] = []
     unrecognized: list[str] = []
     parse_errors: list[str] = []
-    warnings: list[str] = []
-
-    # Accumulated config patches
     bot_patch: dict[str, Any] = {}
     agent_patch: dict[str, Any] = {}
 
@@ -309,9 +337,81 @@ def parse_and_import(
 
         # Set the value via dotted key
         dotted_key = field_def["key"]
-        label = field_def.get("label", dotted_key)
         nested_set(target_patch, dotted_key, value)
         applied.append(f"{env_var} → {scope}:{dotted_key} = {value}")
+
+    return bot_patch, agent_patch, applied, skipped_empty, unrecognized, parse_errors
+
+
+def import_tarball(
+    tarball_bytes: bytes,
+    bot_schema: dict[str, Any] | None,
+    agent_schema: dict[str, Any] | None,
+    bot_config_path: Path | None,
+    agent_config_path: Path | None,
+    oauth_dest_path: Path | None = None,
+) -> ImportResult:
+    """Extract a config tarball and import env files + oauth.json.
+
+    Extracts in-memory → finds ``*.env`` files → parses each line →
+    routes to correct schema → writes to JSON configs.
+    If ``oauth.json`` found, copies to *oauth_dest_path*.
+    """
+    bot_lookup = _build_env_lookup(bot_schema)
+    agent_lookup = _build_env_lookup(agent_schema)
+
+    all_applied: list[str] = []
+    all_skipped: list[str] = []
+    all_unrecognized: list[str] = []
+    all_parse_errors: list[str] = []
+    all_warnings: list[str] = []
+    oauth_imported = False
+
+    bot_patch: dict[str, Any] = {}
+    agent_patch: dict[str, Any] = {}
+
+    try:
+        with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
+            for member in tar.getmembers():
+                if not member.isfile():
+                    continue
+
+                name = member.name
+                # Strip leading directory components for matching
+                basename = Path(name).name
+
+                # Process .env files
+                if basename.endswith(".env"):
+                    f = tar.extractfile(member)
+                    if f is None:
+                        continue
+                    content = f.read().decode("utf-8", errors="replace")
+
+                    bp, ap, applied, skipped, unrec, errors = _parse_env_content(
+                        content, bot_lookup, agent_lookup
+                    )
+                    bot_patch = deep_merge(bot_patch, bp)
+                    agent_patch = deep_merge(agent_patch, ap)
+                    all_applied.extend(applied)
+                    all_skipped.extend(skipped)
+                    all_unrecognized.extend(unrec)
+                    all_parse_errors.extend(errors)
+
+                # Process oauth.json
+                elif basename == "oauth.json" and oauth_dest_path:
+                    f = tar.extractfile(member)
+                    if f is None:
+                        continue
+                    oauth_dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    oauth_dest_path.write_bytes(f.read())
+                    oauth_imported = True
+                    all_applied.append(f"oauth.json → {oauth_dest_path}")
+
+    except tarfile.TarError:
+        logger.exception("Failed to extract config tarball")
+        return ImportResult(
+            parse_errors=["Failed to extract tarball — is it a valid .tar.gz?"]
+        )
 
     # Write patches to config files using deep merge
     if bot_patch and bot_config_path:
@@ -338,12 +438,13 @@ def parse_and_import(
             val = nested_get(current, field_def["key"])
             if val in (None, "", []):
                 label = field_def.get("label", field_def["key"])
-                warnings.append(f"Required field '{label}' ({env_var}) still missing")
+                all_warnings.append(f"Required field '{label}' ({env_var}) still missing")
 
     return ImportResult(
-        applied=applied,
-        skipped_empty=skipped_empty,
-        unrecognized=unrecognized,
-        parse_errors=parse_errors,
-        warnings=warnings,
+        applied=all_applied,
+        skipped_empty=all_skipped,
+        unrecognized=all_unrecognized,
+        parse_errors=all_parse_errors,
+        warnings=all_warnings,
+        oauth_imported=oauth_imported,
     )

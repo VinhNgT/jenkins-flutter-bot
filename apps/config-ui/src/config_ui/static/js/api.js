@@ -130,7 +130,7 @@ const API = {
     }
   },
 
-  /** @returns {Promise<{env_content: string, warnings: string[]}|null>} */
+  /** @returns {Promise<{files: Object, compose_vars: Object, warnings: string[]}|null>} */
   async getExportEnv() {
     try {
       const res = await fetch('/api/export/env');
@@ -138,36 +138,57 @@ const API = {
       if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
       return result;
     } catch (err) {
-      Toast.show(`Failed to generate .env: ${err.message}`, 'error');
+      Toast.show(`Failed to generate env: ${err.message}`, 'error');
       return null;
     }
   },
 
   /**
-   * Download the OAuth token file. Returns true on success.
+   * Download the config tarball. Returns true on success.
    * @returns {Promise<boolean>}
    */
-  async downloadOAuth() {
+  async downloadTarball() {
     try {
-      const res = await fetch('/api/export/oauth');
+      const res = await fetch('/api/export/tarball');
       if (!res.ok) {
         const result = await res.json();
         throw new Error(result.detail || `HTTP ${res.status}`);
       }
-      // Trigger a browser download
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'oauth.json';
+      a.download = 'jfb-config.tar.gz';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       return true;
     } catch (err) {
-      Toast.show(`Failed to download oauth.json: ${err.message}`, 'error');
+      Toast.show(`Failed to download tarball: ${err.message}`, 'error');
       return false;
+    }
+  },
+
+  /**
+   * Import a config tarball.
+   * @param {File} file
+   * @returns {Promise<Object|null>}
+   */
+  async importTarball(file) {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/import/tarball', {
+        method: 'POST',
+        body: form,
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
+      return result;
+    } catch (err) {
+      Toast.show(`Failed to import config: ${err.message}`, 'error');
+      return null;
     }
   },
 };

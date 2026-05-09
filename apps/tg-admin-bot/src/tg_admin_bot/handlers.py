@@ -9,10 +9,11 @@ from config_schema import nested_get
 from stack_manager import (
     DriveOAuth,
     ServiceClient,
-    generate_env,
+    build_export_tarball,
+    generate_env_files,
     generate_jenkinsfile,
+    import_tarball,
     load_json,
-    parse_and_import,
 )
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -193,10 +194,10 @@ async def _service_action_callback(
 async def _export_env_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """Generate and send the .env file."""
+    """Generate and send the config tarball."""
     query = update.callback_query
     assert query is not None
-    await query.answer("Generating .env…")
+    await query.answer("Generating config tarball…")
 
     settings: Settings = context.bot_data["settings"]
     client: ServiceClient = context.bot_data["service_client"]
@@ -207,21 +208,23 @@ async def _export_env_callback(
     bot_data = load_json(settings.bot_config_path)
     agent_data = load_json(settings.agent_config_path)
 
-    content, warnings = generate_env(
+    env_files, warnings = generate_env_files(
         bot_config=bot_data,
         agent_config=agent_data,
         bot_schema=bot_schema,
         agent_schema=agent_schema,
-        oauth_exists=drive_oauth.token_path.exists(),
+    )
+    tarball_bytes = build_export_tarball(
+        env_files, oauth_token_path=drive_oauth.token_path
     )
 
     # Send as document
     import io
 
-    doc = io.BytesIO(content.encode())
-    doc.name = ".env"
+    doc = io.BytesIO(tarball_bytes)
+    doc.name = "jfb-config.tar.gz"
     await query.message.reply_document(  # type: ignore[union-attr]
-        document=doc, caption="📤 Generated `.env` configuration"
+        document=doc, caption="📤 Config export tarball"
     )
 
     if warnings:
@@ -237,13 +240,13 @@ async def _export_env_callback(
 async def _import_env_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Ask the user to upload a .env file."""
+    """Ask the user to upload a tarball."""
     query = update.callback_query
     assert query is not None
     await query.answer()
     await query.edit_message_text(
         "📥 *Import Configuration*\n\n"
-        "Send me a `.env` file to import.\n"
+        "Send me a `.tar.gz` config tarball to import.\n"
         "Use /cancel to abort.",
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -253,7 +256,7 @@ async def _import_env_callback(
 async def _import_env_receive(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Receive and process the uploaded .env file."""
+    """Receive and process the uploaded config tarball."""
     settings: Settings = context.bot_data["settings"]
     if not _ensure_authorized(settings, update):
         return ConversationHandler.END
@@ -267,18 +270,19 @@ async def _import_env_receive(
 
     file = await doc.get_file()
     raw = await file.download_as_bytearray()
-    content = raw.decode("utf-8", errors="replace")
 
     client: ServiceClient = context.bot_data["service_client"]
+    drive_oauth: DriveOAuth = context.bot_data["drive_oauth"]
     bot_schema = await client.schema("bot")
     agent_schema = await client.schema("agent")
 
-    result = parse_and_import(
-        content=content,
+    result = import_tarball(
+        tarball_bytes=bytes(raw),
         bot_schema=bot_schema,
         agent_schema=agent_schema,
         bot_config_path=settings.bot_config_path,
         agent_config_path=settings.agent_config_path,
+        oauth_dest_path=drive_oauth.token_path,
     )
 
     lines: list[str] = ["📥 *Import Results*\n"]
@@ -289,6 +293,9 @@ async def _import_env_receive(
             lines.append(f"  • `{item}`")
         if len(result.applied) > 15:
             lines.append(f"  _… and {len(result.applied) - 15} more_")
+
+    if result.oauth_imported:
+        lines.append("\n🔑 *OAuth token imported*")
 
     if result.skipped_empty:
         lines.append(f"\n⏭ *Skipped ({len(result.skipped_empty)} empty)*")

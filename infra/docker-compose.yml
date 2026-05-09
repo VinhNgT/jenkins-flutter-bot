@@ -48,6 +48,9 @@ services:
       dockerfile: apps/tg-jenkins-bot/Dockerfile
     container_name: tg-bot
     restart: on-failure
+    env_file:
+      - path: env/bot.env
+        required: false
     environment:
       CONFIG_PATH: /config/bot/bot.json
       BOT_SERVICE_URL: "http://tg-bot:9090"
@@ -67,6 +70,9 @@ services:
       dockerfile: infra/Dockerfile.flutter-agent
     container_name: flutter-agent
     restart: on-failure
+    env_file:
+      - path: env/agent.env
+        required: false
     environment:
       CONFIG_PATH: /config/agent.json
       JENKINS_URL: http://jenkins:8080
@@ -86,8 +92,8 @@ services:
     container_name: tg-admin-bot
     restart: on-failure
     environment:
-      ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN}
-      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID}
+      ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN:-}
+      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID:-}
       BOT_CONTROL_URL: http://tg-bot:9090
       AGENT_CONTROL_URL: http://flutter-agent:9091
       BOT_CONFIG_PATH: /config/bot/bot.json

@@ -14,8 +14,10 @@ from stack_manager.config_store import (
 from stack_manager.drive import DriveOAuth as DriveOAuth
 from stack_manager.env_io import (
     ImportResult as ImportResult,
-    generate_env as generate_env,
-    parse_and_import as parse_and_import,
+    build_export_tarball as build_export_tarball,
+    generate_compose_vars as generate_compose_vars,
+    generate_env_files as generate_env_files,
+    import_tarball as import_tarball,
 )
 from stack_manager.jenkins_pipeline import generate_jenkinsfile as generate_jenkinsfile
 from stack_manager.services import ServiceClient as ServiceClient

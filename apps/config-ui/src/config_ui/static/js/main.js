@@ -190,11 +190,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ─── Export .env generator ─────────────────────────────────────
+  // ─── Config Transfer (export + import) ──────────────────────────
   const exportOutput = document.getElementById('export-output');
   const exportWarnings = document.getElementById('export-warnings');
   const exportCopyBtn = document.getElementById('export-copy');
   const exportDownloadBtn = document.getElementById('export-download');
+  const exportTabs = document.getElementById('export-tabs');
+
+  // Cached export data from the last generate
+  let exportData = null;
+  let activeExportTab = 'bot';
+
+  function getTabContent(tab) {
+    if (!exportData) return '';
+    if (tab === 'bot') return exportData.files['bot.env'] || '';
+    if (tab === 'agent') return exportData.files['agent.env'] || '';
+    if (tab === 'compose') {
+      const bot = exportData.compose_vars?.bot || '';
+      const agent = exportData.compose_vars?.agent || '';
+      return bot + '\n' + agent;
+    }
+    return '';
+  }
+
+  function switchExportTab(tab) {
+    activeExportTab = tab;
+    exportOutput.value = getTabContent(tab);
+    exportTabs.querySelectorAll('.export-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.exportTab === tab);
+    });
+  }
+
+  // Tab clicks
+  exportTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-export-tab]');
+    if (tab) switchExportTab(tab.dataset.exportTab);
+  });
 
   document.getElementById('export-generate').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
@@ -209,11 +240,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    exportOutput.value = result.env_content;
+    exportData = result;
+    exportTabs.hidden = false;
+    switchExportTab('bot');
     exportCopyBtn.disabled = false;
     exportDownloadBtn.disabled = false;
 
-    // Show warnings if any
     if (result.warnings?.length) {
       exportWarnings.innerHTML = result.warnings
         .map(w => `<p>⚠️ ${w}</p>`)
@@ -223,7 +255,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       exportWarnings.hidden = true;
     }
 
-    Toast.show('.env file generated', 'success');
+    Toast.show('Config preview generated', 'success');
   });
 
   exportCopyBtn.addEventListener('click', async () => {
@@ -236,25 +268,91 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  exportDownloadBtn.addEventListener('click', () => {
-    const blob = new Blob([exportOutput.value], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '.env';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    Toast.show('.env file downloaded', 'success');
+  exportDownloadBtn.addEventListener('click', async () => {
+    exportDownloadBtn.disabled = true;
+    const ok = await API.downloadTarball();
+    exportDownloadBtn.disabled = false;
+    if (ok) Toast.show('Tarball downloaded', 'success');
   });
 
-  document.getElementById('export-oauth-download').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    const ok = await API.downloadOAuth();
-    btn.disabled = false;
-    if (ok) Toast.show('oauth.json downloaded', 'success');
+  // ─── Import ────────────────────────────────────────────────────
+  const importZone = document.getElementById('import-zone');
+  const importFile = document.getElementById('import-file');
+  const importBrowse = document.getElementById('import-browse');
+  const importFilename = document.getElementById('import-filename');
+  const importUploadBtn = document.getElementById('import-upload');
+  const importResults = document.getElementById('import-results');
+
+  let selectedFile = null;
+
+  importBrowse.addEventListener('click', (e) => {
+    e.preventDefault();
+    importFile.click();
+  });
+
+  importFile.addEventListener('change', () => {
+    if (importFile.files.length) {
+      selectedFile = importFile.files[0];
+      importFilename.textContent = selectedFile.name;
+      importUploadBtn.disabled = false;
+    }
+  });
+
+  // Drag and drop
+  importZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    importZone.classList.add('dragover');
+  });
+  importZone.addEventListener('dragleave', () => {
+    importZone.classList.remove('dragover');
+  });
+  importZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    importZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      selectedFile = e.dataTransfer.files[0];
+      importFilename.textContent = selectedFile.name;
+      importUploadBtn.disabled = false;
+    }
+  });
+
+  importUploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    importUploadBtn.disabled = true;
+
+    const result = await API.importTarball(selectedFile);
+    importUploadBtn.disabled = false;
+
+    if (!result) return;
+
+    // Show results
+    const sections = [];
+    if (result.applied?.length) {
+      sections.push(`<h4>✅ Applied (${result.applied.length})</h4><ul>${result.applied.map(s => `<li>${s}</li>`).join('')}</ul>`);
+    }
+    if (result.skipped_empty?.length) {
+      sections.push(`<h4>⏭️ Skipped (${result.skipped_empty.length})</h4><ul>${result.skipped_empty.map(s => `<li>${s}</li>`).join('')}</ul>`);
+    }
+    if (result.unrecognized?.length) {
+      sections.push(`<h4>❓ Unrecognized (${result.unrecognized.length})</h4><ul>${result.unrecognized.map(s => `<li>${s}</li>`).join('')}</ul>`);
+    }
+    if (result.parse_errors?.length) {
+      sections.push(`<h4>❌ Errors (${result.parse_errors.length})</h4><ul>${result.parse_errors.map(s => `<li>${s}</li>`).join('')}</ul>`);
+    }
+    if (result.warnings?.length) {
+      sections.push(`<h4>⚠️ Warnings (${result.warnings.length})</h4><ul>${result.warnings.map(s => `<li>${s}</li>`).join('')}</ul>`);
+    }
+
+    importResults.innerHTML = sections.join('') || '<p>No changes applied.</p>';
+    importResults.hidden = false;
+
+    const applied = result.applied?.length || 0;
+    Toast.show(`Import complete — ${applied} field(s) applied`, applied ? 'success' : 'info');
+
+    // Reset file input
+    selectedFile = null;
+    importFile.value = '';
+    importFilename.textContent = '';
   });
 
   // Initialize tabs last (starts polling if on dashboard)

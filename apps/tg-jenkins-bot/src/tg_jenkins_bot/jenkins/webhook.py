@@ -37,7 +37,7 @@ async def handle_build_complete(
     request: Request,
     metadata: str = Form(),
     artifact: UploadFile | None = File(default=None),
-) -> dict[str, str]:
+) -> dict[str, str] | JSONResponse:
     """Handle Jenkins build completion callback.
 
     Expected multipart POST:

@@ -325,6 +325,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "jinja2" },
+    { name = "python-multipart" },
     { name = "stack-manager" },
     { name = "uvicorn" },
 ]
@@ -336,6 +337,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "stack-manager", editable = "libs/stack-manager" },
     { name = "uvicorn", specifier = ">=0.29.0" },
 ]

@@ -1,6 +1,6 @@
 [project]
 name = "stack-manager"
-version = "0.1.2-dev.2"
+version = "0.1.2-dev.3"
 description = "Shared operational utilities for stack management (service control, config I/O, Drive OAuth, export/import)"
 requires-python = ">=3.12"
 dependencies = [

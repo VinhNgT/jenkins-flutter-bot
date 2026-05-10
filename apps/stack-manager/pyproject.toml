@@ -1,6 +1,6 @@
 [project]
 name = "stack-manager"
-version = "0.1.2-dev.3"
+version = "0.2.0-dev.1"
 description = "Central operational backend for the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [

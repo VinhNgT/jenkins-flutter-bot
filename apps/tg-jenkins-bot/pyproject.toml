@@ -1,6 +1,6 @@
 [project]
 name = "tg-jenkins-bot"
-version = "0.1.2-dev.3"
+version = "0.2.0-dev.1"
 description = "Telegram bot that triggers Jenkins Flutter builds and uploads APKs to Google Drive"
 requires-python = ">=3.12"
 dependencies = [

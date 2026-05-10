@@ -7,17 +7,15 @@ WORKDIR /app
 # Workspace root
 COPY pyproject.toml uv.lock ./
 
-# Shared libraries
+# Shared library
 COPY libs/config-schema/pyproject.toml libs/config-schema/
 COPY libs/config-schema/src libs/config-schema/src
-COPY libs/stack-manager/pyproject.toml libs/stack-manager/
-COPY libs/stack-manager/src libs/stack-manager/src
 
 # This app
-COPY apps/config-ui/pyproject.toml apps/config-ui/
-COPY apps/config-ui/src apps/config-ui/src
+COPY apps/stack-manager/pyproject.toml apps/stack-manager/
+COPY apps/stack-manager/src apps/stack-manager/src
 
-RUN uv sync --frozen --no-dev --no-editable --package config-ui
+RUN uv sync --frozen --no-dev --no-editable --package stack-manager
 
 FROM python:3.12-slim
 
@@ -27,4 +25,4 @@ COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["config-ui"]
+CMD ["stack-manager"]

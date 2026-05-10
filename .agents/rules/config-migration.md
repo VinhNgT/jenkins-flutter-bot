@@ -49,7 +49,7 @@ Place migration scripts in `scripts/`, named `migrate_<from_version>_to_<to_vers
 |------|-----------------------|-------------|
 | `bot.json` | `CONFIG_PATH` in tg-bot | tg-bot compose / env template |
 | `agent.json` | `CONFIG_PATH` in agent-control | agent-control compose / env template |
-| `drive.json` | `DRIVE_CONFIG_PATH` in config-ui | config-ui compose / env template |
+| `drive.json` | `DRIVE_CONFIG_PATH` in stack-manager | stack-manager compose / env template |
 | `project.json` | `PROJECT_CONFIG_PATH` in stack-manager consumers | compose / env template |
 
 ---

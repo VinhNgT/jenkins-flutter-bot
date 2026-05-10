@@ -6,8 +6,20 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from config_schema import resolve_fields
-from stack_manager import PROJECT_FIELDS
+from config_schema import FieldDef, resolve_fields
+
+# Project fields inlined — previously from stack-manager lib.
+# stack-manager (service) also declares these; they must stay in sync.
+PROJECT_FIELDS: tuple[FieldDef, ...] = (
+    FieldDef(
+        key="project.github_url",
+        env_var="PROJECT_GITHUB_URL",
+        attr="project_github_url",
+        label="GitHub URL",
+        group="Repository",
+        description="Link to the project's GitHub repository",
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -28,3 +40,4 @@ class ProjectConfig:
             config_path = Path(raw) if raw else None
         values = resolve_fields(PROJECT_FIELDS, config_path)
         return cls(**values)
+

@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from stack_manager import ServiceClient
+from ..manager import StackManager
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -14,10 +14,10 @@ router = APIRouter(prefix="/api/services", tags=["services"])
 @router.get("/status")
 async def get_service_status(request: Request) -> dict[str, Any]:
     """Return the current status of all controllable services."""
-    client: ServiceClient = request.app.state.service_client
+    manager: StackManager = request.app.state.manager
     return {
-        "bot": await client.status("bot"),
-        "agent": await client.status("agent"),
+        "bot": await manager.services.status("bot"),
+        "agent": await manager.services.status("agent"),
     }
 
 
@@ -31,9 +31,6 @@ async def control_service(
     if action not in {"start", "stop", "restart"}:
         raise HTTPException(status_code=404, detail="Unknown action")
 
-    client: ServiceClient = request.app.state.service_client
-    if action == "start":
-        return await client.start(service)
-    if action == "stop":
-        return await client.stop(service)
-    return await client.restart(service)
+    manager: StackManager = request.app.state.manager
+    method = getattr(manager.services, action)
+    return await method(service)

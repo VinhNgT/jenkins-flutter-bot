@@ -1,6 +1,6 @@
 # 🔧 Agent Control
 
-An HTTP control wrapper for the Jenkins inbound agent subprocess. Provides a FastAPI control API (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`, `/control/schema`) so config-ui and tg-admin-bot can manage the agent without Docker socket access.
+An HTTP control wrapper for the Jenkins inbound agent subprocess. Provides a FastAPI control API (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`, `/control/schema`) so stack-manager can manage the agent without Docker socket access.
 
 ## How It Works
 
@@ -16,4 +16,4 @@ On startup failure, the FastAPI server stays running — the control API remains
 
 Agent configuration follows the same declarative schema system as all other services. Fields are declared in `schema.py` and resolved via the standard precedence chain.
 
-The `JENKINS_URL` and `JENKINS_AGENT_NAME` are infrastructure fields — typically set in `docker-compose.yml`, not in the config-ui.
+The `JENKINS_URL` and `JENKINS_AGENT_NAME` are infrastructure fields — typically set in `docker-compose.yml`, not in the dashboard.

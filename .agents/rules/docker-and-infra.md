@@ -14,8 +14,8 @@ Triggered when editing Dockerfiles, docker-compose files, compose.sh, or env fil
 
 For the authoritative volume list, see `docker-compose.yml`. Key design decisions:
 
-- **`bot-config`** is mounted in both `config-ui` and `tg-bot` at the same path (`/config/bot/`) so `oauth.json` is accessible from both containers. `tg-admin-bot` also mounts it.
-- **`drive-config`** holds Drive OAuth client credentials (`drive.json`) — separate from bot config because Drive credentials are managed by `config-ui` / `tg-admin-bot`, not by the bot itself.
+- **`bot-config`** is mounted in both `stack-manager` and `tg-bot` at the same path (`/config/bot/`) so `oauth.json` is accessible from both containers. `tg-admin-bot` also mounts it.
+- **`drive-config`** holds Drive OAuth client credentials (`drive.json`) — separate from bot config because Drive credentials are managed by `stack-manager` / `tg-admin-bot`, not by the bot itself.
 - **`bot-data`** holds runtime state (pending builds, build history) — only mounted in `tg-bot`.
 - Jenkins home data stays in its own volume, decoupled from all other services.
 
@@ -26,7 +26,7 @@ For the authoritative volume list, see `docker-compose.yml`. Key design decision
 All services share a single Docker bridge network. Only two ports are exposed to the host:
 
 - **`jenkins:8080`** — Jenkins web UI
-- **`config-ui:9000`** — Config dashboard + Drive OAuth callback
+- **`stack-manager:9000`** — Config dashboard + Drive OAuth callback
 
 Bot (`9090`) and agent (`9091`) ports are internal only. `tg-admin-bot` has no HTTP server.
 
@@ -71,7 +71,7 @@ All apps are built and pushed to GHCR with both the exact version tag and `lates
 
 ## Docker Build Patterns
 
-### Standard Apps (tg-bot, config-ui, tg-admin-bot)
+### Standard Apps (tg-bot, stack-manager, tg-admin-bot)
 
 All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions:
 

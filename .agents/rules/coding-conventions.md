@@ -34,7 +34,7 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 
 - **All FastAPI services** share `fastapi` + `uvicorn`. The `tg-admin-bot` is the exception — it uses only `python-telegram-bot[ext]` with no HTTP server.
 - **All apps** depend on `config-schema` (shared library) for declarative config fields.
-- **`config-ui` and `tg-admin-bot`** depend on `stack-manager` (shared library) for service control, Drive OAuth, env I/O, and Jenkinsfile generation.
+- **`tg-admin-bot`** is a pure HTTP client to `stack-manager` — its only dependencies are `httpx` and `python-telegram-bot`.
 - **Blocking I/O libraries** (e.g., `google-api-python-client`) are wrapped with `asyncio.to_thread()`. See `communication-flows.md` for details.
 
 Check each app's `pyproject.toml` for the authoritative dependency list.
@@ -45,7 +45,7 @@ Check each app's `pyproject.toml` for the authoritative dependency list.
 
 ### Service Apps
 
-The three FastAPI service apps (`tg-jenkins-bot`, `config-ui`, `agent-control`) follow the same module pattern:
+The three FastAPI service apps (`tg-jenkins-bot`, `stack-manager`, `agent-control`) follow the same module pattern:
 
 | Module | Role |
 |--------|------|
@@ -58,14 +58,11 @@ The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`) for domain-
 
 ### Admin Bot
 
-`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It uses `stack-manager` for all operational logic and `settings.py` for a flat `Settings` dataclass.
+`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `stack-manager` HTTP API via `httpx` and `settings.py` for a flat `Settings` dataclass.
 
-### Shared Libraries
-
-Both live in `libs/` and use PyPA `src` layout:
+One library lives in `libs/` using PyPA `src` layout:
 
 - **`config-schema`** — `FieldDef` dataclass, `resolve_fields()`, `serialize_schema()`, `nested_get()`. The authoritative source for the config resolution algorithm.
-- **`stack-manager`** — `ServiceClient`, `DriveOAuth`, config store I/O, env export/import, Jenkinsfile template generation. Re-exports public API from `__init__.py`.
 
 ---
 

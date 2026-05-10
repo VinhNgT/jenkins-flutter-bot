@@ -21,7 +21,7 @@ class DriveOAuth:
     """Manage the Google Drive OAuth flow and token persistence.
 
     Supports two exchange paths:
-    - ``exchange_callback()`` — browser redirect (config-ui)
+    - ``exchange_callback()`` — browser redirect (web dashboard)
     - ``exchange_code()``     — manual code paste (admin bot, headless)
     """
 
@@ -115,7 +115,7 @@ class DriveOAuth:
     def exchange_callback(self, authorization_response: str) -> None:
         """Exchange the browser redirect callback for tokens and save them.
 
-        This is the standard browser-redirect flow used by config-ui.
+        This is the standard browser-redirect flow used by the web dashboard.
         The *authorization_response* is the full callback URL including
         the ``?code=`` query parameter.
         """

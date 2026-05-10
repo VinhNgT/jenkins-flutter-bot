@@ -1,27 +1,20 @@
-"""Declarative schema for the Google Drive configuration module.
+"""Declarative schemas for Drive and Project configuration modules.
 
-This is the single source of truth for the Drive-owned config fields.  It drives:
-  - config_store.py constants  via field introspection
-  - GET /api/config/schema     via serialize_schema()
-  - Frontend rendering         via the serialized JSON
+These schemas were previously split between config-ui (DRIVE_FIELDS) and
+libs/stack-manager (PROJECT_FIELDS).  Stack-manager now owns both as the
+central operational backend.
 """
 
 from __future__ import annotations
 
-from config_schema import FieldDef, serialize_schema  # noqa: F401
-from stack_manager import (
-    PROJECT_FIELDS as PROJECT_FIELDS,  # noqa: F401
-    PROJECT_INFRA as PROJECT_INFRA,  # noqa: F401
-    PROJECT_MODULE_DESCRIPTION as PROJECT_MODULE_DESCRIPTION,  # noqa: F401
-    PROJECT_MODULE_TITLE as PROJECT_MODULE_TITLE,  # noqa: F401
-)
+from config_schema import FieldDef
 
 # ---------------------------------------------------------------------------
-# Drive field declarations
+# Drive configuration
 # ---------------------------------------------------------------------------
 
-MODULE_TITLE = "Google Drive Configuration"
-MODULE_DESCRIPTION = (
+DRIVE_MODULE_TITLE = "Google Drive Configuration"
+DRIVE_MODULE_DESCRIPTION = (
     "Connects the bot to Google Drive so it can upload APKs and return"
     " shareable links in Telegram. Save your OAuth client credentials"
     " first, then click <strong>Connect Google Drive</strong> to authorize"
@@ -65,8 +58,33 @@ DRIVE_FIELDS: tuple[FieldDef, ...] = (
     ),
 )
 
+DRIVE_INFRA: tuple[FieldDef, ...] = ()
+
+# Derived constants
+DRIVE_SECRET_FIELDS = tuple(f.key for f in DRIVE_FIELDS if f.secret)
+
 # ---------------------------------------------------------------------------
-# Infrastructure fields (environment-specific, not portable)
+# Project configuration
 # ---------------------------------------------------------------------------
 
-DRIVE_INFRA: tuple[FieldDef, ...] = ()
+PROJECT_MODULE_TITLE = "Project Configuration"
+PROJECT_MODULE_DESCRIPTION = (
+    "Project-wide settings shared across all services."
+)
+
+PROJECT_FIELDS: tuple[FieldDef, ...] = (
+    FieldDef(
+        key="project.github_url",
+        env_var="PROJECT_GITHUB_URL",
+        attr="project_github_url",
+        label="GitHub URL",
+        group="Repository",
+        description="Link to the project's GitHub repository",
+        help_html=(
+            "The public URL of your GitHub repository."
+            " This is displayed in the dashboard for quick access."
+        ),
+    ),
+)
+
+PROJECT_INFRA: tuple[FieldDef, ...] = ()

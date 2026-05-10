@@ -39,9 +39,9 @@ Additional commands available via the menu button:
 
 ## Configuration
 
-Configuration is managed through the **config-ui dashboard** (preferred) or environment variables. See the [setup guide](../../docs/setup-guide.md) for details.
+Configuration is managed through the **web dashboard** (preferred) or environment variables. See the [setup guide](../../docs/setup-guide.md) for details.
 
-The config precedence chain is: `JSON (config-ui) > Environment Variable > .env file > Default`.
+The config precedence chain is: `JSON (dashboard) > Environment Variable > .env file > Default`.
 
 ### Required Settings
 
@@ -51,11 +51,11 @@ The config precedence chain is: `JSON (config-ui) > Environment Variable > .env 
 | Allowed Chat IDs | Telegram chat metadata |
 | Jenkins URL / User / API Token | Your Jenkins server |
 | Pipeline Job Name | Existing Jenkins pipeline |
-| Drive Client ID & Secret | Google Cloud Console (saved in config-ui Drive tab) |
+| Drive Client ID & Secret | Google Cloud Console (saved in dashboard Drive tab) |
 
 ## Jenkins Pipeline
 
-The bot triggers Jenkins builds but does **not** manage the pipeline definition. The config-ui dashboard includes a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration — copy it into your Jenkins job.
+The bot triggers Jenkins builds but does **not** manage the pipeline definition. The web dashboard includes a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration — copy it into your Jenkins job.
 
 The pipeline contract: the `post` block must POST a multipart form to `BOT_CALLBACK_URL` with a `metadata` JSON field (containing `request_id`, `job_id`, `status`, `commit_hash`) and an `artifact` file on success.
 

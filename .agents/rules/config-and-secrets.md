@@ -6,7 +6,7 @@ description: Declarative configuration schema, secret masking, deep merge, confi
 
 # Configuration & Secrets
 
-Triggered when editing config-related files. Covers the declarative schema system, configuration precedence chain, secret handling, and the config-ui frontend conventions.
+Triggered when editing config-related files. Covers the declarative schema system, configuration precedence chain, secret handling, and the stack-manager frontend conventions.
 
 ---
 
@@ -22,7 +22,7 @@ Each module owns its field declarations:
 |--------|----------|--------------|-----------------|
 | `tg-bot` | `BOT_FIELDS` + `BOT_INFRA` | `Config` | `GET /control/schema` |
 | `agent-control` | `AGENT_FIELDS` + `AGENT_INFRA` | `AgentConfig` | `GET /control/schema` |
-| `config-ui` | `DRIVE_FIELDS` + `DRIVE_INFRA` | — | `GET /api/config/schema` |
+| `stack-manager` | `DRIVE_FIELDS` + `DRIVE_INFRA` | — | `GET /api/config/schema` |
 
 The shared `FieldDef` dataclass, `resolve_fields()`, and `serialize_schema()` live in `config_schema`.
 
@@ -36,7 +36,7 @@ Add a `FieldDef` to the owning module's `schema.py` and the corresponding attrib
 schema.py (FieldDef declarations)
     → config.py (resolve_fields() → typed Config dataclass)
     → control.py (GET /control/schema → serialized JSON)
-    → config-ui (fetches schema via HTTP → schema-renderer.js renders forms)
+    → stack-manager (fetches schema via HTTP → schema-renderer.js renders forms)
 ```
 
 ---
@@ -71,18 +71,18 @@ Do not bypass this chain. If you need a new config value, add a `FieldDef` to th
 
 | File | Volume | Written By | Read By |
 |------|--------|------------|---------|
-| `bot.json` | `bot-config` | config-ui, tg-admin-bot | tg-bot, config-ui, tg-admin-bot |
-| `agent.json` | `agent-config` | config-ui, tg-admin-bot | agent-control, config-ui, tg-admin-bot |
-| `drive.json` | `drive-config` | config-ui, tg-admin-bot | config-ui, tg-admin-bot |
-| `oauth.json` | `bot-config` | config-ui, tg-admin-bot (OAuth) | tg-bot (token reader) |
+| `bot.json` | `bot-config` | stack-manager | tg-bot, stack-manager |
+| `agent.json` | `agent-config` | stack-manager | agent-control, stack-manager |
+| `drive.json` | `drive-config` | stack-manager | stack-manager |
+| `oauth.json` | `bot-config` | stack-manager (OAuth) | tg-bot (token reader) |
 
-Drive OAuth credentials (`client_id`, `client_secret`) live in `drive.json`, not `bot.json`. The `oauth.json` token file is on `bot-config` so both `config-ui` and `tg-bot` can access it at the same mount path.
+Drive OAuth credentials (`client_id`, `client_secret`) live in `drive.json`, not `bot.json`. The `oauth.json` token file is on `bot-config` so both `stack-manager` and `tg-bot` can access it at the same mount path. `tg-admin-bot` no longer mounts config volumes — it proxies all operations through the stack-manager API.
 
 ---
 
 ## Secret Masking
 
-Secret fields are identified dynamically from the schema (`secret: True` on the `FieldDef`). The config-ui strips secret values before sending to the browser and tracks which secrets are set (by character length). On save, `None`/empty secret fields are cleaned from the payload so `deep_merge()` preserves existing values.
+Secret fields are identified dynamically from the schema (`secret: True` on the `FieldDef`). The stack-manager strips secret values before sending to the browser and tracks which secrets are set (by character length). On save, `None`/empty secret fields are cleaned from the payload so `deep_merge()` preserves existing values.
 
 ---
 
@@ -90,13 +90,13 @@ Secret fields are identified dynamically from the schema (`secret: True` on the 
 
 Config saves use `deep_merge()` for recursive dict merging. Sending `{"telegram": {"bot_token": "new"}}` updates only that key — all other fields are preserved.
 
-This is critical for the config-ui workflow. Do not replace deep merge with a full overwrite.
+This is critical for the stack-manager workflow. Do not replace deep merge with a full overwrite.
 
 ---
 
 ## Dynamic UI Rendering
 
-The config-ui renders forms dynamically from module schemas. It fetches schemas from services via HTTP, merges with its local drive schema, and `schema-renderer.js` generates form elements from the `FieldDef` metadata.
+The stack-manager renders forms dynamically from module schemas. It fetches schemas from services via HTTP, merges with its local drive schema, and `schema-renderer.js` generates form elements from the `FieldDef` metadata.
 
 ### Frontend Form Convention
 

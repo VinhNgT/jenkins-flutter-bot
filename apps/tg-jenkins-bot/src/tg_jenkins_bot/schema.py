@@ -3,7 +3,7 @@
 This is the single source of truth for all bot config fields.  It drives:
   - Config.resolve()  via resolve_fields() + post_resolve()
   - GET /control/schema  via serialize_schema()
-  - config-ui rendering  via the serialized JSON
+  - stack-manager rendering  via the serialized JSON
 """
 
 from __future__ import annotations

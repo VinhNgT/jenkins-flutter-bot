@@ -1,21 +1,17 @@
-"""Telegram admin bot handlers — stack management via inline keyboard."""
+"""Telegram admin bot handlers — stack management via inline keyboard.
+
+All operational logic is delegated to the stack-manager HTTP API.
+This module is purely Telegram UI formatting + httpx calls.
+"""
 
 from __future__ import annotations
 
+import io
 import logging
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from typing import TYPE_CHECKING, Any
 
-from config_schema import nested_get
-from stack_manager import (
-    DriveOAuth,
-    ServiceClient,
-    build_export_tarball,
-    generate_env_files,
-    generate_jenkinsfile,
-    import_tarball,
-    load_json,
-)
+import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -39,6 +35,12 @@ def _admin_version() -> str:
         return _pkg_version("tg-admin-bot")
     except PackageNotFoundError:
         return "unknown"
+
+
+def _api(settings: Settings) -> str:
+    """Return the stack-manager base URL."""
+    return settings.stack_manager_url
+
 
 # ---------------------------------------------------------------------------
 # Conversation states for multi-step flows
@@ -108,15 +110,26 @@ async def _status_callback(
     assert query is not None
     await query.answer()
 
-    client: ServiceClient = context.bot_data["service_client"]
-    bot_status = await client.status("bot")
-    agent_status = await client.status("agent")
+    settings: Settings = context.bot_data["settings"]
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{_api(settings)}/api/services/status")
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception:
+        logger.exception("Failed to fetch service status")
+        data = {
+            "bot": {"available": False, "running": False},
+            "agent": {"available": False, "running": False},
+        }
 
     def _icon(s: dict[str, Any]) -> str:
         if not s.get("available"):
             return "⚫"
         return "🟢" if s.get("running") else "🔴"
 
+    bot_status = data.get("bot", {})
+    agent_status = data.get("agent", {})
     text = (
         f"📊 *Service Status*\n\n"
         f"{_icon(bot_status)} *Bot:* "
@@ -171,18 +184,23 @@ async def _service_action_callback(
     await query.answer()
 
     data = query.data or ""
-    # Parse "svc_{action}_{service}"
     parts = data.split("_", 2)
     if len(parts) != 3:
         return
     _, action, service = parts
 
-    client: ServiceClient = context.bot_data["service_client"]
-    method = getattr(client, action, None)
-    if method is None:
-        return
+    settings: Settings = context.bot_data["settings"]
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{_api(settings)}/api/services/{service}/{action}"
+            )
+            resp.raise_for_status()
+            result = resp.json()
+    except Exception:
+        logger.exception("Failed to %s %s", action, service)
+        result = {"running": "unknown", "available": False}
 
-    result = await method(service)
     status_text = "✅" if result.get("running") or result.get("available") else "⚠️"
 
     await query.edit_message_text(
@@ -209,38 +227,21 @@ async def _export_env_callback(
     await query.answer("Generating config tarball…")
 
     settings: Settings = context.bot_data["settings"]
-    client: ServiceClient = context.bot_data["service_client"]
-    drive_oauth: DriveOAuth = context.bot_data["drive_oauth"]
-
-    bot_schema = await client.schema("bot")
-    agent_schema = await client.schema("agent")
-    bot_data = load_json(settings.bot_config_path)
-    agent_data = load_json(settings.agent_config_path)
-    drive_data = load_json(settings.drive_config_path)
-
-    env_files, warnings = generate_env_files(
-        bot_config=bot_data,
-        agent_config=agent_data,
-        bot_schema=bot_schema,
-        agent_schema=agent_schema,
-        drive_config=drive_data,
-    )
-    tarball_bytes = build_export_tarball(
-        env_files, oauth_token_path=drive_oauth.token_path
-    )
-
-    # Send as document
-    import io
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(f"{_api(settings)}/api/export/tarball")
+            resp.raise_for_status()
+            tarball_bytes = resp.content
+    except Exception:
+        logger.exception("Failed to export tarball from stack-manager")
+        await query.edit_message_text("❌ Failed to generate config tarball.")
+        return
 
     doc = io.BytesIO(tarball_bytes)
     doc.name = "jfb-config.tar.gz"
     await query.message.reply_document(  # type: ignore[union-attr]
         document=doc, caption="📤 Config export tarball"
     )
-
-    if warnings:
-        warn_text = "\n".join(f"⚠️ {w}" for w in warnings)
-        await query.message.reply_text(warn_text)  # type: ignore[union-attr]
 
 
 # ---------------------------------------------------------------------------
@@ -282,65 +283,61 @@ async def _import_env_receive(
     file = await doc.get_file()
     raw = await file.download_as_bytearray()
 
-    client: ServiceClient = context.bot_data["service_client"]
-    drive_oauth: DriveOAuth = context.bot_data["drive_oauth"]
-    bot_schema = await client.schema("bot")
-    agent_schema = await client.schema("agent")
-
-    result = import_tarball(
-        tarball_bytes=bytes(raw),
-        bot_schema=bot_schema,
-        agent_schema=agent_schema,
-        bot_config_path=settings.bot_config_path,
-        agent_config_path=settings.agent_config_path,
-        oauth_dest_path=drive_oauth.token_path,
-        drive_config_path=settings.drive_config_path,
-    )
-
-    # Auto-restart bot and agent services to pick up imported config
-    restart_lines: list[str] = []
-    for scope in ("bot", "agent"):
-        try:
-            resp = await client.restart(scope)
-            status = resp.get("status", "unknown")
-            restart_lines.append(f"  • {scope}: {status}")
-        except Exception:
-            logger.exception("Failed to restart %s after import", scope)
-            restart_lines.append(f"  • {scope}: restart failed")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{_api(settings)}/api/import/tarball",
+                files={"file": ("config.tar.gz", bytes(raw), "application/gzip")},
+            )
+            resp.raise_for_status()
+            result = resp.json()
+    except Exception:
+        logger.exception("Failed to import tarball via stack-manager")
+        await update.message.reply_text(  # type: ignore[union-attr]
+            "❌ Import failed. Check stack-manager logs."
+        )
+        return ConversationHandler.END
 
     lines: list[str] = ["📥 *Import Results*\n"]
 
-    if result.applied:
-        lines.append(f"✅ *Applied ({len(result.applied)}):*")
-        for item in result.applied[:15]:
+    applied = result.get("applied", [])
+    if applied:
+        lines.append(f"✅ *Applied ({len(applied)}):*")
+        for item in applied[:15]:
             lines.append(f"  • `{item}`")
-        if len(result.applied) > 15:
-            lines.append(f"  _… and {len(result.applied) - 15} more_")
+        if len(applied) > 15:
+            lines.append(f"  _… and {len(applied) - 15} more_")
 
-    if result.oauth_imported:
+    if result.get("oauth_imported"):
         lines.append("\n🔑 *OAuth token imported*")
 
-    if result.skipped_empty:
-        lines.append(f"\n⏭ *Skipped ({len(result.skipped_empty)} empty)*")
+    skipped = result.get("skipped_empty", [])
+    if skipped:
+        lines.append(f"\n⏭ *Skipped ({len(skipped)} empty)*")
 
-    if result.unrecognized:
-        lines.append(f"\n❓ *Unrecognized ({len(result.unrecognized)}):*")
-        for item in result.unrecognized[:10]:
+    unrecognized = result.get("unrecognized", [])
+    if unrecognized:
+        lines.append(f"\n❓ *Unrecognized ({len(unrecognized)}):*")
+        for item in unrecognized[:10]:
             lines.append(f"  • `{item}`")
 
-    if result.parse_errors:
-        lines.append(f"\n❌ *Parse errors ({len(result.parse_errors)}):*")
-        for item in result.parse_errors[:10]:
+    parse_errors = result.get("parse_errors", [])
+    if parse_errors:
+        lines.append(f"\n❌ *Parse errors ({len(parse_errors)}):*")
+        for item in parse_errors[:10]:
             lines.append(f"  • {item}")
 
-    if result.warnings:
+    warnings = result.get("warnings", [])
+    if warnings:
         lines.append("\n⚠️ *Warnings:*")
-        for item in result.warnings:
+        for item in warnings:
             lines.append(f"  • {item}")
 
-    if restart_lines:
+    restart_results = result.get("restart_results", {})
+    if restart_results:
         lines.append("\n🔄 *Service Restarts:*")
-        lines.extend(restart_lines)
+        for svc, status in restart_results.items():
+            lines.append(f"  • {svc}: {status}")
 
     await update.message.reply_text(  # type: ignore[union-attr]
         "\n".join(lines), parse_mode=ParseMode.MARKDOWN
@@ -362,15 +359,17 @@ async def _jenkinsfile_callback(
     await query.answer("Generating Jenkinsfile…")
 
     settings: Settings = context.bot_data["settings"]
-    bot_data = load_json(settings.bot_config_path)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{_api(settings)}/api/jenkinsfile")
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception:
+        logger.exception("Failed to generate Jenkinsfile via stack-manager")
+        await query.edit_message_text("❌ Failed to generate Jenkinsfile.")
+        return
 
-    repo_url = nested_get(bot_data, "git.repo_url") or "<YOUR_REPO_URL>"
-    credentials_id = nested_get(bot_data, "jenkins.credentials_id") or ""
-
-    script = generate_jenkinsfile(repo_url, credentials_id)
-
-    import io
-
+    script = data.get("script", "")
     doc = io.BytesIO(script.encode())
     doc.name = "Jenkinsfile"
     await query.message.reply_document(  # type: ignore[union-attr]
@@ -379,40 +378,39 @@ async def _jenkinsfile_callback(
 
 
 # ---------------------------------------------------------------------------
-# Drive OAuth — headless code-paste flow
+# Drive OAuth — headless code-paste flow via stack-manager API
 # ---------------------------------------------------------------------------
 
 
 async def _drive_setup_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Start Drive OAuth flow — ask for client_id."""
+    """Start Drive OAuth flow — check status first."""
     query = update.callback_query
     assert query is not None
     await query.answer()
 
-    drive_oauth: DriveOAuth = context.bot_data["drive_oauth"]
     settings: Settings = context.bot_data["settings"]
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{_api(settings)}/api/drive/status")
+            resp.raise_for_status()
+            status = resp.json()
+    except Exception:
+        logger.exception("Failed to check Drive status")
+        status = {"connected": False, "configured": False}
 
-    # Check current status
-    drive_data = load_json(settings.drive_config_path)
-    client_id = nested_get(drive_data, "drive.client_id") or ""
-    client_secret = nested_get(drive_data, "drive.client_secret") or ""
-
-    if drive_oauth.token_path.exists():
-        status = drive_oauth.status(client_id, client_secret)
-        if status.get("connected"):
-            await query.edit_message_text(
-                "🔑 *Google Drive*\n\n"
-                f"✅ Connected — token at `{drive_oauth.token_path}`\n\n"
-                "To reconnect, delete the token first via config-ui "
-                "or manually remove the file.",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("« Back", callback_data="back")]]
-                ),
-            )
-            return ConversationHandler.END
+    if status.get("connected"):
+        await query.edit_message_text(
+            "🔑 *Google Drive*\n\n"
+            "✅ Connected\n\n"
+            "To reconnect, disconnect first via the web dashboard.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("« Back", callback_data="back")]]
+            ),
+        )
+        return ConversationHandler.END
 
     await query.edit_message_text(
         "🔑 *Google Drive Setup*\n\n"
@@ -443,7 +441,7 @@ async def _drive_receive_client_id(
 async def _drive_receive_client_secret(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Receive client_secret, generate consent URL."""
+    """Receive client_secret, generate consent URL via stack-manager."""
     settings: Settings = context.bot_data["settings"]
     if not _ensure_authorized(settings, update):
         return ConversationHandler.END
@@ -451,19 +449,32 @@ async def _drive_receive_client_secret(
     client_secret = update.message.text.strip()  # type: ignore[union-attr]
     client_id = context.user_data.get("drive_client_id", "")  # type: ignore[union-attr]
 
-    drive_oauth: DriveOAuth = context.bot_data["drive_oauth"]
+    # Save credentials to drive config via stack-manager
     try:
-        auth_url = drive_oauth.start(
-            client_id=client_id,
-            client_secret=client_secret,
-            redirect_uri="http://localhost",
-        )
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.put(
+                f"{_api(settings)}/api/config/drive",
+                json={"drive": {"client_id": client_id, "client_secret": client_secret}},
+            )
     except Exception:
-        logger.exception("Failed to start Drive OAuth flow")
-        await update.message.reply_text(  # type: ignore[union-attr]
-            "❌ Failed to start OAuth flow. Check your credentials."
-        )
-        return ConversationHandler.END
+        logger.exception("Failed to save Drive credentials")
+
+    # For headless flow, the user needs to manually use the Google consent URL
+    # with redirect_uri=http://localhost, then paste the code
+    from urllib.parse import quote, urlencode
+
+    params = urlencode(
+        {
+            "client_id": client_id,
+            "redirect_uri": "http://localhost",
+            "response_type": "code",
+            "scope": "https://www.googleapis.com/auth/drive.file",
+            "access_type": "offline",
+            "prompt": "consent",
+        },
+        quote_via=quote,
+    )
+    auth_url = f"https://accounts.google.com/o/oauth2/auth?{params}"
 
     context.user_data["drive_client_secret"] = client_secret  # type: ignore[index]
 
@@ -481,7 +492,7 @@ async def _drive_receive_client_secret(
 async def _drive_receive_code(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Receive OAuth code, exchange for tokens."""
+    """Receive OAuth code, exchange for tokens via stack-manager API."""
     settings: Settings = context.bot_data["settings"]
     if not _ensure_authorized(settings, update):
         return ConversationHandler.END
@@ -490,11 +501,17 @@ async def _drive_receive_code(
     client_id = context.user_data.get("drive_client_id", "")  # type: ignore[union-attr]
     client_secret = context.user_data.get("drive_client_secret", "")  # type: ignore[union-attr]
 
-    drive_oauth: DriveOAuth = context.bot_data["drive_oauth"]
     try:
-        drive_oauth.exchange_code(
-            code=code, client_id=client_id, client_secret=client_secret
-        )
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{_api(settings)}/api/drive/connect/exchange",
+                json={
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                },
+            )
+            resp.raise_for_status()
     except Exception:
         logger.exception("Drive OAuth code exchange failed")
         await update.message.reply_text(  # type: ignore[union-attr]
@@ -504,8 +521,7 @@ async def _drive_receive_code(
         return ConversationHandler.END
 
     await update.message.reply_text(  # type: ignore[union-attr]
-        "✅ *Google Drive connected!*\n\n"
-        f"Token saved to `{drive_oauth.token_path}`",
+        "✅ *Google Drive connected!*",
         parse_mode=ParseMode.MARKDOWN,
     )
     return ConversationHandler.END

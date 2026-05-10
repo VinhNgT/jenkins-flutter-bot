@@ -19,9 +19,9 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
 class DriveUploader:
-    """Handles Google Drive file operations using OAuth tokens from config-ui.
+    """Handles Google Drive file operations using OAuth tokens from stack-manager.
 
-    OAuth tokens are managed by config-ui and saved to a shared volume.
+    OAuth tokens are managed by stack-manager and saved to a shared volume.
     This class only reads and refreshes those tokens — it never initiates
     the OAuth flow itself.
 

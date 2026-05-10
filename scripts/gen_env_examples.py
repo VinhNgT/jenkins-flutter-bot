@@ -14,8 +14,8 @@ from pathlib import Path
 from agent_control.schema import AGENT_FIELDS, AGENT_INFRA
 from agent_control.schema import MODULE_TITLE as AGENT_TITLE
 from config_schema import FieldDef
-from config_ui.schema import DRIVE_FIELDS, DRIVE_INFRA
-from config_ui.schema import MODULE_TITLE as DRIVE_TITLE
+from stack_manager.schema import DRIVE_FIELDS, DRIVE_INFRA
+from stack_manager.schema import DRIVE_MODULE_TITLE as DRIVE_TITLE
 from tg_jenkins_bot.schema import BOT_FIELDS, BOT_INFRA
 from tg_jenkins_bot.schema import MODULE_TITLE as BOT_TITLE
 

@@ -8,8 +8,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..config_store import load_json, nested_get
-from ..settings import Settings
+from ..config_store import load_json
+from ..manager import StackManager
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +17,13 @@ router = APIRouter(prefix="/api/drive", tags=["drive"])
 
 
 def _drive_credentials(
-    ui_config: dict[str, Any],
+    drive_data: dict[str, Any],
 ) -> tuple[str | None, str | None]:
-    """Extract Drive client credentials from UI config."""
-    client_id = nested_get(ui_config, "drive.client_id")
-    client_secret = nested_get(ui_config, "drive.client_secret")
+    """Extract Drive client credentials from drive config."""
+    from config_schema import nested_get
+
+    client_id = nested_get(drive_data, "drive.client_id")
+    client_secret = nested_get(drive_data, "drive.client_secret")
     return (
         str(client_id) if client_id not in (None, "") else None,
         str(client_secret) if client_secret not in (None, "") else None,
@@ -36,19 +38,18 @@ def _drive_callback_url(request: Request) -> str:
 @router.get("/status")
 async def get_drive_status(request: Request) -> dict[str, Any]:
     """Return current Google Drive connection status."""
-    settings: Settings = request.app.state.settings
-    drive_oauth = request.app.state.drive_oauth
-    ui = load_json(settings.drive_config_path)
-    client_id, client_secret = _drive_credentials(ui)
+    manager: StackManager = request.app.state.manager
+    drive_data = load_json(manager.paths.drive)
+    client_id, client_secret = _drive_credentials(drive_data)
 
     if not client_id or not client_secret:
         return {
             "configured": False,
             "connected": False,
-            "token_path": str(drive_oauth.token_path),
+            "token_path": str(manager.drive_oauth.token_path),
         }
 
-    status = drive_oauth.status(client_id, client_secret)
+    status = manager.drive_oauth.status(client_id, client_secret)
     status["configured"] = True
     return status
 
@@ -56,10 +57,9 @@ async def get_drive_status(request: Request) -> dict[str, Any]:
 @router.post("/connect/start")
 async def start_drive_connect(request: Request) -> dict[str, Any]:
     """Start the Drive OAuth flow — returns the authorization URL."""
-    settings: Settings = request.app.state.settings
-    drive_oauth = request.app.state.drive_oauth
-    ui = load_json(settings.drive_config_path)
-    client_id, client_secret = _drive_credentials(ui)
+    manager: StackManager = request.app.state.manager
+    drive_data = load_json(manager.paths.drive)
+    client_id, client_secret = _drive_credentials(drive_data)
 
     if not client_id or not client_secret:
         raise HTTPException(
@@ -71,7 +71,7 @@ async def start_drive_connect(request: Request) -> dict[str, Any]:
         )
 
     return {
-        "auth_url": drive_oauth.start(
+        "auth_url": manager.drive_oauth.start(
             client_id,
             client_secret,
             _drive_callback_url(request),
@@ -79,12 +79,39 @@ async def start_drive_connect(request: Request) -> dict[str, Any]:
     }
 
 
+@router.post("/connect/exchange")
+async def exchange_drive_code(request: Request) -> dict[str, Any]:
+    """Exchange a manually-pasted auth code for tokens (headless flow).
+
+    Used by tg-admin-bot via the stack-manager API instead of managing
+    DriveOAuth directly.
+    """
+    manager: StackManager = request.app.state.manager
+    body = await request.json()
+    code = body.get("code", "")
+    client_id = body.get("client_id", "")
+    client_secret = body.get("client_secret", "")
+
+    if not code or not client_id or not client_secret:
+        raise HTTPException(
+            status_code=400,
+            detail="code, client_id, and client_secret are required.",
+        )
+
+    try:
+        manager.drive_oauth.exchange_code(code, client_id, client_secret)
+        return {"success": True}
+    except Exception as exc:
+        logger.exception("Drive code exchange failed")
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @router.get("/oauth/callback", name="drive_oauth_callback")
 async def drive_oauth_callback(request: Request) -> Any:
     """Handle the Google OAuth redirect callback."""
     from fastapi.templating import Jinja2Templates
 
-    drive_oauth = request.app.state.drive_oauth
+    manager: StackManager = request.app.state.manager
     templates: Jinja2Templates = request.app.state.templates
     error = request.query_params.get("error")
 
@@ -111,7 +138,7 @@ async def drive_oauth_callback(request: Request) -> Any:
         )
 
     try:
-        drive_oauth.exchange_callback(str(request.url))
+        manager.drive_oauth.exchange_callback(str(request.url))
     except RuntimeError as exc:
         return templates.TemplateResponse(
             request=request,
@@ -170,15 +197,8 @@ async def drive_oauth_callback(request: Request) -> Any:
 @router.delete("/token")
 async def disconnect_drive(request: Request) -> dict[str, Any]:
     """Delete the saved OAuth token, disconnecting the current Google account."""
-    drive_oauth = request.app.state.drive_oauth
-    token_path = drive_oauth.token_path
-    if not token_path.exists():
+    manager: StackManager = request.app.state.manager
+    deleted = manager.drive_oauth.delete_tokens()
+    if not deleted:
         return {"disconnected": False, "detail": "No token file found."}
-    try:
-        token_path.unlink()
-        logger.info("Removed Drive OAuth token at %s", token_path)
-        return {"disconnected": True}
-    except Exception:
-        logger.exception("Failed to remove Drive OAuth token at %s", token_path)
-        raise HTTPException(status_code=500, detail="Failed to remove token file.")
-
+    return {"disconnected": True}

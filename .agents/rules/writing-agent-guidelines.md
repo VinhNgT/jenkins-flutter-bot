@@ -61,7 +61,7 @@ The first sentence stays accurate when fields are added. The second is instantly
 
 The highest-value content in a guide is the list of things an agent must NOT do. Constraints prevent expensive mistakes. State them clearly and explain the rationale:
 
-> **Do NOT expose bot or agent ports to the host** — only `jenkins:8080` and `config-ui:9000` are host-facing.
+> **Do NOT expose bot or agent ports to the host** — only `jenkins:8080` and `stack-manager:9000` are host-facing.
 
 The constraint is the rule. The explanation prevents the agent from "helpfully" overriding it.
 

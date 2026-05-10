@@ -12,7 +12,6 @@ resolution-markers = [
 members = [
     "agent-control",
     "config-schema",
-    "config-ui",
     "jenkins-flutter-bot",
     "stack-manager",
     "tg-admin-bot",
@@ -314,33 +313,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "python-dotenv", specifier = ">=1.0.0" }]
-
-[[package]]
-name = "config-ui"
-version = "0.1.2.dev3"
-source = { editable = "apps/config-ui" }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "config-schema" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "jinja2" },
-    { name = "python-multipart" },
-    { name = "stack-manager" },
-    { name = "uvicorn" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=24.1.0" },
-    { name = "config-schema", editable = "libs/config-schema" },
-    { name = "fastapi", specifier = ">=0.111.0" },
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "jinja2", specifier = ">=3.1.0" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "stack-manager", editable = "libs/stack-manager" },
-    { name = "uvicorn", specifier = ">=0.29.0" },
-]
 
 [[package]]
 name = "cryptography"
@@ -1039,18 +1011,28 @@ wheels = [
 [[package]]
 name = "stack-manager"
 version = "0.1.2.dev3"
-source = { editable = "libs/stack-manager" }
+source = { editable = "apps/stack-manager" }
 dependencies = [
+    { name = "aiofiles" },
     { name = "config-schema" },
+    { name = "fastapi" },
     { name = "google-auth-oauthlib" },
     { name = "httpx" },
+    { name = "jinja2" },
+    { name = "python-multipart" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "aiofiles", specifier = ">=24.1.0" },
     { name = "config-schema", editable = "libs/config-schema" },
+    { name = "fastapi", specifier = ">=0.111.0" },
     { name = "google-auth-oauthlib", specifier = ">=1.2.0" },
     { name = "httpx", specifier = ">=0.27.0" },
+    { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "uvicorn", specifier = ">=0.29.0" },
 ]
 
 [[package]]
@@ -1071,16 +1053,14 @@ name = "tg-admin-bot"
 version = "0.1.2.dev3"
 source = { editable = "apps/tg-admin-bot" }
 dependencies = [
-    { name = "config-schema" },
+    { name = "httpx" },
     { name = "python-telegram-bot", extra = ["ext"] },
-    { name = "stack-manager" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "config-schema", editable = "libs/config-schema" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "python-telegram-bot", extras = ["ext"], specifier = ">=21.0" },
-    { name = "stack-manager", editable = "libs/stack-manager" },
 ]
 
 [[package]]
@@ -1094,7 +1074,6 @@ dependencies = [
     { name = "httpx" },
     { name = "python-multipart" },
     { name = "python-telegram-bot", extra = ["ext"] },
-    { name = "stack-manager" },
     { name = "uvicorn" },
 ]
 
@@ -1106,7 +1085,6 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "python-telegram-bot", extras = ["ext"], specifier = ">=21.0" },
-    { name = "stack-manager", editable = "libs/stack-manager" },
     { name = "uvicorn", specifier = ">=0.29.0" },
 ]
 

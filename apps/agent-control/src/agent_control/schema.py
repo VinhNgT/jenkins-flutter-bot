@@ -3,7 +3,7 @@
 This is the single source of truth for all agent config fields.  It drives:
   - AgentConfig.resolve()  via resolve_fields()
   - GET /control/schema    via serialize_schema()
-  - config-ui rendering    via the serialized JSON
+  - stack-manager rendering    via the serialized JSON
 """
 
 from __future__ import annotations

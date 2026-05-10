@@ -1,13 +1,13 @@
 [project]
-name = "config-ui"
+name = "stack-manager"
 version = "0.1.2-dev.3"
-description = "Web dashboard for Jenkins Flutter Bot stack configuration"
+description = "Central operational backend for the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [
     "config-schema",
-    "stack-manager",
     "aiofiles>=24.1.0",
     "fastapi>=0.111.0",
+    "google-auth-oauthlib>=1.2.0",
     "httpx>=0.27.0",
     "jinja2>=3.1.0",
     "python-multipart>=0.0.9",
@@ -16,10 +16,9 @@ dependencies = [
 
 [tool.uv.sources]
 config-schema = { workspace = true }
-stack-manager = { workspace = true }
 
 [project.scripts]
-config-ui = "config_ui.main:cli"
+stack-manager = "stack_manager.main:cli"
 
 [build-system]
 requires = ["hatchling"]

@@ -13,15 +13,15 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 - [Step 2 — Set Up Jenkins](#step-2--set-up-jenkins)
   - [2a. Initial Jenkins Setup](#2a-initial-jenkins-setup)
   - [2b. Create the Flutter Agent Node](#2b-create-the-flutter-agent-node)
-  - [2c. Configure the Agent in Config UI](#2c-configure-the-agent-in-config-ui)
+  - [2c. Configure the Agent in Stack Manager](#2c-configure-the-agent-in-stack-manager)
   - [2d. Create a Jenkins API Token](#2d-create-a-jenkins-api-token)
   - [2e. Add Repository Credentials (Private Repos)](#2e-add-repository-credentials-private-repos)
   - [2f. Create the Pipeline Job](#2f-create-the-pipeline-job)
-  - [2g. Save Jenkins Settings in Config UI](#2g-save-jenkins-settings-in-config-ui)
+  - [2g. Save Jenkins Settings in Stack Manager](#2g-save-jenkins-settings-in-stack-manager)
 - [Step 3 — Set Up the Telegram Bot](#step-3--set-up-the-telegram-bot)
 - [Step 4 — Set Up Google Drive](#step-4--set-up-google-drive)
   - [4a. Create Google Cloud Credentials](#4a-create-google-cloud-credentials)
-  - [4b. Save & Connect in Config UI](#4b-save--connect-in-config-ui)
+  - [4b. Save & Connect in Stack Manager](#4b-save--connect-in-stack-manager)
 - [Step 5 — Start Services & Test](#step-5--start-services--test)
 - [Troubleshooting](#troubleshooting)
 - [Admin Bot Setup (Optional)](#admin-bot-setup-optional)
@@ -77,13 +77,13 @@ This starts all five services:
 | Service          | URL                    | Purpose                                    |
 | ---------------- | ---------------------- | ------------------------------------------ |
 | `jenkins`        | http://localhost:8080   | Jenkins controller (web UI)                |
-| `config-ui`      | http://localhost:9000   | Configuration dashboard                    |
+| `stack-manager`      | http://localhost:9000   | Configuration dashboard                    |
 | `tg-bot`         | Internal (:9090)       | Telegram bot + webhook receiver            |
 | `flutter-agent`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs    |
 | `tg-admin-bot`   | Internal (polling)     | Headless admin bot (optional — needs `ADMIN_BOT_TOKEN` in `infra/.env`) |
 
 > [!NOTE]
-> The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so the config-ui can manage them.
+> The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so the stack-manager can manage them.
 
 Open **http://localhost:9000** — you'll use this dashboard throughout the remaining steps.
 
@@ -116,9 +116,9 @@ Open **http://localhost:9000** — you'll use this dashboard throughout the rema
 6. Click **Save**
 7. On the node status page, find the **secret token** (shown in the agent launch command, after `-secret`)
 
-### 2c. Configure the Agent in Config UI
+### 2c. Configure the Agent in Stack Manager
 
-Now switch to the **config-ui** at http://localhost:9000:
+Now switch to the **stack-manager** at http://localhost:9000:
 
 1. Open the **Jenkins Agent** tab
 2. Paste the **secret token** from the previous step into the **Agent Secret** field
@@ -187,7 +187,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
 
 5. Under **Pipeline**, paste a Jenkinsfile script.
 
-   > **💡 Tip:** After completing the next sub-step ([2g](#2g-save-jenkins-settings-in-config-ui)), the config-ui dashboard has a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration. You can copy it directly into Jenkins.
+   > **💡 Tip:** After completing the next sub-step ([2g](#2g-save-jenkins-settings-in-stack-manager)), the stack-manager dashboard has a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration. You can copy it directly into Jenkins.
 
    Alternatively, use this reference template:
 
@@ -299,9 +299,9 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
 
 6. Click **Save**
 
-### 2g. Save Jenkins Settings in Config UI
+### 2g. Save Jenkins Settings in Stack Manager
 
-Switch to the **config-ui** at http://localhost:9000:
+Switch to the **stack-manager** at http://localhost:9000:
 
 1. Open the **Telegram Bot** tab
 2. Fill in the Jenkins fields:
@@ -343,7 +343,7 @@ Switch to the **config-ui** at http://localhost:9000:
      about - Show version and system info
      ```
 
-Now enter these values in the config-ui:
+Now enter these values in the stack-manager:
 
 6. Open the **Telegram Bot** tab at http://localhost:9000
 7. Fill in:
@@ -388,7 +388,7 @@ Now enter these values in the config-ui:
    - Click **Create**
    - Copy the **Client ID** and **Client Secret**
 
-### 4b. Save & Connect in Config UI
+### 4b. Save & Connect in Stack Manager
 
 1. Open the **Google Drive** tab at http://localhost:9000
 2. Paste the **Client ID** and **Client Secret** you just created
@@ -406,7 +406,7 @@ Now enter these values in the config-ui:
 
 ### Start the Bot and Agent
 
-Use the **Service Control** section in the config-ui dashboard:
+Use the **Service Control** section in the stack-manager dashboard:
 
 1. Click **Start** next to the **Agent** service — this connects the `flutter-agent` to Jenkins
 2. Click **Start** next to the **Bot** service — this starts Telegram polling
@@ -447,24 +447,24 @@ docker compose restart
 # Check logs for a specific service
 docker compose logs tg-bot
 docker compose logs flutter-agent
-docker compose logs config-ui
+docker compose logs stack-manager
 ```
 
 ### Bot says "Google Drive setup required"
 
-- Ensure you've entered the Drive Client ID and Secret in config-ui
+- Ensure you've entered the Drive Client ID and Secret in stack-manager
 - Click "Connect Google Drive" and complete the OAuth flow
 - Make sure your Google account is added as a test user in the OAuth consent screen
 
 ### Agent shows as offline in Jenkins
 
-- Verify the agent secret is correct in config-ui
+- Verify the agent secret is correct in stack-manager
 - Check the agent logs: `docker compose logs flutter-agent`
 - Ensure the `JENKINS_AGENT_NAME` matches the node name in Jenkins (default: `flutter-agent`)
 
 ### Build triggers but Jenkins returns 403
 
-- Verify Jenkins username and API token in config-ui
+- Verify Jenkins username and API token in stack-manager
 - Ensure the API token hasn't expired — generate a new one if needed
 - Check that the Jenkins job name matches (`flutter-build` by default)
 
@@ -498,7 +498,7 @@ docker compose up -d --build
 
 ## Admin Bot Setup (Optional)
 
-The `tg-admin-bot` provides a Telegram-based fallback for stack management when the config-ui dashboard is unavailable.
+The `tg-admin-bot` provides a Telegram-based fallback for stack management when the stack-manager dashboard is unavailable.
 
 1. Create a **separate** bot via @BotFather (not the same as the build bot)
 2. Add both values to `infra/.env`:

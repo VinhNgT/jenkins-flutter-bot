@@ -10,8 +10,6 @@ COPY pyproject.toml uv.lock ./
 # Shared library
 COPY libs/config-schema/pyproject.toml libs/config-schema/
 COPY libs/config-schema/src libs/config-schema/src
-COPY libs/stack-manager/pyproject.toml libs/stack-manager/
-COPY libs/stack-manager/src libs/stack-manager/src
 
 # This app
 COPY apps/tg-jenkins-bot/pyproject.toml apps/tg-jenkins-bot/

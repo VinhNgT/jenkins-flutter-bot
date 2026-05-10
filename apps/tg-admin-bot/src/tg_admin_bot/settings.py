@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -14,20 +13,12 @@ class Settings:
     Env vars:
         ADMIN_BOT_TOKEN      — Telegram bot token for the admin bot
         ADMIN_CHAT_ID        — Telegram chat ID authorized for admin commands
-        BOT_CONTROL_URL      — Base URL of the tg-bot control API
-        AGENT_CONTROL_URL    — Base URL of the agent-control API
-        BOT_CONFIG_PATH      — Path to bot.json
-        AGENT_CONFIG_PATH    — Path to agent.json
-        DRIVE_CONFIG_PATH    — Path to drive.json (for Drive OAuth creds)
+        STACK_MANAGER_URL    — Base URL of the stack-manager API
     """
 
     bot_token: str
     admin_chat_id: int
-    bot_control_url: str | None
-    agent_control_url: str | None
-    bot_config_path: Path | None
-    agent_config_path: Path | None
-    drive_config_path: Path | None
+    stack_manager_url: str
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -39,16 +30,10 @@ class Settings:
         except ValueError:
             chat_id = 0
 
-        def _path(env: str) -> Path | None:
-            val = os.environ.get(env)
-            return Path(val) if val else None
-
         return cls(
             bot_token=token,
             admin_chat_id=chat_id,
-            bot_control_url=os.environ.get("BOT_CONTROL_URL"),
-            agent_control_url=os.environ.get("AGENT_CONTROL_URL"),
-            bot_config_path=_path("BOT_CONFIG_PATH"),
-            agent_config_path=_path("AGENT_CONFIG_PATH"),
-            drive_config_path=_path("DRIVE_CONFIG_PATH"),
+            stack_manager_url=os.environ.get(
+                "STACK_MANAGER_URL", "http://stack-manager:9000"
+            ),
         )

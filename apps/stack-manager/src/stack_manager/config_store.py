@@ -1,56 +1,70 @@
-"""JSON config file I/O, secret handling for config-ui.
+"""JSON config file I/O, secret handling, and schema metadata helpers.
 
-Core I/O functions (load_json, write_json, deep_merge, nested_set, etc.)
-are imported from shared libraries.  This module adds the config-ui-specific
-secret masking and form handling layer on top.
+Merges the framework-agnostic I/O from the former library with the
+secret-masking layer that was previously in config-ui.
 """
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from config_schema import nested_get, nested_set
 from fastapi import HTTPException
-from stack_manager import load_json
-from stack_manager import write_json as _write_json
-from stack_manager.config_store import (
-    extract_defaults as extract_defaults,
-    extract_required_fields as extract_required_fields,
-    extract_secret_fields as extract_secret_fields,
-)
-
-from .schema import DRIVE_FIELDS
-
-# Re-export shared functions so existing intra-package imports keep working.
-load_json = load_json
-nested_get = nested_get
-nested_set = nested_set
-
-# ---------------------------------------------------------------------------
-# Drive scope constants — derived from the local schema
-# ---------------------------------------------------------------------------
-
-DRIVE_SECRET_FIELDS = tuple(f.key for f in DRIVE_FIELDS if f.secret)
-DRIVE_DEFAULTS = {f.key: f.default for f in DRIVE_FIELDS if f.default}
-DRIVE_REQUIRED_FIELDS = tuple(f.key for f in DRIVE_FIELDS if f.required)
 
 
 # ---------------------------------------------------------------------------
-# Framework bridge — catches ValueError from stack_manager.write_json
+# JSON file I/O
 # ---------------------------------------------------------------------------
 
 
-def write_json(path: Any, data: dict[str, Any]) -> None:
-    """Write JSON, converting ValueError to HTTPException."""
-    try:
-        _write_json(path, data)
-    except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+def load_json(path: Path | None) -> dict[str, Any]:
+    """Load a JSON config file, returning {} if missing or *path* is None."""
+    if path is None or not path.exists():
+        return {}
+    return json.loads(path.read_text())
+
+
+def write_json(path: Path | None, data: dict[str, Any]) -> None:
+    """Write a dict as pretty-printed JSON, creating parent dirs.
+
+    Raises ``HTTPException(500)`` when *path* is ``None``.
+    """
+    if path is None:
+        raise HTTPException(status_code=500, detail="Config path not set")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True))
 
 
 # ---------------------------------------------------------------------------
-# Nested dict helpers (kept locally — only used by secret handling)
+# Schema metadata extractors
+# ---------------------------------------------------------------------------
+
+
+def extract_secret_fields(schema: dict[str, Any] | None) -> tuple[str, ...]:
+    """Extract secret field keys from a serialized schema response."""
+    if not schema or "fields" not in schema:
+        return ()
+    return tuple(f["key"] for f in schema["fields"] if f.get("secret"))
+
+
+def extract_defaults(schema: dict[str, Any] | None) -> dict[str, str]:
+    """Extract default values from a serialized schema response."""
+    if not schema or "fields" not in schema:
+        return {}
+    return {f["key"]: f["default"] for f in schema["fields"] if f.get("default")}
+
+
+def extract_required_fields(schema: dict[str, Any] | None) -> tuple[str, ...]:
+    """Extract required field keys from a serialized schema response."""
+    if not schema or "fields" not in schema:
+        return ()
+    return tuple(f["key"] for f in schema["fields"] if f.get("required"))
+
+
+# ---------------------------------------------------------------------------
+# Nested dict helpers (used by secret handling)
 # ---------------------------------------------------------------------------
 
 

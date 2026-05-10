@@ -16,19 +16,18 @@ services:
     networks:
       - jenkins
 
-  config-ui:
+  stack-manager:
     build:
       context: ..
-      dockerfile: apps/config-ui/Dockerfile
-    container_name: config-ui
+      dockerfile: apps/stack-manager/Dockerfile
+    container_name: stack-manager
     restart: on-failure
     ports:
       - "9000:9000"
     environment:
       BOT_CONTROL_URL: http://tg-bot:9090
       AGENT_CONTROL_URL: http://flutter-agent:9091
-      # Both config-ui and tg-bot mount bot-config at /config/bot
-      # so oauth.json lands at the same path in both containers.
+      # stack-manager owns all config volumes
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
       DRIVE_CONFIG_PATH: /config/drive/drive.json
@@ -60,7 +59,7 @@ services:
     expose:
       - "9090"
     volumes:
-      # Same mount point as config-ui for bot-config volume
+      # Same mount point as stack-manager for bot-config volume
       - bot-config:/config/bot
       - bot-data:/app/data
       - project-config:/config/project:ro
@@ -98,17 +97,9 @@ services:
     environment:
       ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN:-}
       ADMIN_CHAT_ID: ${ADMIN_CHAT_ID:-}
-      BOT_CONTROL_URL: http://tg-bot:9090
-      AGENT_CONTROL_URL: http://flutter-agent:9091
-      BOT_CONFIG_PATH: /config/bot/bot.json
-      AGENT_CONFIG_PATH: /config/agent/agent.json
-      DRIVE_CONFIG_PATH: /config/drive/drive.json
-      PROJECT_CONFIG_PATH: /config/project/project.json
-    volumes:
-      - bot-config:/config/bot
-      - agent-config:/config/agent
-      - drive-config:/config/drive
-      - project-config:/config/project
+      STACK_MANAGER_URL: http://stack-manager:9000
+    depends_on:
+      - stack-manager
     networks:
       - jenkins
 

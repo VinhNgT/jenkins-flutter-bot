@@ -6,7 +6,7 @@ globs: **/*.py
 
 # Coding Conventions
 
-Triggered when editing Python files. Covers the Python stack, coding style, and project structure patterns used across all three apps.
+Triggered when editing Python files. Covers the Python stack, coding style, and project structure patterns used across all apps.
 
 ---
 
@@ -14,18 +14,6 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 
 - **Python 3.12+** — all apps declare `requires-python = ">=3.12"`.
 - **`from __future__ import annotations`** at the top of every module for deferred type evaluation.
-
-### Dependencies
-
-| Package | Used By | Purpose |
-|---------|---------|---------|
-| `fastapi` + `uvicorn` | All apps | HTTP APIs and servers |
-| `python-telegram-bot[ext]` | tg-bot | Telegram bot framework |
-| `httpx` | tg-bot, config-ui | Async HTTP client |
-| `google-api-python-client` | tg-bot | Google Drive API |
-| `google-auth-oauthlib` | config-ui | OAuth2 browser-redirect flow |
-| `python-multipart` | tg-bot | Multipart form parsing (webhook) |
-| `python-dotenv` | config-schema (shared) | `.env` file loading |
 
 ### Package Manager
 
@@ -42,37 +30,42 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 | `mypy` | Static type checking (configured in `pyproject.toml`) |
 | `ruff` | Linting + formatting |
 
+### Key Dependency Patterns
+
+- **All FastAPI services** share `fastapi` + `uvicorn`. The `tg-admin-bot` is the exception — it uses only `python-telegram-bot[ext]` with no HTTP server.
+- **All apps** depend on `config-schema` (shared library) for declarative config fields.
+- **`config-ui` and `tg-admin-bot`** depend on `stack-manager` (shared library) for service control, Drive OAuth, env I/O, and Jenkinsfile generation.
+- **Blocking I/O libraries** (e.g., `google-api-python-client`) are wrapped with `asyncio.to_thread()`. See `communication-flows.md` for details.
+
+Check each app's `pyproject.toml` for the authoritative dependency list.
+
 ---
 
 ## Project Structure
 
-All three apps (`tg-jenkins-bot`, `config-ui`, `agent-control`) follow the same structure:
+### Service Apps
 
-```
-apps/<app-name>/
-├── pyproject.toml          # deps, scripts, build config
-└── src/<package_name>/
-    ├── __init__.py
-    ├── main.py             # FastAPI app factory, lifespan, CLI entry
-    ├── schema.py           # Field declarations (imports FieldDef etc. from config_schema)
-    ├── config.py           # Typed Config dataclass (delegates to schema.py)
-    └── control.py          # Manager class + control routes + GET /control/schema
-```
+The three FastAPI service apps (`tg-jenkins-bot`, `config-ui`, `agent-control`) follow the same module pattern:
 
-Shared infrastructure lives in `libs/config-schema/`:
+| Module | Role |
+|--------|------|
+| `main.py` | FastAPI app factory, lifespan, CLI entry |
+| `schema.py` | `FieldDef` tuple declarations (imports from `config_schema`) |
+| `config.py` | Typed frozen Config dataclass (delegates to `schema.py`) |
+| `control.py` | Manager class + `/control/*` routes + `GET /control/schema` |
 
-```
-libs/config-schema/
-├── pyproject.toml
-└── src/config_schema/
-    ├── __init__.py         # Public API re-exports
-    └── schema.py           # FieldDef, resolve_fields, serialize_schema, nested_get
-```
+The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`) for domain-specific logic.
 
-- **`pyproject.toml`** declares a `[project.scripts]` entry point used as the Docker `ENTRYPOINT`.
-- **`main.py`** creates the FastAPI app via a factory function, wires up the lifespan, and includes routers.
-- **`schema.py`** (per-app) declares the module's `FieldDef` tuples. The shared `FieldDef` dataclass, `resolve_fields()`, and `serialize_schema()` live in `config_schema`.
-- **Routers** are defined in their respective modules as `APIRouter` instances and included in `main.py`.
+### Admin Bot
+
+`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It uses `stack-manager` for all operational logic and `settings.py` for a flat `Settings` dataclass.
+
+### Shared Libraries
+
+Both live in `libs/` and use PyPA `src` layout:
+
+- **`config-schema`** — `FieldDef` dataclass, `resolve_fields()`, `serialize_schema()`, `nested_get()`. The authoritative source for the config resolution algorithm.
+- **`stack-manager`** — `ServiceClient`, `DriveOAuth`, config store I/O, env export/import, Jenkinsfile template generation. Re-exports public API from `__init__.py`.
 
 ---
 

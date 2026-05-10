@@ -1,143 +1,102 @@
 ---
 trigger: glob
-globs: **/Dockerfile*, **/docker-compose*.yml, **/compose.sh
-description: Docker volumes, networking, multi-stage build patterns, agent Dockerfile specifics, and CI/CD image pipeline.
+globs: **/Dockerfile*, **/docker-compose*.yml, **/compose.sh, **/env/*.env*
+description: Docker volumes, networking, build patterns, env file system, and CI/CD image pipeline.
 ---
 
 # Docker & Infrastructure
 
-Triggered when editing Dockerfiles, docker-compose files, or compose.sh. Covers volumes, networking, image build patterns, the flutter-agent's uv exception, and the CI/CD image release pipeline.
+Triggered when editing Dockerfiles, docker-compose files, compose.sh, or env files.
 
 ---
 
 ## Volumes
 
-| Volume | Purpose | Mounted In |
-|--------|---------|------------|
-| `jenkins-data` | Jenkins home directory | `jenkins` |
-| `bot-config` | Shared bot config + OAuth tokens | `config-ui`, `tg-bot` |
-| `agent-config` | Agent configuration JSON | `config-ui`, `flutter-agent` |
-| `ui-config` | UI configuration (Drive OAuth creds) | `config-ui` |
-| `bot-data` | Runtime data (pending builds) | `tg-bot` |
+For the authoritative volume list, see `docker-compose.yml`. Key design decisions:
+
+- **`bot-config`** is mounted in both `config-ui` and `tg-bot` at the same path (`/config/bot/`) so `oauth.json` is accessible from both containers. `tg-admin-bot` also mounts it.
+- **`drive-config`** holds Drive OAuth client credentials (`drive.json`) — separate from bot config because Drive credentials are managed by `config-ui` / `tg-admin-bot`, not by the bot itself.
+- **`bot-data`** holds runtime state (pending builds, build history) — only mounted in `tg-bot`.
+- Jenkins home data stays in its own volume, decoupled from all other services.
 
 ---
 
 ## Network
 
-All services share a single Docker bridge network (`jenkins`). Only two ports are exposed to the host:
+All services share a single Docker bridge network. Only two ports are exposed to the host:
 
-| Port | Service | Host Exposure | Purpose |
-|------|---------|---------------|---------|
-| 8080 | jenkins | Exposed | Jenkins web UI |
-| 9000 | config-ui | Exposed | Config dashboard + Drive OAuth callback |
-| 9090 | tg-bot | Internal only | Webhook receiver + control API |
-| 9091 | flutter-agent | Internal only | Agent control API |
+- **`jenkins:8080`** — Jenkins web UI
+- **`config-ui:9000`** — Config dashboard + Drive OAuth callback
+
+Bot (`9090`) and agent (`9091`) ports are internal only. `tg-admin-bot` has no HTTP server.
 
 Do not expose bot or agent ports to the host.
 
 ---
 
+## Per-Service Environment Files
+
+Services consume optional per-service `.env` files via Compose `env_file:` with `required: false` (Compose v2.24+). These live in `infra/env/`.
+
+Template files (`*.env.example`) are auto-generated from schemas via `scripts/gen_env_examples.py`. Regenerate after schema changes.
+
+The `tg-admin-bot` uses `ADMIN_BOT_TOKEN` and `ADMIN_CHAT_ID` via `${VAR:-}` interpolation in `docker-compose.yml`, sourced from `infra/.env`.
+
+---
+
 ## Dev vs Production Compose
 
-Two compose modes are provided via `compose.sh` in `infra/`:
+Two compose modes via `compose.sh`:
 
 ```bash
 ./compose.sh [args]          # Dev — builds images locally from source
 ./compose.sh prod [args]     # Prod — pulls pre-built images from GHCR
 ```
 
-**Dev mode** (`docker-compose.yml` only):
-- Builds all images from local source on every `--build`
-- Use for active development and testing changes
+**Production mode** overlays `docker-compose.prod.yml`, which replaces `build:` with `image:` pointing to GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
 
-**Production mode** (`docker-compose.yml` + `docker-compose.prod.yml`):
-- The prod override sets `build: null` and points each service to a GHCR image
-- Images are pulled from `ghcr.io/vinhngt/jenkins-flutter-bot/<name>:<tag>`
-- Defaults to `latest`; pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`
-- The `jenkins` service has **no** prod override — it's a dev/testing convenience only. Remove it from the stack for production deployments pointing at an external Jenkins.
-
-`IMAGE_TAG` is a compose-invocation variable only — it is not set inside any container.
+The `jenkins` service has **no** prod override — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the service.
 
 ---
 
 ## CI/CD Image Pipeline
 
-Defined in `.github/workflows/build-images.yml`. Triggers on version tags matching `v*.*.*`.
+Defined in `.github/workflows/build-images.yml`. Triggers on `v*.*.*` tags.
 
-Three images are built and pushed to GHCR:
+All apps are built and pushed to GHCR with both the exact version tag and `latest`. The `flutter-agent` is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
 
-| Image | Platforms | Registry Path |
-|-------|-----------|---------------|
-| `tg-bot` | `linux/amd64`, `linux/arm64` | `ghcr.io/vinhngt/jenkins-flutter-bot/tg-bot` |
-| `config-ui` | `linux/amd64`, `linux/arm64` | `ghcr.io/vinhngt/jenkins-flutter-bot/config-ui` |
-| `flutter-agent` | `linux/amd64` only | `ghcr.io/vinhngt/jenkins-flutter-bot/flutter-agent` |
-
-Each image is tagged with both the exact version (e.g., `v1.2.3`) and `latest`.
-
-`flutter-agent` is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
-
-**To release a new version:** push a `v*.*.*` tag. GitHub Actions handles the rest.
-
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
+**To release:** `git tag v1.2.3 && git push origin v1.2.3`.
 
 ---
 
 ## Docker Build Patterns
 
-### tg-jenkins-bot and config-ui
+### Standard Apps (tg-bot, config-ui, tg-admin-bot)
 
-Both follow the same two-stage pattern. Build context is the **repo root** for all services (required to access the shared `libs/config-schema/` library):
+All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions:
 
-```dockerfile
-# Stage 1: uv builder
-FROM python:3.12-slim AS builder
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-WORKDIR /app
-COPY pyproject.toml uv.lock ./
-COPY libs/config-schema/pyproject.toml libs/config-schema/
-COPY libs/config-schema/src libs/config-schema/src
-COPY apps/<app-name>/pyproject.toml apps/<app-name>/
-COPY apps/<app-name>/src apps/<app-name>/src
-RUN uv sync --frozen --no-dev --no-editable --package <package-name>
-
-# Stage 2: slim runtime (no uv, no build tools)
-FROM python:3.12-slim
-COPY --from=builder /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-CMD ["<project-scripts-entry>"]
-```
-
-Key points:
-- `uv sync --frozen` uses the lockfile for reproducible installs
-- `--package <name>` installs only the target app + its workspace dependencies
-- `--no-dev` excludes mypy, ruff, etc.
-- `--no-editable` installs the package properly (not as an editable link)
+- Build context is the **repo root** (required to access `libs/`)
+- `uv sync --frozen --no-dev --no-editable --package <name>` installs only the target app + transitive workspace dependencies
 - The final image has no `uv`, no build caches, no dev deps
-- `.dockerignore` at repo root excludes `.git/`, `.venv/`, `__pycache__/`, etc.
+- The `[project.scripts]` entry in each app's `pyproject.toml` is the Docker `CMD`
 
 ### flutter-agent (Exception)
 
-The flutter-agent uses a **two-stage build**: Stage 1 (`sdk-builder`) downloads Android and Flutter SDKs; Stage 2 copies the pre-built SDKs into a clean runtime image with `COPY --chown` to avoid duplicating multi-GB layers.
+Two-stage build with fundamentally different concerns: Stage 1 downloads multi-GB Android/Flutter SDKs; Stage 2 copies them into the runtime image.
 
-Key conventions:
+Key conventions and the *why*:
 
-- **`COPY --chown`** instead of `RUN chown -R` — prevents massive intermediate layer duplication
-- **uv is kept in runtime** — the base image (`jenkins/inbound-agent:jdk21`) lacks Python 3.12, so uv manages both Python installation (`UV_PYTHON_INSTALL_DIR=/opt/uv-python`) and dependencies
-- **`platform: linux/amd64`** is set in docker-compose — Flutter does not support Android release builds on Linux ARM64; x86_64 emulation is required on Apple Silicon hosts
-- **Gradle memory tuning** via `GRADLE_OPTS` — daemon disabled, JVM heap capped, VFS watching disabled. See the Dockerfile comments for rationale.
-
-The flutter-agent's Docker Compose build context is the **repo root** (`..` from `infra/`) — same as all other services, since all need access to the workspace root and shared library.
+- **`COPY --chown`** instead of `RUN chown -R` — prevents massive intermediate layer duplication when transferring multi-GB SDK directories
+- **uv is kept in runtime** — the base image (`jenkins/inbound-agent`) lacks Python 3.12, so uv manages both Python installation and dependencies
+- **`platform: linux/amd64`** in docker-compose — Flutter does not support Android release builds on Linux ARM64; x86_64 emulation is required on Apple Silicon hosts
+- **Gradle memory tuning** — daemon disabled, JVM heap capped. See the Dockerfile comments for rationale.
 
 ---
 
 ## Agent Subprocess Management
 
-The `AgentManager` in agent-control wraps the Jenkins inbound agent as a child process:
+The `AgentManager` wraps the Jenkins inbound agent as a child process:
 
-- `start()` spawns `/usr/local/bin/jenkins-agent` via `subprocess.Popen`
-- `stop()` sends `SIGTERM`, waits 5 seconds, then `SIGKILL` if the process hasn't exited
-- `status()` uses `process.poll()` to check if the process is still running
-- `start()` passes a **filtered environment** to the subprocess — only `JENKINS_URL`, `JENKINS_AGENT_NAME`, `JENKINS_SECRET`, `JENKINS_WEB_SOCKET`, and `JENKINS_TUNNEL` are forwarded, preventing duplicate CLI arguments from the entrypoint script
+- **Filtered environment** — only Jenkins-specific vars (`JENKINS_URL`, `JENKINS_AGENT_NAME`, `JENKINS_SECRET`, `JENKINS_WEB_SOCKET`, `JENKINS_TUNNEL`) are forwarded to the subprocess. This prevents the entrypoint script from receiving duplicate arguments via other env vars.
+- **Graceful shutdown** — `SIGTERM` first, wait 5 seconds, then `SIGKILL`.
+- **On failure, the FastAPI server stays running** — the control API remains available for retries.

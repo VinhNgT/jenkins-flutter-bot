@@ -1,388 +1,67 @@
 # 🤖 Telegram Jenkins Build Bot
 
-A self-hosted Telegram bot that acts as a thin trigger layer for Jenkins CI/CD. It lets you trigger builds, tracks only the builds started through Telegram, and delivers resulting artifacts through Google Drive using credentials managed in the config UI dashboard.
-
-## Table of Contents
-
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Setup & API Keys](#setup--api-keys)
-- [Configuration](#configuration)
-- [Quick Start](#quick-start)
-- [Telegram Bot Commands](#telegram-bot-commands)
-- [Project Structure](#project-structure)
-- [Troubleshooting](#troubleshooting)
-
----
+A self-hosted Telegram bot that acts as a thin trigger layer for Jenkins CI/CD. It lets users trigger Flutter builds, tracks only the builds started through Telegram, and delivers resulting APKs through Google Drive.
 
 ## Features
 
-- **Jenkins Integration** — Seamlessly trigger builds on a Jenkins server and receive webhook callbacks when builds complete.
-- **Telegram Interface** — Trigger builds, check status, and receive Drive links directly from Telegram chat.
-- **Google Drive Upload** — Use the config UI dashboard to complete Google OAuth through a browser callback, then upload artifacts to Google Drive and return a shareable link.
-- **Chat Whitelist** — Restrict bot access to specific authorized Telegram chat IDs.
-- **Bot-Scoped Tracking** — Only builds triggered by the bot are correlated back to Telegram users.
-- **Thin Trigger Layer** — Minimal local state; relies on Jenkins for heavy lifting and build orchestration.
+- **Jenkins Integration** — Trigger builds on Jenkins via REST API and receive webhook callbacks on completion.
+- **Telegram Interface** — Keyboard-driven UI for triggering builds, checking status, and receiving Drive download links.
+- **Google Drive Upload** — Uploads build artifacts to Drive and returns shareable per-file download links.
+- **Chat Whitelist** — Restricts bot access to specific authorized Telegram chat IDs.
+- **Bot-Scoped Tracking** — Only builds triggered by the bot are correlated back to Telegram users. No Jenkins metadata from manual triggers is ever exposed.
 
----
+## How It Works
 
-## Prerequisites
+1. User taps **🔨 Build** → bot presents branch selection via inline keyboard
+2. Bot triggers Jenkins with a unique `request_id` and stores a `PendingBuild`
+3. Jenkins pipeline runs on the flutter-agent, then POSTs results to the bot's webhook
+4. Bot matches `request_id`, uploads APK to Drive, sends the download link to Telegram
+5. Bot enforces `max_recent_builds` retention — evicts oldest entries and cleans up Drive files
 
-| Tool        | Version | Purpose                           |
-| ----------- | ------- | --------------------------------- |
-| **Python**  | ≥ 3.12  | Runtime                           |
-| **uv**      | latest  | Package & virtualenv manager      |
-| **Jenkins** | any     | A Jenkins server with a build job |
+The bot owns zero build logic — all cloning, compiling, and packaging is delegated to the Jenkins pipeline.
 
-> [!NOTE]
-> The heavy lifting (cloning, building) is done by your Jenkins server. This bot acts merely as a controller and notifier.
+## Telegram Interface
 
----
+The bot uses a persistent two-button keyboard:
 
-## Setup & API Keys
+| Button | Action |
+|--------|--------|
+| **🔨 Build** | Start a new build — presents branch selection |
+| **📦 Recent** | Show recent builds with download links |
 
-You need values from **three** external services: Telegram, Jenkins, and Google Cloud. The bot reads them from the config UI JSON file or from environment variables.
+Additional commands available via the menu button:
 
-Collect this checklist before you start:
-
-| Setting                | Required | Source                      | Notes                                               |
-| ---------------------- | -------- | --------------------------- | --------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN`   | Yes      | Telegram / @BotFather       | Bot API token                                       |
-| `ALLOWED_CHAT_IDS`     | Yes      | Telegram chat metadata      | Comma-separated list of allowed chat IDs            |
-| `JENKINS_URL`          | Yes      | Your Jenkins server         | Base URL only, no trailing job path                 |
-| `JENKINS_USER`         | Yes      | Jenkins user directory      | Prefer a dedicated service account                  |
-| `JENKINS_API_TOKEN`    | Yes      | Jenkins user security page  | Copy once when generated                            |
-| `JENKINS_JOB_NAME`     | Yes      | Existing Jenkins job        | Current client expects a top-level job path segment |
-| `GOOGLE_CLIENT_ID`     | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
-| `GOOGLE_CLIENT_SECRET` | Yes      | Google Cloud OAuth client   | Used by config UI Drive setup                       |
-| `BOT_SERVICE_URL`      | Optional | Your deployment topology    | Internal URL for this service; port is derived automatically. Defaults to `http://tg-bot:9090` in Docker |
-| `DRIVE_FOLDER_NAME`    | Optional | Your choice                 | Destination folder name in Google Drive             |
-| `APP_NAME`             | Optional | Your choice                 | Display name shown in bot messages (e.g. "MyApp"); defaults to `DRIVE_FOLDER_NAME` |
-
-### 1. Telegram Bot Token
-
-1. Open Telegram and search for **@BotFather**
-2. Send `/newbot` and choose a name and username
-3. Copy the token provided (e.g., `123456789:ABCdefGhI...`) — this is your `TELEGRAM_BOT_TOKEN`
-
-> [!TIP]
-> While chatting with @BotFather, send `/setcommands` and paste:
->
-> ```
-> start - Show help and available commands
-> build - Build latest commit (or specify branch/hash)
-> status - Current build status and service health
-> recent - Recent build history with download links
-> cancel - Cancel a build in progress
-> ```
-
-### 2. Finding Your Telegram Chat ID
-
-1. Add your bot to a group or start a private chat.
-2. Send any message to the bot.
-3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in your browser.
-4. Look for `"chat":{"id":123456789}`. This number is your chat ID (groups will be negative). Add it to `ALLOWED_CHAT_IDS`.
-5. If you want multiple chats to use the bot, store them as a comma-separated list such as `123456789,-100987654321`.
-
-> [!TIP]
-> `@userinfobot` or `@RawDataBot` can also reveal chat IDs without using `getUpdates`.
-
-### 3. Jenkins URL, User, API Token, and Job Name
-
-The bot needs access to a Jenkins server to trigger builds and monitor status.
-
-1. Open Jenkins in your browser and copy the base URL (for example `http://192.168.1.50:8080`). This is `JENKINS_URL`.
-2. Create or identify a dedicated Jenkins user for the bot.
-3. Grant that user at least `Overall/Read`, `Job/Read`, and `Job/Build`. Some Jenkins setups also require `View/Read`.
-4. Open the Jenkins user menu, go to **Security**, and create an **API Token**. Copy it immediately; this is `JENKINS_API_TOKEN`.
-5. Copy the exact Jenkins job name that the bot should trigger. This becomes `JENKINS_JOB_NAME`.
-
-> [!IMPORTANT]
-> The current Jenkins client builds URLs as `${JENKINS_URL}/job/${JENKINS_JOB_NAME}`. If your pipeline lives inside nested Jenkins folders, you will need to adapt the job path or the client implementation.
-
-### 4. Google Cloud OAuth2 Client for Drive Uploads
-
-This step is required to upload built artifacts to Google Drive and bypass Telegram file size limits.
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/) and create a project.
-2. Enable the **Google Drive API** under **APIs & Services -> Library**.
-3. Configure the **OAuth consent screen**.
-4. If the app is not published, add every Google account that will authorize Drive access as a **test user**.
-5. Go to **Credentials -> Create Credentials -> OAuth 2.0 Client ID**.
-6. Select **Web application** as the application type.
-7. Add an **Authorized redirect URI** for the config UI callback.
-
-   Local development example:
-
-   ```text
-   http://127.0.0.1:9000/api/drive/oauth/callback
-   ```
-
-   Deployed config UI example:
-
-   ```text
-   https://config.example.com/api/drive/oauth/callback
-   ```
-
-8. Copy the **Client ID** and **Client Secret**. These are `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-9. Save these values in the config UI dashboard before starting the Drive connection flow.
-
-### 5. Bot Service URL
-
-Jenkins must be able to call the bot back when a build finishes.
-
-1. Set `BOT_SERVICE_URL` to the internal URL Jenkins can reach for the bot service. The listen port is derived automatically from the URL.
-2. Do **not** append `/webhook/build-complete`; the bot adds that path automatically.
-3. Use a URL that is reachable from the Jenkins server, not just from your browser.
-
-Examples:
-
-```text
-BOT_SERVICE_URL=http://192.168.1.50:9090
-BOT_SERVICE_URL=http://tg-jenkins-bot:9090
-```
-
-### 6. Optional Values
-
-Use these only when your deployment needs them:
-
-| Setting                | When to use it                                                                         | How to get it                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `DRIVE_FOLDER_NAME`    | You want uploads grouped in a specific Drive folder                                    | Choose any folder name you want the uploader to create or reuse                      |
-| `BOT_OAUTH_TOKEN_PATH` | You want the Drive OAuth token stored outside the default config directory             | Choose a writable path shared by the config UI and bot                               |
-
----
+| Command | Description |
+|---------|-------------|
+| `/status` | Show service health and active builds |
+| `/help` | Show usage instructions |
+| `/about` | Show version and system info |
 
 ## Configuration
 
-Configuration precedence is:
+Configuration is managed through the **config-ui dashboard** (preferred) or environment variables. See the [setup guide](../../docs/setup-guide.md) for details.
 
-1. JSON config file written by the config UI
-2. Process environment variables
-3. `.env`
-4. Built-in defaults
+The config precedence chain is: `JSON (config-ui) > Environment Variable > .env file > Default`.
 
-If you use the dashboard, its saved JSON config takes precedence over `.env`.
+### Required Settings
 
-Copy `.env.example` to `.env` and fill in the values if you are not relying entirely on the config UI:
+| Setting | Source |
+|---------|--------|
+| Telegram Bot Token | [@BotFather](https://t.me/BotFather) |
+| Allowed Chat IDs | Telegram chat metadata |
+| Jenkins URL / User / API Token | Your Jenkins server |
+| Pipeline Job Name | Existing Jenkins pipeline |
+| Drive Client ID & Secret | Google Cloud Console (saved in config-ui Drive tab) |
 
-```env
-# Required — Telegram
-TELEGRAM_BOT_TOKEN=123456:ABC-your-bot-token
-ALLOWED_CHAT_IDS=123456789,-100987654321
+## Jenkins Pipeline
 
-# Required — Jenkins
-JENKINS_URL=http://192.168.1.50:8080
-JENKINS_USER=build-bot
-JENKINS_API_TOKEN=your-jenkins-api-token
-JENKINS_JOB_NAME=flutter-build
+The bot triggers Jenkins builds but does **not** manage the pipeline definition. The config-ui dashboard includes a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration — copy it into your Jenkins job.
 
-# Required — Google Drive OAuth client for the config UI callback flow
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
+The pipeline contract: the `post` block must POST a multipart form to `BOT_CALLBACK_URL` with a `metadata` JSON field (containing `request_id`, `job_id`, `status`, `commit_hash`) and an `artifact` file on success.
 
-# Required — Bot Service URL
-# Jenkins will POST build results to this address (port is derived automatically)
-BOT_SERVICE_URL=http://192.168.1.50:9090
+## Setup
 
-# Optional
-# CONFIG_PATH=/app/config/bot.json
-# BOT_OAUTH_TOKEN_PATH=/app/config/oauth.json
-# DRIVE_FOLDER_NAME=flutter-builds
-# APP_NAME=MyApp
-```
-
----
-
-## Quick Start
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/VinhNgT/jenkins-flutter-bot.git
-cd jenkins-flutter-bot/apps/tg-jenkins-bot
-```
-
-### 2. Install dependencies & Run
-
-```bash
-uv sync
-uv run tg-jenkins-bot
-```
-
-### 3. Connect Google Drive
-
-1. Start the config UI dashboard or the full compose stack.
-2. Open the dashboard and save your bot config, including `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-3. In the Google Drive setup panel, click the authorization button.
-4. Sign in with a Google account that is listed as a test user in your GCP project.
-5. Grant the requested permission (`drive.file` scope).
-6. Google will redirect back to the config UI callback page automatically.
-7. Wait for the dashboard to refresh and show that Drive is connected. No code copy and paste is required.
-8. Return to Telegram and run `/status` to confirm the bot is ready.
-
----
-
-## Jenkins Pipeline Setup
-
-The bot triggers Jenkins builds but does **not** manage the pipeline definition. Configure your pipeline directly in Jenkins:
-
-1. Create a new **Pipeline** job in Jenkins
-2. Under "Pipeline", select **"Pipeline script"** (not "from SCM")
-3. Paste the pipeline script below and customize `url` and `credentialsId`
-4. The bot passes `BRANCH`, `BOT_CALLBACK_URL`, `BOT_REQUEST_ID`, and `BOT_JOB_ID` as build parameters — Jenkins handles everything else
-
-> [!IMPORTANT]
-> **Private repositories** require a Personal Access Token (PAT) stored as a Jenkins credential. Create a "Username with password" credential in **Manage Jenkins → Credentials** — use your Git hosting username and the PAT as the password. Note the credential **ID** (e.g., `gitlab-credentials`) for use in the `credentialsId` field below. See the [setup guide](../../docs/setup-guide.md#3d-add-repository-credentials-private-repos) for step-by-step instructions.
-
-<details>
-<summary>Reference pipeline script</summary>
-
-```groovy
-pipeline {
-    agent { label 'flutter' }
-    parameters {
-        string(name: 'BRANCH', defaultValue: 'main')
-        string(name: 'BOT_CALLBACK_URL', defaultValue: '')
-        string(name: 'BOT_REQUEST_ID', defaultValue: '')
-        string(name: 'BOT_JOB_ID', defaultValue: '')
-    }
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout([$class: 'GitSCM',
-                    branches: [[name: "*/${params.BRANCH}"]],
-                    userRemoteConfigs: [[
-                        url: 'https://gitlab.com/your-org/your-flutter-app.git',
-                        credentialsId: 'gitlab-credentials'
-                    ]]
-                ])
-            }
-        }
-        stage('Build APK') {
-            steps { sh 'flutter build apk --release' }
-        }
-    }
-    post {
-        success {
-            script {
-                if (params.BOT_CALLBACK_URL) {
-                    def commit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                    def meta = [request_id: params.BOT_REQUEST_ID, job_id: params.BOT_JOB_ID,
-                                status: 'success', commit_hash: commit,
-                                build_number: env.BUILD_NUMBER, build_url: env.BUILD_URL]
-                    writeJSON file: 'metadata.json', json: meta
-                    retry(3) {
-                        sh "curl -sf -X POST \"${params.BOT_CALLBACK_URL}\" " +
-                           "-F 'metadata=@metadata.json;type=application/json' " +
-                           "-F 'artifact=@build/app/outputs/flutter-apk/app-release.apk'"
-                    }
-                }
-            }
-        }
-        failure {
-            script {
-                if (params.BOT_CALLBACK_URL) {
-                    def commit = sh(script: 'git rev-parse HEAD || echo unknown', returnStdout: true).trim()
-                    def meta = [request_id: params.BOT_REQUEST_ID, job_id: params.BOT_JOB_ID,
-                                status: 'failed', commit_hash: commit,
-                                build_number: env.BUILD_NUMBER, build_url: env.BUILD_URL,
-                                logs: 'Check Jenkins console for details']
-                    writeJSON file: 'metadata.json', json: meta
-                    retry(3) {
-                        sh "curl -sf -X POST \"${params.BOT_CALLBACK_URL}\" " +
-                           "-F 'metadata=@metadata.json;type=application/json'"
-                    }
-                }
-            }
-        }
-        always { cleanWs() }
-    }
-}
-```
-
-</details>
-
----
-
-## Telegram Bot Commands
-
-| Command           | Description                              |
-| ----------------- | ---------------------------------------- |
-| `/start`          | Show welcome message and command list    |
-| `/build`          | Build latest commit on `main`            |
-| `/build <branch>` | Build latest commit on a specific branch |
-| `/build <hash>`   | Build a specific commit                  |
-| `/status`         | Show service health and build status     |
-| `/recent`         | List recent builds with download links   |
-| `/cancel`         | Cancel the current build in progress     |
-| `/cancel <branch>`| Cancel a specific branch's build         |
-
----
-
-## Project Structure
-
-```text
-apps/tg-jenkins-bot/
-├── pyproject.toml                   # Metadata, dependencies
-├── uv.lock                          # Locked dependency versions
-├── .env.example                     # Environment template
-│
-├── src/tg_jenkins_bot/
-│   ├── main.py                      # FastAPI entry point for control and webhook routes
-│   ├── control.py                   # Bot lifecycle and /control/* routes
-│   ├── config.py                    # Configuration management
-│   │
-│   ├── bot/
-│   │   ├── context.py               # Pending build tracking and Telegram delivery
-│   │   └── handlers.py              # Telegram command handlers
-│   │
-│   ├── jenkins/
-│   │   ├── client.py                # Jenkins REST API wrapper & triggering
-│   │   └── webhook.py               # Build completion webhook handling
-│   │
-│   └── drive/
-│       └── uploader.py              # Shared Drive token handling and uploads
-│
-└── data/                            # Runtime data (gitignored)
-    └── ...                          # Local runtime artifacts when used outside compose
-```
-
----
-
-## Troubleshooting
-
-### Bot doesn't respond to commands
-
-- Verify `TELEGRAM_BOT_TOKEN` is correct.
-- Check that your chat ID is in `ALLOWED_CHAT_IDS`.
-- Look for errors in the terminal output.
-
-### Jenkins builds aren't triggering
-
-- Ensure `JENKINS_URL`, `JENKINS_USER`, and `JENKINS_API_TOKEN` are correct.
-- Ensure the user has permissions to trigger `JENKINS_JOB_NAME`.
-
-### Build fails at checkout (authentication error)
-
-- Private repositories require a PAT stored as a Jenkins credential.
-- Verify the `credentialsId` in your Jenkinsfile matches the credential ID stored in Jenkins.
-- Check if the PAT has expired — generate a new one and update the credential in **Manage Jenkins → Credentials**.
-- Ensure the PAT has the correct scope (`read_repository` for GitLab, `Contents: Read-only` for GitHub).
-
-### Drive OAuth flow fails
-
-- Ensure the OAuth client is configured with the exact config UI callback URL.
-- Ensure your Google account is added as a **test user** in the OAuth consent screen if the app is not published.
-- Start the authorization flow from the config UI after saving `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-- If the callback page opens but the dashboard does not update, refresh the dashboard once and inspect the config-ui logs.
-
-### Webhook not receiving callbacks
-
-- Ensure `BOT_SERVICE_URL` is accessible from the Jenkins server.
-
-
----
+📖 **See [docs/setup-guide.md](../../docs/setup-guide.md) for the complete walkthrough** — Jenkins setup, bot creation, Google Drive OAuth, and configuration.
 
 ## License
 

@@ -1,4 +1,6 @@
-# 🏗️ Jenkins Flutter Bot — Setup Guide
+# Jenkins Flutter Bot — Setup Guide
+
+← [Back to README](../README.md)
 
 Step-by-step instructions to get the full CI/CD stack running: a Telegram bot that triggers Flutter builds on Jenkins and delivers APKs through Google Drive.
 
@@ -23,7 +25,6 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 - [Step 5 — Start Services & Test](#step-5--start-services--test)
 - [Troubleshooting](#troubleshooting)
 - [Admin Bot Setup (Optional)](#admin-bot-setup-optional)
-- [Architecture Reference](#architecture-reference)
 
 ---
 
@@ -511,42 +512,4 @@ The admin bot supports: config view/edit, service control, headless Drive OAuth 
 
 ---
 
-## Architecture Reference
-
-```mermaid
-graph TD
-    subgraph Users
-        TU["Telegram User"]
-        BA["Browser Admin"]
-        TA["Telegram Admin"]
-    end
-
-    subgraph Management
-        CUI["config-ui :9000 (exposed)"]
-        TAB["tg-admin-bot (internal)"]
-    end
-
-    subgraph Managed Services
-        BOT["tg-bot :9090 (internal)"]
-        AGT["flutter-agent :9091 (internal)"]
-    end
-
-    JNK["jenkins :8080 (exposed)"]
-
-    TU -- polling --> BOT
-    BA -- ":9000" --> CUI
-    TA -- polling --> TAB
-
-    CUI -- "/control/*" --> BOT
-    CUI -- "/control/*" --> AGT
-    TAB -- "/control/*" --> BOT
-    TAB -- "/control/*" --> AGT
-
-    BOT -- "REST trigger" --> JNK
-    JNK -- "dispatches build" --> AGT
-    AGT -- "webhook (build result)" --> BOT
-```
-
-**Exposed ports:** Only `jenkins:8080` and `config-ui:9000` are accessible from the host. All other services communicate over the internal Docker network.
-
-> **Production note:** The bundled `jenkins` service is for development/testing. In production, point `JENKINS_URL` to an external Jenkins instance and remove the `jenkins` service from `docker-compose.yml`.
+> For a system architecture overview, see the [main README](../README.md).

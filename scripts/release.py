@@ -167,7 +167,8 @@ def _run(args: list[str]) -> None:
 
 def git_commit_tag(version: str) -> None:
     tag = f"v{version}"
-    _run(["git", "add"] + [str(p) for p in PYPROJECT_FILES])
+    lock_file = REPO_ROOT / "uv.lock"
+    _run(["git", "add"] + [str(p) for p in PYPROJECT_FILES] + [str(lock_file)])
     _run(["git", "commit", "-m", f"chore: bump version to {tag}"])
     _run(["git", "tag", tag])
 
@@ -359,6 +360,8 @@ def main() -> None:
         raise SystemExit("Aborted.")
 
     write_version(new)
+    ok("Syncing uv.lock and .venv…")
+    _run(["uv", "sync"])
     git_commit_tag(new)
     ok("Done.")
 

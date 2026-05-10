@@ -9,6 +9,12 @@ This is the single source of truth for the Drive-owned config fields.  It drives
 from __future__ import annotations
 
 from config_schema import FieldDef, serialize_schema  # noqa: F401
+from stack_manager import (
+    PROJECT_FIELDS as PROJECT_FIELDS,  # noqa: F401
+    PROJECT_INFRA as PROJECT_INFRA,  # noqa: F401
+    PROJECT_MODULE_DESCRIPTION as PROJECT_MODULE_DESCRIPTION,  # noqa: F401
+    PROJECT_MODULE_TITLE as PROJECT_MODULE_TITLE,  # noqa: F401
+)
 
 # ---------------------------------------------------------------------------
 # Drive field declarations

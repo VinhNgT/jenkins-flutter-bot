@@ -20,4 +20,8 @@ from stack_manager.env_io import (
     import_tarball as import_tarball,
 )
 from stack_manager.jenkins_pipeline import generate_jenkinsfile as generate_jenkinsfile
+from stack_manager.project_schema import PROJECT_FIELDS as PROJECT_FIELDS
+from stack_manager.project_schema import PROJECT_INFRA as PROJECT_INFRA
+from stack_manager.project_schema import PROJECT_MODULE_DESCRIPTION as PROJECT_MODULE_DESCRIPTION
+from stack_manager.project_schema import PROJECT_MODULE_TITLE as PROJECT_MODULE_TITLE
 from stack_manager.services import ServiceClient as ServiceClient

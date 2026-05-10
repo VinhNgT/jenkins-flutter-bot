@@ -71,6 +71,42 @@ a:hover { text-decoration: underline; }
 
 .version-badge.loaded { opacity: 1; }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.github-link:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-alt));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.github-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
 .app-body {
   display: flex;
   min-height: calc(100vh - 46px);

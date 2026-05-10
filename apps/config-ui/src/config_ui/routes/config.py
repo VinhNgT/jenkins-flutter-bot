@@ -16,7 +16,15 @@ from ..config_store import (
     strip_secrets,
     write_json,
 )
-from ..schema import MODULE_DESCRIPTION, MODULE_TITLE, DRIVE_FIELDS, serialize_schema
+from ..schema import (
+    DRIVE_FIELDS,
+    MODULE_DESCRIPTION,
+    MODULE_TITLE,
+    PROJECT_FIELDS,
+    PROJECT_MODULE_DESCRIPTION,
+    PROJECT_MODULE_TITLE,
+    serialize_schema,
+)
 from stack_manager import ServiceClient
 from ..settings import Settings
 
@@ -39,6 +47,9 @@ async def get_schema(request: Request) -> dict[str, Any]:
     client: ServiceClient = request.app.state.service_client
     schemas = await _fetch_schemas(client)
     schemas["drive"] = serialize_schema(DRIVE_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
+    schemas["project"] = serialize_schema(
+        PROJECT_FIELDS, PROJECT_MODULE_TITLE, PROJECT_MODULE_DESCRIPTION
+    )
     return schemas
 
 
@@ -57,12 +68,14 @@ async def get_config(request: Request) -> dict[str, Any]:
         "bot": load_json(settings.bot_config_path),
         "agent": load_json(settings.agent_config_path),
         "drive": load_json(settings.drive_config_path),
+        "project": load_json(settings.project_config_path),
     }
 
     return {
         "bot": strip_secrets(raw["bot"], bot_secrets),
         "agent": strip_secrets(raw["agent"], agent_secrets),
         "drive": strip_secrets(raw["drive"], DRIVE_SECRET_FIELDS),
+        "project": raw["project"],  # no secret fields in project scope
         "_secrets_set": {
             "bot": secrets_set(raw["bot"], bot_secrets),
             "agent": secrets_set(raw["agent"], agent_secrets),
@@ -81,6 +94,7 @@ async def save_config(scope: str, request: Request) -> dict[str, Any]:
         "bot": settings.bot_config_path,
         "agent": settings.agent_config_path,
         "drive": settings.drive_config_path,
+        "project": settings.project_config_path,
     }
     path = path_map.get(scope)
     if path is None:
@@ -89,6 +103,8 @@ async def save_config(scope: str, request: Request) -> dict[str, Any]:
     # Determine secret fields for this scope
     if scope == "drive":
         secret_fields = DRIVE_SECRET_FIELDS
+    elif scope == "project":
+        secret_fields = ()  # project has no secret fields
     else:
         schema = await client.schema(scope)
         secret_fields = extract_secret_fields(schema)

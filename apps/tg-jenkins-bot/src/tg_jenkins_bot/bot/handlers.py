@@ -103,16 +103,27 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     ctx = _get_ctx(context)
     app_name = _escape(ctx.config.app_name)
+
+    # Build the optional GitHub footer line from the project config
+    github_url = ctx.project_config.github_url.strip() if ctx.project_config else ""
+    version_str = f"<i>v{_bot_version()}</i>"
+    footer = (
+        f'<a href="{github_url}">⭐ GitHub</a>  ·  {version_str}'
+        if github_url
+        else version_str
+    )
+
     await update.message.reply_text(
         f"👋 Hi! I'll build <b>{app_name}</b> and send you a download link "
         "when it's ready.\n"
         "\n"
         "Tap 🔨 Build to get started!\n"
         "\n"
-        f"<i>v{_bot_version()}</i>",
+        f"{footer}",
         parse_mode="HTML",
         reply_markup=REPLY_KEYBOARD,
     )
+
 
 
 # ---------------------------------------------------------------------------

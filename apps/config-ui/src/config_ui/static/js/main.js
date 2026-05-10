@@ -15,6 +15,20 @@ async function loadVersion() {
   }
 }
 
+function loadGithubLink(schemas, config) {
+  // Resolve github_url: saved config value first, then schema default.
+  const configUrl = config?.project?.project?.github_url ?? '';
+  const schemaDefault = schemas?.project?.fields
+    ?.find(f => f.key === 'project.github_url')?.default ?? '';
+  const url = (configUrl || schemaDefault).trim();
+
+  const ghLink = document.getElementById('github-link');
+  if (ghLink && url) {
+    ghLink.href = url;
+    ghLink.removeAttribute('hidden');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize global modules
   initSecretFields();
@@ -33,13 +47,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (schemas.bot) renderSchemaForm('schema-container-bot', 'bot', schemas.bot);
     if (schemas.agent) renderSchemaForm('schema-container-agent', 'agent', schemas.agent);
     if (schemas.drive) renderSchemaForm('schema-container-drive', 'drive', schemas.drive);
+    if (schemas.project) renderSchemaForm('schema-container-project', 'project', schemas.project);
   }
+
+  // Populate the GitHub header link from schema + config
+  loadGithubLink(schemas, config);
 
   // Populate values into rendered forms
   if (config) {
     populateScope('bot', config.bot, config._secrets_set?.bot);
     populateScope('agent', config.agent, config._secrets_set?.agent);
-    populateScope('ui', config.ui, config._secrets_set?.ui);
+    populateScope('drive', config.drive, config._secrets_set?.drive);
+    populateScope('project', config.project);
   }
 
   // ─── Delegated save/reload handlers ───────────────────────────

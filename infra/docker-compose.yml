@@ -32,10 +32,12 @@ services:
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
       DRIVE_CONFIG_PATH: /config/drive/drive.json
+      PROJECT_CONFIG_PATH: /config/project/project.json
     volumes:
       - bot-config:/config/bot
       - agent-config:/config/agent
       - drive-config:/config/drive
+      - project-config:/config/project
     depends_on:
       - tg-bot
       - flutter-agent
@@ -54,12 +56,14 @@ services:
     environment:
       CONFIG_PATH: /config/bot/bot.json
       BOT_SERVICE_URL: "http://tg-bot:9090"
+      PROJECT_CONFIG_PATH: /config/project/project.json
     expose:
       - "9090"
     volumes:
       # Same mount point as config-ui for bot-config volume
       - bot-config:/config/bot
       - bot-data:/app/data
+      - project-config:/config/project:ro
     networks:
       - jenkins
 
@@ -99,10 +103,12 @@ services:
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
       DRIVE_CONFIG_PATH: /config/drive/drive.json
+      PROJECT_CONFIG_PATH: /config/project/project.json
     volumes:
       - bot-config:/config/bot
       - agent-config:/config/agent
       - drive-config:/config/drive
+      - project-config:/config/project
     networks:
       - jenkins
 
@@ -111,6 +117,7 @@ volumes:
   bot-config:
   agent-config:
   drive-config:
+  project-config:
   bot-data:
 
 networks:

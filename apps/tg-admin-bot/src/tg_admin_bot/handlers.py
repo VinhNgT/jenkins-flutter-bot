@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from typing import TYPE_CHECKING, Any
 
 from config_schema import nested_get
@@ -30,6 +31,14 @@ if TYPE_CHECKING:
     from .settings import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def _admin_version() -> str:
+    """Return the installed tg-admin-bot package version, or 'unknown'."""
+    try:
+        return _pkg_version("tg-admin-bot")
+    except PackageNotFoundError:
+        return "unknown"
 
 # ---------------------------------------------------------------------------
 # Conversation states for multi-step flows
@@ -80,7 +89,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     await update.message.reply_text(  # type: ignore[union-attr]
-        "⚙️ *Admin Panel*\n\nChoose an action:",
+        f"⚙️ *Admin Panel* `v{_admin_version()}`\n\nChoose an action:",
         reply_markup=_ADMIN_KEYBOARD,
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -515,7 +524,7 @@ async def _back_callback(
     assert query is not None
     await query.answer()
     await query.edit_message_text(
-        "⚙️ *Admin Panel*\n\nChoose an action:",
+        f"⚙️ *Admin Panel* `v{_admin_version()}`\n\nChoose an action:",
         reply_markup=_ADMIN_KEYBOARD,
         parse_mode=ParseMode.MARKDOWN,
     )

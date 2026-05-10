@@ -13,6 +13,7 @@ from __future__ import annotations
 import html
 import logging
 import secrets
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from datetime import datetime, timezone
 
 from telegram import (
@@ -37,6 +38,14 @@ REPLY_KEYBOARD = ReplyKeyboardMarkup(
     resize_keyboard=True,
     is_persistent=True,
 )
+
+
+def _bot_version() -> str:
+    """Return the installed tg-jenkins-bot package version, or 'unknown'."""
+    try:
+        return _pkg_version("tg-jenkins-bot")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +107,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"👋 Hi! I'll build <b>{app_name}</b> and send you a download link "
         "when it's ready.\n"
         "\n"
-        "Tap 🔨 Build to get started!",
+        "Tap 🔨 Build to get started!\n"
+        "\n"
+        f"<i>v{_bot_version()}</i>",
         parse_mode="HTML",
         reply_markup=REPLY_KEYBOARD,
     )

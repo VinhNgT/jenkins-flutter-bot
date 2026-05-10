@@ -16,6 +16,7 @@ from .routes.export import router as export_router
 from .routes.jenkins_pipeline import router as jenkinsfile_router
 from .routes.pages import router as pages_router
 from .routes.services import router as services_router
+from .routes.version import router as version_router
 from .settings import Settings
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
 
     # --- Include routers ---
     app.include_router(pages_router)
+    app.include_router(version_router)
     app.include_router(config_router)
     app.include_router(drive_router)
     app.include_router(export_router)

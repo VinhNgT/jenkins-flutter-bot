@@ -1,9 +1,25 @@
 /* Entry point — initialize all modules and wire event listeners. */
 
+async function loadVersion() {
+  try {
+    const res = await fetch('/api/version');
+    if (!res.ok) return;
+    const { version } = await res.json();
+    const el = document.getElementById('version-badge');
+    if (el && version) {
+      el.textContent = 'v' + version;
+      el.classList.add('loaded');
+    }
+  } catch {
+    // silently ignore — the badge stays empty
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize global modules
   initSecretFields();
   initHelpPopovers();
+  loadVersion();
 
   // ─── Schema-first rendering ───────────────────────────────────
   // Fetch schemas from all modules, render forms, then populate values.

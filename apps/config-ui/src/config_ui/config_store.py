@@ -20,7 +20,7 @@ from stack_manager.config_store import (
     extract_secret_fields as extract_secret_fields,
 )
 
-from .schema import UI_FIELDS
+from .schema import DRIVE_FIELDS
 
 # Re-export shared functions so existing intra-package imports keep working.
 load_json = load_json
@@ -28,12 +28,12 @@ nested_get = nested_get
 nested_set = nested_set
 
 # ---------------------------------------------------------------------------
-# UI scope constants — derived from the local schema
+# Drive scope constants — derived from the local schema
 # ---------------------------------------------------------------------------
 
-UI_SECRET_FIELDS = tuple(f.key for f in UI_FIELDS if f.secret)
-UI_DEFAULTS = {f.key: f.default for f in UI_FIELDS if f.default}
-UI_REQUIRED_FIELDS = tuple(f.key for f in UI_FIELDS if f.required)
+DRIVE_SECRET_FIELDS = tuple(f.key for f in DRIVE_FIELDS if f.secret)
+DRIVE_DEFAULTS = {f.key: f.default for f in DRIVE_FIELDS if f.default}
+DRIVE_REQUIRED_FIELDS = tuple(f.key for f in DRIVE_FIELDS if f.required)
 
 
 # ---------------------------------------------------------------------------

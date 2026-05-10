@@ -64,6 +64,10 @@ def _build_env_lines(
     - Empty optional fields → ``# KEY=`` (commented out)
     - Fields using their default → commented with the default value
 
+    Infrastructure fields (from ``schema["infra"]``) are appended in a
+    separate section, always commented out and always empty — they serve
+    as documentation of all possible env vars the container accepts.
+
     Returns (lines, warnings).
     """
     if not schema or "fields" not in schema:
@@ -72,23 +76,33 @@ def _build_env_lines(
     lines: list[str] = []
     warnings: list[str] = []
 
-    # Group fields by their group label for readability
-    groups: dict[str, list[dict[str, Any]]] = {}
+    # Collect portable fields grouped by UI group
+    portable_groups: dict[str, list[dict[str, Any]]] = {}
     for field_def in schema["fields"]:
         env_var = field_def.get("env_var", "")
         if not env_var:
             continue
         group = field_def.get("group", "General")
-        groups.setdefault(group, []).append(field_def)
+        portable_groups.setdefault(group, []).append(field_def)
 
-    if not groups:
+    # Collect infra fields grouped by UI group
+    infra_groups: dict[str, list[dict[str, Any]]] = {}
+    for field_def in schema.get("infra", []):
+        env_var = field_def.get("env_var", "")
+        if not env_var:
+            continue
+        group = field_def.get("group", "General")
+        infra_groups.setdefault(group, []).append(field_def)
+
+    if not portable_groups and not infra_groups:
         return [], []
 
+    # --- Portable fields (with values) ---
     lines.append(f"# {'─' * 40}")
     lines.append(f"# {section_label}")
     lines.append(f"# {'─' * 40}")
 
-    for group_name, fields in groups.items():
+    for group_name, fields in portable_groups.items():
         lines.append("")
         lines.append(f"# ── {group_name} ──")
 
@@ -130,6 +144,35 @@ def _build_env_lines(
             else:
                 lines.append(f"# {env_var}=")
 
+    # --- Infrastructure fields (always commented out, always empty) ---
+    if infra_groups:
+        lines.append("")
+        lines.append(f"# {'─' * 40}")
+        lines.append("# Infrastructure (environment-specific, not portable)")
+        lines.append("# These settings are tied to your deployment topology.")
+        lines.append("# Prefer docker-compose `environment:` section; .env is also acceptable.")
+        lines.append(f"# {'─' * 40}")
+
+        for group_name, fields in infra_groups.items():
+            lines.append("")
+            lines.append(f"# ── {group_name} ──")
+
+            for field_def in fields:
+                env_var = field_def["env_var"]
+                key = field_def["key"]
+                label = field_def.get("label", key)
+                description = field_def.get("description", "")
+                default = field_def.get("default", "")
+                lines.append("")
+
+                req_tag = " (required)" if field_def.get("required", False) else ""
+                lines.append(f"# {label}{req_tag}")
+                if description:
+                    lines.append(f"# {description}")
+                if default:
+                    lines.append(f"# Default: {default}")
+                lines.append(f"# {env_var}=")
+
     lines.append("")
     return lines, warnings
 
@@ -139,10 +182,12 @@ def generate_env_files(
     agent_config: dict[str, Any],
     bot_schema: dict[str, Any] | None,
     agent_schema: dict[str, Any] | None,
+    drive_config: dict[str, Any] | None = None,
+    drive_schema: dict[str, Any] | None = None,
 ) -> tuple[dict[str, str], list[str]]:
     """Generate per-service env file contents.
 
-    Returns ``({"bot.env": "...", "agent.env": "..."}, warnings)``.
+    Returns ``({"bot.env": "...", "agent.env": "...", "drive.env": "..."}, warnings)``.
     """
     files: dict[str, str] = {}
     all_warnings: list[str] = []
@@ -160,6 +205,14 @@ def generate_env_files(
     )
     files["agent.env"] = "\n".join(agent_lines)
     all_warnings.extend(agent_warnings)
+
+    # Drive env file (OAuth credentials)
+    if drive_schema and drive_config is not None:
+        drive_lines, drive_warnings = _build_env_lines(
+            drive_schema, drive_config, "Google Drive"
+        )
+        files["drive.env"] = "\n".join(drive_lines)
+        all_warnings.extend(drive_warnings)
 
     return files, all_warnings
 
@@ -278,20 +331,27 @@ class ImportResult:
 def _build_env_lookup(
     schema: dict[str, Any] | None,
 ) -> dict[str, dict[str, Any]]:
-    """Build a lookup from env_var → field metadata."""
+    """Build a lookup from env_var → field metadata.
+
+    Includes both portable fields (``schema["fields"]``) and infra
+    fields (``schema["infra"]``) so that imports recognise all valid
+    env vars.
+    """
     if not schema or "fields" not in schema:
         return {}
-    return {f["env_var"]: f for f in schema["fields"] if f.get("env_var")}
+    all_fields = list(schema["fields"]) + list(schema.get("infra", []))
+    return {f["env_var"]: f for f in all_fields if f.get("env_var")}
 
 
 def _parse_env_content(
     content: str,
     bot_lookup: dict[str, dict[str, Any]],
     agent_lookup: dict[str, dict[str, Any]],
-) -> tuple[dict[str, Any], dict[str, Any], list[str], list[str], list[str], list[str]]:
-    """Parse env file content and route values to bot/agent patches.
+    drive_lookup: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str], list[str], list[str], list[str]]:
+    """Parse env file content and route values to bot/agent/drive patches.
 
-    Returns (bot_patch, agent_patch, applied, skipped_empty,
+    Returns (bot_patch, agent_patch, drive_patch, applied, skipped_empty,
              unrecognized, parse_errors).
     """
     applied: list[str] = []
@@ -300,6 +360,9 @@ def _parse_env_content(
     parse_errors: list[str] = []
     bot_patch: dict[str, Any] = {}
     agent_patch: dict[str, Any] = {}
+    drive_patch: dict[str, Any] = {}
+
+    _drive_lookup = drive_lookup or {}
 
     for line_num, raw_line in enumerate(content.splitlines(), start=1):
         line = raw_line.strip()
@@ -317,7 +380,7 @@ def _parse_env_content(
         # Resolve the value from whichever capture group matched
         value = match.group(2) or match.group(3) or match.group(4) or ""
 
-        # Look up in bot schema, then agent schema
+        # Look up in bot schema, then agent schema, then drive schema
         if env_var in bot_lookup:
             field_def = bot_lookup[env_var]
             target_patch = bot_patch
@@ -326,6 +389,10 @@ def _parse_env_content(
             field_def = agent_lookup[env_var]
             target_patch = agent_patch
             scope = "agent"
+        elif env_var in _drive_lookup:
+            field_def = _drive_lookup[env_var]
+            target_patch = drive_patch
+            scope = "drive"
         else:
             unrecognized.append(f"{env_var} (not in any schema, ignored)")
             continue
@@ -340,7 +407,7 @@ def _parse_env_content(
         nested_set(target_patch, dotted_key, value)
         applied.append(f"{env_var} → {scope}:{dotted_key} = {value}")
 
-    return bot_patch, agent_patch, applied, skipped_empty, unrecognized, parse_errors
+    return bot_patch, agent_patch, drive_patch, applied, skipped_empty, unrecognized, parse_errors
 
 
 def import_tarball(
@@ -350,6 +417,8 @@ def import_tarball(
     bot_config_path: Path | None,
     agent_config_path: Path | None,
     oauth_dest_path: Path | None = None,
+    drive_schema: dict[str, Any] | None = None,
+    drive_config_path: Path | None = None,
 ) -> ImportResult:
     """Extract a config tarball and import env files + oauth.json.
 
@@ -359,6 +428,7 @@ def import_tarball(
     """
     bot_lookup = _build_env_lookup(bot_schema)
     agent_lookup = _build_env_lookup(agent_schema)
+    drive_lookup = _build_env_lookup(drive_schema)
 
     all_applied: list[str] = []
     all_skipped: list[str] = []
@@ -369,6 +439,7 @@ def import_tarball(
 
     bot_patch: dict[str, Any] = {}
     agent_patch: dict[str, Any] = {}
+    drive_patch: dict[str, Any] = {}
 
     try:
         with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
@@ -387,11 +458,12 @@ def import_tarball(
                         continue
                     content = f.read().decode("utf-8", errors="replace")
 
-                    bp, ap, applied, skipped, unrec, errors = _parse_env_content(
-                        content, bot_lookup, agent_lookup
+                    bp, ap, dp, applied, skipped, unrec, errors = _parse_env_content(
+                        content, bot_lookup, agent_lookup, drive_lookup
                     )
                     bot_patch = deep_merge(bot_patch, bp)
                     agent_patch = deep_merge(agent_patch, ap)
+                    drive_patch = deep_merge(drive_patch, dp)
                     all_applied.extend(applied)
                     all_skipped.extend(skipped)
                     all_unrecognized.extend(unrec)
@@ -424,10 +496,16 @@ def import_tarball(
         merged = deep_merge(existing, agent_patch)
         write_json(agent_config_path, merged)
 
+    if drive_patch and drive_config_path:
+        existing = load_json(drive_config_path)
+        merged = deep_merge(existing, drive_patch)
+        write_json(drive_config_path, merged)
+
     # Warn about required fields still missing after import
     for lookup, config_path, scope in [
         (bot_lookup, bot_config_path, "bot"),
         (agent_lookup, agent_config_path, "agent"),
+        (drive_lookup, drive_config_path, "drive"),
     ]:
         if not config_path:
             continue

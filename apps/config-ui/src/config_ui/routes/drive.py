@@ -38,7 +38,7 @@ async def get_drive_status(request: Request) -> dict[str, Any]:
     """Return current Google Drive connection status."""
     settings: Settings = request.app.state.settings
     drive_oauth = request.app.state.drive_oauth
-    ui = load_json(settings.ui_config_path)
+    ui = load_json(settings.drive_config_path)
     client_id, client_secret = _drive_credentials(ui)
 
     if not client_id or not client_secret:
@@ -58,7 +58,7 @@ async def start_drive_connect(request: Request) -> dict[str, Any]:
     """Start the Drive OAuth flow — returns the authorization URL."""
     settings: Settings = request.app.state.settings
     drive_oauth = request.app.state.drive_oauth
-    ui = load_json(settings.ui_config_path)
+    ui = load_json(settings.drive_config_path)
     client_id, client_secret = _drive_credentials(ui)
 
     if not client_id or not client_secret:

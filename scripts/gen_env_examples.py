@@ -11,15 +11,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_control.schema import AGENT_FIELDS
+from agent_control.schema import AGENT_FIELDS, AGENT_INFRA
 from agent_control.schema import MODULE_TITLE as AGENT_TITLE
 from config_schema import FieldDef
-from tg_jenkins_bot.schema import BOT_FIELDS
+from config_ui.schema import DRIVE_FIELDS, DRIVE_INFRA
+from config_ui.schema import MODULE_TITLE as DRIVE_TITLE
+from tg_jenkins_bot.schema import BOT_FIELDS, BOT_INFRA
 from tg_jenkins_bot.schema import MODULE_TITLE as BOT_TITLE
 
 
-def _generate_example(fields: tuple[FieldDef, ...], title: str) -> str:
-    """Generate a self-documenting .env.example from FieldDef declarations."""
+def _generate_example(
+    fields: tuple[FieldDef, ...],
+    infra_fields: tuple[FieldDef, ...],
+    title: str,
+) -> str:
+    """Generate a self-documenting .env.example from FieldDef declarations.
+
+    Portable fields are emitted first with their defaults.
+    Infrastructure-only fields are appended in a separate section,
+    always commented out and always empty — they document all possible
+    env vars the container accepts.
+    """
     lines: list[str] = [
         f"# {'─' * 50}",
         f"# {title}",
@@ -30,14 +42,22 @@ def _generate_example(fields: tuple[FieldDef, ...], title: str) -> str:
         "# To regenerate:  uv run python scripts/gen_env_examples.py",
     ]
 
-    # Group fields
-    groups: dict[str, list[FieldDef]] = {}
+    # Group portable fields by UI group
+    portable: dict[str, list[FieldDef]] = {}
     for f in fields:
         if not f.env_var:
             continue
-        groups.setdefault(f.group, []).append(f)
+        portable.setdefault(f.group, []).append(f)
 
-    for group_name, group_fields in groups.items():
+    # Group infra fields by UI group
+    infra: dict[str, list[FieldDef]] = {}
+    for f in infra_fields:
+        if not f.env_var:
+            continue
+        infra.setdefault(f.group, []).append(f)
+
+    # --- Portable fields ---
+    for group_name, group_fields in portable.items():
         lines.append("")
         lines.append(f"# ── {group_name} ──")
 
@@ -57,6 +77,29 @@ def _generate_example(fields: tuple[FieldDef, ...], title: str) -> str:
             else:
                 lines.append(f"# {f.env_var}=")
 
+    # --- Infrastructure fields ---
+    if infra:
+        lines.append("")
+        lines.append(f"# {'─' * 50}")
+        lines.append("# Infrastructure (environment-specific, not portable)")
+        lines.append("# These settings are tied to your deployment topology.")
+        lines.append("# Prefer docker-compose `environment:` section; .env is also acceptable.")
+        lines.append(f"# {'─' * 50}")
+
+        for group_name, group_fields in infra.items():
+            lines.append("")
+            lines.append(f"# ── {group_name} ──")
+
+            for f in group_fields:
+                lines.append("")
+                req_tag = " (required)" if f.required else ""
+                lines.append(f"# {f.label}{req_tag}")
+                if f.description:
+                    lines.append(f"# {f.description}")
+                if f.default:
+                    lines.append(f"# Default: {f.default}")
+                lines.append(f"# {f.env_var}=")
+
     lines.append("")
     return "\n".join(lines)
 
@@ -65,14 +108,15 @@ def main() -> None:
     env_dir = Path(__file__).resolve().parent.parent / "infra" / "env"
     env_dir.mkdir(parents=True, exist_ok=True)
 
-    bot_example = env_dir / "bot.env.example"
-    agent_example = env_dir / "agent.env.example"
+    examples = [
+        (env_dir / "bot.env.example", BOT_FIELDS, BOT_INFRA, BOT_TITLE),
+        (env_dir / "agent.env.example", AGENT_FIELDS, AGENT_INFRA, AGENT_TITLE),
+        (env_dir / "drive.env.example", DRIVE_FIELDS, DRIVE_INFRA, DRIVE_TITLE),
+    ]
 
-    bot_example.write_text(_generate_example(BOT_FIELDS, BOT_TITLE))
-    agent_example.write_text(_generate_example(AGENT_FIELDS, AGENT_TITLE))
-
-    print(f"✓ Generated {bot_example.relative_to(Path.cwd())}")
-    print(f"✓ Generated {agent_example.relative_to(Path.cwd())}")
+    for path, fields, infra_fields, title in examples:
+        path.write_text(_generate_example(fields, infra_fields, title))
+        print(f"✓ Generated {path.relative_to(Path.cwd())}")
 
 
 if __name__ == "__main__":

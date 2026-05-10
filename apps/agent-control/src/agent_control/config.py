@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .schema import AGENT_FIELDS, resolve_fields
+from .schema import AGENT_FIELDS, AGENT_INFRA, resolve_fields
 
 
 @dataclass(frozen=True)
@@ -21,5 +21,5 @@ class AgentConfig:
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> AgentConfig:
         """Build config with priority: file > env > .env > defaults."""
-        values = resolve_fields(AGENT_FIELDS, config_path)
+        values = resolve_fields(AGENT_FIELDS + AGENT_INFRA, config_path)
         return cls(**values)

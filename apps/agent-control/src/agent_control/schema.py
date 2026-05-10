@@ -24,15 +24,6 @@ MODULE_DESCRIPTION = (
 
 AGENT_FIELDS: tuple[FieldDef, ...] = (
     FieldDef(
-        key="jenkins.url",
-        env_var="JENKINS_URL",
-        attr="jenkins_url",
-        label="Jenkins URL",
-        group="Agent Connection",
-        description="Same Jenkins controller URL used for the agent's inbound connection",
-        default="http://jenkins:8080",
-    ),
-    FieldDef(
         key="agent.name",
         env_var="JENKINS_AGENT_NAME",
         attr="agent_name",
@@ -63,6 +54,22 @@ AGENT_FIELDS: tuple[FieldDef, ...] = (
         secret=True,
         required=True,
         field_type="password",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Infrastructure fields (environment-specific, not portable)
+# ---------------------------------------------------------------------------
+
+AGENT_INFRA: tuple[FieldDef, ...] = (
+    FieldDef(
+        key="jenkins.url",
+        env_var="JENKINS_URL",
+        attr="jenkins_url",
+        label="Jenkins URL",
+        group="Agent Connection",
+        description="Same Jenkins controller URL used for the agent's inbound connection",
+        default="http://jenkins:8080",
     ),
     FieldDef(
         key="agent.web_socket",

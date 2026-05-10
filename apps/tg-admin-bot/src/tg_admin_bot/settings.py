@@ -18,7 +18,7 @@ class Settings:
         AGENT_CONTROL_URL    — Base URL of the agent-control API
         BOT_CONFIG_PATH      — Path to bot.json
         AGENT_CONFIG_PATH    — Path to agent.json
-        UI_CONFIG_PATH       — Path to ui.json (for Drive OAuth creds)
+        DRIVE_CONFIG_PATH    — Path to drive.json (for Drive OAuth creds)
     """
 
     bot_token: str
@@ -27,7 +27,7 @@ class Settings:
     agent_control_url: str | None
     bot_config_path: Path | None
     agent_config_path: Path | None
-    ui_config_path: Path | None
+    drive_config_path: Path | None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -50,5 +50,5 @@ class Settings:
             agent_control_url=os.environ.get("AGENT_CONTROL_URL"),
             bot_config_path=_path("BOT_CONFIG_PATH"),
             agent_config_path=_path("AGENT_CONFIG_PATH"),
-            ui_config_path=_path("UI_CONFIG_PATH"),
+            drive_config_path=_path("DRIVE_CONFIG_PATH"),
         )

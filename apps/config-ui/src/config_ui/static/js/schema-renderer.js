@@ -7,7 +7,7 @@ const SCOPE_LABELS = { bot: 'Bot', agent: 'Agent', ui: 'Drive' };
 /**
  * Render a config form panel from a module schema.
  * @param {string} containerId  - target div id (e.g. "schema-container-bot")
- * @param {string} scope        - "bot", "agent", or "ui"
+ * @param {string} scope        - "bot", "agent", or "drive"
  * @param {Object} schema       - { title, description, fields: [...] }
  */
 // eslint-disable-next-line no-unused-vars

@@ -207,12 +207,14 @@ async def _export_env_callback(
     agent_schema = await client.schema("agent")
     bot_data = load_json(settings.bot_config_path)
     agent_data = load_json(settings.agent_config_path)
+    drive_data = load_json(settings.drive_config_path)
 
     env_files, warnings = generate_env_files(
         bot_config=bot_data,
         agent_config=agent_data,
         bot_schema=bot_schema,
         agent_schema=agent_schema,
+        drive_config=drive_data,
     )
     tarball_bytes = build_export_tarball(
         env_files, oauth_token_path=drive_oauth.token_path
@@ -283,7 +285,19 @@ async def _import_env_receive(
         bot_config_path=settings.bot_config_path,
         agent_config_path=settings.agent_config_path,
         oauth_dest_path=drive_oauth.token_path,
+        drive_config_path=settings.drive_config_path,
     )
+
+    # Auto-restart bot and agent services to pick up imported config
+    restart_lines: list[str] = []
+    for scope in ("bot", "agent"):
+        try:
+            resp = await client.restart(scope)
+            status = resp.get("status", "unknown")
+            restart_lines.append(f"  • {scope}: {status}")
+        except Exception:
+            logger.exception("Failed to restart %s after import", scope)
+            restart_lines.append(f"  • {scope}: restart failed")
 
     lines: list[str] = ["📥 *Import Results*\n"]
 
@@ -314,6 +328,10 @@ async def _import_env_receive(
         lines.append("\n⚠️ *Warnings:*")
         for item in result.warnings:
             lines.append(f"  • {item}")
+
+    if restart_lines:
+        lines.append("\n🔄 *Service Restarts:*")
+        lines.extend(restart_lines)
 
     await update.message.reply_text(  # type: ignore[union-attr]
         "\n".join(lines), parse_mode=ParseMode.MARKDOWN
@@ -368,9 +386,9 @@ async def _drive_setup_callback(
     settings: Settings = context.bot_data["settings"]
 
     # Check current status
-    ui_data = load_json(settings.ui_config_path)
-    client_id = nested_get(ui_data, "drive.client_id") or ""
-    client_secret = nested_get(ui_data, "drive.client_secret") or ""
+    drive_data = load_json(settings.drive_config_path)
+    client_id = nested_get(drive_data, "drive.client_id") or ""
+    client_secret = nested_get(drive_data, "drive.client_secret") or ""
 
     if drive_oauth.token_path.exists():
         status = drive_oauth.status(client_id, client_secret)

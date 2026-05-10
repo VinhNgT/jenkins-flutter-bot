@@ -8,7 +8,7 @@ from config_schema import deep_merge
 from fastapi import APIRouter, Request
 
 from ..config_store import (
-    UI_SECRET_FIELDS,
+    DRIVE_SECRET_FIELDS,
     clean_secrets_from_payload,
     extract_secret_fields,
     load_json,
@@ -16,7 +16,7 @@ from ..config_store import (
     strip_secrets,
     write_json,
 )
-from ..schema import MODULE_DESCRIPTION, MODULE_TITLE, UI_FIELDS, serialize_schema
+from ..schema import MODULE_DESCRIPTION, MODULE_TITLE, DRIVE_FIELDS, serialize_schema
 from stack_manager import ServiceClient
 from ..settings import Settings
 
@@ -38,7 +38,7 @@ async def get_schema(request: Request) -> dict[str, Any]:
     """Return config field schemas aggregated from all modules."""
     client: ServiceClient = request.app.state.service_client
     schemas = await _fetch_schemas(client)
-    schemas["ui"] = serialize_schema(UI_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
+    schemas["drive"] = serialize_schema(DRIVE_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
     return schemas
 
 
@@ -56,17 +56,17 @@ async def get_config(request: Request) -> dict[str, Any]:
     raw = {
         "bot": load_json(settings.bot_config_path),
         "agent": load_json(settings.agent_config_path),
-        "ui": load_json(settings.ui_config_path),
+        "drive": load_json(settings.drive_config_path),
     }
 
     return {
         "bot": strip_secrets(raw["bot"], bot_secrets),
         "agent": strip_secrets(raw["agent"], agent_secrets),
-        "ui": strip_secrets(raw["ui"], UI_SECRET_FIELDS),
+        "drive": strip_secrets(raw["drive"], DRIVE_SECRET_FIELDS),
         "_secrets_set": {
             "bot": secrets_set(raw["bot"], bot_secrets),
             "agent": secrets_set(raw["agent"], agent_secrets),
-            "ui": secrets_set(raw["ui"], UI_SECRET_FIELDS),
+            "drive": secrets_set(raw["drive"], DRIVE_SECRET_FIELDS),
         },
     }
 
@@ -80,15 +80,15 @@ async def save_config(scope: str, request: Request) -> dict[str, Any]:
     path_map = {
         "bot": settings.bot_config_path,
         "agent": settings.agent_config_path,
-        "ui": settings.ui_config_path,
+        "drive": settings.drive_config_path,
     }
     path = path_map.get(scope)
     if path is None:
         return {"error": f"Unknown scope: {scope}"}
 
     # Determine secret fields for this scope
-    if scope == "ui":
-        secret_fields = UI_SECRET_FIELDS
+    if scope == "drive":
+        secret_fields = DRIVE_SECRET_FIELDS
     else:
         schema = await client.schema(scope)
         secret_fields = extract_secret_fields(schema)

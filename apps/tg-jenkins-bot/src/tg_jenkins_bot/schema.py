@@ -115,15 +115,6 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
     ),
     # ── Jenkins Connection ──
     FieldDef(
-        key="jenkins.url",
-        env_var="JENKINS_URL",
-        attr="jenkins_url",
-        label="Jenkins URL",
-        group="Jenkins Connection",
-        description="Internal Docker network URL (e.g. http://jenkins:8080)",
-        required=True,
-    ),
-    FieldDef(
         key="jenkins.user",
         env_var="JENKINS_USER",
         attr="jenkins_user",
@@ -256,6 +247,22 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         field_type="number",
         value_type="int",
     ),
+)
+
+# ---------------------------------------------------------------------------
+# Infrastructure fields (environment-specific, not portable)
+# ---------------------------------------------------------------------------
+
+BOT_INFRA: tuple[FieldDef, ...] = (
+    FieldDef(
+        key="jenkins.url",
+        env_var="JENKINS_URL",
+        attr="jenkins_url",
+        label="Jenkins URL",
+        group="Jenkins Connection",
+        description="Internal Docker network URL (e.g. http://jenkins:8080)",
+        required=True,
+    ),
     FieldDef(
         key="bot.service_url",
         env_var="BOT_SERVICE_URL",
@@ -265,7 +272,6 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         description="Internal URL for this service (Jenkins POSTs results here, port is derived automatically)",
         default="http://tg-bot:9090",
     ),
-
 )
 
 # ---------------------------------------------------------------------------

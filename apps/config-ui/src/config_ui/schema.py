@@ -1,6 +1,6 @@
-"""Declarative schema for the config-ui (Google Drive) configuration module.
+"""Declarative schema for the Google Drive configuration module.
 
-This is the single source of truth for the UI-owned config fields.  It drives:
+This is the single source of truth for the Drive-owned config fields.  It drives:
   - config_store.py constants  via field introspection
   - GET /api/config/schema     via serialize_schema()
   - Frontend rendering         via the serialized JSON
@@ -11,7 +11,7 @@ from __future__ import annotations
 from config_schema import FieldDef, serialize_schema  # noqa: F401
 
 # ---------------------------------------------------------------------------
-# UI field declarations
+# Drive field declarations
 # ---------------------------------------------------------------------------
 
 MODULE_TITLE = "Google Drive Configuration"
@@ -23,10 +23,10 @@ MODULE_DESCRIPTION = (
     " is stored in a shared volume."
 )
 
-UI_FIELDS: tuple[FieldDef, ...] = (
+DRIVE_FIELDS: tuple[FieldDef, ...] = (
     FieldDef(
         key="drive.client_id",
-        env_var="",
+        env_var="DRIVE_CLIENT_ID",
         attr="drive_client_id",
         label="Drive Client ID",
         group="OAuth Credentials",
@@ -44,7 +44,7 @@ UI_FIELDS: tuple[FieldDef, ...] = (
     ),
     FieldDef(
         key="drive.client_secret",
-        env_var="",
+        env_var="DRIVE_CLIENT_SECRET",
         attr="drive_client_secret",
         label="Drive Client Secret",
         group="OAuth Credentials",
@@ -58,3 +58,9 @@ UI_FIELDS: tuple[FieldDef, ...] = (
         field_type="password",
     ),
 )
+
+# ---------------------------------------------------------------------------
+# Infrastructure fields (environment-specific, not portable)
+# ---------------------------------------------------------------------------
+
+DRIVE_INFRA: tuple[FieldDef, ...] = ()

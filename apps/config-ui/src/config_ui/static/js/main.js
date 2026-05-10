@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (schemas) {
     if (schemas.bot) renderSchemaForm('schema-container-bot', 'bot', schemas.bot);
     if (schemas.agent) renderSchemaForm('schema-container-agent', 'agent', schemas.agent);
-    if (schemas.ui) renderSchemaForm('schema-container-ui', 'ui', schemas.ui);
+    if (schemas.drive) renderSchemaForm('schema-container-drive', 'drive', schemas.drive);
   }
 
   // Populate values into rendered forms
@@ -41,23 +41,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = collectScope(scope);
       const result = await API.saveScope(scope, data);
       if (result) {
-        const label = { bot: 'Bot', agent: 'Agent', ui: 'Drive' }[scope] || scope;
+        const label = { bot: 'Bot', agent: 'Agent', drive: 'Drive' }[scope] || scope;
         Toast.show(`${label} config saved`, 'success');
         const freshConfig = await API.getConfig();
         if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
-        if (scope === 'ui') await refreshDriveCard();
+        if (scope === 'drive') await refreshDriveCard();
       }
       return;
     }
 
-    // Reload buttons: data-reload="bot|agent|ui"
+    // Reload buttons: data-reload="bot|agent|drive"
     const reloadBtn = e.target.closest('[data-reload]');
     if (reloadBtn) {
       const scope = reloadBtn.dataset.reload;
       const freshConfig = await API.getConfig();
       if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
-      if (scope === 'ui') await refreshDriveCard();
-      const label = { bot: 'Bot', agent: 'Agent', ui: 'Drive' }[scope] || scope;
+      if (scope === 'drive') await refreshDriveCard();
+      const label = { bot: 'Bot', agent: 'Agent', drive: 'Drive' }[scope] || scope;
       Toast.show(`${label} config reloaded`, 'info');
       return;
     }

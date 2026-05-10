@@ -31,11 +31,11 @@ services:
       # so oauth.json lands at the same path in both containers.
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
-      UI_CONFIG_PATH: /config/ui/ui.json
+      DRIVE_CONFIG_PATH: /config/drive/drive.json
     volumes:
       - bot-config:/config/bot
       - agent-config:/config/agent
-      - ui-config:/config/ui
+      - drive-config:/config/drive
     depends_on:
       - tg-bot
       - flutter-agent
@@ -98,11 +98,11 @@ services:
       AGENT_CONTROL_URL: http://flutter-agent:9091
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
-      UI_CONFIG_PATH: /config/ui/ui.json
+      DRIVE_CONFIG_PATH: /config/drive/drive.json
     volumes:
       - bot-config:/config/bot
       - agent-config:/config/agent
-      - ui-config:/config/ui
+      - drive-config:/config/drive
     networks:
       - jenkins
 
@@ -110,7 +110,7 @@ volumes:
   jenkins-data:
   bot-config:
   agent-config:
-  ui-config:
+  drive-config:
   bot-data:
 
 networks:

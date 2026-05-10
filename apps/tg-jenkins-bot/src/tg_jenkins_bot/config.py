@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .schema import BOT_FIELDS, post_resolve, resolve_fields
+from .schema import BOT_FIELDS, BOT_INFRA, post_resolve, resolve_fields
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ class Config:
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> Config:
         """Build config with priority: file > env > .env > defaults."""
-        values = resolve_fields(BOT_FIELDS, config_path)
+        values = resolve_fields(BOT_FIELDS + BOT_INFRA, config_path)
         values = post_resolve(values, config_path)
         return cls(**values)
 

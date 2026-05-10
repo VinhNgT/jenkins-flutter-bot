@@ -155,9 +155,14 @@ async def get_schema() -> dict[str, Any]:
     """Return the agent module's config field schema."""
     from .schema import (
         AGENT_FIELDS,
+        AGENT_INFRA,
         MODULE_DESCRIPTION,
         MODULE_TITLE,
         serialize_schema,
     )
 
-    return serialize_schema(AGENT_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
+    schema = serialize_schema(AGENT_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
+    schema["infra"] = serialize_schema(
+        AGENT_INFRA, MODULE_TITLE, MODULE_DESCRIPTION
+    )["fields"]
+    return schema

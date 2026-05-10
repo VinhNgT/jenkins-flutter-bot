@@ -28,7 +28,7 @@ const API = {
 
   /**
    * Save config for a single scope.
-   * @param {'bot'|'agent'|'ui'} scope
+   * @param {'bot'|'agent'|'drive'} scope
    * @param {Object} data
    * @returns {Promise<Object|null>}
    */

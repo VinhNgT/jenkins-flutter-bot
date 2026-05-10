@@ -22,7 +22,7 @@ function nestedGet(target, dottedKey) {
 /**
  * Collect form data for a single scope. Disabled secret inputs (stored,
  * unchanged) are skipped so existing values are preserved on the backend.
- * @param {string} scope - 'bot', 'agent', or 'ui'
+ * @param {string} scope - 'bot', 'agent', or 'drive'
  * @returns {Object}
  */
 // eslint-disable-next-line no-unused-vars

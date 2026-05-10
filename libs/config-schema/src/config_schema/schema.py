@@ -150,7 +150,7 @@ def resolve_fields(
     for f in fields:
         raw = nested_get(file_data, f.key)
         if raw in (None, ""):
-            raw = os.environ.get(f.env_var)
+            raw = os.environ.get(f.env_var) if f.env_var else None
         if raw in (None, ""):
             raw = f.default
         values[f.attr] = _coerce(raw, f.value_type)

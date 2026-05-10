@@ -33,7 +33,7 @@ jobs:
           # builds on Linux ARM64.
           - name: flutter-agent
             context: .
-            dockerfile: infra/jenkins/Dockerfile.flutter-agent
+            dockerfile: infra/Dockerfile.flutter-agent
             platforms: linux/amd64
 
           - name: tg-admin-bot

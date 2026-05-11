@@ -17,7 +17,6 @@ class Settings:
         BOT_CONFIG_PATH      — Path to bot.json
         AGENT_CONFIG_PATH    — Path to agent.json
         DRIVE_CONFIG_PATH    — Path to drive.json
-        PROJECT_CONFIG_PATH  — Path to project.json
     """
 
     bot_control_url: str | None
@@ -25,7 +24,6 @@ class Settings:
     bot_config_path: Path | None
     agent_config_path: Path | None
     drive_config_path: Path | None
-    project_config_path: Path | None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -41,5 +39,4 @@ class Settings:
             bot_config_path=_path("BOT_CONFIG_PATH"),
             agent_config_path=_path("AGENT_CONFIG_PATH"),
             drive_config_path=_path("DRIVE_CONFIG_PATH"),
-            project_config_path=_path("PROJECT_CONFIG_PATH"),
         )

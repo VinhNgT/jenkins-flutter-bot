@@ -1,8 +1,6 @@
-"""Declarative schemas for Drive and Project configuration modules.
+"""Declarative schema for the Drive configuration module.
 
-These schemas were previously split between config-ui (DRIVE_FIELDS) and
-libs/stack-manager (PROJECT_FIELDS).  Stack-manager now owns both as the
-central operational backend.
+Stack-manager owns the Drive OAuth field declarations used by the web UI.
 """
 
 from __future__ import annotations
@@ -63,28 +61,4 @@ DRIVE_INFRA: tuple[FieldDef, ...] = ()
 # Derived constants
 DRIVE_SECRET_FIELDS = tuple(f.key for f in DRIVE_FIELDS if f.secret)
 
-# ---------------------------------------------------------------------------
-# Project configuration
-# ---------------------------------------------------------------------------
 
-PROJECT_MODULE_TITLE = "Project Configuration"
-PROJECT_MODULE_DESCRIPTION = (
-    "Project-wide settings shared across all services."
-)
-
-PROJECT_FIELDS: tuple[FieldDef, ...] = (
-    FieldDef(
-        key="project.github_url",
-        env_var="PROJECT_GITHUB_URL",
-        attr="github_url",
-        label="GitHub URL",
-        group="Repository",
-        description="Link to the project's GitHub repository",
-        help_html=(
-            "The public URL of your GitHub repository."
-            " This is displayed in the dashboard for quick access."
-        ),
-    ),
-)
-
-PROJECT_INFRA: tuple[FieldDef, ...] = ()

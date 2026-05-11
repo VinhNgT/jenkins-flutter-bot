@@ -31,7 +31,6 @@ from .config import Config
 from .drive.uploader import DriveUploader
 from .git.remote import GitRemoteClient
 from .jenkins.client import JenkinsClient
-from .project_config import ProjectConfig
 
 logger = logging.getLogger(__name__)
 
@@ -127,10 +126,9 @@ class BotManager:
                 # after _build_application() runs, so we build a bootstrap
                 # context with bot=None first, then replace it with the real
                 # context once the application object exists.
-                project_config = ProjectConfig.resolve()
                 bootstrap_context = BotContext(
                     config=config,
-                    project_config=project_config,
+                    github_url=config.github_url,
                     jenkins=jenkins,
                     drive=drive,
                     bot=None,  # type: ignore[arg-type]
@@ -139,7 +137,7 @@ class BotManager:
                 application = _build_application(bootstrap_context)
                 bot_context = BotContext(
                     config=config,
-                    project_config=project_config,
+                    github_url=config.github_url,
                     jenkins=jenkins,
                     drive=drive,
                     bot=application.bot,

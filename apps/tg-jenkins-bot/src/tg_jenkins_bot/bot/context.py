@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from ..drive.uploader import DriveUploader
     from ..git.remote import GitRemoteClient
     from ..jenkins.client import JenkinsClient
-    from ..project_config import ProjectConfig
 
 logger = logging.getLogger(__name__)
 
@@ -172,11 +171,11 @@ class BotContext:
         jenkins: JenkinsClient,
         drive: DriveUploader,
         bot: Bot | None,
-        project_config: ProjectConfig | None = None,
+        github_url: str = "",
         git_remote: GitRemoteClient | None = None,
     ) -> None:
         self.config = config
-        self.project_config = project_config
+        self.github_url = github_url
         self.jenkins = jenkins
         self.drive = drive
         self.bot = bot

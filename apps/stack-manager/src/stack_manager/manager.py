@@ -35,9 +35,6 @@ from .schema import (
     DRIVE_MODULE_DESCRIPTION,
     DRIVE_MODULE_TITLE,
     DRIVE_SECRET_FIELDS,
-    PROJECT_FIELDS,
-    PROJECT_MODULE_DESCRIPTION,
-    PROJECT_MODULE_TITLE,
 )
 from .services import ServiceClient
 from .settings import Settings
@@ -52,7 +49,6 @@ class ConfigPaths:
     bot: Path | None
     agent: Path | None
     drive: Path | None
-    project: Path | None
     oauth_token: Path
 
     @classmethod
@@ -66,7 +62,6 @@ class ConfigPaths:
             bot=settings.bot_config_path,
             agent=settings.agent_config_path,
             drive=settings.drive_config_path,
-            project=settings.project_config_path,
             oauth_token=oauth_token,
         )
 
@@ -95,7 +90,6 @@ class StackManager:
             "bot": self.paths.bot,
             "agent": self.paths.agent,
             "drive": self.paths.drive,
-            "project": self.paths.project,
         }.get(scope)
 
     def load_config(self, scope: str) -> dict[str, Any]:
@@ -120,15 +114,12 @@ class StackManager:
     # ------------------------------------------------------------------
 
     async def fetch_all_schemas(self) -> dict[str, Any]:
-        """Fetch schemas from bot/agent services, plus local drive/project."""
+        """Fetch schemas from bot/agent services, plus local drive schema."""
         schemas: dict[str, Any] = {
             "bot": await self.services.schema("bot"),
             "agent": await self.services.schema("agent"),
             "drive": serialize_schema(
                 DRIVE_FIELDS, DRIVE_MODULE_TITLE, DRIVE_MODULE_DESCRIPTION
-            ),
-            "project": serialize_schema(
-                PROJECT_FIELDS, PROJECT_MODULE_TITLE, PROJECT_MODULE_DESCRIPTION
             ),
         }
         return schemas
@@ -153,14 +144,12 @@ class StackManager:
             "bot": self.load_config("bot"),
             "agent": self.load_config("agent"),
             "drive": self.load_config("drive"),
-            "project": self.load_config("project"),
         }
 
         return {
             "bot": strip_secrets(raw["bot"], bot_secrets),
             "agent": strip_secrets(raw["agent"], agent_secrets),
             "drive": strip_secrets(raw["drive"], DRIVE_SECRET_FIELDS),
-            "project": raw["project"],
             "_secrets_set": {
                 "bot": secrets_set(raw["bot"], bot_secrets),
                 "agent": secrets_set(raw["agent"], agent_secrets),
@@ -172,8 +161,6 @@ class StackManager:
         """Save config for a scope, determining secrets dynamically."""
         if scope == "drive":
             secret_fields = DRIVE_SECRET_FIELDS
-        elif scope == "project":
-            secret_fields: tuple[str, ...] = ()
         else:
             schema = await self.services.schema(scope)
             secret_fields = extract_secret_fields(schema)

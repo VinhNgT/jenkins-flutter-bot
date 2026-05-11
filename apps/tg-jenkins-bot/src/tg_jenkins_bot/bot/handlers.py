@@ -105,7 +105,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     app_name = _escape(ctx.config.app_name)
 
     # Build the optional GitHub footer line from the project config
-    github_url = ctx.project_config.github_url.strip() if ctx.project_config else ""
+    github_url = ctx.github_url
     version_str = f"<i>v{_bot_version()}</i>"
     footer = (
         f'<a href="{github_url}">⭐ GitHub</a>  ·  {version_str}'

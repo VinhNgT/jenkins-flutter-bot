@@ -247,6 +247,19 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         field_type="number",
         value_type="int",
     ),
+    FieldDef(
+        key="project.github_url",
+        env_var="PROJECT_GITHUB_URL",
+        attr="github_url",
+        label="GitHub URL",
+        group="Build Settings",
+        description="Link to the project's GitHub repository",
+        help_html=(
+            "The public URL of your GitHub repository."
+            " This is displayed in the bot's /start message for quick access."
+        ),
+        default="https://github.com/VinhNgT/jenkins-flutter-bot",
+    ),
 )
 
 # ---------------------------------------------------------------------------

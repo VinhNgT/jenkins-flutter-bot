@@ -36,6 +36,7 @@ class Config:
     max_recent_builds: int
     build_timeout: int
     admin_contact: str
+    github_url: str
 
     # Git repository (optional — enables commit comparison)
     git_repo_url: str

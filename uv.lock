@@ -21,7 +21,7 @@ members = [
 
 [[package]]
 name = "agent-control"
-version = "0.2.0.dev1"
+version = "0.2.0.dev2"
 source = { editable = "apps/agent-control" }
 dependencies = [
     { name = "config-schema" },
@@ -306,7 +306,7 @@ wheels = [
 
 [[package]]
 name = "config-schema"
-version = "0.2.0.dev1"
+version = "0.2.0.dev2"
 source = { editable = "libs/config-schema" }
 dependencies = [
     { name = "python-dotenv" },
@@ -527,7 +527,7 @@ wheels = [
 
 [[package]]
 name = "jenkins-flutter-bot"
-version = "0.2.0.dev1"
+version = "0.2.0.dev2"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -1030,7 +1030,7 @@ wheels = [
 
 [[package]]
 name = "stack-manager"
-version = "0.2.0.dev1"
+version = "0.2.0.dev2"
 source = { editable = "apps/stack-manager" }
 dependencies = [
     { name = "aiofiles" },
@@ -1070,7 +1070,7 @@ wheels = [
 
 [[package]]
 name = "tg-admin-bot"
-version = "0.2.0.dev1"
+version = "0.2.0.dev2"
 source = { editable = "apps/tg-admin-bot" }
 dependencies = [
     { name = "httpx" },
@@ -1085,7 +1085,7 @@ requires-dist = [
 
 [[package]]
 name = "tg-jenkins-bot"
-version = "0.2.0.dev1"
+version = "0.2.0.dev2"
 source = { editable = "apps/tg-jenkins-bot" }
 dependencies = [
     { name = "config-schema" },

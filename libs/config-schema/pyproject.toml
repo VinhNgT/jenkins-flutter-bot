@@ -1,6 +1,6 @@
 [project]
 name = "config-schema"
-version = "0.2.0-dev.1"
+version = "0.2.0-dev.2"
 description = "Declarative configuration schema framework for the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [

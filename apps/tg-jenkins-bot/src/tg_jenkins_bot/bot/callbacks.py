@@ -3,6 +3,8 @@
 Dispatches ``CallbackQuery`` events based on ``callback_data`` prefix.
 All interactive states (branch picker, cancel confirm, rebuild confirm)
 are handled here via in-place message editing.
+
+Entry points are /build and /recent slash commands (see handlers.py).
 """
 
 from __future__ import annotations

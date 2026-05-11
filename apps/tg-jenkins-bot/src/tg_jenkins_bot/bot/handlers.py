@@ -1,10 +1,10 @@
-"""Telegram handlers — keyboard buttons + slash commands.
+"""Telegram handlers — slash commands + inline keyboards.
 
 Provides:
-  - /start, /help — welcome message with persistent keyboard
+  - /start, /help — welcome message
+  - /build [ref] — branch picker or direct trigger if ref is supplied
+  - /recent — recent builds with download links
   - /status — admin diagnostic (semi-technical, kept as-is)
-  - 🔨 Build keyboard button — branch picker + build trigger
-  - 📦 Recent keyboard button — recent builds with download links
   - Free-text handler for typed branch names during build sessions
 """
 
@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
     Update,
     LinkPreviewOptions,
 )
@@ -29,16 +28,6 @@ from ..jenkins.client import JenkinsTriggerError
 from .context import BotContext, PendingBuild, _format_duration, _format_elapsed
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Persistent keyboard — shown on every reply
-# ---------------------------------------------------------------------------
-
-REPLY_KEYBOARD = ReplyKeyboardMarkup(
-    [["🔨 Build", "📦 Recent"]],
-    resize_keyboard=True,
-    is_persistent=True,
-)
 
 
 def _bot_version() -> str:
@@ -99,7 +88,7 @@ async def _ensure_authorized(
 
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start and /help commands — welcome message with keyboard."""
+    """Handle /start and /help commands — welcome message."""
     if not update.message:
         return
     ctx = _get_ctx(context)
@@ -118,14 +107,12 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"👋 Hi! I'll build <b>{app_name}</b> and send you a download link "
         "when it's ready.\n"
         "\n"
-        "Tap 🔨 Build to get started!\n"
+        "Use /build to trigger a build, or /recent to see past builds.\n"
         "\n"
         f"{footer}",
         parse_mode="HTML",
-        reply_markup=REPLY_KEYBOARD,
         link_preview_options=LinkPreviewOptions(is_disabled=True),
     )
-
 
 
 # ---------------------------------------------------------------------------
@@ -232,19 +219,22 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",
-        reply_markup=REPLY_KEYBOARD,
     )
 
 
 # ---------------------------------------------------------------------------
-# 🔨 Build keyboard button
+# /build [ref] command
 # ---------------------------------------------------------------------------
 
 
-async def keyboard_build_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    """Handle the 🔨 Build keyboard button — show branch picker."""
+async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/build — show branch picker, or trigger directly if a ref is provided.
+
+    Usage:
+      /build          → shows the inline branch-picker keyboard
+      /build main     → skips the picker and triggers main immediately
+      /build feat/xyz → triggers the given branch directly
+    """
     if not update.message or not update.effective_chat:
         return
     ctx = _get_ctx(context)
@@ -261,9 +251,16 @@ async def keyboard_build_handler(
             f"❌ Can't build right now — Google Drive isn't connected.\n"
             f"{ctx._admin_hint()}",
             parse_mode="HTML",
-            reply_markup=REPLY_KEYBOARD,
         )
         return
+
+    # If a branch name was supplied as an argument, trigger directly
+    args = context.args or []
+    if args:
+        ref = " ".join(args).strip()
+        if ref:
+            await _trigger_build(update, context, ref)
+            return
 
     # Check session lock (group chats)
     existing = ctx.get_session(chat_id)
@@ -271,7 +268,6 @@ async def keyboard_build_handler(
         await update.message.reply_text(
             f"🔇 {_escape(existing.user_name)} is picking a branch right now.",
             parse_mode="HTML",
-            reply_markup=REPLY_KEYBOARD,
         )
         return
 
@@ -291,21 +287,19 @@ async def keyboard_build_handler(
         reply_markup=InlineKeyboardMarkup(buttons),
     )
 
-    # Start session (30s lock)
+    # Start session (TTL lock)
     user_name = (user.first_name if user else "Someone") or "Someone"
     user_id = user.id if user else 0
     ctx.start_session(chat_id, user_id, user_name, msg.message_id)
 
 
 # ---------------------------------------------------------------------------
-# 📦 Recent keyboard button
+# /recent command
 # ---------------------------------------------------------------------------
 
 
-async def keyboard_recent_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    """Handle the 📦 Recent keyboard button — show recent builds."""
+async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/recent — show recent successful builds with download links."""
     if not update.message or not update.effective_chat:
         return
     ctx = _get_ctx(context)
@@ -318,7 +312,6 @@ async def keyboard_recent_handler(
     if not builds:
         await update.message.reply_text(
             "📭 No successful builds yet.",
-            reply_markup=REPLY_KEYBOARD,
         )
         return
 
@@ -344,7 +337,6 @@ async def keyboard_recent_handler(
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",
-        reply_markup=REPLY_KEYBOARD,
     )
 
 

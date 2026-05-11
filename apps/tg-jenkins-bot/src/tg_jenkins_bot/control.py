@@ -8,7 +8,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request
-from telegram import MenuButtonCommands
+
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -21,8 +21,8 @@ from telegram.ext import (
 from .bot.callbacks import callback_router
 from .bot.context import BotContext
 from .bot.handlers import (
-    keyboard_build_handler,
-    keyboard_recent_handler,
+    build_handler,
+    recent_handler,
     start_handler,
     status_handler,
     text_branch_handler,
@@ -40,25 +40,19 @@ def _build_application(bot_context: BotContext) -> Application:
     application = ApplicationBuilder().token(bot_context.config.telegram_token).build()
     application.bot_data["bot_context"] = bot_context
 
-    # Slash commands (kept)
+    # Slash commands
     application.add_handler(CommandHandler("start", start_handler))
     application.add_handler(CommandHandler("help", start_handler))
     application.add_handler(CommandHandler("status", status_handler))
+    application.add_handler(CommandHandler("build", build_handler))
+    application.add_handler(CommandHandler("recent", recent_handler))
 
-    # Keyboard buttons (new)
-    application.add_handler(
-        MessageHandler(filters.Regex("^🔨 Build$"), keyboard_build_handler)
-    )
-    application.add_handler(
-        MessageHandler(filters.Regex("^📦 Recent$"), keyboard_recent_handler)
-    )
-
-    # Free-text branch name (new)
+    # Free-text branch name (for the "✏️ Type a name" path)
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_branch_handler)
     )
 
-    # Inline button callbacks (new)
+    # Inline button callbacks
     application.add_handler(CallbackQueryHandler(callback_router))
 
     return application
@@ -151,17 +145,14 @@ class BotManager:
                     raise RuntimeError("Application.updater is None after start")
                 await application.updater.start_polling(drop_pending_updates=True)
 
-                # Register visible commands (replaces BotFather /setcommands)
+                # Register visible commands in the "/" picker
                 await application.bot.set_my_commands(
                     [
+                        ("build", "Trigger a new build"),
+                        ("recent", "Show recent builds"),
                         ("status", "Check build system health"),
                         ("help", "How to use this bot"),
                     ]
-                )
-
-                # Replace "/" icon with "📋 Menu" label
-                await application.bot.set_chat_menu_button(
-                    menu_button=MenuButtonCommands(),
                 )
 
                 self._application = application
@@ -294,7 +285,7 @@ async def get_schema() -> dict[str, Any]:
     )
 
     schema = serialize_schema(BOT_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
-    schema["infra"] = serialize_schema(
-        BOT_INFRA, MODULE_TITLE, MODULE_DESCRIPTION
-    )["fields"]
+    schema["infra"] = serialize_schema(BOT_INFRA, MODULE_TITLE, MODULE_DESCRIPTION)[
+        "fields"
+    ]
     return schema

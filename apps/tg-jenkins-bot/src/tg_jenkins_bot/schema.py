@@ -148,7 +148,6 @@ BOT_FIELDS: tuple[FieldDef, ...] = (
         description="Must match the pipeline job name in Jenkins",
         default="flutter-build",
     ),
-
     FieldDef(
         key="jenkins.credentials_id",
         env_var="JENKINS_CREDENTIALS_ID",
@@ -302,9 +301,7 @@ def post_resolve(
         repo_url = values.get("git_repo_url", "")
         if repo_url:
             repo_name = repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
-        values["app_name"] = (
-            values.get("drive_folder_name") or repo_name or "your app"
-        )
+        values["app_name"] = values.get("drive_folder_name") or repo_name or "your app"
 
     # oauth_token_path — keep tokens next to the config file when possible
     resolved_path = config_path

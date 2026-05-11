@@ -35,8 +35,6 @@ def _slugify(text: str) -> str:
     return slug or "build"
 
 
-
-
 @dataclass
 class BuildSession:
     """Ephemeral session for the branch-picking phase.

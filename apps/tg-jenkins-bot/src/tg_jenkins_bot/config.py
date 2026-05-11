@@ -65,5 +65,3 @@ class Config:
     def bot_callback_url(self) -> str:
         """Full webhook URL that Jenkins calls on build completion."""
         return f"{self.bot_service_url.rstrip('/')}/webhook/build-complete"
-
-

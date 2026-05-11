@@ -25,9 +25,7 @@ class GitRemoteClient:
     treats ``None`` as "unknown" and proceeds with the build.
     """
 
-    def __init__(
-        self, base_url: str, project_id: str, token: str = ""
-    ) -> None:
+    def __init__(self, base_url: str, project_id: str, token: str = "") -> None:
         self._base_url = base_url.rstrip("/")
         # URL-encode the project path (slashes → %2F).
         # Numeric IDs pass through unchanged.

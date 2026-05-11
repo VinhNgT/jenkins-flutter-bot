@@ -21,6 +21,7 @@ from telegram import (
     InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
     Update,
+    LinkPreviewOptions,
 )
 from telegram.ext import ContextTypes
 
@@ -122,6 +123,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"{footer}",
         parse_mode="HTML",
         reply_markup=REPLY_KEYBOARD,
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
     )
 
 

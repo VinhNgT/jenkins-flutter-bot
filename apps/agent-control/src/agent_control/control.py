@@ -93,14 +93,24 @@ class AgentManager:
             self._process = None
             self._config = None
 
+    def _is_configured(self) -> bool:
+        """Check whether the required config fields are present."""
+        try:
+            config = AgentConfig.resolve()
+            return bool(config.secret)
+        except Exception:
+            logger.exception("Failed to resolve agent config during status check")
+            return False
+
     def status(self) -> dict[str, Any]:
         """Return the current agent manager status."""
+        active_config = self._config if self.running else None
         return {
-            "configured": self._config is not None,
+            "configured": self._is_configured(),
             "running": self.running,
             "pid": self._process.pid if self.running and self._process else None,
             "last_error": self._last_error,
-            "agent_name": self._config.agent_name if self._config else None,
+            "agent_name": active_config.agent_name if active_config else None,
         }
 
 

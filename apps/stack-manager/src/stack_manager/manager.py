@@ -272,7 +272,13 @@ class StackManager:
     # ------------------------------------------------------------------
 
     def get_jenkinsfile(self) -> dict[str, Any]:
-        """Generate a Jenkinsfile pipeline script from current config."""
+        """Generate both public and private Jenkinsfile variants from current config.
+
+        Always returns two scripts:
+        - ``script_public``: plain ``git`` step, no credentials.
+        - ``script_private``: ``checkout`` step using a Jenkins saved credential
+          (the configured ``credentials_id``, or a placeholder if not set).
+        """
         bot_data = self.load_config("bot")
         repo_url = nested_get(bot_data, "git.repo_url") or ""
         credentials_id = nested_get(bot_data, "jenkins.credentials_id") or ""
@@ -284,8 +290,20 @@ class StackManager:
                 "Repository URL not configured — update it in the Bot config tab."
             )
 
-        script = generate_jenkinsfile(repo_url, credentials_id)
-        return {"script": script, "warnings": warnings}
+        effective_credentials_id = credentials_id or "<YOUR_CREDENTIALS_ID>"
+        if not credentials_id:
+            warnings.append(
+                "Repo Credentials ID not configured — the private script uses a "
+                "placeholder. Set it in the Bot config tab or edit the Jenkinsfile."
+            )
+
+        script_public = generate_jenkinsfile(repo_url, credentials_id="")
+        script_private = generate_jenkinsfile(repo_url, effective_credentials_id)
+        return {
+            "script_public": script_public,
+            "script_private": script_private,
+            "warnings": warnings,
+        }
 
     # ------------------------------------------------------------------
     # Drive OAuth helpers

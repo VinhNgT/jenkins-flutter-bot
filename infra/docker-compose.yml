@@ -55,6 +55,7 @@ services:
     environment:
       CONFIG_PATH: /config/bot/bot.json
       BOT_SERVICE_URL: "http://tg-bot:9090"
+      JENKINS_URL: "http://jenkins:8080"
       PROJECT_CONFIG_PATH: /config/project/project.json
     expose:
       - "9090"

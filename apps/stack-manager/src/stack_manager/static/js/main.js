@@ -181,27 +181,53 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ─── Jenkinsfile generator ──────────────────────────────────────
-  const jenkinsfileOutput = document.getElementById('jenkinsfile-output');
   const jenkinsfileWarnings = document.getElementById('jenkinsfile-warnings');
-  const jenkinsfileCopyBtn = document.getElementById('jenkinsfile-copy');
+  const jenkinsfileTabs     = document.getElementById('jenkinsfile-tabs');
+  const jfPanelPublic       = document.getElementById('jf-panel-public');
+  const jfPanelPrivate      = document.getElementById('jf-panel-private');
+  const jfOutputPublic      = document.getElementById('jenkinsfile-output-public');
+  const jfOutputPrivate     = document.getElementById('jenkinsfile-output-private');
+  const jfCopyPublic        = document.getElementById('jenkinsfile-copy-public');
+  const jfCopyPrivate       = document.getElementById('jenkinsfile-copy-private');
+
+  let activeJfTab = 'public';
+
+  function switchJfTab(tab) {
+    activeJfTab = tab;
+    jfPanelPublic.hidden  = (tab !== 'public');
+    jfPanelPrivate.hidden = (tab !== 'private');
+    jenkinsfileTabs.querySelectorAll('[data-jf-tab]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.jfTab === tab);
+    });
+  }
+
+  jenkinsfileTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-jf-tab]');
+    if (btn) switchJfTab(btn.dataset.jfTab);
+  });
 
   document.getElementById('jenkinsfile-generate').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
-    jenkinsfileOutput.value = 'Generating…';
+    jfOutputPublic.value  = 'Generating…';
+    jfOutputPrivate.value = 'Generating…';
 
     const result = await API.getJenkinsfile();
     btn.disabled = false;
 
     if (!result) {
-      jenkinsfileOutput.value = '';
+      jfOutputPublic.value  = '';
+      jfOutputPrivate.value = '';
       return;
     }
 
-    jenkinsfileOutput.value = result.script;
-    jenkinsfileCopyBtn.disabled = false;
+    jfOutputPublic.value  = result.script_public  ?? '';
+    jfOutputPrivate.value = result.script_private ?? '';
+    jfCopyPublic.disabled  = false;
+    jfCopyPrivate.disabled = false;
+    jenkinsfileTabs.hidden = false;
+    switchJfTab(activeJfTab);
 
-    // Show warnings if any
     if (result.warnings?.length) {
       jenkinsfileWarnings.innerHTML = result.warnings
         .map(w => `<p>⚠️ ${w}</p>`)
@@ -211,19 +237,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       jenkinsfileWarnings.hidden = true;
     }
 
-    Toast.show('Jenkinsfile generated', 'success');
+    Toast.show('Jenkinsfiles generated', 'success');
   });
 
-  jenkinsfileCopyBtn.addEventListener('click', async () => {
+  async function copyToClipboard(text) {
     try {
-      await navigator.clipboard.writeText(jenkinsfileOutput.value);
+      await navigator.clipboard.writeText(text);
       Toast.show('Copied to clipboard', 'success');
     } catch {
-      // Fallback: select all text for manual copy
-      jenkinsfileOutput.select();
       Toast.show('Press Ctrl+C to copy', 'info');
     }
-  });
+  }
+
+  jfCopyPublic.addEventListener('click',  () => copyToClipboard(jfOutputPublic.value));
+  jfCopyPrivate.addEventListener('click', () => copyToClipboard(jfOutputPrivate.value));
+
 
   // ─── Config Transfer (export + import) ──────────────────────────
   const exportOutput = document.getElementById('export-output');

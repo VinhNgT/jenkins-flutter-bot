@@ -36,10 +36,10 @@ def generate_jenkinsfile(repo_url: str, credentials_id: str) -> str:
         public-repo checkout template is used instead.
     """
     if credentials_id:
-        checkout = _CHECKOUT_PRIVATE.substitute(
+        checkout = _CHECKOUT_PRIVATE.safe_substitute(
             repo_url=repo_url, credentials_id=credentials_id
         )
     else:
-        checkout = _CHECKOUT_PUBLIC.substitute(repo_url=repo_url)
+        checkout = _CHECKOUT_PUBLIC.safe_substitute(repo_url=repo_url)
 
-    return _PIPELINE_TEMPLATE.substitute(checkout=checkout)
+    return _PIPELINE_TEMPLATE.safe_substitute(checkout=checkout)

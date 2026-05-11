@@ -204,11 +204,30 @@ class BotManager:
         await self.stop()
         await self.start(config)
 
+    def _is_configured(self) -> bool:
+        """Check whether the required user-supplied config fields are present.
+
+        Only checks runtime fields (BOT_FIELDS) that users must configure via
+        the web UI.  Infrastructure fields like ``jenkins_url`` are excluded —
+        they come from environment variables and always have a working default.
+        """
+        try:
+            config = Config.resolve()
+            return bool(
+                config.telegram_token
+                and config.jenkins_user
+                and config.jenkins_api_token
+            )
+        except Exception:
+            logger.exception("Failed to resolve bot config during status check")
+            return False
+
     def status(self) -> dict[str, Any]:
         """Return the current bot manager status."""
         bot_context = self._bot_context
+        active_config = self._config if self.running else None
         return {
-            "configured": self._config is not None,
+            "configured": self._is_configured(),
             "running": self.running,
             "drive_connected": (
                 bot_context.drive.is_connected() if bot_context else False
@@ -216,7 +235,7 @@ class BotManager:
             "pending_builds": (bot_context.pending_count if bot_context else 0),
             "tracked_builds": (bot_context.tracked_count if bot_context else 0),
             "last_error": self._last_error,
-            "job_name": self._config.jenkins_job_name if self._config else None,
+            "job_name": active_config.jenkins_job_name if active_config else None,
         }
 
 

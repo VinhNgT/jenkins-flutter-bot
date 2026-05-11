@@ -76,7 +76,7 @@ PROJECT_FIELDS: tuple[FieldDef, ...] = (
     FieldDef(
         key="project.github_url",
         env_var="PROJECT_GITHUB_URL",
-        attr="project_github_url",
+        attr="github_url",
         label="GitHub URL",
         group="Repository",
         description="Link to the project's GitHub repository",

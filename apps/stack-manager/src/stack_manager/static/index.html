@@ -114,16 +114,50 @@
           <div class="jenkinsfile-actions">
             <button class="btn btn-accent" id="jenkinsfile-generate" type="button">
               <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 003 3.5v13A1.5 1.5 0 004.5 18h11a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 0011.378 2H4.5zm2.25 8.5a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5zm0 3a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5z" clip-rule="evenodd" /></svg>
-              Generate Script
-            </button>
-            <button class="btn btn-secondary" id="jenkinsfile-copy" type="button" disabled>
-              <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" /><path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.44A1.5 1.5 0 008.378 6H4.5z" /></svg>
-              Copy to Clipboard
+              Generate Scripts
             </button>
           </div>
           <div id="jenkinsfile-warnings" class="jenkinsfile-warnings" hidden></div>
-          <textarea id="jenkinsfile-output" class="jenkinsfile-output" readonly placeholder="Click 'Generate Script' to create your Jenkinsfile…"></textarea>
+
+          <!-- Version tabs -->
+          <div class="export-tabs" id="jenkinsfile-tabs" hidden>
+            <button class="export-tab active" data-jf-tab="public">Public Repo</button>
+            <button class="export-tab" data-jf-tab="private">Private Repo (PAT)</button>
+          </div>
+
+          <!-- Public version -->
+          <div id="jf-panel-public" class="jf-panel">
+            <p class="panel-desc" style="margin-top:0.5rem">
+              For <strong>public repositories</strong> — no authentication required.
+              Uses the plain <code>git</code> step.
+            </p>
+            <div class="jenkinsfile-actions" style="margin-bottom:0.5rem">
+              <button class="btn btn-secondary" id="jenkinsfile-copy-public" type="button" disabled>
+                <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" /><path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.44A1.5 1.5 0 008.378 6H4.5z" /></svg>
+                Copy to Clipboard
+              </button>
+            </div>
+            <textarea id="jenkinsfile-output-public" class="jenkinsfile-output" readonly placeholder="Click 'Generate Scripts' to create your Jenkinsfile…"></textarea>
+          </div>
+
+          <!-- Private version -->
+          <div id="jf-panel-private" class="jf-panel" hidden>
+            <p class="panel-desc" style="margin-top:0.5rem">
+              For <strong>private repositories</strong> — uses a Jenkins saved credential
+              (set <em>Repo Credentials ID</em> in the Bot config tab).
+              The <code>credentialsId</code> must match a credential stored in
+              <strong>Jenkins → Manage Jenkins → Credentials</strong>.
+            </p>
+            <div class="jenkinsfile-actions" style="margin-bottom:0.5rem">
+              <button class="btn btn-secondary" id="jenkinsfile-copy-private" type="button" disabled>
+                <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" /><path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.44A1.5 1.5 0 008.378 6H4.5z" /></svg>
+                Copy to Clipboard
+              </button>
+            </div>
+            <textarea id="jenkinsfile-output-private" class="jenkinsfile-output" readonly placeholder="Click 'Generate Scripts' to create your Jenkinsfile…"></textarea>
+          </div>
         </section>
+
 
         <!-- ===== Config Transfer (Export / Import) ===== -->
         <section id="panel-export" class="tab-panel" role="tabpanel" hidden>

@@ -1,0 +1,47 @@
+# Mock override — replaces jenkins + flutter-agent with lightweight mocks.
+# Usage: ./compose.sh mock [args]
+#
+# The mock-jenkins service uses container_name "jenkins" so the bot's
+# JENKINS_URL (http://jenkins:8080) resolves without any config changes.
+#
+# The flutter-agent is replaced with the mock agent-control API so
+# stack-manager sees the agent as configured and running.
+#
+# Configurable environment:
+#   MOCK_BUILD_DELAY  — simulated build time in seconds (default: 10)
+#   MOCK_FAILURE_RATE — probability of failure, 0.0–1.0 (default: 0)
+
+services:
+  # Replace real Jenkins with mock
+  jenkins:
+    build:
+      context: ..
+      dockerfile: apps/mock-jenkins/Dockerfile
+    container_name: jenkins
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      MOCK_BUILD_DELAY: ${MOCK_BUILD_DELAY:-10}
+      MOCK_FAILURE_RATE: ${MOCK_FAILURE_RATE:-0}
+    volumes: !reset []
+    networks:
+      - jenkins
+
+  # Replace real flutter-agent with mock agent-control API
+  flutter-agent:
+    platform: !reset ""
+    build:
+      context: ..
+      dockerfile: apps/mock-jenkins/Dockerfile
+    container_name: flutter-agent
+    restart: on-failure
+    command: ["mock-agent"]
+    environment:
+      JENKINS_AGENT_NAME: flutter-agent
+    expose:
+      - "9091"
+    env_file: !reset []
+    volumes: !reset []
+    networks:
+      - jenkins

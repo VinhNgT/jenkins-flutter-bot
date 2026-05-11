@@ -17,8 +17,8 @@ async function loadVersion() {
 
 function loadGithubLink(schemas, config) {
   // Resolve github_url: saved config value first, then schema default.
-  const configUrl = config?.project?.project?.github_url ?? '';
-  const schemaDefault = schemas?.project?.fields
+  const configUrl = config?.bot?.project?.github_url ?? '';
+  const schemaDefault = schemas?.bot?.fields
     ?.find(f => f.key === 'project.github_url')?.default ?? '';
   const url = (configUrl || schemaDefault).trim();
 
@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (schemas.bot) renderSchemaForm('schema-container-bot', 'bot', schemas.bot);
     if (schemas.agent) renderSchemaForm('schema-container-agent', 'agent', schemas.agent);
     if (schemas.drive) renderSchemaForm('schema-container-drive', 'drive', schemas.drive);
-    if (schemas.project) renderSchemaForm('schema-container-project', 'project', schemas.project);
   }
 
   // Populate the GitHub header link from schema + config
@@ -58,7 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateScope('bot', config.bot, config._secrets_set?.bot);
     populateScope('agent', config.agent, config._secrets_set?.agent);
     populateScope('drive', config.drive, config._secrets_set?.drive);
-    populateScope('project', config.project);
   }
 
   // ─── Delegated save/reload handlers ───────────────────────────

@@ -16,42 +16,24 @@ class Config:
     telegram_token: str
     allowed_chat_ids: list[int]
 
-    # Jenkins
-    jenkins_url: str
-    jenkins_user: str
-    jenkins_api_token: str
-    jenkins_job_name: str
-    jenkins_credentials_id: str
-
-    # Google Drive
-    oauth_token_path: Path
+    # Stack Manager
+    stack_manager_url: str
 
     bot_service_url: str
 
     # Optional
-    drive_folder_name: str
     app_name: str
     branch_list: list[str]
     session_ttl: int
-    max_recent_builds: int
     build_timeout: int
     admin_contact: str
     github_url: str
-
-    # Git repository (optional — enables commit comparison)
-    git_repo_url: str
-    git_access_token: str
-
-    @property
-    def commit_check_enabled(self) -> bool:
-        """Whether duplicate commit detection is configured."""
-        return bool(self.git_repo_url)
 
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> Config:
         """Build config with priority: file > env > .env > defaults."""
         values = resolve_fields(BOT_FIELDS + BOT_INFRA, config_path)
-        values = post_resolve(values, config_path)
+        values = post_resolve(values)
         return cls(**values)
 
     @property
@@ -63,5 +45,5 @@ class Config:
 
     @property
     def bot_callback_url(self) -> str:
-        """Full webhook URL that Jenkins calls on build completion."""
-        return f"{self.bot_service_url.rstrip('/')}/webhook/build-complete"
+        """Full callback URL that stack-manager POSTs build results to."""
+        return f"{self.bot_service_url.rstrip('/')}/callback/build-result"

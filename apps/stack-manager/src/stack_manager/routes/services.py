@@ -10,6 +10,8 @@ from ..manager import StackManager
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
+_MANAGED_SERVICES = {"bot", "agent", "file_manager"}
+
 
 @router.get("/status")
 async def get_service_status(request: Request) -> dict[str, Any]:
@@ -18,6 +20,7 @@ async def get_service_status(request: Request) -> dict[str, Any]:
     return {
         "bot": await manager.services.status("bot"),
         "agent": await manager.services.status("agent"),
+        "file_manager": await manager.services.status("file_manager"),
     }
 
 
@@ -26,7 +29,7 @@ async def control_service(
     request: Request, service: str, action: str
 ) -> dict[str, Any]:
     """Start, stop, or restart a service."""
-    if service not in {"bot", "agent"}:
+    if service not in _MANAGED_SERVICES:
         raise HTTPException(status_code=404, detail="Unknown service")
     if action not in {"start", "stop", "restart"}:
         raise HTTPException(status_code=404, detail="Unknown action")

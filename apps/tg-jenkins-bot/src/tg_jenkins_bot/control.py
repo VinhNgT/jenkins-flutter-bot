@@ -1,11 +1,14 @@
-"""Bot lifecycle management and HTTP control routes."""
+"""Bot lifecycle management and HTTP control routes.
+
+The bot is a thin Telegram frontend — all build orchestration is
+delegated to the stack-manager service via :class:`SMClient`.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 from typing import Any
-from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -28,15 +31,13 @@ from .bot.handlers import (
     text_branch_handler,
 )
 from .config import Config
-from .drive.uploader import DriveUploader
-from .git.remote import GitRemoteClient
-from .jenkins.client import JenkinsClient
+from .sm_client import SMClient
 
 logger = logging.getLogger(__name__)
 
 
 def _build_application(bot_context: BotContext) -> Application:
-    """Create a Telegram application wired with the new handler architecture."""
+    """Create a Telegram application wired with the handler architecture."""
     application = ApplicationBuilder().token(bot_context.config.telegram_token).build()
     application.bot_data["bot_context"] = bot_context
 
@@ -66,6 +67,7 @@ class BotManager:
         self._application: Application | None = None
         self._bot_context: BotContext | None = None
         self._config: Config | None = None
+        self._sm_client: SMClient | None = None
         self._last_error: str | None = None
 
     @property
@@ -85,36 +87,15 @@ class BotManager:
             missing = []
             if not config.telegram_token:
                 missing.append("TELEGRAM_BOT_TOKEN")
-            if not config.jenkins_url:
-                missing.append("JENKINS_URL")
-            if not config.jenkins_user:
-                missing.append("JENKINS_USER")
-            if not config.jenkins_api_token:
-                missing.append("JENKINS_API_TOKEN")
+            if not config.stack_manager_url:
+                missing.append("STACK_MANAGER_URL")
             if missing:
                 raise ValueError(
                     f"Missing required configuration: {', '.join(missing)}"
                 )
 
             try:
-                jenkins = JenkinsClient(
-                    url=config.jenkins_url,
-                    user=config.jenkins_user,
-                    api_token=config.jenkins_api_token,
-                    job_name=config.jenkins_job_name,
-                )
-                drive = DriveUploader(token_path=config.oauth_token_path)
-                git_remote: GitRemoteClient | None = None
-                if config.commit_check_enabled:
-                    parsed = urlparse(config.git_repo_url)
-                    base_url = f"{parsed.scheme}://{parsed.netloc}"
-                    project_id = parsed.path.strip("/").removesuffix(".git")
-                    git_remote = GitRemoteClient(
-                        base_url=base_url,
-                        project_id=project_id,
-                        token=config.git_access_token,
-                    )
-                    logger.info("Commit check enabled for project: %s", project_id)
+                sm_client = SMClient(config.stack_manager_url)
 
                 # Two-step construction: application.bot is only available
                 # after _build_application() runs, so we build a bootstrap
@@ -122,20 +103,14 @@ class BotManager:
                 # context once the application object exists.
                 bootstrap_context = BotContext(
                     config=config,
-                    github_url=config.github_url,
-                    jenkins=jenkins,
-                    drive=drive,
+                    sm_client=sm_client,
                     bot=None,  # type: ignore[arg-type]
-                    git_remote=git_remote,
                 )
                 application = _build_application(bootstrap_context)
                 bot_context = BotContext(
                     config=config,
-                    github_url=config.github_url,
-                    jenkins=jenkins,
-                    drive=drive,
+                    sm_client=sm_client,
                     bot=application.bot,
-                    git_remote=git_remote,
                 )
                 application.bot_data["bot_context"] = bot_context
 
@@ -158,6 +133,7 @@ class BotManager:
                 self._application = application
                 self._bot_context = bot_context
                 self._config = config
+                self._sm_client = sm_client
                 self._last_error = None
                 logger.info("Telegram bot started")
             except Exception as exc:
@@ -179,14 +155,13 @@ class BotManager:
             await application.shutdown()
 
             # Close reusable HTTP clients
-            if self._bot_context:
-                await self._bot_context.jenkins.close()
-                if self._bot_context.git_remote:
-                    await self._bot_context.git_remote.close()
+            if self._sm_client:
+                await self._sm_client.close()
 
             self._application = None
             self._bot_context = None
             self._config = None
+            self._sm_client = None
 
     async def restart(self, config: Config) -> None:
         """Restart the Telegram polling application."""
@@ -197,34 +172,24 @@ class BotManager:
         """Check whether the required user-supplied config fields are present.
 
         Only checks runtime fields (BOT_FIELDS) that users must configure via
-        the web UI.  Infrastructure fields like ``jenkins_url`` are excluded —
-        they come from environment variables and always have a working default.
+        the web UI.
         """
         try:
             config = Config.resolve()
-            return bool(
-                config.telegram_token
-                and config.jenkins_user
-                and config.jenkins_api_token
-            )
+            return bool(config.telegram_token)
         except Exception:
             logger.exception("Failed to resolve bot config during status check")
             return False
 
     def status(self) -> dict[str, Any]:
         """Return the current bot manager status."""
-        bot_context = self._bot_context
-        active_config = self._config if self.running else None
         return {
             "configured": self._is_configured(),
             "running": self.running,
-            "drive_connected": (
-                bot_context.drive.is_connected() if bot_context else False
+            "pending_builds": (
+                self._bot_context.pending_count if self._bot_context else 0
             ),
-            "pending_builds": (bot_context.pending_count if bot_context else 0),
-            "tracked_builds": (bot_context.tracked_count if bot_context else 0),
             "last_error": self._last_error,
-            "job_name": active_config.jenkins_job_name if active_config else None,
         }
 
 
@@ -289,3 +254,51 @@ async def get_schema() -> dict[str, Any]:
         "fields"
     ]
     return schema
+
+
+# ---------------------------------------------------------------------------
+# Build event callback (from stack-manager)
+# ---------------------------------------------------------------------------
+
+callback_event_router = APIRouter(tags=["callback"])
+
+
+@callback_event_router.post("/callback/build-result")
+async def handle_build_result(request: Request) -> dict[str, str]:
+    """Receive a build result forwarded by the stack-manager orchestrator.
+
+    Expected JSON payload::
+
+        {
+            "request_id": "abc123",
+            "branch": "main",
+            "commit_hash": "abc1234",
+            "result": "success",
+            "triggered_at": 1715500000.0,
+            "completed_at": 1715501000.0,
+            "download_url": "https://..."
+        }
+    """
+    manager = _get_manager(request)
+    ctx = manager.bot_context
+    if ctx is None:
+        return {"status": "ignored", "reason": "bot not running"}
+
+    body = await request.json()
+    request_id = body.get("request_id", "")
+    result = body.get("result", "")
+
+    pending = ctx.consume_pending(request_id)
+    if pending is None:
+        logger.info(
+            "Build result for unknown request_id=%s — ignoring",
+            request_id[:8],
+        )
+        return {"status": "ignored", "reason": "no pending build"}
+
+    if result == "success":
+        await ctx.on_build_success(pending, body)
+    else:
+        await ctx.on_build_failure(pending, body)
+
+    return {"status": "processed"}

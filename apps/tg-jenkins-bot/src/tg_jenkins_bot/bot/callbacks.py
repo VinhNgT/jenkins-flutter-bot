@@ -50,10 +50,6 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _on_branch_selected(update, context, data)
     elif data == "build:custom":
         await _on_custom_branch(update, context)
-    elif data.startswith("build:confirm_rebuild:"):
-        await _on_confirm_rebuild(update, context, data)
-    elif data.startswith("build:back_to_dup:"):
-        await _on_back_to_duplicate(update, context, data)
     elif data.startswith("build:confirm_cancel_rebuild:"):
         await _on_confirm_cancel_rebuild(update, context, data)
     elif data.startswith("build:do_cancel_rebuild:"):
@@ -118,88 +114,6 @@ async def _on_custom_branch(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await update.callback_query.edit_message_text("✏️ Type the branch name:")
     except Exception:
         logger.exception("Failed to edit message for custom branch")
-
-
-# ---------------------------------------------------------------------------
-# Rebuild confirmations
-# ---------------------------------------------------------------------------
-
-
-async def _on_confirm_rebuild(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Two-step: show confirmation for 'Rebuild Anyway'."""
-    assert update.callback_query is not None
-    ref = data.removeprefix("build:confirm_rebuild:")
-
-    buttons = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "✅ Yes, rebuild",
-                    callback_data=f"build:branch:{ref}",
-                ),
-                InlineKeyboardButton(
-                    "↩️ Go back",
-                    callback_data=f"build:back_to_dup:{ref}",
-                ),
-            ],
-        ]
-    )
-
-    try:
-        await update.callback_query.edit_message_text(
-            f"⚠️ Rebuild <code>{_escape(ref)}</code> anyway?\n"
-            "This will start a fresh build.",
-            parse_mode="HTML",
-            reply_markup=buttons,
-        )
-    except Exception:
-        logger.exception("Failed to show rebuild confirmation")
-
-
-async def _on_back_to_duplicate(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Restore the duplicate-detection message (go back from confirm)."""
-    assert update.callback_query is not None
-    ctx = _get_ctx(context)
-    ref = data.removeprefix("build:back_to_dup:")
-
-    last_build = ctx.last_successful_build_for_branch(ref)
-    buttons_list: list[list[InlineKeyboardButton]] = []
-    if last_build and last_build.drive_link:
-        buttons_list.append(
-            [
-                InlineKeyboardButton(
-                    "📲 Download APK",
-                    url=last_build.drive_link,
-                )
-            ]
-        )
-    buttons_list.append(
-        [
-            InlineKeyboardButton(
-                "🔄 Rebuild Anyway",
-                callback_data=f"build:confirm_rebuild:{ref[:40]}",
-            )
-        ]
-    )
-
-    app_name = _escape(ctx.config.app_name)
-    try:
-        await update.callback_query.edit_message_text(
-            f"📦 <b>{app_name}</b> is already up to date"
-            f" on <code>{_escape(ref)}</code>.",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(buttons_list),
-        )
-    except Exception:
-        logger.exception("Failed to restore duplicate message")
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +270,7 @@ async def _on_confirm_cancel(
     context: ContextTypes.DEFAULT_TYPE,
     data: str,
 ) -> None:
-    """Execute: cancel the build."""
+    """Execute: cancel the build via stack-manager."""
     assert update.callback_query is not None
     request_id = data.removeprefix("cancel:confirm:")
     ctx = _get_ctx(context)
@@ -371,15 +285,11 @@ async def _on_confirm_cancel(
             logger.exception("Failed to edit stale cancel confirm")
         return
 
-    # Cancel on Jenkins (best-effort)
-    if pending.queue_id is not None:
-        try:
-            await ctx.jenkins.cancel_build(pending.queue_id)
-        except Exception:
-            logger.exception(
-                "Failed to cancel Jenkins build (queue_id=%d)",
-                pending.queue_id,
-            )
+    # Cancel via stack-manager (best-effort)
+    try:
+        await ctx.sm_client.cancel_build(request_id)
+    except Exception:
+        logger.exception("Failed to cancel build via stack-manager")
 
     try:
         await update.callback_query.edit_message_text(

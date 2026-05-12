@@ -176,3 +176,84 @@ async def get_schema() -> dict[str, Any]:
         AGENT_INFRA, MODULE_TITLE, MODULE_DESCRIPTION
     )["fields"]
     return schema
+
+
+@control_router.get("/config")
+async def get_config() -> dict[str, Any]:
+    """Return current config values with secrets masked."""
+    import json
+    import os
+    from pathlib import Path
+
+    from .schema import AGENT_FIELDS, AGENT_INFRA
+
+    secret_keys = tuple(f.key for f in AGENT_FIELDS + AGENT_INFRA if f.secret)
+
+    config_path_str = os.environ.get("CONFIG_PATH")
+    config_path = Path(config_path_str) if config_path_str else None
+
+    data: dict[str, Any] = {}
+    if config_path and config_path.exists():
+        data = json.loads(config_path.read_text())
+
+    # Mask secrets, track lengths
+    from config_schema import nested_get, nested_set
+
+    secret_lengths: dict[str, int | bool] = {}
+    for key in secret_keys:
+        value = nested_get(data, key)
+        if value not in (None, ""):
+            secret_lengths[key] = len(str(value))
+            nested_set(data, key, None)
+        else:
+            secret_lengths[key] = False
+
+    return {"values": data, "secret_lengths": secret_lengths}
+
+
+@control_router.put("/config")
+async def put_config(request: Request) -> dict[str, Any]:
+    """Save config values with deep merge to preserve existing fields."""
+    import json
+    import os
+    from pathlib import Path
+
+    from config_schema import deep_merge, nested_get
+
+    from .schema import AGENT_FIELDS, AGENT_INFRA
+
+    config_path_str = os.environ.get("CONFIG_PATH")
+    if not config_path_str:
+        return {"status": "error", "detail": "CONFIG_PATH not set"}
+    config_path = Path(config_path_str)
+
+    payload = await request.json()
+
+    # Strip empty/None secrets to avoid overwriting existing values
+    secret_keys = tuple(f.key for f in AGENT_FIELDS + AGENT_INFRA if f.secret)
+    for key in secret_keys:
+        value = nested_get(payload, key)
+        if value is None or value == "":
+            # Walk and remove
+            parts = key.split(".")
+            container: Any = payload
+            for part in parts[:-1]:
+                if isinstance(container, dict):
+                    container = container.get(part, {})
+                else:
+                    container = None
+                    break
+            if isinstance(container, dict):
+                container.pop(parts[-1], None)
+
+    # Deep merge with existing
+    existing: dict[str, Any] = {}
+    if config_path.exists():
+        existing = json.loads(config_path.read_text())
+
+    merged = deep_merge(existing, payload)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(merged, indent=2))
+
+    return {"status": "saved"}
+

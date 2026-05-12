@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 class JenkinsTriggerError(Exception):
     """Raised when a Jenkins build trigger fails.
 
-    Carries both a technical `detail` for logs and a jargon-free
-    `user_message` suitable for display in Telegram messages.
+    Carries both a technical ``detail`` for logs and a jargon-free
+    ``user_message`` suitable for display in frontend notifications.
     """
 
     def __init__(self, detail: str, user_message: str) -> None:
@@ -27,7 +27,7 @@ def _extract_params(build: dict[str, Any]) -> dict[str, str]:
     """Extract build parameters from Jenkins actions array.
 
     Jenkins stores parameters inside an actions array as:
-    [{"parameters": [{"name": "BRANCH", "value": "main"}, ...]}, ...]
+    ``[{"parameters": [{"name": "BRANCH", "value": "main"}, ...]}, ...]``
     """
     for action in build.get("actions", []):
         params = action.get("parameters")
@@ -51,7 +51,7 @@ class JenkinsBuild:
 
 
 class JenkinsClient:
-    """Triggers parameterized Jenkins builds and queries build history."""
+    """Triggers parameterised Jenkins builds and queries build history."""
 
     def __init__(self, url: str, user: str, api_token: str, job_name: str) -> None:
         self.base_url = url.rstrip("/")
@@ -70,8 +70,9 @@ class JenkinsClient:
     async def get_builds(self, count: int = 20) -> list[JenkinsBuild]:
         """Fetch recent builds from Jenkins with their parameters.
 
-        Returns up to `count` builds. Caller is responsible for filtering
-        to only bot-triggered builds (by matching request_id).
+        Returns up to ``count`` builds.  The caller is responsible for
+        filtering to only orchestrator-triggered builds (by matching
+        ``request_id``).
         """
         tree = (
             "builds[number,result,building,timestamp,duration,"
@@ -120,11 +121,12 @@ class JenkinsClient:
         request_id: str,
         job_id: str,
     ) -> int:
-        """Trigger a parameterized Jenkins build.
+        """Trigger a parameterised Jenkins build.
 
         Returns the queue item ID on success.
 
-        Raises JenkinsTriggerError with a user-friendly message on failure.
+        Raises ``JenkinsTriggerError`` with a user-friendly message on
+        failure.
         """
         url = f"{self.job_url}/buildWithParameters"
         params = {

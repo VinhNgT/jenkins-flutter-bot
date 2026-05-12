@@ -16,6 +16,10 @@ services:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/flutter-agent:${IMAGE_TAG:-latest}
 
+  file-manager:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/file-manager:${IMAGE_TAG:-latest}
+
   tg-admin-bot:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-admin-bot:${IMAGE_TAG:-latest}

@@ -27,17 +27,22 @@ services:
     environment:
       BOT_CONTROL_URL: http://tg-bot:9090
       AGENT_CONTROL_URL: http://flutter-agent:9091
+      FILE_MANAGER_CONTROL_URL: http://file-manager:9092
+      SM_SERVICE_URL: http://stack-manager:9000
       # stack-manager owns all config volumes
       BOT_CONFIG_PATH: /config/bot/bot.json
       AGENT_CONFIG_PATH: /config/agent/agent.json
       DRIVE_CONFIG_PATH: /config/drive/drive.json
+      BUILD_DATA_PATH: /app/data
     volumes:
       - bot-config:/config/bot
       - agent-config:/config/agent
       - drive-config:/config/drive
+      - sm-data:/app/data
     depends_on:
       - tg-bot
       - flutter-agent
+      - file-manager
     networks:
       - jenkins
 
@@ -53,11 +58,10 @@ services:
     environment:
       CONFIG_PATH: /config/bot/bot.json
       BOT_SERVICE_URL: "http://tg-bot:9090"
-      JENKINS_URL: "http://jenkins:8080"
+      STACK_MANAGER_URL: "http://stack-manager:9000"
     expose:
       - "9090"
     volumes:
-      # Same mount point as stack-manager for bot-config volume
       - bot-config:/config/bot
       - bot-data:/app/data
     networks:
@@ -85,6 +89,21 @@ services:
     networks:
       - jenkins
 
+  file-manager:
+    build:
+      context: ..
+      dockerfile: apps/file-manager/Dockerfile
+    container_name: file-manager
+    restart: on-failure
+    environment:
+      CONFIG_PATH: /config/storage.json
+    expose:
+      - "9092"
+    volumes:
+      - storage-config:/config
+    networks:
+      - jenkins
+
   tg-admin-bot:
     build:
       context: ..
@@ -105,7 +124,9 @@ volumes:
   bot-config:
   agent-config:
   drive-config:
+  storage-config:
   bot-data:
+  sm-data:
 
 networks:
   jenkins:

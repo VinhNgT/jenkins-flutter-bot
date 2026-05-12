@@ -1,7 +1,8 @@
 """StackManager — the central operational hub.
 
-Owns all shared state (config paths, ServiceClient, DriveOAuth) and
-provides high-level methods that routes delegate to.
+Owns all shared state (config paths, ServiceClient, BuildOrchestrator,
+file-manager proxy) and provides high-level methods that routes
+delegate to.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import httpx
 from config_schema import deep_merge, nested_get, serialize_schema
 
 from .config_store import (
@@ -21,7 +23,7 @@ from .config_store import (
     strip_secrets,
     write_json,
 )
-from .drive import DriveOAuth
+from .builds.orchestrator import BuildOrchestrator
 from .env_io import (
     build_export_tarball,
     generate_compose_vars,
@@ -49,20 +51,14 @@ class ConfigPaths:
     bot: Path | None
     agent: Path | None
     drive: Path | None
-    oauth_token: Path
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ConfigPaths:
         """Derive config paths from settings."""
-        if settings.bot_config_path is not None:
-            oauth_token = settings.bot_config_path.parent / "oauth.json"
-        else:
-            oauth_token = Path("data/oauth.json")
         return cls(
             bot=settings.bot_config_path,
             agent=settings.agent_config_path,
             drive=settings.drive_config_path,
-            oauth_token=oauth_token,
         )
 
 
@@ -74,12 +70,23 @@ class StackManager:
     """
 
     def __init__(self, settings: Settings) -> None:
+        self.settings = settings
         self.paths = ConfigPaths.from_settings(settings)
         self.services = ServiceClient(
             bot_url=settings.bot_control_url,
             agent_url=settings.agent_control_url,
+            file_manager_url=settings.file_manager_url,
         )
-        self.drive_oauth = DriveOAuth(self.paths.oauth_token)
+        self.orchestrator = BuildOrchestrator(
+            data_dir=settings.build_data_path,
+            sm_service_url=settings.sm_service_url,
+            file_manager_url=settings.file_manager_url or "http://file-manager:9092",
+        )
+        self.fm_client = httpx.AsyncClient(timeout=10.0)
+
+    async def close(self) -> None:
+        """Shut down reusable HTTP clients."""
+        await self.fm_client.aclose()
 
     # ------------------------------------------------------------------
     # Config I/O
@@ -94,7 +101,26 @@ class StackManager:
 
     def load_config(self, scope: str) -> dict[str, Any]:
         """Load a config JSON file by scope name."""
+        if scope == "storage":
+            return self._fetch_storage_config_sync()
         return load_json(self._scope_path(scope))
+
+    def _fetch_storage_config_sync(self) -> dict[str, Any]:
+        """Fetch current config from file-manager (blocking fallback).
+
+        Config routes are sync so we use the sync httpx client here.
+        For production the storage config should be fetched async.
+        """
+        url = self.settings.file_manager_url
+        if not url:
+            return {}
+        try:
+            resp = httpx.get(f"{url}/control/config", timeout=5.0)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception:
+            logger.exception("Failed to fetch storage config")
+            return {}
 
     def save_config(
         self,
@@ -114,13 +140,14 @@ class StackManager:
     # ------------------------------------------------------------------
 
     async def fetch_all_schemas(self) -> dict[str, Any]:
-        """Fetch schemas from bot/agent services, plus local drive schema."""
+        """Fetch schemas from bot/agent/file-manager services, plus local drive schema."""
         schemas: dict[str, Any] = {
             "bot": await self.services.schema("bot"),
             "agent": await self.services.schema("agent"),
             "drive": serialize_schema(
                 DRIVE_FIELDS, DRIVE_MODULE_TITLE, DRIVE_MODULE_DESCRIPTION
             ),
+            "storage": await self.services.schema("file_manager"),
         }
         return schemas
 
@@ -141,9 +168,9 @@ class StackManager:
         agent_secrets = extract_secret_fields(agent_schema)
 
         raw = {
-            "bot": self.load_config("bot"),
-            "agent": self.load_config("agent"),
-            "drive": self.load_config("drive"),
+            "bot": load_json(self.paths.bot),
+            "agent": load_json(self.paths.agent),
+            "drive": load_json(self.paths.drive),
         }
 
         return {
@@ -159,12 +186,30 @@ class StackManager:
 
     async def save_scope(self, scope: str, payload: dict[str, Any]) -> None:
         """Save config for a scope, determining secrets dynamically."""
+        if scope == "storage":
+            await self._save_storage_config(payload)
+            return
         if scope == "drive":
             secret_fields = DRIVE_SECRET_FIELDS
         else:
             schema = await self.services.schema(scope)
             secret_fields = extract_secret_fields(schema)
         self.save_config(scope, payload, secret_fields)
+
+    async def _save_storage_config(self, payload: dict[str, Any]) -> None:
+        """Proxy a config save to the file-manager service."""
+        url = self.settings.file_manager_url
+        if not url:
+            logger.error("Cannot save storage config — file_manager_url not set")
+            return
+        try:
+            resp = await self.fm_client.put(
+                f"{url}/control/config",
+                json=payload,
+            )
+            resp.raise_for_status()
+        except Exception:
+            logger.exception("Failed to save storage config via file-manager")
 
     # ------------------------------------------------------------------
     # Export / Import
@@ -180,9 +225,9 @@ class StackManager:
             DRIVE_INFRA, DRIVE_MODULE_TITLE, DRIVE_MODULE_DESCRIPTION
         )["fields"]
 
-        bot_data = self.load_config("bot")
-        agent_data = self.load_config("agent")
-        drive_data = self.load_config("drive")
+        bot_data = load_json(self.paths.bot)
+        agent_data = load_json(self.paths.agent)
+        drive_data = load_json(self.paths.drive)
 
         files, warnings = generate_env_files(
             bot_config=bot_data,
@@ -211,16 +256,14 @@ class StackManager:
         )["fields"]
 
         files, _ = generate_env_files(
-            bot_config=self.load_config("bot"),
-            agent_config=self.load_config("agent"),
+            bot_config=load_json(self.paths.bot),
+            agent_config=load_json(self.paths.agent),
             bot_schema=bot_schema,
             agent_schema=agent_schema,
-            drive_config=self.load_config("drive"),
+            drive_config=load_json(self.paths.drive),
             drive_schema=drive_schema,
         )
-        return build_export_tarball(
-            files, oauth_token_path=self.drive_oauth.token_path
-        )
+        return build_export_tarball(files)
 
     async def import_tarball(self, raw: bytes) -> dict[str, Any]:
         """Import a config tarball, apply changes, and restart services."""
@@ -235,7 +278,6 @@ class StackManager:
             agent_schema=agent_schema,
             bot_config_path=self.paths.bot,
             agent_config_path=self.paths.agent,
-            oauth_dest_path=self.drive_oauth.token_path,
             drive_schema=drive_schema,
             drive_config_path=self.paths.drive,
         )
@@ -291,19 +333,3 @@ class StackManager:
             "script_private": script_private,
             "warnings": warnings,
         }
-
-    # ------------------------------------------------------------------
-    # Drive OAuth helpers
-    # ------------------------------------------------------------------
-
-    def _drive_credentials(self) -> tuple[str, str]:
-        """Read drive client_id and client_secret from config."""
-        drive_data = self.load_config("drive")
-        client_id = nested_get(drive_data, "drive.client_id") or ""
-        client_secret = nested_get(drive_data, "drive.client_secret") or ""
-        return client_id, client_secret
-
-    def drive_status(self) -> dict[str, Any]:
-        """Return current Drive OAuth connection status."""
-        client_id, client_secret = self._drive_credentials()
-        return self.drive_oauth.status(client_id, client_secret)

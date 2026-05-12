@@ -1,4 +1,4 @@
-"""Entry point — runs the FastAPI control/webhook server."""
+"""Entry point — runs the FastAPI control/callback server."""
 
 from __future__ import annotations
 
@@ -10,8 +10,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from .config import Config
-from .control import BotManager, control_router
-from .jenkins.webhook import webhook_router
+from .control import BotManager, callback_event_router, control_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,11 +39,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
-    """Create the FastAPI app hosting webhook and control routes."""
+    """Create the FastAPI app hosting callback and control routes."""
     app = FastAPI(title="tg-jenkins-bot", lifespan=lifespan)
     app.state.manager = BotManager()
     app.include_router(control_router)
-    app.include_router(webhook_router)
+    app.include_router(callback_event_router)
     return app
 
 

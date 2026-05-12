@@ -1,4 +1,4 @@
-"""GitLab API client for querying branch HEAD commits."""
+"""Git remote client for querying branch HEAD commits."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Request timeout — fast enough to not block /build noticeably,
+# Request timeout — fast enough to not block the trigger noticeably,
 # long enough for high-latency self-hosted instances.
 _TIMEOUT = 5.0
 
@@ -17,8 +17,8 @@ _TIMEOUT = 5.0
 class GitRemoteClient:
     """Queries a GitLab instance for the latest commit on a branch.
 
-    Used by the build handler to detect duplicate builds — if the remote
-    HEAD matches the last built commit, the build is redundant.
+    Used by the build orchestrator to detect duplicate builds — if the
+    remote HEAD matches the last built commit, the build is redundant.
 
     All methods are fail-safe: network errors, auth failures, and
     unexpected responses return ``None`` rather than raising.  The caller
@@ -37,7 +37,7 @@ class GitRemoteClient:
         """Return the HEAD commit SHA of a remote branch, or None on failure.
 
         Calls the GitLab Branches API:
-            GET /api/v4/projects/{id}/repository/branches/{branch}
+            ``GET /api/v4/projects/{id}/repository/branches/{branch}``
 
         Returns the full 40-character commit SHA from ``commit.id``,
         or ``None`` if the request fails for any reason.

@@ -1,4 +1,4 @@
-"""Google Drive OAuth API routes."""
+"""Google Drive OAuth API routes — proxies to file-manager service."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import json
 import logging
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 
-from ..config_store import load_json
 from ..manager import StackManager
 
 logger = logging.getLogger(__name__)
@@ -16,99 +16,79 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/drive", tags=["drive"])
 
 
-def _drive_credentials(
-    drive_data: dict[str, Any],
-) -> tuple[str | None, str | None]:
-    """Extract Drive client credentials from drive config."""
-    from config_schema import nested_get
-
-    client_id = nested_get(drive_data, "drive.client_id")
-    client_secret = nested_get(drive_data, "drive.client_secret")
-    return (
-        str(client_id) if client_id not in (None, "") else None,
-        str(client_secret) if client_secret not in (None, "") else None,
-    )
-
-
-def _drive_callback_url(request: Request) -> str:
-    """Build the OAuth callback URL from the current request context."""
-    return str(request.url_for("drive_oauth_callback"))
-
-
 @router.get("/status")
 async def get_drive_status(request: Request) -> dict[str, Any]:
-    """Return current Google Drive connection status."""
+    """Return current Google Drive connection status from file-manager."""
     manager: StackManager = request.app.state.manager
-    drive_data = load_json(manager.paths.drive)
-    client_id, client_secret = _drive_credentials(drive_data)
-
-    if not client_id or not client_secret:
-        return {
-            "configured": False,
-            "connected": False,
-            "token_path": str(manager.drive_oauth.token_path),
-        }
-
-    status = manager.drive_oauth.status(client_id, client_secret)
-    status["configured"] = True
-    return status
+    try:
+        resp = await manager.fm_client.get(
+            f"{manager.settings.file_manager_url}/api/auth/status"
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception:
+        logger.exception("Failed to reach file-manager for drive status")
+        return {"configured": False, "connected": False, "available": False}
 
 
 @router.post("/connect/start")
 async def start_drive_connect(request: Request) -> dict[str, Any]:
-    """Start the Drive OAuth flow — returns the authorization URL."""
+    """Start the Drive OAuth flow via file-manager — returns the auth URL."""
     manager: StackManager = request.app.state.manager
-    drive_data = load_json(manager.paths.drive)
-    client_id, client_secret = _drive_credentials(drive_data)
 
-    if not client_id or not client_secret:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Configure the Drive client ID and client secret "
-                "in the Google Drive tab first."
-            ),
-        )
+    # Build the redirect URI from the current request context so the
+    # OAuth callback comes back to *this* service (stack-manager), which
+    # then proxies the exchange to file-manager.
+    callback_url = str(request.url_for("drive_oauth_callback"))
 
-    return {
-        "auth_url": manager.drive_oauth.start(
-            client_id,
-            client_secret,
-            _drive_callback_url(request),
+    try:
+        resp = await manager.fm_client.post(
+            f"{manager.settings.file_manager_url}/api/auth/connect/start",
+            json={"redirect_uri": callback_url},
         )
-    }
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        logger.exception("file-manager rejected OAuth start")
+        detail = exc.response.text if exc.response else str(exc)
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except Exception as exc:
+        logger.exception("Cannot reach file-manager for OAuth start")
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @router.post("/connect/exchange")
 async def exchange_drive_code(request: Request) -> dict[str, Any]:
     """Exchange a manually-pasted auth code for tokens (headless flow).
 
-    Used by tg-admin-bot via the stack-manager API instead of managing
-    DriveOAuth directly.
+    Used by tg-admin-bot via the stack-manager API.
     """
     manager: StackManager = request.app.state.manager
     body = await request.json()
-    code = body.get("code", "")
-    client_id = body.get("client_id", "")
-    client_secret = body.get("client_secret", "")
-
-    if not code or not client_id or not client_secret:
-        raise HTTPException(
-            status_code=400,
-            detail="code, client_id, and client_secret are required.",
-        )
 
     try:
-        manager.drive_oauth.exchange_code(code, client_id, client_secret)
-        return {"success": True}
+        resp = await manager.fm_client.post(
+            f"{manager.settings.file_manager_url}/api/auth/connect/exchange",
+            json=body,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        logger.exception("file-manager rejected code exchange")
+        detail = exc.response.text if exc.response else str(exc)
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
     except Exception as exc:
-        logger.exception("Drive code exchange failed")
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.exception("Cannot reach file-manager for code exchange")
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @router.get("/oauth/callback", name="drive_oauth_callback")
 async def drive_oauth_callback(request: Request) -> Any:
-    """Handle the Google OAuth redirect callback."""
+    """Handle the Google OAuth redirect callback.
+
+    Receives the OAuth redirect from Google, then proxies the full
+    callback URL to file-manager for token exchange.
+    """
     from fastapi.templating import Jinja2Templates
 
     manager: StackManager = request.app.state.manager
@@ -137,28 +117,16 @@ async def drive_oauth_callback(request: Request) -> Any:
             status_code=400,
         )
 
+    # Forward the full callback URL to file-manager for token exchange
     try:
-        manager.drive_oauth.exchange_callback(str(request.url))
-    except RuntimeError as exc:
-        return templates.TemplateResponse(
-            request=request,
-            name="oauth_callback.html",
-            context={
-                "title": "Google Drive Connection Failed",
-                "message": str(exc),
-                "payload_json": json.dumps(
-                    {
-                        "type": "drive-oauth-complete",
-                        "success": False,
-                        "message": str(exc),
-                    }
-                ),
-            },
-            status_code=400,
+        resp = await manager.fm_client.post(
+            f"{manager.settings.file_manager_url}/api/auth/callback",
+            json={"authorization_response": str(request.url)},
         )
+        resp.raise_for_status()
     except Exception as exc:
         msg = f"Drive authorization failed: {exc}"
-        logger.exception("Drive OAuth callback failed")
+        logger.exception("Drive OAuth callback proxy failed")
         return templates.TemplateResponse(
             request=request,
             name="oauth_callback.html",
@@ -196,9 +164,14 @@ async def drive_oauth_callback(request: Request) -> Any:
 
 @router.delete("/token")
 async def disconnect_drive(request: Request) -> dict[str, Any]:
-    """Delete the saved OAuth token, disconnecting the current Google account."""
+    """Disconnect Drive by deleting OAuth tokens via file-manager."""
     manager: StackManager = request.app.state.manager
-    deleted = manager.drive_oauth.delete_tokens()
-    if not deleted:
-        return {"disconnected": False, "detail": "No token file found."}
-    return {"disconnected": True}
+    try:
+        resp = await manager.fm_client.delete(
+            f"{manager.settings.file_manager_url}/api/auth/token"
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception:
+        logger.exception("Failed to disconnect Drive via file-manager")
+        return {"disconnected": False, "detail": "Cannot reach file-manager."}

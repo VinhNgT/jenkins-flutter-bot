@@ -1,4 +1,4 @@
-"""HTTP client for bot and agent control APIs."""
+"""HTTP client for bot, agent, and file-manager control APIs."""
 
 from __future__ import annotations
 
@@ -11,21 +11,29 @@ logger = logging.getLogger(__name__)
 
 
 class ServiceClient:
-    """Call bot and agent control endpoints over the internal network.
+    """Call bot, agent, and file-manager control endpoints over the internal network.
 
     Decoupled from any framework — constructor takes raw URLs instead of
     a settings object.
     """
 
-    def __init__(self, bot_url: str | None, agent_url: str | None) -> None:
+    def __init__(
+        self,
+        bot_url: str | None,
+        agent_url: str | None,
+        file_manager_url: str | None = None,
+    ) -> None:
         self._bot_url = bot_url
         self._agent_url = agent_url
+        self._file_manager_url = file_manager_url
 
     def _service_url(self, service: str) -> str | None:
         if service == "bot":
             return self._bot_url
         if service == "agent":
             return self._agent_url
+        if service == "file_manager":
+            return self._file_manager_url
         raise ValueError(f"Unknown service: {service}")
 
     async def _control(

@@ -1,6 +1,6 @@
 # config-hub
 
-Centralized configuration proxy and web dashboard for the Jenkins Flutter Bot ecosystem. Serves as the single operational entry point for all configuration management, service control, OAuth flows, and UI tooling.
+Centralized configuration proxy and web dashboard for the Jenkins Flutter Bot microservice ecosystem. Serves as the single operational entry point for all configuration management, service control, OAuth flows, and UI tooling.
 
 ## Features
 

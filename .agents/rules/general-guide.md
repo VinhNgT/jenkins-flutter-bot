@@ -5,13 +5,13 @@ description: Core architectural reference — project identity, repo layout, ser
 
 # Jenkins Flutter Bot — AI Agent Guide
 
-This is the core architectural reference for the **jenkins-flutter-bot** monorepo. It loads on every interaction. For detailed guidance on specific topics, see the companion rule files.
+This is the core architectural reference for the **jenkins-flutter-bot** monorepo, which implements a microservice architecture. It loads on every interaction. For detailed guidance on specific topics, see the companion rule files.
 
 ---
 
 ## What This Project Is
 
-A self-hosted CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins and delivers APKs through Google Drive. Seven containerized services coordinate over an internal Docker network.
+A self-hosted microservice CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins and delivers APKs through Google Drive. Seven containerized microservices coordinate over an internal Docker network.
 
 **It is NOT a build system.** It is a thin orchestration layer around Jenkins. All cloning, compiling, and artifact packaging is delegated to a Jenkins pipeline running on a Flutter-capable agent.
 
@@ -19,7 +19,7 @@ A self-hosted CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins
 
 ## Repository Layout
 
-The monorepo uses a **uv workspace** with two top-level directories for code:
+The monorepo uses a **uv workspace** to manage its microservices, with two top-level directories for code:
 
 - **`apps/`** — Seven deployable Python applications, each with a Dockerfile, `pyproject.toml`, and `src/<package>/` layout.
 - **`libs/`** — One shared workspace library consumed by the apps.

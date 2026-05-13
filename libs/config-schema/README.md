@@ -1,6 +1,6 @@
 # 📋 Config Schema
 
-A shared workspace library providing the declarative configuration schema framework used by all services in the Jenkins Flutter Bot ecosystem.
+A shared workspace library providing the declarative configuration schema framework used by all microservices in the Jenkins Flutter Bot ecosystem.
 
 ## What It Provides
 

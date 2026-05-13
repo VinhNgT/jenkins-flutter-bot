@@ -4,13 +4,13 @@ version = "0.2.0-dev.2"
 description = "HTTP control wrapper for a Jenkins inbound agent process"
 requires-python = ">=3.12"
 dependencies = [
-    "config-schema",
+    "config-core",
     "fastapi>=0.111.0",
     "uvicorn>=0.29.0",
 ]
 
 [tool.uv.sources]
-config-schema = { workspace = true }
+config-core = { workspace = true }
 
 [project.scripts]
 agent-control = "agent_control.main:cli"

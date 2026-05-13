@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from config_schema import nested_get, nested_set
+from config_core import ConfigDocument
 from fastapi import HTTPException
 
 
@@ -97,10 +97,11 @@ def strip_secrets(
     to tell the frontend which secrets have been configured.
     """
     stripped = json.loads(json.dumps(data))
+    doc = ConfigDocument(stripped)
     for field in secret_fields:
-        if nested_get(stripped, field) is not None:
-            nested_set(stripped, field, None)
-    return stripped
+        if doc.get(field) is not None:
+            doc.set(field, None)
+    return doc.data
 
 
 def secrets_set(
@@ -116,8 +117,9 @@ def secrets_set(
         {"telegram.bot_token": 46, "jenkins.api_token": False}
     """
     result: dict[str, int | bool] = {}
+    doc = ConfigDocument(data)
     for field in secret_fields:
-        value = nested_get(data, field)
+        value = doc.get(field)
         if value not in (None, ""):
             result[field] = len(str(value))
         else:
@@ -135,8 +137,9 @@ def clean_secrets_from_payload(
     the secret field.  Absent keys are preserved by ``deep_merge()``.
     """
     cleaned = json.loads(json.dumps(incoming))
+    doc = ConfigDocument(cleaned)
     for field in secret_fields:
-        value = nested_get(cleaned, field)
+        value = doc.get(field)
         if value is None or value == "":
             _nested_remove(cleaned, field)
-    return cleaned
+    return doc.data

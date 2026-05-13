@@ -12,8 +12,8 @@ resolution-markers = [
 members = [
     "agent-control",
     "build-manager",
+    "config-core",
     "config-hub",
-    "config-schema",
     "file-manager",
     "jenkins-flutter-bot",
     "mock-jenkins",
@@ -26,14 +26,14 @@ name = "agent-control"
 version = "0.2.0.dev2"
 source = { editable = "apps/agent-control" }
 dependencies = [
-    { name = "config-schema" },
+    { name = "config-core" },
     { name = "fastapi" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "config-schema", editable = "libs/config-schema" },
+    { name = "config-core", editable = "libs/config-core" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "uvicorn", specifier = ">=0.29.0" },
 ]
@@ -133,7 +133,7 @@ name = "build-manager"
 version = "0.2.0.dev2"
 source = { editable = "apps/build-manager" }
 dependencies = [
-    { name = "config-schema" },
+    { name = "config-core" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "python-multipart" },
@@ -142,7 +142,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "config-schema", editable = "libs/config-schema" },
+    { name = "config-core", editable = "libs/config-core" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
@@ -319,11 +319,28 @@ wheels = [
 ]
 
 [[package]]
+name = "config-core"
+version = "0.2.0.dev2"
+source = { editable = "libs/config-core" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.7.1" },
+    { name = "pydantic-settings", specifier = ">=2.2.1" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+]
+
+[[package]]
 name = "config-hub"
 version = "0.2.0.dev2"
 source = { editable = "apps/config-hub" }
 dependencies = [
-    { name = "config-schema" },
+    { name = "config-core" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "jinja2" },
@@ -333,24 +350,13 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "config-schema", editable = "libs/config-schema" },
+    { name = "config-core", editable = "libs/config-core" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "uvicorn", specifier = ">=0.29.0" },
 ]
-
-[[package]]
-name = "config-schema"
-version = "0.2.0.dev2"
-source = { editable = "libs/config-schema" }
-dependencies = [
-    { name = "python-dotenv" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "python-dotenv", specifier = ">=1.0.0" }]
 
 [[package]]
 name = "cryptography"
@@ -426,7 +432,7 @@ name = "file-manager"
 version = "0.2.0.dev2"
 source = { editable = "apps/file-manager" }
 dependencies = [
-    { name = "config-schema" },
+    { name = "config-core" },
     { name = "fastapi" },
     { name = "google-api-python-client" },
     { name = "google-auth-oauthlib" },
@@ -437,7 +443,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "config-schema", editable = "libs/config-schema" },
+    { name = "config-core", editable = "libs/config-core" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "google-api-python-client", specifier = ">=2.130.0" },
     { name = "google-auth-oauthlib", specifier = ">=1.2.0" },
@@ -981,6 +987,20 @@ wheels = [
 ]
 
 [[package]]
+name = "pydantic-settings"
+version = "2.14.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "typing-inspection" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/60/1d1e59c9c90d54591469ada7d268251f71c24bdb765f1a8a832cee8c6653/pydantic_settings-2.14.1.tar.gz", hash = "sha256:e874d3bec7e787b0c9958277956ed9b4dd5de6a80e162188fdaff7c5e26fd5fa", size = 235551, upload-time = "2026-05-08T13:40:06.542Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ae/8d/f1af3832f5e6eb13ba94ee809e72b8ecb5eef226d27ee0bef7d963d943c7/pydantic_settings-2.14.1-py3-none-any.whl", hash = "sha256:6e3c7edfd8277687cdc598f56e5cff0e9bfff0910a3749deaa8d4401c3a2b9de", size = 60964, upload-time = "2026-05-08T13:40:04.958Z" },
+]
+
+[[package]]
 name = "pyparsing"
 version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1123,7 +1143,7 @@ name = "tg-jenkins-bot"
 version = "0.3.0.dev1"
 source = { editable = "apps/tg-jenkins-bot" }
 dependencies = [
-    { name = "config-schema" },
+    { name = "config-core" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "python-telegram-bot", extra = ["ext"] },
@@ -1132,7 +1152,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "config-schema", editable = "libs/config-schema" },
+    { name = "config-core", editable = "libs/config-core" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "python-telegram-bot", extras = ["ext"], specifier = ">=21.0" },

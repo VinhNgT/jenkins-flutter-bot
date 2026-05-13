@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from config_schema import deep_merge, nested_get, nested_set
+from config_core import ConfigDocument
 
 from .config_store import load_json, write_json
 
@@ -122,7 +122,8 @@ def _build_env_lines(
             if description:
                 lines.append(f"# {description}")
 
-            raw = nested_get(config_data, key)
+            doc = ConfigDocument(config_data)
+            raw = doc.get(key)
 
             # Field has a value — emit it
             if raw not in (None, "", []):
@@ -246,7 +247,8 @@ def generate_compose_vars(
 
         key = field_def["key"]
         value_type = field_def.get("value_type", "str")
-        raw = nested_get(config_data, key)
+        doc = ConfigDocument(config_data)
+        raw = doc.get(key)
 
         if raw not in (None, "", []):
             value = _serialize_value(raw, value_type)
@@ -413,7 +415,8 @@ def _parse_env_content(
 
         # Set the value via dotted key
         dotted_key = field_def["key"]
-        nested_set(target_patch, dotted_key, value)
+        doc = ConfigDocument(target_patch)
+        doc.set(dotted_key, value)
         applied.append(f"{env_var} → {scope}:{dotted_key} = {value}")
 
     return (
@@ -478,9 +481,17 @@ def import_tarball(
                     bp, ap, dp, applied, skipped, unrec, errors = _parse_env_content(
                         content, bot_lookup, agent_lookup, drive_lookup
                     )
-                    bot_patch = deep_merge(bot_patch, bp)
-                    agent_patch = deep_merge(agent_patch, ap)
-                    drive_patch = deep_merge(drive_patch, dp)
+                    bot_doc = ConfigDocument(bot_patch)
+                    bot_doc.merge(bp)
+                    bot_patch = bot_doc.data
+                    
+                    agent_doc = ConfigDocument(agent_patch)
+                    agent_doc.merge(ap)
+                    agent_patch = agent_doc.data
+                    
+                    drive_doc = ConfigDocument(drive_patch)
+                    drive_doc.merge(dp)
+                    drive_patch = drive_doc.data
                     all_applied.extend(applied)
                     all_skipped.extend(skipped)
                     all_unrecognized.extend(unrec)
@@ -505,18 +516,21 @@ def import_tarball(
     # Write patches to config files using deep merge
     if bot_patch and bot_config_path:
         existing = load_json(bot_config_path)
-        merged = deep_merge(existing, bot_patch)
-        write_json(bot_config_path, merged)
+        doc = ConfigDocument(existing)
+        doc.merge(bot_patch)
+        write_json(bot_config_path, doc.data)
 
     if agent_patch and agent_config_path:
         existing = load_json(agent_config_path)
-        merged = deep_merge(existing, agent_patch)
-        write_json(agent_config_path, merged)
+        doc = ConfigDocument(existing)
+        doc.merge(agent_patch)
+        write_json(agent_config_path, doc.data)
 
     if drive_patch and drive_config_path:
         existing = load_json(drive_config_path)
-        merged = deep_merge(existing, drive_patch)
-        write_json(drive_config_path, merged)
+        doc = ConfigDocument(existing)
+        doc.merge(drive_patch)
+        write_json(drive_config_path, doc.data)
 
     # Warn about required fields still missing after import
     for lookup, config_path, scope in [
@@ -530,7 +544,8 @@ def import_tarball(
         for env_var, field_def in lookup.items():
             if not field_def.get("required"):
                 continue
-            val = nested_get(current, field_def["key"])
+            doc = ConfigDocument(current)
+            val = doc.get(field_def["key"])
             if val in (None, "", []):
                 label = field_def.get("label", field_def["key"])
                 all_warnings.append(

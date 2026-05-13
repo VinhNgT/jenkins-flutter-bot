@@ -1,10 +1,12 @@
 [project]
-name = "config-schema"
+name = "config-core"
 version = "0.2.0-dev.2"
-description = "Declarative configuration schema framework for the Jenkins Flutter Bot stack"
+description = "Configuration core framework for the Jenkins Flutter Bot stack based on Pydantic"
 requires-python = ">=3.12"
 dependencies = [
     "python-dotenv>=1.0.0",
+    "pydantic>=2.7.1",
+    "pydantic-settings>=2.2.1"
 ]
 
 [build-system]

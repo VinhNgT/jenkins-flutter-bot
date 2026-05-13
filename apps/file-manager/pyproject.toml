@@ -4,7 +4,7 @@ version = "0.2.0-dev.2"
 description = "Backend-agnostic file storage service for the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [
-    "config-schema",
+    "config-core",
     "fastapi>=0.111.0",
     "google-api-python-client>=2.130.0",
     "google-auth-oauthlib>=1.2.0",
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-config-schema = { workspace = true }
+config-core = { workspace = true }
 
 [project.scripts]
 file-manager = "file_manager.main:cli"

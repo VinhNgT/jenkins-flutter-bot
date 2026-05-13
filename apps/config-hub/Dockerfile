@@ -8,8 +8,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Shared library
-COPY libs/config-schema/pyproject.toml libs/config-schema/
-COPY libs/config-schema/src libs/config-schema/src
+COPY libs/config-core/pyproject.toml libs/config-core/
+COPY libs/config-core/src libs/config-core/src
 
 # This app
 COPY apps/config-hub/pyproject.toml apps/config-hub/

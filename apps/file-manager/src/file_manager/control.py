@@ -8,12 +8,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-from config_schema import deep_merge
+from config_core import ConfigDocument, get_frontend_schema
 from fastapi import APIRouter, Request
 
 from .backends.google_drive import GoogleDriveBackend
 from .config import StorageConfig, _DEFAULT_CONFIG_PATH
-from .schema import get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +86,26 @@ async def status(request: Request) -> dict[str, Any]:
     return result
 
 
+def _get_secret_keys() -> list[str]:
+    keys = []
+    for name, field in StorageConfig.model_fields.items():
+        extra = field.json_schema_extra or {}
+        if extra.get("secret"):
+            keys.append(extra.get("json_key", name))
+    return keys
+
+
 @control_router.get("/schema")
 async def schema() -> dict[str, Any]:
-    return get_registry().serialize()
+    return get_frontend_schema(
+        StorageConfig,
+        title="File Storage Configuration",
+        description=(
+            "Configures the storage backend used for uploading build artifacts."
+            " The current implementation uses Google Drive — enter your OAuth"
+            " credentials below, then connect via the dashboard."
+        )
+    )
 
 
 @control_router.get("/config")
@@ -101,28 +117,19 @@ async def get_config(request: Request) -> dict[str, Any]:
         return {"values": {}, "secret_lengths": {}}
 
     data = json.loads(config_path.read_text())
+    doc = ConfigDocument(data)
 
     # Mask secrets
-    secret_lengths: dict[str, int] = {}
-    for key in get_registry().secret_keys:
-        parts = key.split(".")
-        current: Any = data
-        for part in parts:
-            if isinstance(current, dict):
-                current = current.get(part)
-            else:
-                current = None
-                break
-        if current and isinstance(current, str):
-            secret_lengths[key] = len(current)
-            # Remove the secret from the response
-            container = data
-            for part in parts[:-1]:
-                container = container.get(part, {})
-            if isinstance(container, dict):
-                container.pop(parts[-1], None)
+    secret_lengths: dict[str, int | bool] = {}
+    for key in _get_secret_keys():
+        value = doc.get(key)
+        if value not in (None, ""):
+            secret_lengths[key] = len(str(value))
+            doc.set(key, None)
+        else:
+            secret_lengths[key] = False
 
-    return {"values": data, "secret_lengths": secret_lengths}
+    return {"values": doc.data, "secret_lengths": secret_lengths}
 
 
 @control_router.put("/config")
@@ -132,28 +139,33 @@ async def put_config(request: Request) -> dict[str, Any]:
     config_path = mgr._config_path()
 
     payload = await request.json()
+    payload_doc = ConfigDocument(payload)
 
     # Strip empty/None secrets to avoid overwriting existing values
-    for key in get_registry().secret_keys:
-        parts = key.split(".")
-        container: Any = payload
-        for part in parts[:-1]:
+    for key in _get_secret_keys():
+        value = payload_doc.get(key)
+        if value is None or value == "":
+            parts = key.split(".")
+            container: Any = payload_doc.data
+            for part in parts[:-1]:
+                if isinstance(container, dict):
+                    container = container.get(part, {})
+                else:
+                    container = None
+                    break
             if isinstance(container, dict):
-                container = container.get(part, {})
-            else:
-                container = None
-                break
-        if isinstance(container, dict) and not container.get(parts[-1]):
-            container.pop(parts[-1], None)
+                container.pop(parts[-1], None)
 
     # Deep merge with existing
     existing: dict[str, Any] = {}
     if config_path.exists():
         existing = json.loads(config_path.read_text())
 
-    merged = deep_merge(existing, payload)
+    doc = ConfigDocument(existing)
+    doc.merge(payload_doc.data)
+
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(merged, indent=2))
+    config_path.write_text(json.dumps(doc.data, indent=2))
 
     mgr.reload_config()
     return {"status": "saved"}

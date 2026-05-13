@@ -86,8 +86,8 @@ RUN mkdir -p ${GRADLE_USER_HOME} \
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-COPY libs/config-schema/pyproject.toml libs/config-schema/
-COPY libs/config-schema/src libs/config-schema/src
+COPY libs/config-core/pyproject.toml libs/config-core/
+COPY libs/config-core/src libs/config-core/src
 COPY apps/agent-control/pyproject.toml apps/agent-control/
 COPY apps/agent-control/src apps/agent-control/src
 RUN uv sync --frozen --no-dev --no-editable --package agent-control --python 3.12

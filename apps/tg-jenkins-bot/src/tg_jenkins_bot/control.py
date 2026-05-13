@@ -11,7 +11,7 @@ import json
 import logging
 from typing import Any
 
-from config_schema import deep_merge, nested_get, nested_set
+from config_core import ConfigDocument, get_frontend_schema
 from fastapi import APIRouter, HTTPException, Request
 
 from telegram.ext import (
@@ -34,7 +34,6 @@ from .bot.handlers import (
 )
 from .build_client import BuildClient
 from .config import _DEFAULT_CONFIG_PATH, Config
-from .schema import get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -235,45 +234,65 @@ async def bot_status(request: Request) -> dict[str, Any]:
     return _get_manager(request).status()
 
 
+def _get_secret_keys() -> list[str]:
+    keys = []
+    for name, field in Config.model_fields.items():
+        extra = field.json_schema_extra or {}
+        if extra.get("secret"):
+            keys.append(extra.get("json_key", name))
+    return keys
+
+
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the bot module's config field schema."""
-    return get_registry().serialize()
+    return get_frontend_schema(
+        Config,
+        title="Telegram Bot Configuration",
+        description=(
+            "Configures the Telegram bot interface. You need a Bot Token from"
+            " @BotFather. You must also specify which chat IDs are allowed to"
+            " use the bot to prevent unauthorized access."
+        )
+    )
 
 
 @control_router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    secret_keys = get_registry().secret_keys
+    secret_keys = _get_secret_keys()
 
     data: dict[str, Any] = {}
     if _DEFAULT_CONFIG_PATH.exists():
         data = json.loads(_DEFAULT_CONFIG_PATH.read_text())
+        
+    doc = ConfigDocument(data)
 
     secret_lengths: dict[str, int | bool] = {}
     for key in secret_keys:
-        value = nested_get(data, key)
+        value = doc.get(key)
         if value not in (None, ""):
             secret_lengths[key] = len(str(value))
-            nested_set(data, key, None)
+            doc.set(key, None)
         else:
             secret_lengths[key] = False
 
-    return {"values": data, "secret_lengths": secret_lengths}
+    return {"values": doc.data, "secret_lengths": secret_lengths}
 
 
 @control_router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
     payload = await request.json()
+    payload_doc = ConfigDocument(payload)
 
     # Strip empty/None secrets to avoid overwriting existing values
-    secret_keys = get_registry().secret_keys
+    secret_keys = _get_secret_keys()
     for key in secret_keys:
-        value = nested_get(payload, key)
+        value = payload_doc.get(key)
         if value is None or value == "":
             parts = key.split(".")
-            container: Any = payload
+            container: Any = payload_doc.data
             for part in parts[:-1]:
                 if isinstance(container, dict):
                     container = container.get(part, {})
@@ -288,9 +307,11 @@ async def put_config(request: Request) -> dict[str, Any]:
     if _DEFAULT_CONFIG_PATH.exists():
         existing = json.loads(_DEFAULT_CONFIG_PATH.read_text())
 
-    merged = deep_merge(existing, payload)
+    doc = ConfigDocument(existing)
+    doc.merge(payload_doc.data)
+    
     _DEFAULT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _DEFAULT_CONFIG_PATH.write_text(json.dumps(merged, indent=2))
+    _DEFAULT_CONFIG_PATH.write_text(json.dumps(doc.data, indent=2))
 
     return {"status": "saved"}
 

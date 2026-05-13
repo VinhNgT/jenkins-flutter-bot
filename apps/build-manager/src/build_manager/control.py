@@ -11,12 +11,11 @@ import json
 import logging
 from typing import Any
 
-from config_schema import deep_merge, nested_get, nested_set
+from config_core import ConfigDocument, get_frontend_schema
 from fastapi import APIRouter, Request
 
 from .builds.coordinator import BuildCoordinator
 from .config import BuildConfig
-from .schema import get_registry
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -133,10 +132,26 @@ async def restart(request: Request) -> dict[str, Any]:
         return {"status": "error", "detail": "Restart failed — check logs"}
 
 
+def _get_secret_keys() -> list[str]:
+    keys = []
+    for name, field in BuildConfig.model_fields.items():
+        extra = field.json_schema_extra or {}
+        if extra.get("secret"):
+            keys.append(extra.get("json_key", name))
+    return keys
+
+
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the build manager's config field schema."""
-    return get_registry().serialize()
+    return get_frontend_schema(
+        BuildConfig,
+        title="Build Manager Configuration",
+        description=(
+            "Configures the build manager's connection to Jenkins and the"
+            " Git repository used for builds."
+        )
+    )
 
 
 @control_router.get("/config")
@@ -149,16 +164,17 @@ async def get_config(request: Request) -> dict[str, Any]:
     if config_path and config_path.exists():
         data = json.loads(config_path.read_text())
 
+    doc = ConfigDocument(data)
     secret_lengths: dict[str, int | bool] = {}
-    for key in get_registry().secret_keys:
-        value = nested_get(data, key)
+    for key in _get_secret_keys():
+        value = doc.get(key)
         if value not in (None, ""):
             secret_lengths[key] = len(str(value))
-            nested_set(data, key, None)
+            doc.set(key, None)
         else:
             secret_lengths[key] = False
 
-    return {"values": data, "secret_lengths": secret_lengths}
+    return {"values": doc.data, "secret_lengths": secret_lengths}
 
 
 @control_router.put("/config")
@@ -168,13 +184,14 @@ async def put_config(request: Request) -> dict[str, Any]:
     config_path = manager.settings.config_path
 
     payload = await request.json()
+    payload_doc = ConfigDocument(payload)
 
     # Strip empty/None secrets to avoid overwriting existing values
-    for key in get_registry().secret_keys:
-        value = nested_get(payload, key)
+    for key in _get_secret_keys():
+        value = payload_doc.get(key)
         if value is None or value == "":
             parts = key.split(".")
-            container: Any = payload
+            container: Any = payload_doc.data
             for part in parts[:-1]:
                 if isinstance(container, dict):
                     container = container.get(part, {})
@@ -189,8 +206,10 @@ async def put_config(request: Request) -> dict[str, Any]:
     if config_path.exists():
         existing = json.loads(config_path.read_text())
 
-    merged = deep_merge(existing, payload)
+    doc = ConfigDocument(existing)
+    doc.merge(payload_doc.data)
+
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(merged, indent=2))
+    config_path.write_text(json.dumps(doc.data, indent=2))
 
     return {"status": "saved"}

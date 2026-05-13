@@ -7,6 +7,10 @@ from pathlib import Path
 
 from .schema import BOT_FIELDS, BOT_INFRA, post_resolve, resolve_fields
 
+# Default config file path inside the container.  Can be overridden via the
+# CONFIG_PATH environment variable for local development outside Docker.
+_DEFAULT_CONFIG_PATH = Path("/app/data/bot.json")
+
 
 @dataclass(frozen=True)
 class Config:
@@ -32,7 +36,9 @@ class Config:
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> Config:
         """Build config with priority: file > env > .env > defaults."""
-        values = resolve_fields(BOT_FIELDS + BOT_INFRA, config_path)
+        values = resolve_fields(
+            BOT_FIELDS + BOT_INFRA, config_path or _DEFAULT_CONFIG_PATH
+        )
         values = post_resolve(values)
         return cls(**values)
 

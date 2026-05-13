@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
 from .schema import STORAGE_FIELDS, STORAGE_INFRA, resolve_fields
+
+# Default config file path inside the container.  Can be overridden via the
+# CONFIG_PATH environment variable for local development outside Docker.
+_DEFAULT_CONFIG_PATH = Path("/app/data/storage.json")
 
 
 @dataclass(frozen=True)
@@ -23,7 +26,7 @@ class StorageConfig:
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> StorageConfig:
         """Build config with priority: file > env > .env > defaults."""
-        if config_path is None and os.environ.get("CONFIG_PATH"):
-            config_path = Path(os.environ["CONFIG_PATH"])
-        values = resolve_fields(STORAGE_FIELDS + STORAGE_INFRA, config_path)
+        values = resolve_fields(
+            STORAGE_FIELDS + STORAGE_INFRA, config_path or _DEFAULT_CONFIG_PATH
+        )
         return cls(**values)

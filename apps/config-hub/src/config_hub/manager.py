@@ -18,15 +18,13 @@ from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-# All services whose config and schema are proxied through config-hub.
-_PROXIED_SERVICES = ("bot", "agent", "file_manager", "builds")
-
-# Scope name → internal service name mapping.
-# The web UI uses these scope names in API calls.
-_SCOPE_TO_SERVICE = {
+# Maps UI scope names → internal ServiceClient service names.
+# Most scopes match directly; the exception is "drive" which is the feature
+# name visible in the UI, backed by the generic "file_manager" service.
+_SCOPE_TO_SERVICE: dict[str, str] = {
     "bot": "bot",
     "agent": "agent",
-    "storage": "file_manager",
+    "drive": "file_manager",
     "builds": "builds",
 }
 
@@ -58,10 +56,10 @@ class ConfigHubManager:
 
     async def fetch_all_schemas(self) -> dict[str, Any]:
         """Fetch schemas from all managed services."""
-        schemas: dict[str, Any] = {}
-        for scope, service in _SCOPE_TO_SERVICE.items():
-            schemas[scope] = await self.services.schema(service)
-        return schemas
+        return {
+            scope: await self.services.schema(svc)
+            for scope, svc in _SCOPE_TO_SERVICE.items()
+        }
 
     # ------------------------------------------------------------------
     # Config CRUD (proxied to owning services)
@@ -72,8 +70,8 @@ class ConfigHubManager:
         result: dict[str, Any] = {}
         secrets_set: dict[str, Any] = {}
 
-        for scope, service in _SCOPE_TO_SERVICE.items():
-            config = await self.services.get_config(service)
+        for scope, svc in _SCOPE_TO_SERVICE.items():
+            config = await self.services.get_config(svc)
             if config:
                 result[scope] = config.get("values", {})
                 secrets_set[scope] = config.get("secret_lengths", {})
@@ -86,12 +84,12 @@ class ConfigHubManager:
 
     async def save_scope(self, scope: str, payload: dict[str, Any]) -> None:
         """Proxy a config save to the owning service."""
-        service = _SCOPE_TO_SERVICE.get(scope)
-        if not service:
+        svc = _SCOPE_TO_SERVICE.get(scope)
+        if not svc:
             logger.error("Unknown config scope: %s", scope)
             return
 
-        result = await self.services.put_config(service, payload)
+        result = await self.services.put_config(svc, payload)
         if result.get("status") == "error":
             logger.error("Failed to save %s config: %s", scope, result)
 
@@ -110,9 +108,9 @@ class ConfigHubManager:
         schemas: dict[str, Any] = {}
         configs: dict[str, Any] = {}
 
-        for scope, service in _SCOPE_TO_SERVICE.items():
-            schemas[scope] = await self.services.schema(service)
-            config = await self.services.get_config(service)
+        for scope, svc in _SCOPE_TO_SERVICE.items():
+            schemas[scope] = await self.services.schema(svc)
+            config = await self.services.get_config(svc)
             configs[scope] = config.get("values", {}) if config else {}
 
         files, warnings = generate_env_files(
@@ -120,8 +118,8 @@ class ConfigHubManager:
             agent_config=configs.get("agent", {}),
             bot_schema=schemas.get("bot"),
             agent_schema=schemas.get("agent"),
-            drive_config=configs.get("storage", {}),
-            drive_schema=schemas.get("storage"),
+            drive_config=configs.get("drive", {}),
+            drive_schema=schemas.get("drive"),
         )
         compose_vars = {
             "bot": generate_compose_vars(
@@ -140,9 +138,9 @@ class ConfigHubManager:
         schemas: dict[str, Any] = {}
         configs: dict[str, Any] = {}
 
-        for scope, service in _SCOPE_TO_SERVICE.items():
-            schemas[scope] = await self.services.schema(service)
-            config = await self.services.get_config(service)
+        for scope, svc in _SCOPE_TO_SERVICE.items():
+            schemas[scope] = await self.services.schema(svc)
+            config = await self.services.get_config(svc)
             configs[scope] = config.get("values", {}) if config else {}
 
         files, _ = generate_env_files(
@@ -150,8 +148,8 @@ class ConfigHubManager:
             agent_config=configs.get("agent", {}),
             bot_schema=schemas.get("bot"),
             agent_schema=schemas.get("agent"),
-            drive_config=configs.get("storage", {}),
-            drive_schema=schemas.get("storage"),
+            drive_config=configs.get("drive", {}),
+            drive_schema=schemas.get("drive"),
         )
         return build_export_tarball(files)
 

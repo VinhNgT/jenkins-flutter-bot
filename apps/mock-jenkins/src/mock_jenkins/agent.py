@@ -3,6 +3,8 @@
 Serves the same /control/* endpoints that config-hub queries:
   - GET  /control/status  — reports agent as configured and running
   - GET  /control/schema  — returns the real agent schema (AGENT_FIELDS + AGENT_INFRA)
+  - GET  /control/config  — returns empty config values (no file in mock mode)
+  - PUT  /control/config  — no-op save (returns success without writing)
   - POST /control/start   — no-op, returns running status
   - POST /control/stop    — no-op, returns running status
   - POST /control/restart — no-op, returns running status
@@ -155,6 +157,21 @@ async def agent_start() -> dict[str, Any]:
 async def agent_stop() -> dict[str, Any]:
     """No-op stop — agent is always running in mock mode."""
     return _status_response()
+
+
+@agent_app.get("/control/config")
+async def agent_get_config() -> dict[str, Any]:
+    """Return empty config — no file is written in mock mode."""
+    # Secret keys from the inline schema that need secret_lengths tracking.
+    secret_keys = [f["key"] for f in _AGENT_SCHEMA["fields"] if f.get("secret")]
+    secret_lengths = {key: False for key in secret_keys}
+    return {"values": {}, "secret_lengths": secret_lengths}
+
+
+@agent_app.put("/control/config")
+async def agent_put_config() -> dict[str, Any]:
+    """No-op config save — mock mode has no persistent config file."""
+    return {"status": "ok"}
 
 
 @agent_app.post("/control/restart")

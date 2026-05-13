@@ -8,18 +8,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from config_schema import deep_merge, serialize_schema
+from config_schema import deep_merge
 from fastapi import APIRouter, Request
 
 from .backends.google_drive import GoogleDriveBackend
 from .config import StorageConfig, _DEFAULT_CONFIG_PATH
-from .schema import (
-    MODULE_DESCRIPTION,
-    MODULE_TITLE,
-    STORAGE_FIELDS,
-    STORAGE_INFRA,
-    STORAGE_SECRET_FIELDS,
-)
+from .schema import registry
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +49,12 @@ class StorageManager:
     def start(self) -> None:
         """Resolve config and initialise the storage backend."""
         config_path = self._config_path()
-        self._config = StorageConfig.resolve(config_path)
+        try:
+            self._config = StorageConfig.resolve(config_path)
+        except ValueError as e:
+            logger.error("Configuration missing: %s", e)
+            return
+
         self._backend = GoogleDriveBackend(self._token_path())
         logger.info("StorageManager started")
 
@@ -90,11 +89,7 @@ async def status(request: Request) -> dict[str, Any]:
 
 @control_router.get("/schema")
 async def schema() -> dict[str, Any]:
-    schema_data = serialize_schema(STORAGE_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
-    schema_data["infra"] = serialize_schema(
-        STORAGE_INFRA, MODULE_TITLE, MODULE_DESCRIPTION
-    )["fields"]
-    return schema_data
+    return registry.serialize()
 
 
 @control_router.get("/config")
@@ -109,7 +104,7 @@ async def get_config(request: Request) -> dict[str, Any]:
 
     # Mask secrets
     secret_lengths: dict[str, int] = {}
-    for key in STORAGE_SECRET_FIELDS:
+    for key in registry.secret_keys:
         parts = key.split(".")
         current: Any = data
         for part in parts:
@@ -139,7 +134,7 @@ async def put_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    for key in STORAGE_SECRET_FIELDS:
+    for key in registry.secret_keys:
         parts = key.split(".")
         container: Any = payload
         for part in parts[:-1]:

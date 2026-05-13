@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from .config import AgentConfig
 from .control import AgentManager, control_router
 
 logging.basicConfig(
@@ -23,8 +22,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage agent lifecycle on startup/shutdown."""
     try:
-        config = AgentConfig.resolve()
-        app.state.manager.start(config)
+        app.state.manager.start()
     except Exception:
         logger.exception("Agent not auto-started")
 

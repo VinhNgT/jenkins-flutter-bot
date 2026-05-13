@@ -179,13 +179,13 @@ async def _send_callback(build: MockBuild, *, success: bool) -> None:
                         "application/octet-stream",
                     ),
                 }
-                resp = await client.post(build.callback_url, files=files)
+                resp = await client.post(build.callback_url, files=files)  # type: ignore
             else:
                 # Multipart POST without artifact
                 files = {
                     "metadata": (None, json.dumps(metadata), "application/json"),
                 }
-                resp = await client.post(build.callback_url, files=files)
+                resp = await client.post(build.callback_url, files=files)  # type: ignore
 
             logger.info(
                 "Webhook callback sent to %s — status %d",

@@ -78,22 +78,18 @@ class BotManager:
     def running(self) -> bool:
         return self._application is not None and self._bot_context is not None
 
-    async def start(self, config: Config) -> None:
+    async def start(self) -> None:
         """Build and start the Telegram polling application."""
         async with self._lock:
             if self.running:
                 return
 
-            missing = []
-            if not config.telegram_token:
-                missing.append("TELEGRAM_BOT_TOKEN")
-            if not config.build_manager_url:
-                missing.append("BUILD_MANAGER_URL")
-            if missing:
-                raise ValueError(
-                    f"Missing required configuration: {', '.join(missing)}"
-                )
-
+            try:
+                config = Config.resolve()
+            except ValueError as e:
+                self._last_error = str(e)
+                logger.error("Configuration missing: %s", e)
+                return
             try:
                 build_client = BuildClient(config.build_manager_url)
 
@@ -163,10 +159,10 @@ class BotManager:
             self._config = None
             self._build_client = None
 
-    async def restart(self, config: Config) -> None:
+    async def restart(self) -> None:
         """Restart the Telegram polling application."""
         await self.stop()
-        await self.start(config)
+        await self.start()
 
     def _is_configured(self) -> bool:
         """Check whether the required user-supplied config fields are present.
@@ -204,9 +200,8 @@ def _get_manager(request: Request) -> BotManager:
 async def start_bot(request: Request) -> dict[str, Any]:
     """Start the Telegram bot if it is not already running."""
     manager = _get_manager(request)
-    config = Config.resolve()
     try:
-        await manager.start(config)
+        await manager.start()
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return manager.status()
@@ -224,9 +219,8 @@ async def stop_bot(request: Request) -> dict[str, Any]:
 async def restart_bot(request: Request) -> dict[str, Any]:
     """Restart the Telegram bot using the current resolved config."""
     manager = _get_manager(request)
-    config = Config.resolve()
     try:
-        await manager.restart(config)
+        await manager.restart()
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return manager.status()
@@ -241,19 +235,9 @@ async def bot_status(request: Request) -> dict[str, Any]:
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the bot module's config field schema."""
-    from .schema import (
-        BOT_FIELDS,
-        BOT_INFRA,
-        MODULE_DESCRIPTION,
-        MODULE_TITLE,
-        serialize_schema,
-    )
+    from .schema import registry
 
-    schema = serialize_schema(BOT_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
-    schema["infra"] = serialize_schema(BOT_INFRA, MODULE_TITLE, MODULE_DESCRIPTION)[
-        "fields"
-    ]
-    return schema
+    return registry.serialize()
 
 
 @control_router.get("/config")
@@ -264,9 +248,9 @@ async def get_config() -> dict[str, Any]:
     from config_schema import nested_get, nested_set
 
     from .config import _DEFAULT_CONFIG_PATH
-    from .schema import BOT_FIELDS, BOT_INFRA
+    from .schema import registry
 
-    secret_keys = tuple(f.key for f in BOT_FIELDS + BOT_INFRA if f.secret)
+    secret_keys = registry.secret_keys
 
     data: dict[str, Any] = {}
     if _DEFAULT_CONFIG_PATH.exists():
@@ -292,12 +276,12 @@ async def put_config(request: Request) -> dict[str, Any]:
     from config_schema import deep_merge, nested_get
 
     from .config import _DEFAULT_CONFIG_PATH
-    from .schema import BOT_FIELDS, BOT_INFRA
+    from .schema import registry
 
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    secret_keys = tuple(f.key for f in BOT_FIELDS + BOT_INFRA if f.secret)
+    secret_keys = registry.secret_keys
     for key in secret_keys:
         value = nested_get(payload, key)
         if value is None or value == "":

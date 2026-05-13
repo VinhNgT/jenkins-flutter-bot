@@ -326,6 +326,7 @@ class ImportResult:
     parse_errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     oauth_imported: bool = False
+    configs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 def _build_env_lookup(
@@ -333,14 +334,14 @@ def _build_env_lookup(
 ) -> dict[str, dict[str, Any]]:
     """Build a lookup from env_var → field metadata.
 
-    Includes both portable fields (``schema["fields"]``) and infra
-    fields (``schema["infra"]``) so that imports recognise all valid
-    env vars.
+    Includes only portable fields (``schema["fields"]``) so that imports
+    only write portable config to the JSON files. Infra fields must be
+    configured via environment variables or docker-compose, never JSON.
     """
     if not schema or "fields" not in schema:
         return {}
-    all_fields = list(schema["fields"]) + list(schema.get("infra", []))
-    return {f["env_var"]: f for f in all_fields if f.get("env_var")}
+    
+    return {f["env_var"]: f for f in schema["fields"] if f.get("env_var")}
 
 
 def _parse_env_content(
@@ -525,4 +526,9 @@ def import_tarball(
         parse_errors=all_parse_errors,
         warnings=all_warnings,
         oauth_imported=oauth_imported,
+        configs={
+            "bot": bot_patch,
+            "agent": agent_patch,
+            "file_manager": drive_patch,
+        },
     )

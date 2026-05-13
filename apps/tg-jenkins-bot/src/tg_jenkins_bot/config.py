@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .schema import BOT_FIELDS, BOT_INFRA, post_resolve, resolve_fields
+from .schema import post_resolve, registry
 
 # Default config file path inside the container.  Can be overridden via the
 # CONFIG_PATH environment variable for local development outside Docker.
@@ -36,9 +36,7 @@ class Config:
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> Config:
         """Build config with priority: file > env > .env > defaults."""
-        values = resolve_fields(
-            BOT_FIELDS + BOT_INFRA, config_path or _DEFAULT_CONFIG_PATH
-        )
+        values = registry.resolve(config_path or _DEFAULT_CONFIG_PATH)
         values = post_resolve(values)
         return cls(**values)
 

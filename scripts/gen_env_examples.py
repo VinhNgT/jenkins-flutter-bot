@@ -11,20 +11,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_control.schema import AGENT_FIELDS, AGENT_INFRA
-from agent_control.schema import MODULE_TITLE as AGENT_TITLE
-from config_schema import FieldDef
-from file_manager.schema import MODULE_TITLE as STORAGE_TITLE
-from file_manager.schema import STORAGE_FIELDS, STORAGE_INFRA
-from tg_jenkins_bot.schema import BOT_FIELDS, BOT_INFRA
-from tg_jenkins_bot.schema import MODULE_TITLE as BOT_TITLE
+from agent_control.schema import registry as agent_registry
+from file_manager.schema import registry as storage_registry
+from tg_jenkins_bot.schema import registry as bot_registry
+from config_schema import RuntimeFieldDef, InfraFieldDef, ConfigRegistry
 
 
-def _generate_example(
-    fields: tuple[FieldDef, ...],
-    infra_fields: tuple[FieldDef, ...],
-    title: str,
-) -> str:
+def _generate_example(registry: ConfigRegistry) -> str:
     """Generate a self-documenting .env.example from FieldDef declarations.
 
     Portable fields are emitted first with their defaults.
@@ -34,27 +27,27 @@ def _generate_example(
     """
     lines: list[str] = [
         f"# {'─' * 50}",
-        f"# {title}",
+        f"# {registry.title}",
         f"# {'─' * 50}",
         "#",
         "# This example is generated from the schema definitions.",
-        "# To use:  cp bot.env.example bot.env  (then fill in values)",
+        "# To use:  cp <name>.env.example <name>.env  (then fill in values)",
         "# To regenerate:  uv run python scripts/gen_env_examples.py",
     ]
 
     # Group portable fields by UI group
-    portable: dict[str, list[FieldDef]] = {}
-    for f in fields:
+    portable: dict[str, list[RuntimeFieldDef]] = {}
+    for f in registry.runtime_fields:
         if not f.env_var:
             continue
         portable.setdefault(f.group, []).append(f)
 
     # Group infra fields by UI group
-    infra: dict[str, list[FieldDef]] = {}
-    for f in infra_fields:
-        if not f.env_var:
+    infra: dict[str, list[InfraFieldDef]] = {}
+    for f_infra in registry.infra_fields:
+        if not f_infra.env_var:
             continue
-        infra.setdefault(f.group, []).append(f)
+        infra.setdefault(f_infra.group, []).append(f_infra)
 
     # --- Portable fields ---
     for group_name, group_fields in portable.items():
@@ -86,19 +79,19 @@ def _generate_example(
         lines.append("# Prefer docker-compose `environment:` section; .env is also acceptable.")
         lines.append(f"# {'─' * 50}")
 
-        for group_name, group_fields in infra.items():
+        for group_name, infra_group_fields in infra.items():
             lines.append("")
             lines.append(f"# ── {group_name} ──")
 
-            for f in group_fields:
+            for f_infra in infra_group_fields:
                 lines.append("")
-                req_tag = " (required)" if f.required else ""
-                lines.append(f"# {f.label}{req_tag}")
-                if f.description:
-                    lines.append(f"# {f.description}")
-                if f.default:
-                    lines.append(f"# Default: {f.default}")
-                lines.append(f"# {f.env_var}=")
+                req_tag = " (required)" if f_infra.required else ""
+                lines.append(f"# {f_infra.label}{req_tag}")
+                if f_infra.description:
+                    lines.append(f"# {f_infra.description}")
+                if f_infra.default:
+                    lines.append(f"# Default: {f_infra.default}")
+                lines.append(f"# {f_infra.env_var}=")
 
     lines.append("")
     return "\n".join(lines)
@@ -109,13 +102,13 @@ def main() -> None:
     env_dir.mkdir(parents=True, exist_ok=True)
 
     examples = [
-        (env_dir / "bot.env.example", BOT_FIELDS, BOT_INFRA, BOT_TITLE),
-        (env_dir / "agent.env.example", AGENT_FIELDS, AGENT_INFRA, AGENT_TITLE),
-        (env_dir / "storage.env.example", STORAGE_FIELDS, STORAGE_INFRA, STORAGE_TITLE),
+        (env_dir / "bot.env.example", bot_registry),
+        (env_dir / "agent.env.example", agent_registry),
+        (env_dir / "storage.env.example", storage_registry),
     ]
 
-    for path, fields, infra_fields, title in examples:
-        path.write_text(_generate_example(fields, infra_fields, title))
+    for path, reg in examples:
+        path.write_text(_generate_example(reg))
         print(f"✓ Generated {path.relative_to(Path.cwd())}")
 
 

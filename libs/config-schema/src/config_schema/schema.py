@@ -3,12 +3,12 @@
 This module is the single source of truth for the declarative config
 framework used by all services in the stack.  It provides:
 
-  - ``FieldDef``          — frozen dataclass describing one config field
+  - ``RuntimeFieldDef``   — frozen dataclass for UI-editable runtime config fields
+  - ``InfraFieldDef``     — frozen dataclass for environment-only infrastructure fields
+  - ``ConfigRegistry``    — centralized registry for managing and resolving a module's config
   - ``nested_get()``      — read a value from a nested dict by dotted key
   - ``nested_set()``      — write a value into a nested dict by dotted key
   - ``deep_merge()``      — recursively merge dicts, preserving absent keys
-  - ``resolve_fields()``  — resolve config with priority: file > env > .env > default
-  - ``serialize_schema()``— convert field definitions to a JSON-ready dict
 """
 
 from __future__ import annotations
@@ -22,14 +22,12 @@ from typing import Any
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------------------------
-# Field definition
+# Field definitions
 # ---------------------------------------------------------------------------
 
-
 @dataclass(frozen=True)
-class FieldDef:
-    """Declarative definition for a single configuration field."""
-
+class RuntimeFieldDef:
+    """Declarative definition for a portable, UI-editable configuration field."""
     key: str  # Dotted JSON key: "telegram.bot_token"
     env_var: str  # Env var fallback: "TELEGRAM_BOT_TOKEN"
     attr: str  # Python attribute on Config: "telegram_token"
@@ -45,10 +43,22 @@ class FieldDef:
     value_type: str = "str"  # "str", "int", "bool", "list[int]"
 
 
+@dataclass(frozen=True)
+class InfraFieldDef:
+    """Declarative definition for an environment-only infrastructure field."""
+    env_var: str  # Env var: "JENKINS_URL"
+    attr: str  # Python attribute on Config: "jenkins_url"
+    label: str = ""
+    group: str = "Infrastructure"
+    description: str = ""
+    default: str = ""  # Hardcoded default
+    required: bool = False
+    value_type: str = "str"  # "str", "int", "bool", "list[int]"
+
+
 # ---------------------------------------------------------------------------
 # Nested dict helpers
 # ---------------------------------------------------------------------------
-
 
 def nested_get(data: dict[str, Any], dotted_key: str) -> Any:
     """Read a value from a nested dict using a dotted key path."""
@@ -61,122 +71,134 @@ def nested_get(data: dict[str, Any], dotted_key: str) -> Any:
 
 
 def nested_set(data: dict[str, Any], dotted_key: str, value: Any) -> None:
-    """Set a value in a nested dict using a dotted key path.
-
-    Intermediate dicts are created automatically if they don't exist.
-    """
-    current = data
+    """Write a value into a nested dict using a dotted key path."""
     parts = dotted_key.split(".")
+    current = data
     for part in parts[:-1]:
-        next_value = current.get(part)
-        if not isinstance(next_value, dict):
-            next_value = {}
-            current[part] = next_value
-        current = next_value
+        if part not in current or not isinstance(current[part], dict):
+            current[part] = {}
+        current = current[part]
     current[parts[-1]] = value
 
 
-def deep_merge(existing: Any, incoming: Any) -> Any:
-    """Recursively merge *incoming* dict into *existing*, preserving absent keys.
-
-    Non-dict values in *incoming* overwrite *existing*.  Dict values are
-    merged recursively so that sending ``{"a": {"b": 1}}`` only touches
-    the ``a.b`` path without clobbering sibling keys.
+def deep_merge(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge dicts, replacing lists and primitives.
+    
+    Keys missing from `updates` are left untouched in `target`.
     """
-    if isinstance(existing, dict) and isinstance(incoming, dict):
-        merged = {**existing}
-        for key, value in incoming.items():
-            merged[key] = deep_merge(merged.get(key), value)
-        return merged
-    return incoming
+    merged = target.copy()
+    for k, v in updates.items():
+        if isinstance(v, dict) and k in merged and isinstance(merged[k], dict):
+            merged[k] = deep_merge(merged[k], v)
+        else:
+            merged[k] = v
+    return merged
 
 
 # ---------------------------------------------------------------------------
-# Type coercion
+# Registry
 # ---------------------------------------------------------------------------
 
+def _coerce(value: str | None, value_type: str) -> Any:
+    """Coerce a string value into its declared type."""
+    if value is None:
+        return "" if value_type == "str" else None
 
-def _coerce(raw: Any, value_type: str) -> Any:
-    """Convert a raw config value to its declared Python type."""
-    if value_type == "str":
-        return str(raw) if raw not in (None, "") else ""
+    try:
+        match value_type:
+            case "int":
+                return int(value)
+            case "bool":
+                return str(value).lower() in ("true", "1", "yes")
+            case "list[int]":
+                return [int(x.strip()) for x in value.split(",") if x.strip()]
+            case "str" | _:
+                return str(value)
+    except (ValueError, TypeError):
+        return None
 
-    if value_type == "int":
-        return int(raw) if raw not in (None, "") else 0
+_BACKEND_ONLY_KEYS = {"attr", "env_var"}
 
-    if value_type == "bool":
-        if isinstance(raw, bool):
-            return raw
-        return str(raw).lower() not in {"0", "false", "no", ""}
+class ConfigRegistry:
+    """Central registry for managing a module's configuration schema and resolution."""
+    
+    def __init__(self, title: str, description: str):
+        self.title = title
+        self.description = description
+        self.runtime_fields: list[RuntimeFieldDef] = []
+        self.infra_fields: list[InfraFieldDef] = []
+        
+    def register_runtime(self, **kwargs) -> None:
+        """Register a portable, UI-editable runtime configuration field."""
+        self.runtime_fields.append(RuntimeFieldDef(**kwargs))
+        
+    def register_infra(self, **kwargs) -> None:
+        """Register an environment-only infrastructure field."""
+        self.infra_fields.append(InfraFieldDef(**kwargs))
 
-    if value_type == "list[int]":
-        if isinstance(raw, list):
-            return [int(v) for v in raw]
-        if isinstance(raw, str) and raw:
-            return [int(v.strip()) for v in raw.split(",") if v.strip()]
-        return []
+    @property
+    def secret_keys(self) -> tuple[str, ...]:
+        """Return the dotted keys for all runtime fields marked as secret."""
+        return tuple(f.key for f in self.runtime_fields if f.secret)
 
-    if value_type == "list[str]":
-        if isinstance(raw, list):
-            return [str(v) for v in raw]
-        if isinstance(raw, str) and raw:
-            return [v.strip() for v in raw.split(",") if v.strip()]
-        return []
+    def resolve(self, config_path: Path | None = None) -> dict[str, Any]:
+        """Resolve all fields into a unified config dict.
+        
+        Resolution Priority:
+          Runtime: JSON File > Environment > .env > Default
+          Infra: Environment > .env > Default
+        """
+        load_dotenv()
 
-    return raw
+        path = config_path
+        if path is None and os.environ.get("CONFIG_PATH"):
+            path = Path(os.environ["CONFIG_PATH"])
 
+        file_data: dict[str, Any] = {}
+        if path and path.exists():
+            file_data = json.loads(path.read_text())
 
-# ---------------------------------------------------------------------------
-# Config resolution
-# ---------------------------------------------------------------------------
+        values: dict[str, Any] = {}
+        missing: list[str] = []
 
+        # Resolve Runtime fields (JSON > Env > Default)
+        for f in self.runtime_fields:
+            raw = nested_get(file_data, f.key)
+            if raw in (None, ""):
+                raw = os.environ.get(f.env_var) if f.env_var else None
+            if raw in (None, ""):
+                raw = f.default
+            
+            coerced = _coerce(raw, f.value_type)
+            values[f.attr] = coerced
 
-def resolve_fields(
-    fields: tuple[FieldDef, ...],
-    config_path: Path | None = None,
-) -> dict[str, Any]:
-    """Resolve config values with priority: file > env > .env > default."""
-    load_dotenv()
+            if f.required and coerced in (None, "", []):
+                missing.append(f.label)
 
-    path = config_path
-    if path is None and os.environ.get("CONFIG_PATH"):
-        path = Path(os.environ["CONFIG_PATH"])
+        # Resolve Infra fields (Env > Default)
+        for f_infra in self.infra_fields:
+            raw = os.environ.get(f_infra.env_var)
+            if raw in (None, ""):
+                raw = f_infra.default
+                
+            coerced = _coerce(raw, f.value_type)
+            values[f.attr] = coerced
+            
+            if f.required and coerced in (None, "", []):
+                missing.append(f.env_var)
 
-    file_data: dict[str, Any] = {}
-    if path and path.exists():
-        file_data = json.loads(path.read_text())
+        if missing:
+            raise ValueError(f"Missing required configuration: {', '.join(missing)}")
 
-    values: dict[str, Any] = {}
-    for f in fields:
-        raw = nested_get(file_data, f.key)
-        if raw in (None, ""):
-            raw = os.environ.get(f.env_var) if f.env_var else None
-        if raw in (None, ""):
-            raw = f.default
-        values[f.attr] = _coerce(raw, f.value_type)
+        return values
 
-    return values
-
-
-# ---------------------------------------------------------------------------
-# Schema serialization (for GET /control/schema)
-# ---------------------------------------------------------------------------
-
-# Fields excluded from the serialized schema — they are backend-only concerns.
-_BACKEND_ONLY_KEYS = {"attr"}
-
-
-def serialize_schema(
-    fields: tuple[FieldDef, ...],
-    title: str,
-    description: str,
-) -> dict[str, Any]:
-    """Serialize module schema to a JSON-ready dict for the HTTP endpoint."""
-    return {
-        "title": title,
-        "description": description,
-        "fields": [
-            {k: v for k, v in asdict(f).items() if k not in _BACKEND_ONLY_KEYS}
-            for f in fields
-        ],
-    }
+    def serialize(self) -> dict[str, Any]:
+        """Serialize the runtime schema to a JSON-ready dict for the HTTP endpoint."""
+        return {
+            "title": self.title,
+            "description": self.description,
+            "fields": [
+                {k: v for k, v in asdict(f).items() if k not in _BACKEND_ONLY_KEYS}
+                for f in self.runtime_fields
+            ],
+        }

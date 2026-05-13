@@ -16,14 +16,7 @@ from fastapi import APIRouter, Request
 
 from .builds.coordinator import BuildCoordinator
 from .config import BuildConfig
-from .schema import (
-    BUILD_FIELDS,
-    BUILD_INFRA,
-    BUILD_SECRET_FIELDS,
-    MODULE_DESCRIPTION,
-    MODULE_TITLE,
-    serialize_schema,
-)
+from .schema import registry
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -50,7 +43,11 @@ class BuildManager:
 
     def start(self) -> None:
         """Initialise the coordinator from the current config."""
-        config = BuildConfig.resolve(self.settings.config_path)
+        try:
+            config = BuildConfig.resolve(self.settings.config_path)
+        except ValueError as e:
+            logger.error("Configuration missing: %s", e)
+            return
 
         coord = BuildCoordinator(
             data_dir=self.settings.build_data_path,
@@ -139,11 +136,7 @@ async def restart(request: Request) -> dict[str, Any]:
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the build manager's config field schema."""
-    schema = serialize_schema(BUILD_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
-    schema["infra"] = serialize_schema(
-        BUILD_INFRA, MODULE_TITLE, MODULE_DESCRIPTION
-    )["fields"]
-    return schema
+    return registry.serialize()
 
 
 @control_router.get("/config")
@@ -157,7 +150,7 @@ async def get_config(request: Request) -> dict[str, Any]:
         data = json.loads(config_path.read_text())
 
     secret_lengths: dict[str, int | bool] = {}
-    for key in BUILD_SECRET_FIELDS:
+    for key in registry.secret_keys:
         value = nested_get(data, key)
         if value not in (None, ""):
             secret_lengths[key] = len(str(value))
@@ -177,7 +170,7 @@ async def put_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    for key in BUILD_SECRET_FIELDS:
+    for key in registry.secret_keys:
         value = nested_get(payload, key)
         if value is None or value == "":
             parts = key.split(".")

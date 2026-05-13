@@ -39,9 +39,16 @@ class AgentManager:
     def running(self) -> bool:
         return self._process is not None and self._process.poll() is None
 
-    def start(self, config: AgentConfig) -> None:
+    def start(self) -> None:
         """Spawn the Jenkins inbound agent as a child process."""
         if self.running:
+            return
+
+        try:
+            config = AgentConfig.resolve()
+        except ValueError as e:
+            self._last_error = str(e)
+            logger.error("Configuration missing: %s", e)
             return
 
         if not config.secret:
@@ -125,9 +132,8 @@ def _get_manager(request: Request) -> AgentManager:
 async def start_agent(request: Request) -> dict[str, Any]:
     """Start the Jenkins agent if it is not already running."""
     manager = _get_manager(request)
-    config = AgentConfig.resolve()
     try:
-        manager.start(config)
+        manager.start()
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return manager.status()
@@ -145,10 +151,9 @@ async def stop_agent(request: Request) -> dict[str, Any]:
 async def restart_agent(request: Request) -> dict[str, Any]:
     """Restart the Jenkins agent using the current resolved config."""
     manager = _get_manager(request)
-    config = AgentConfig.resolve()
     try:
         manager.stop()
-        manager.start(config)
+        manager.start()
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return manager.status()
@@ -163,19 +168,9 @@ async def agent_status(request: Request) -> dict[str, Any]:
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the agent module's config field schema."""
-    from .schema import (
-        AGENT_FIELDS,
-        AGENT_INFRA,
-        MODULE_DESCRIPTION,
-        MODULE_TITLE,
-        serialize_schema,
-    )
+    from .schema import registry
 
-    schema = serialize_schema(AGENT_FIELDS, MODULE_TITLE, MODULE_DESCRIPTION)
-    schema["infra"] = serialize_schema(
-        AGENT_INFRA, MODULE_TITLE, MODULE_DESCRIPTION
-    )["fields"]
-    return schema
+    return registry.serialize()
 
 
 @control_router.get("/config")
@@ -184,9 +179,9 @@ async def get_config() -> dict[str, Any]:
     import json
 
     from .config import _DEFAULT_CONFIG_PATH
-    from .schema import AGENT_FIELDS, AGENT_INFRA
+    from .schema import registry
 
-    secret_keys = tuple(f.key for f in AGENT_FIELDS + AGENT_INFRA if f.secret)
+    secret_keys = registry.secret_keys
 
     data: dict[str, Any] = {}
     if _DEFAULT_CONFIG_PATH.exists():
@@ -215,12 +210,12 @@ async def put_config(request: Request) -> dict[str, Any]:
     from config_schema import deep_merge, nested_get
 
     from .config import _DEFAULT_CONFIG_PATH
-    from .schema import AGENT_FIELDS, AGENT_INFRA
+    from .schema import registry
 
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    secret_keys = tuple(f.key for f in AGENT_FIELDS + AGENT_INFRA if f.secret)
+    secret_keys = registry.secret_keys
     for key in secret_keys:
         value = nested_get(payload, key)
         if value is None or value == "":

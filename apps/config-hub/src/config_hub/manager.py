@@ -159,17 +159,20 @@ class ConfigHubManager:
         Parses the tarball, extracts env values, converts to JSON config,
         and saves via PUT /control/config to each owning service.
         """
-        from .env_io import parse_import_tarball
+        from .env_io import import_tarball
 
-        parsed = parse_import_tarball(
+        parsed = import_tarball(
             tarball_bytes=raw,
             bot_schema=await self.services.schema("bot"),
             agent_schema=await self.services.schema("agent"),
+            bot_config_path=None,
+            agent_config_path=None,
             drive_schema=await self.services.schema("file_manager"),
+            drive_config_path=None,
         )
 
         # Save each scope's config to the owning service
-        for scope, config_data in parsed.get("configs", {}).items():
+        for scope, config_data in parsed.configs.items():
             if config_data:
                 await self.save_scope(scope, config_data)
 
@@ -183,7 +186,8 @@ class ConfigHubManager:
                 logger.exception("Failed to restart %s after import", scope)
                 restart_results[scope] = "restart_failed"
 
-        return {**parsed, "restart_results": restart_results}
+        import dataclasses
+        return {**dataclasses.asdict(parsed), "restart_results": restart_results}
 
     # ------------------------------------------------------------------
     # Jenkinsfile (UI quality-of-life feature)

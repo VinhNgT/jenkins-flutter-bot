@@ -27,9 +27,8 @@ def _resolve_listen_port() -> int:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage bot lifecycle on startup/shutdown."""
-    config = Config.resolve()
     try:
-        await app.state.manager.start(config)
+        await app.state.manager.start()
     except Exception:
         logger.exception("Bot not auto-started")
 

@@ -16,33 +16,44 @@ services:
     networks:
       - jenkins
 
-  stack-manager:
+  build-orchestrator:
     build:
       context: ..
-      dockerfile: apps/stack-manager/Dockerfile
-    container_name: stack-manager
+      dockerfile: apps/build-orchestrator/Dockerfile
+    container_name: build-orchestrator
+    restart: on-failure
+    environment:
+      CONFIG_PATH: /app/data/orchestrator.json
+      SELF_URL: http://build-orchestrator:9010
+      FILE_MANAGER_URL: http://file-manager:9092
+      BUILD_DATA_PATH: /app/data
+    expose:
+      - "9010"
+    volumes:
+      - orchestrator-data:/app/data
+    depends_on:
+      - file-manager
+    networks:
+      - jenkins
+
+  config-hub:
+    build:
+      context: ..
+      dockerfile: apps/config-hub/Dockerfile
+    container_name: config-hub
     restart: on-failure
     ports:
       - "9000:9000"
     environment:
       BOT_CONTROL_URL: http://tg-bot:9090
       AGENT_CONTROL_URL: http://flutter-agent:9091
-      FILE_MANAGER_CONTROL_URL: http://file-manager:9092
-      SM_SERVICE_URL: http://stack-manager:9000
-      # stack-manager owns all config volumes
-      BOT_CONFIG_PATH: /config/bot/bot.json
-      AGENT_CONFIG_PATH: /config/agent/agent.json
-      DRIVE_CONFIG_PATH: /config/drive/drive.json
-      BUILD_DATA_PATH: /app/data
-    volumes:
-      - bot-config:/config/bot
-      - agent-config:/config/agent
-      - drive-config:/config/drive
-      - sm-data:/app/data
+      FILE_MANAGER_URL: http://file-manager:9092
+      ORCHESTRATOR_URL: http://build-orchestrator:9010
     depends_on:
       - tg-bot
       - flutter-agent
       - file-manager
+      - build-orchestrator
     networks:
       - jenkins
 
@@ -56,13 +67,12 @@ services:
       - path: env/bot.env
         required: false
     environment:
-      CONFIG_PATH: /config/bot/bot.json
+      CONFIG_PATH: /app/data/bot.json
       BOT_SERVICE_URL: "http://tg-bot:9090"
-      STACK_MANAGER_URL: "http://stack-manager:9000"
+      ORCHESTRATOR_URL: "http://build-orchestrator:9010"
     expose:
       - "9090"
     volumes:
-      - bot-config:/config/bot
       - bot-data:/app/data
     networks:
       - jenkins
@@ -78,14 +88,14 @@ services:
       - path: env/agent.env
         required: false
     environment:
-      CONFIG_PATH: /config/agent.json
+      CONFIG_PATH: /app/data/agent.json
       JENKINS_URL: http://jenkins:8080
       JENKINS_AGENT_NAME: flutter-agent
       JENKINS_WEB_SOCKET: "true"
     expose:
       - "9091"
     volumes:
-      - agent-config:/config
+      - agent-data:/app/data
     networks:
       - jenkins
 
@@ -96,11 +106,11 @@ services:
     container_name: file-manager
     restart: on-failure
     environment:
-      CONFIG_PATH: /config/storage.json
+      CONFIG_PATH: /app/data/storage.json
     expose:
       - "9092"
     volumes:
-      - storage-config:/config
+      - storage-data:/app/data
     networks:
       - jenkins
 
@@ -113,20 +123,18 @@ services:
     environment:
       ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN:-}
       ADMIN_CHAT_ID: ${ADMIN_CHAT_ID:-}
-      STACK_MANAGER_URL: http://stack-manager:9000
+      CONFIG_HUB_URL: http://config-hub:9000
     depends_on:
-      - stack-manager
+      - config-hub
     networks:
       - jenkins
 
 volumes:
   jenkins-data:
-  bot-config:
-  agent-config:
-  drive-config:
-  storage-config:
   bot-data:
-  sm-data:
+  agent-data:
+  orchestrator-data:
+  storage-data:
 
 networks:
   jenkins:

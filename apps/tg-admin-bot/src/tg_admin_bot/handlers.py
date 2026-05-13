@@ -1,6 +1,6 @@
 """Telegram admin bot handlers — stack management via inline keyboard.
 
-All operational logic is delegated to the stack-manager HTTP API.
+All operational logic is delegated to the config-hub HTTP API.
 This module is purely Telegram UI formatting + httpx calls.
 """
 
@@ -38,8 +38,8 @@ def _admin_version() -> str:
 
 
 def _api(settings: Settings) -> str:
-    """Return the stack-manager base URL."""
-    return settings.stack_manager_url
+    """Return the config-hub base URL."""
+    return settings.config_hub_url
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ async def _export_env_callback(
             resp.raise_for_status()
             tarball_bytes = resp.content
     except Exception:
-        logger.exception("Failed to export tarball from stack-manager")
+        logger.exception("Failed to export tarball from config-hub")
         await query.edit_message_text("❌ Failed to generate config tarball.")
         return
 
@@ -292,9 +292,9 @@ async def _import_env_receive(
             resp.raise_for_status()
             result = resp.json()
     except Exception:
-        logger.exception("Failed to import tarball via stack-manager")
+        logger.exception("Failed to import tarball via config-hub")
         await update.message.reply_text(  # type: ignore[union-attr]
-            "❌ Import failed. Check stack-manager logs."
+            "❌ Import failed. Check config-hub logs."
         )
         return ConversationHandler.END
 
@@ -365,7 +365,7 @@ async def _jenkinsfile_callback(
             resp.raise_for_status()
             data = resp.json()
     except Exception:
-        logger.exception("Failed to generate Jenkinsfile via stack-manager")
+        logger.exception("Failed to generate Jenkinsfile via config-hub")
         await query.edit_message_text("❌ Failed to generate Jenkinsfile.")
         return
 
@@ -378,7 +378,7 @@ async def _jenkinsfile_callback(
 
 
 # ---------------------------------------------------------------------------
-# Drive OAuth — headless code-paste flow via stack-manager API
+# Drive OAuth — headless code-paste flow via config-hub API
 # ---------------------------------------------------------------------------
 
 
@@ -441,7 +441,7 @@ async def _drive_receive_client_id(
 async def _drive_receive_client_secret(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Receive client_secret, generate consent URL via stack-manager."""
+    """Receive client_secret, generate consent URL via config-hub."""
     settings: Settings = context.bot_data["settings"]
     if not _ensure_authorized(settings, update):
         return ConversationHandler.END
@@ -449,7 +449,7 @@ async def _drive_receive_client_secret(
     client_secret = update.message.text.strip()  # type: ignore[union-attr]
     client_id = context.user_data.get("drive_client_id", "")  # type: ignore[union-attr]
 
-    # Save credentials to drive config via stack-manager
+    # Save credentials to drive config via config-hub
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             await client.put(
@@ -492,7 +492,7 @@ async def _drive_receive_client_secret(
 async def _drive_receive_code(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Receive OAuth code, exchange for tokens via stack-manager API."""
+    """Receive OAuth code, exchange for tokens via config-hub API."""
     settings: Settings = context.bot_data["settings"]
     if not _ensure_authorized(settings, update):
         return ConversationHandler.END

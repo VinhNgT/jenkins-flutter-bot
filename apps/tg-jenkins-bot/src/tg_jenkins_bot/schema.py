@@ -3,7 +3,7 @@
 This is the single source of truth for all bot config fields.  It drives:
   - Config.resolve()  via resolve_fields() + post_resolve()
   - GET /control/schema  via serialize_schema()
-  - stack-manager rendering  via the serialized JSON
+  - config-hub rendering  via the serialized JSON
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ MODULE_TITLE = "Telegram Bot Configuration"
 MODULE_DESCRIPTION = (
     "Configures the Telegram bot that receives <code>/build</code> commands"
     " and delivers build notifications. Build orchestration is handled"
-    " by the stack-manager service."
+    " by the build-orchestrator service."
 )
 
 BOT_FIELDS: tuple[FieldDef, ...] = (
@@ -149,17 +149,17 @@ BOT_INFRA: tuple[FieldDef, ...] = (
         attr="bot_service_url",
         label="Bot Service URL",
         group="Infrastructure",
-        description="Internal URL for this service (stack-manager POSTs build results here)",
+        description="Internal URL for this service (build-orchestrator POSTs build results here)",
         default="http://tg-bot:9090",
     ),
     FieldDef(
-        key="bot.stack_manager_url",
-        env_var="STACK_MANAGER_URL",
-        attr="stack_manager_url",
-        label="Stack Manager URL",
+        key="bot.orchestrator_url",
+        env_var="ORCHESTRATOR_URL",
+        attr="orchestrator_url",
+        label="Build Orchestrator URL",
         group="Infrastructure",
-        description="Internal URL of the stack-manager service",
-        default="http://stack-manager:9000",
+        description="Internal URL of the build-orchestrator service",
+        default="http://build-orchestrator:9010",
         required=True,
     ),
 )

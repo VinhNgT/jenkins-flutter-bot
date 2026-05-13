@@ -45,7 +45,7 @@ class GoogleDriveBackend:
         return self._token_path
 
     # ------------------------------------------------------------------
-    # OAuth helpers (migrated from stack-manager drive.py)
+    # OAuth helpers (migrated from legacy drive module)
     # ------------------------------------------------------------------
 
     @staticmethod

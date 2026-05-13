@@ -110,7 +110,7 @@ async def oauth_callback(request: Request) -> dict[str, str]:
 async def oauth_callback_proxy(request: Request) -> dict[str, str]:
     """Exchange a proxied authorization response URL for tokens.
 
-    Used by stack-manager: Google redirects to SM, SM forwards the full
+    Used by config-hub: Google redirects here, which forwards the full
     ``authorization_response`` URL here.
     """
     mgr = _mgr(request)

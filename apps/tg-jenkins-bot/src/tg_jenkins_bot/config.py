@@ -16,8 +16,8 @@ class Config:
     telegram_token: str
     allowed_chat_ids: list[int]
 
-    # Stack Manager
-    stack_manager_url: str
+    # Build Orchestrator
+    orchestrator_url: str
 
     bot_service_url: str
 
@@ -45,5 +45,5 @@ class Config:
 
     @property
     def bot_callback_url(self) -> str:
-        """Full callback URL that stack-manager POSTs build results to."""
+        """Full callback URL that build-orchestrator POSTs build results to."""
         return f"{self.bot_service_url.rstrip('/')}/callback/build-result"

@@ -1,6 +1,6 @@
 # tg-admin-bot
 
-A headless Telegram bot for stack management — provides a fallback interface when the web dashboard is unavailable. All operational logic is delegated to the `stack-manager` HTTP API via `httpx`.
+A headless Telegram bot for stack management — provides a fallback interface when the web dashboard is unavailable. All operational logic is delegated to the `config-hub` HTTP API via `httpx`.
 
 ## Features
 
@@ -13,7 +13,7 @@ A headless Telegram bot for stack management — provides a fallback interface w
 
 ## Architecture
 
-The admin bot runs as a Telegram polling bot with no HTTP server. It is a pure **HTTP API client** to the `stack-manager` service — no direct library dependencies on operational logic. All config volumes, service control, and OAuth flows are handled by `stack-manager`; the bot formats results for the Telegram UI.
+The admin bot runs as a Telegram polling bot with no HTTP server. It is a pure **HTTP API client** to the `config-hub` service — no direct library dependencies on operational logic. All config, service control, and OAuth flows are handled by `config-hub`; the bot formats results for the Telegram UI.
 
 ## Environment Variables
 
@@ -21,7 +21,7 @@ The admin bot runs as a Telegram polling bot with no HTTP server. It is a pure *
 |----------|-------------|
 | `ADMIN_BOT_TOKEN` | Telegram bot token for the admin bot |
 | `ADMIN_CHAT_ID` | Telegram chat ID authorized for admin commands |
-| `STACK_MANAGER_URL` | Base URL of the stack-manager API (default: `http://stack-manager:9000`) |
+| `CONFIG_HUB_URL` | Base URL of the config-hub API (default: `http://config-hub:9000`) |
 
 ## Usage
 

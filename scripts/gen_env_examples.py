@@ -14,8 +14,8 @@ from pathlib import Path
 from agent_control.schema import AGENT_FIELDS, AGENT_INFRA
 from agent_control.schema import MODULE_TITLE as AGENT_TITLE
 from config_schema import FieldDef
-from stack_manager.schema import DRIVE_FIELDS, DRIVE_INFRA
-from stack_manager.schema import DRIVE_MODULE_TITLE as DRIVE_TITLE
+from file_manager.schema import MODULE_TITLE as STORAGE_TITLE
+from file_manager.schema import STORAGE_FIELDS, STORAGE_INFRA
 from tg_jenkins_bot.schema import BOT_FIELDS, BOT_INFRA
 from tg_jenkins_bot.schema import MODULE_TITLE as BOT_TITLE
 
@@ -111,7 +111,7 @@ def main() -> None:
     examples = [
         (env_dir / "bot.env.example", BOT_FIELDS, BOT_INFRA, BOT_TITLE),
         (env_dir / "agent.env.example", AGENT_FIELDS, AGENT_INFRA, AGENT_TITLE),
-        (env_dir / "drive.env.example", DRIVE_FIELDS, DRIVE_INFRA, DRIVE_TITLE),
+        (env_dir / "storage.env.example", STORAGE_FIELDS, STORAGE_INFRA, STORAGE_TITLE),
     ]
 
     for path, fields, infra_fields, title in examples:

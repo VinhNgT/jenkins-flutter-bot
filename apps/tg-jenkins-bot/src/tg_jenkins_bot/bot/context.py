@@ -2,7 +2,7 @@
 
 This module manages the Telegram UI layer of the build lifecycle.
 All build orchestration (Jenkins, file storage, Git queries) is
-delegated to the stack-manager service via :class:`SMClient`.
+delegated to the build-orchestrator service via :class:`OrchClient`.
 
 Owns:
   - Pending build tracking (request_id → chat_id/message_id mapping)
@@ -24,7 +24,7 @@ from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 if TYPE_CHECKING:
     from ..config import Config
-    from ..sm_client import SMClient
+    from ..orch_client import OrchClient
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class PendingBuild:
 
     This is a Telegram-side record that maps ``request_id`` to the
     originating chat and message for inline editing.  The canonical
-    build state lives in the stack-manager service.
+    build state lives in the build-orchestrator service.
     """
 
     request_id: str
@@ -100,18 +100,18 @@ class BotContext:
     - Message formatting and editing helpers
     - Notification rendering for build results
 
-    Delegates to :class:`SMClient` for all build operations (trigger,
+    Delegates to :class:`OrchClient` for all build operations (trigger,
     cancel, recent builds, status).
     """
 
     def __init__(
         self,
         config: Config,
-        sm_client: SMClient,
+        orch_client: OrchClient,
         bot: Bot | None,
     ) -> None:
         self.config = config
-        self.sm_client = sm_client
+        self.orch_client = orch_client
         self.bot = bot
         self._pending: dict[str, PendingBuild] = {}
         self._sessions: dict[int, BuildSession] = {}

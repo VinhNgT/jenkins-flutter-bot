@@ -1,13 +1,14 @@
 [project]
-name = "tg-jenkins-bot"
-version = "0.3.0-dev.1"
-description = "Telegram bot frontend for triggering builds via the build-orchestrator service"
+name = "config-hub"
+version = "0.2.0-dev.2"
+description = "Centralized configuration proxy and web dashboard for the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [
     "config-schema",
-    "python-telegram-bot[ext]>=21.0",
-    "httpx>=0.27.0",
     "fastapi>=0.111.0",
+    "httpx>=0.27.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.9",
     "uvicorn>=0.29.0",
 ]
 
@@ -15,7 +16,7 @@ dependencies = [
 config-schema = { workspace = true }
 
 [project.scripts]
-tg-jenkins-bot = "tg_jenkins_bot.main:cli"
+config-hub = "config_hub.main:cli"
 
 [build-system]
 requires = ["hatchling"]

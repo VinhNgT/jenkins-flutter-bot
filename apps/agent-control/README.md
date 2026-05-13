@@ -1,6 +1,6 @@
 # 🔧 Agent Control
 
-An HTTP control wrapper for the Jenkins inbound agent subprocess. Provides a FastAPI control API (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`, `/control/schema`) so stack-manager can manage the agent without Docker socket access.
+An HTTP control wrapper for the Jenkins inbound agent subprocess. Provides a FastAPI control API (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`, `/control/schema`) so config-hub can manage the agent without Docker socket access.
 
 ## How It Works
 

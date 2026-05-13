@@ -23,7 +23,7 @@ from telegram import (
 )
 from telegram.ext import ContextTypes
 
-from ..sm_client import SMClientError
+from ..orch_client import OrchClientError
 from .context import BotContext, _format_duration, _format_elapsed
 
 logger = logging.getLogger(__name__)
@@ -136,8 +136,8 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Current pending builds (after cleanup)
     pending = ctx.list_pending()
 
-    # Fetch build status from stack-manager
-    sm_status = await ctx.sm_client.get_build_status()
+    # Fetch build status from build-orchestrator
+    sm_status = await ctx.orch_client.get_build_status()
 
     # Headline
     app_name = _escape(ctx.config.app_name)
@@ -164,7 +164,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
 
     # Recent successful build
-    recent = await ctx.sm_client.get_recent_builds(count=1)
+    recent = await ctx.orch_client.get_recent_builds(count=1)
     successful = [b for b in recent if b.result == "success"]
     if successful:
         b = successful[0]
@@ -265,7 +265,7 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not await _ensure_authorized(update, context):
         return
 
-    builds = await ctx.sm_client.get_recent_builds(count=5)
+    builds = await ctx.orch_client.get_recent_builds(count=5)
     successful = [b for b in builds if b.result == "success"]
 
     if not successful:
@@ -348,8 +348,8 @@ async def _trigger_build(
 ) -> None:
     """Core build trigger logic — shared by branch picker and text input.
 
-    Delegates the actual build trigger to the stack-manager service via
-    :class:`SMClient`.  The bot only manages local Telegram state
+    Delegates the actual build trigger to the build-orchestrator service via
+    :class:`OrchClient`.  The bot only manages local Telegram state
     (pending tracking, message editing).
     """
     assert update.effective_chat is not None
@@ -400,17 +400,17 @@ async def _trigger_build(
         match = ctx.find_pending_for_branch(ref)
         if match:
             old_rid, old_pending = match
-            await ctx.sm_client.cancel_build(old_rid)
+            await ctx.orch_client.cancel_build(old_rid)
             ctx.consume_pending(old_rid)
             await ctx.on_build_cancelled(old_pending)
 
-    # Trigger build via stack-manager
+    # Trigger build via build-orchestrator
     try:
-        result = await ctx.sm_client.trigger_build(
+        result = await ctx.orch_client.trigger_build(
             branch=ref,
             callback_url=ctx.config.bot_callback_url,
         )
-    except SMClientError as exc:
+    except OrchClientError as exc:
         error_text = f"❌ {_escape(exc.user_message)}"
         if picker_message_id:
             try:

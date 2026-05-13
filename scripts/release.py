@@ -46,11 +46,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 PYPROJECT_FILES: list[Path] = [
     REPO_ROOT / "pyproject.toml",
-    REPO_ROOT / "apps" / "tg-jenkins-bot"  / "pyproject.toml",
-    REPO_ROOT / "apps" / "stack-manager"   / "pyproject.toml",
-    REPO_ROOT / "apps" / "agent-control"   / "pyproject.toml",
-    REPO_ROOT / "apps" / "tg-admin-bot"    / "pyproject.toml",
-    REPO_ROOT / "libs" / "config-schema"   / "pyproject.toml",
+    REPO_ROOT / "apps" / "tg-jenkins-bot"      / "pyproject.toml",
+    REPO_ROOT / "apps" / "build-orchestrator"   / "pyproject.toml",
+    REPO_ROOT / "apps" / "config-hub"           / "pyproject.toml",
+    REPO_ROOT / "apps" / "file-manager"         / "pyproject.toml",
+    REPO_ROOT / "apps" / "agent-control"        / "pyproject.toml",
+    REPO_ROOT / "apps" / "tg-admin-bot"         / "pyproject.toml",
+    REPO_ROOT / "libs" / "config-schema"        / "pyproject.toml",
 ]
 
 VERSION_RE = re.compile(r'^(version\s*=\s*")[^"]+(")', re.MULTILINE)

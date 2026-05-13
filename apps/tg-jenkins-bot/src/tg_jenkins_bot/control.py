@@ -1,7 +1,7 @@
 """Bot lifecycle management and HTTP control routes.
 
 The bot is a thin Telegram frontend — all build orchestration is
-delegated to the stack-manager service via :class:`SMClient`.
+delegated to the build-orchestrator service via :class:`OrchClient`.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from .bot.handlers import (
     text_branch_handler,
 )
 from .config import Config
-from .sm_client import SMClient
+from .orch_client import OrchClient
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class BotManager:
         self._application: Application | None = None
         self._bot_context: BotContext | None = None
         self._config: Config | None = None
-        self._sm_client: SMClient | None = None
+        self._orch_client: OrchClient | None = None
         self._last_error: str | None = None
 
     @property
@@ -87,15 +87,15 @@ class BotManager:
             missing = []
             if not config.telegram_token:
                 missing.append("TELEGRAM_BOT_TOKEN")
-            if not config.stack_manager_url:
-                missing.append("STACK_MANAGER_URL")
+            if not config.orchestrator_url:
+                missing.append("ORCHESTRATOR_URL")
             if missing:
                 raise ValueError(
                     f"Missing required configuration: {', '.join(missing)}"
                 )
 
             try:
-                sm_client = SMClient(config.stack_manager_url)
+                orch_client = OrchClient(config.orchestrator_url)
 
                 # Two-step construction: application.bot is only available
                 # after _build_application() runs, so we build a bootstrap
@@ -103,13 +103,13 @@ class BotManager:
                 # context once the application object exists.
                 bootstrap_context = BotContext(
                     config=config,
-                    sm_client=sm_client,
+                    orch_client=orch_client,
                     bot=None,  # type: ignore[arg-type]
                 )
                 application = _build_application(bootstrap_context)
                 bot_context = BotContext(
                     config=config,
-                    sm_client=sm_client,
+                    orch_client=orch_client,
                     bot=application.bot,
                 )
                 application.bot_data["bot_context"] = bot_context
@@ -133,7 +133,7 @@ class BotManager:
                 self._application = application
                 self._bot_context = bot_context
                 self._config = config
-                self._sm_client = sm_client
+                self._orch_client = orch_client
                 self._last_error = None
                 logger.info("Telegram bot started")
             except Exception as exc:
@@ -155,13 +155,13 @@ class BotManager:
             await application.shutdown()
 
             # Close reusable HTTP clients
-            if self._sm_client:
-                await self._sm_client.close()
+            if self._orch_client:
+                await self._orch_client.close()
 
             self._application = None
             self._bot_context = None
             self._config = None
-            self._sm_client = None
+            self._orch_client = None
 
     async def restart(self, config: Config) -> None:
         """Restart the Telegram polling application."""
@@ -256,8 +256,86 @@ async def get_schema() -> dict[str, Any]:
     return schema
 
 
+@control_router.get("/config")
+async def get_config() -> dict[str, Any]:
+    """Return current config values with secrets masked."""
+    import json
+    import os
+    from pathlib import Path
+
+    from config_schema import nested_get, nested_set
+
+    from .schema import BOT_FIELDS, BOT_INFRA
+
+    secret_keys = tuple(f.key for f in BOT_FIELDS + BOT_INFRA if f.secret)
+
+    config_path_str = os.environ.get("CONFIG_PATH")
+    config_path = Path(config_path_str) if config_path_str else None
+
+    data: dict[str, Any] = {}
+    if config_path and config_path.exists():
+        data = json.loads(config_path.read_text())
+
+    secret_lengths: dict[str, int | bool] = {}
+    for key in secret_keys:
+        value = nested_get(data, key)
+        if value not in (None, ""):
+            secret_lengths[key] = len(str(value))
+            nested_set(data, key, None)
+        else:
+            secret_lengths[key] = False
+
+    return {"values": data, "secret_lengths": secret_lengths}
+
+
+@control_router.put("/config")
+async def put_config(request: Request) -> dict[str, Any]:
+    """Save config values with deep merge to preserve existing fields."""
+    import json
+    import os
+    from pathlib import Path
+
+    from config_schema import deep_merge, nested_get
+
+    from .schema import BOT_FIELDS, BOT_INFRA
+
+    config_path_str = os.environ.get("CONFIG_PATH")
+    if not config_path_str:
+        return {"status": "error", "detail": "CONFIG_PATH not set"}
+    config_path = Path(config_path_str)
+
+    payload = await request.json()
+
+    # Strip empty/None secrets to avoid overwriting existing values
+    secret_keys = tuple(f.key for f in BOT_FIELDS + BOT_INFRA if f.secret)
+    for key in secret_keys:
+        value = nested_get(payload, key)
+        if value is None or value == "":
+            parts = key.split(".")
+            container: Any = payload
+            for part in parts[:-1]:
+                if isinstance(container, dict):
+                    container = container.get(part, {})
+                else:
+                    container = None
+                    break
+            if isinstance(container, dict):
+                container.pop(parts[-1], None)
+
+    # Deep merge with existing
+    existing: dict[str, Any] = {}
+    if config_path.exists():
+        existing = json.loads(config_path.read_text())
+
+    merged = deep_merge(existing, payload)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(merged, indent=2))
+
+    return {"status": "saved"}
+
+
 # ---------------------------------------------------------------------------
-# Build event callback (from stack-manager)
+# Build event callback (from build-orchestrator)
 # ---------------------------------------------------------------------------
 
 callback_event_router = APIRouter(tags=["callback"])
@@ -265,7 +343,7 @@ callback_event_router = APIRouter(tags=["callback"])
 
 @callback_event_router.post("/callback/build-result")
 async def handle_build_result(request: Request) -> dict[str, str]:
-    """Receive a build result forwarded by the stack-manager orchestrator.
+    """Receive a build result forwarded by the build-orchestrator.
 
     Expected JSON payload::
 

@@ -1,6 +1,6 @@
 """Mock agent-control server — emulates the flutter-agent's control API.
 
-Serves the same /control/* endpoints that stack-manager queries:
+Serves the same /control/* endpoints that config-hub queries:
   - GET  /control/status  — reports agent as configured and running
   - GET  /control/schema  — returns the real agent schema (AGENT_FIELDS + AGENT_INFRA)
   - POST /control/start   — no-op, returns running status

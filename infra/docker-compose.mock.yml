@@ -5,7 +5,7 @@
 # JENKINS_URL (http://jenkins:8080) resolves without any config changes.
 #
 # The flutter-agent is replaced with the mock agent-control API so
-# stack-manager sees the agent as configured and running.
+# config-hub sees the agent as configured and running.
 #
 # Configurable environment:
 #   MOCK_BUILD_DELAY  — simulated build time in seconds (default: 10)

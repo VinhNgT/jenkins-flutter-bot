@@ -13,12 +13,12 @@ class Settings:
     Env vars:
         ADMIN_BOT_TOKEN      — Telegram bot token for the admin bot
         ADMIN_CHAT_ID        — Telegram chat ID authorized for admin commands
-        STACK_MANAGER_URL    — Base URL of the stack-manager API
+        CONFIG_HUB_URL       — Base URL of the config-hub API
     """
 
     bot_token: str
     admin_chat_id: int
-    stack_manager_url: str
+    config_hub_url: str
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -33,7 +33,7 @@ class Settings:
         return cls(
             bot_token=token,
             admin_chat_id=chat_id,
-            stack_manager_url=os.environ.get(
-                "STACK_MANAGER_URL", "http://stack-manager:9000"
+            config_hub_url=os.environ.get(
+                "CONFIG_HUB_URL", "http://config-hub:9000"
             ),
         )

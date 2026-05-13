@@ -19,10 +19,6 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 MOCK_AGENT_PORT = int(os.environ.get("MOCK_AGENT_PORT", "9091"))
@@ -187,5 +183,9 @@ async def agent_restart() -> dict[str, Any]:
 
 def cli() -> None:
     """CLI entry point for the mock agent server."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    )
     logger.info("Starting mock-agent-control on port %d", MOCK_AGENT_PORT)
     uvicorn.run(agent_app, host="0.0.0.0", port=MOCK_AGENT_PORT)

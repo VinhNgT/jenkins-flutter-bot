@@ -56,9 +56,7 @@ class BuildCoordinator:
     def jenkins(self) -> JenkinsClient | None:
         return self._jenkins
 
-    def init_jenkins(
-        self, url: str, user: str, api_token: str, job_name: str
-    ) -> None:
+    def init_jenkins(self, url: str, user: str, api_token: str, job_name: str) -> None:
         """Initialise (or re-initialise) the Jenkins client."""
         self._jenkins = JenkinsClient(url, user, api_token, job_name)
         logger.info("Jenkins client initialised for %s", url)

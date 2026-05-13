@@ -7,9 +7,11 @@ delegated to the build-manager service via :class:`BuildClient`.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
+from config_schema import deep_merge, nested_get, nested_set
 from fastapi import APIRouter, HTTPException, Request
 
 from telegram.ext import (
@@ -30,8 +32,9 @@ from .bot.handlers import (
     status_handler,
     text_branch_handler,
 )
-from .config import Config
 from .build_client import BuildClient
+from .config import _DEFAULT_CONFIG_PATH, Config
+from .schema import get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -235,22 +238,13 @@ async def bot_status(request: Request) -> dict[str, Any]:
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the bot module's config field schema."""
-    from .schema import registry
-
-    return registry.serialize()
+    return get_registry().serialize()
 
 
 @control_router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    import json
-
-    from config_schema import nested_get, nested_set
-
-    from .config import _DEFAULT_CONFIG_PATH
-    from .schema import registry
-
-    secret_keys = registry.secret_keys
+    secret_keys = get_registry().secret_keys
 
     data: dict[str, Any] = {}
     if _DEFAULT_CONFIG_PATH.exists():
@@ -271,17 +265,10 @@ async def get_config() -> dict[str, Any]:
 @control_router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
-    import json
-
-    from config_schema import deep_merge, nested_get
-
-    from .config import _DEFAULT_CONFIG_PATH
-    from .schema import registry
-
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    secret_keys = registry.secret_keys
+    secret_keys = get_registry().secret_keys
     for key in secret_keys:
         value = nested_get(payload, key)
         if value is None or value == "":

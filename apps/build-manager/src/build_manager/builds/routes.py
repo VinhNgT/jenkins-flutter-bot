@@ -10,6 +10,7 @@ Exposes the build lifecycle to frontends:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import tempfile
@@ -46,9 +47,7 @@ async def trigger_build(request: Request) -> dict[str, Any]:
     coord = _coordinator(request)
 
     try:
-        result = await coord.trigger_build(
-            branch, frontend_callback_url=callback_url
-        )
+        result = await coord.trigger_build(branch, frontend_callback_url=callback_url)
         return result
     except JenkinsTriggerError as exc:
         raise HTTPException(status_code=502, detail=exc.user_message) from exc
@@ -66,8 +65,6 @@ async def build_webhook(
       - ``metadata``: JSON string with build result info
       - ``artifact``: optional uploaded APK file (on success)
     """
-    import json
-
     # Parse metadata from form or body
     if metadata:
         meta = json.loads(metadata)

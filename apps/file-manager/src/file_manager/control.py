@@ -13,7 +13,7 @@ from fastapi import APIRouter, Request
 
 from .backends.google_drive import GoogleDriveBackend
 from .config import StorageConfig, _DEFAULT_CONFIG_PATH
-from .schema import registry
+from .schema import get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ async def status(request: Request) -> dict[str, Any]:
 
 @control_router.get("/schema")
 async def schema() -> dict[str, Any]:
-    return registry.serialize()
+    return get_registry().serialize()
 
 
 @control_router.get("/config")
@@ -104,7 +104,7 @@ async def get_config(request: Request) -> dict[str, Any]:
 
     # Mask secrets
     secret_lengths: dict[str, int] = {}
-    for key in registry.secret_keys:
+    for key in get_registry().secret_keys:
         parts = key.split(".")
         current: Any = data
         for part in parts:
@@ -134,7 +134,7 @@ async def put_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    for key in registry.secret_keys:
+    for key in get_registry().secret_keys:
         parts = key.split(".")
         container: Any = payload
         for part in parts[:-1]:

@@ -43,9 +43,7 @@ class ServiceClient:
             return self._build_manager_url
         raise ValueError(f"Unknown service: {service}")
 
-    async def _control(
-        self, service: str, action: str | None = None
-    ) -> dict[str, Any]:
+    async def _control(self, service: str, action: str | None = None) -> dict[str, Any]:
         url = self._service_url(service)
         if not url:
             return {
@@ -118,18 +116,14 @@ class ServiceClient:
             logger.exception("Failed to fetch config from %s", service)
             return None
 
-    async def put_config(
-        self, service: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def put_config(self, service: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Save config values to a service."""
         url = self._service_url(service)
         if not url:
             return {"status": "error", "detail": "service URL not configured"}
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.put(
-                    f"{url}/control/config", json=payload
-                )
+                response = await client.put(f"{url}/control/config", json=payload)
                 response.raise_for_status()
                 return response.json()
         except Exception:

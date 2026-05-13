@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 import os
 import random
@@ -27,10 +28,6 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, Query, Request, Response
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -109,9 +106,7 @@ async def _simulate_build(build: MockBuild) -> None:
         await asyncio.sleep(MOCK_BUILD_DELAY)
 
         if build.cancelled:
-            logger.info(
-                "Build #%d was cancelled during simulation", build.build_number
-            )
+            logger.info("Build #%d was cancelled during simulation", build.build_number)
             return
 
         # Determine success/failure
@@ -165,8 +160,6 @@ async def _send_callback(build: MockBuild, *, success: bool) -> None:
             "This is a test failure — no real compilation was attempted."
         )
 
-    import json
-
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             if success:
@@ -193,9 +186,7 @@ async def _send_callback(build: MockBuild, *, success: bool) -> None:
                 resp.status_code,
             )
     except Exception:
-        logger.exception(
-            "Failed to send webhook callback to %s", build.callback_url
-        )
+        logger.exception("Failed to send webhook callback to %s", build.callback_url)
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +216,10 @@ async def job_api(job_name: str, tree: str = "") -> dict[str, Any]:
     """
     if "name" in tree and "builds" not in tree:
         # Connection check — GET /job/{name}/api/json?tree=name
-        return {"_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob", "name": job_name}
+        return {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
+            "name": job_name,
+        }
 
     # Build history query
     builds_json: list[dict[str, Any]] = []
@@ -384,7 +378,11 @@ async def stop_build(job_name: str, build_number: int) -> Response:
 
 
 def cli() -> None:
-    """CLI entry point."""
+    """CLI entry point for the mock Jenkins server."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    )
     logger.info(
         "Starting mock-jenkins on port %d (delay=%ds, failure_rate=%.0f%%)",
         MOCK_PORT,

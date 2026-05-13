@@ -7,11 +7,18 @@ high-level methods that routes delegate to.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import Any
 
 import httpx
 
+from .env_io import (
+    build_export_tarball,
+    generate_compose_vars,
+    generate_env_files,
+    import_tarball,
+)
 from .jenkins_pipeline import generate_jenkinsfile
 from .services import ServiceClient
 from .settings import Settings
@@ -103,8 +110,6 @@ class ConfigHubManager:
         Fetches config and schemas from all services via HTTP, then
         generates env file content for each service.
         """
-        from .env_io import generate_compose_vars, generate_env_files
-
         schemas: dict[str, Any] = {}
         configs: dict[str, Any] = {}
 
@@ -133,8 +138,6 @@ class ConfigHubManager:
 
     async def export_tarball(self) -> bytes:
         """Build a .tar.gz containing all config as env files."""
-        from .env_io import build_export_tarball, generate_env_files
-
         schemas: dict[str, Any] = {}
         configs: dict[str, Any] = {}
 
@@ -159,8 +162,6 @@ class ConfigHubManager:
         Parses the tarball, extracts env values, converts to JSON config,
         and saves via PUT /control/config to each owning service.
         """
-        from .env_io import import_tarball
-
         parsed = import_tarball(
             tarball_bytes=raw,
             bot_schema=await self.services.schema("bot"),
@@ -186,7 +187,6 @@ class ConfigHubManager:
                 logger.exception("Failed to restart %s after import", scope)
                 restart_results[scope] = "restart_failed"
 
-        import dataclasses
         return {**dataclasses.asdict(parsed), "restart_results": restart_results}
 
     # ------------------------------------------------------------------

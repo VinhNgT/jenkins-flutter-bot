@@ -25,9 +25,11 @@ from dotenv import load_dotenv
 # Field definitions
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class RuntimeFieldDef:
     """Declarative definition for a portable, UI-editable configuration field."""
+
     key: str  # Dotted JSON key: "telegram.bot_token"
     env_var: str  # Env var fallback: "TELEGRAM_BOT_TOKEN"
     attr: str  # Python attribute on Config: "telegram_token"
@@ -46,6 +48,7 @@ class RuntimeFieldDef:
 @dataclass(frozen=True)
 class InfraFieldDef:
     """Declarative definition for an environment-only infrastructure field."""
+
     env_var: str  # Env var: "JENKINS_URL"
     attr: str  # Python attribute on Config: "jenkins_url"
     label: str = ""
@@ -59,6 +62,7 @@ class InfraFieldDef:
 # ---------------------------------------------------------------------------
 # Nested dict helpers
 # ---------------------------------------------------------------------------
+
 
 def nested_get(data: dict[str, Any], dotted_key: str) -> Any:
     """Read a value from a nested dict using a dotted key path."""
@@ -83,7 +87,7 @@ def nested_set(data: dict[str, Any], dotted_key: str, value: Any) -> None:
 
 def deep_merge(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
     """Recursively merge dicts, replacing lists and primitives.
-    
+
     Keys missing from `updates` are left untouched in `target`.
     """
     merged = target.copy()
@@ -98,6 +102,7 @@ def deep_merge(target: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
+
 
 def _coerce(value: str | None, value_type: str) -> Any:
     """Coerce a string value into its declared type."""
@@ -117,21 +122,23 @@ def _coerce(value: str | None, value_type: str) -> Any:
     except (ValueError, TypeError):
         return None
 
+
 _BACKEND_ONLY_KEYS = {"attr", "env_var"}
+
 
 class ConfigRegistry:
     """Central registry for managing a module's configuration schema and resolution."""
-    
+
     def __init__(self, title: str, description: str):
         self.title = title
         self.description = description
         self.runtime_fields: list[RuntimeFieldDef] = []
         self.infra_fields: list[InfraFieldDef] = []
-        
+
     def register_runtime(self, **kwargs) -> None:
         """Register a portable, UI-editable runtime configuration field."""
         self.runtime_fields.append(RuntimeFieldDef(**kwargs))
-        
+
     def register_infra(self, **kwargs) -> None:
         """Register an environment-only infrastructure field."""
         self.infra_fields.append(InfraFieldDef(**kwargs))
@@ -143,7 +150,7 @@ class ConfigRegistry:
 
     def resolve(self, config_path: Path | None = None) -> dict[str, Any]:
         """Resolve all fields into a unified config dict.
-        
+
         Resolution Priority:
           Runtime: JSON File > Environment > .env > Default
           Infra: Environment > .env > Default
@@ -168,7 +175,7 @@ class ConfigRegistry:
                 raw = os.environ.get(f.env_var) if f.env_var else None
             if raw in (None, ""):
                 raw = f.default
-            
+
             coerced = _coerce(raw, f.value_type)
             values[f.attr] = coerced
 
@@ -180,10 +187,10 @@ class ConfigRegistry:
             raw = os.environ.get(f_infra.env_var)
             if raw in (None, ""):
                 raw = f_infra.default
-                
+
             coerced = _coerce(raw, f.value_type)
             values[f.attr] = coerced
-            
+
             if f.required and coerced in (None, "", []):
                 missing.append(f.env_var)
 

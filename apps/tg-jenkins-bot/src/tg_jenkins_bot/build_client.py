@@ -51,9 +51,7 @@ class BuildClient:
         """Close the underlying HTTP client."""
         await self._client.aclose()
 
-    async def trigger_build(
-        self, branch: str, callback_url: str
-    ) -> dict[str, Any]:
+    async def trigger_build(self, branch: str, callback_url: str) -> dict[str, Any]:
         """Trigger a build via the build manager.
 
         Returns ``{request_id, status}`` on success.
@@ -94,17 +92,13 @@ class BuildClient:
             logger.exception("Failed to cancel build via build-manager")
             return {"status": "error"}
 
-    async def get_recent_builds(
-        self, count: int = 5
-    ) -> list[BuildResult]:
+    async def get_recent_builds(self, count: int = 5) -> list[BuildResult]:
         """Fetch recent completed builds from the build manager."""
         url = f"{self._base_url}/api/builds/recent"
         try:
             resp = await self._client.get(url, params={"count": count})
             if resp.status_code != 200:
-                logger.error(
-                    "Failed to fetch recent builds: %d", resp.status_code
-                )
+                logger.error("Failed to fetch recent builds: %d", resp.status_code)
                 return []
             data = resp.json()
             return [

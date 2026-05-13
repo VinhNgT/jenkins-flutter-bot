@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.templating import Jinja2Templates
 
 from ..manager import ConfigHubManager
 
@@ -89,8 +90,6 @@ async def drive_oauth_callback(request: Request) -> Any:
     Receives the OAuth redirect from Google, then proxies the full
     callback URL to file-manager for token exchange.
     """
-    from fastapi.templating import Jinja2Templates
-
     manager: ConfigHubManager = request.app.state.manager
     templates: Jinja2Templates = request.app.state.templates
     error = request.query_params.get("error")

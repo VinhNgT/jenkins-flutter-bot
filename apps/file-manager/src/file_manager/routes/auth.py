@@ -120,9 +120,7 @@ async def oauth_callback_proxy(request: Request) -> dict[str, str]:
     body = await request.json()
     authorization_response = body.get("authorization_response", "")
     if not authorization_response:
-        raise HTTPException(
-            status_code=400, detail="authorization_response required"
-        )
+        raise HTTPException(status_code=400, detail="authorization_response required")
 
     try:
         mgr.backend.exchange_callback(authorization_response)

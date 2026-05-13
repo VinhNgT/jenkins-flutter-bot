@@ -12,10 +12,6 @@ from fastapi import FastAPI
 from .control import StorageManager, control_router
 from .routes import auth, files
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -45,4 +41,8 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the file-manager service."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    )
     uvicorn.run(create_app(), host="0.0.0.0", port=9092)

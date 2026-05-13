@@ -150,7 +150,9 @@ def _build_env_lines(
         lines.append(f"# {'─' * 40}")
         lines.append("# Infrastructure (environment-specific, not portable)")
         lines.append("# These settings are tied to your deployment topology.")
-        lines.append("# Prefer docker-compose `environment:` section; .env is also acceptable.")
+        lines.append(
+            "# Prefer docker-compose `environment:` section; .env is also acceptable."
+        )
         lines.append(f"# {'─' * 40}")
 
         for group_name, fields in infra_groups.items():
@@ -193,9 +195,7 @@ def generate_env_files(
     all_warnings: list[str] = []
 
     # Bot env file
-    bot_lines, bot_warnings = _build_env_lines(
-        bot_schema, bot_config, "Telegram Bot"
-    )
+    bot_lines, bot_warnings = _build_env_lines(bot_schema, bot_config, "Telegram Bot")
     files["bot.env"] = "\n".join(bot_lines)
     all_warnings.extend(bot_warnings)
 
@@ -252,13 +252,13 @@ def generate_compose_vars(
             value = _serialize_value(raw, value_type)
             lines.append(f'{env_var}: "{value}"')
         elif field_def.get("required"):
-            lines.append(f"{env_var}: \"\"  # required")
+            lines.append(f'{env_var}: ""  # required')
         else:
             default = field_def.get("default", "")
             if default:
-                lines.append(f"# {env_var}: \"{default}\"")
+                lines.append(f'# {env_var}: "{default}"')
             else:
-                lines.append(f"# {env_var}: \"\"")
+                lines.append(f'# {env_var}: ""')
 
     return "\n".join(lines) + "\n"
 
@@ -340,7 +340,7 @@ def _build_env_lookup(
     """
     if not schema or "fields" not in schema:
         return {}
-    
+
     return {f["env_var"]: f for f in schema["fields"] if f.get("env_var")}
 
 
@@ -349,7 +349,15 @@ def _parse_env_content(
     bot_lookup: dict[str, dict[str, Any]],
     agent_lookup: dict[str, dict[str, Any]],
     drive_lookup: dict[str, dict[str, Any]] | None = None,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str], list[str], list[str], list[str]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    list[str],
+    list[str],
+    list[str],
+    list[str],
+]:
     """Parse env file content and route values to bot/agent/drive patches.
 
     Returns (bot_patch, agent_patch, drive_patch, applied, skipped_empty,
@@ -408,7 +416,15 @@ def _parse_env_content(
         nested_set(target_patch, dotted_key, value)
         applied.append(f"{env_var} → {scope}:{dotted_key} = {value}")
 
-    return bot_patch, agent_patch, drive_patch, applied, skipped_empty, unrecognized, parse_errors
+    return (
+        bot_patch,
+        agent_patch,
+        drive_patch,
+        applied,
+        skipped_empty,
+        unrecognized,
+        parse_errors,
+    )
 
 
 def import_tarball(
@@ -517,7 +533,9 @@ def import_tarball(
             val = nested_get(current, field_def["key"])
             if val in (None, "", []):
                 label = field_def.get("label", field_def["key"])
-                all_warnings.append(f"Required field '{label}' ({env_var}) still missing")
+                all_warnings.append(
+                    f"Required field '{label}' ({env_var}) still missing"
+                )
 
     return ImportResult(
         applied=all_applied,

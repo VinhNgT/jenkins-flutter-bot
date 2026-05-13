@@ -12,10 +12,6 @@ from fastapi import FastAPI
 from .config import Config
 from .control import BotManager, callback_event_router, control_router
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +44,10 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    )
     uvicorn.run(
         create_app(),
         host="0.0.0.0",

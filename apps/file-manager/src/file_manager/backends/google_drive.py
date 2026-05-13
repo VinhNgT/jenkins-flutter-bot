@@ -149,9 +149,7 @@ class GoogleDriveBackend:
         flow.fetch_token(code=code)
         self._save_credentials(flow.credentials)
 
-    def load_tokens(
-        self, client_id: str, client_secret: str
-    ) -> Credentials | None:
+    def load_tokens(self, client_id: str, client_secret: str) -> Credentials | None:
         """Load saved OAuth tokens from disk, refreshing if needed."""
         if not self._token_path.exists():
             return None
@@ -200,9 +198,7 @@ class GoogleDriveBackend:
         """Return the public Google Drive folder browse URL."""
         return f"https://drive.google.com/drive/folders/{folder_id}"
 
-    def _ensure_folder_sync(
-        self, creds: Credentials, folder_name: str
-    ) -> str:
+    def _ensure_folder_sync(self, creds: Credentials, folder_name: str) -> str:
         """Find or create a Drive folder by name. Returns folder_id."""
         service = self._get_drive_service(creds)
 
@@ -240,9 +236,7 @@ class GoogleDriveBackend:
 
         return folder_id
 
-    async def _ensure_folder(
-        self, creds: Credentials, folder_name: str
-    ) -> str:
+    async def _ensure_folder(self, creds: Credentials, folder_name: str) -> str:
         """Find or create a Drive folder by name. Returns folder_id."""
         if folder_name in self._folder_id_cache:
             return self._folder_id_cache[folder_name]

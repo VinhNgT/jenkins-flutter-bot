@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
-from .schema import post_resolve, registry
+from .schema import get_registry, post_resolve
 
 # Default config file path inside the container.  Can be overridden via the
 # CONFIG_PATH environment variable for local development outside Docker.
@@ -36,15 +37,12 @@ class Config:
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> Config:
         """Build config with priority: file > env > .env > defaults."""
-        values = registry.resolve(config_path or _DEFAULT_CONFIG_PATH)
+        values = get_registry().resolve(config_path or _DEFAULT_CONFIG_PATH)
         values = post_resolve(values)
         return cls(**values)
 
     @property
     def bot_webhook_port(self) -> int:
-        """Listen port derived from bot_service_url."""
-        from urllib.parse import urlparse
-
         return urlparse(self.bot_service_url).port or 9090
 
     @property

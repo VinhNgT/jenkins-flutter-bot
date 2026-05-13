@@ -16,12 +16,8 @@ from string import Template
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 _PIPELINE_TEMPLATE = Template((_TEMPLATE_DIR / "pipeline.groovy").read_text())
-_CHECKOUT_PRIVATE = Template(
-    (_TEMPLATE_DIR / "checkout_private.groovy").read_text()
-)
-_CHECKOUT_PUBLIC = Template(
-    (_TEMPLATE_DIR / "checkout_public.groovy").read_text()
-)
+_CHECKOUT_PRIVATE = Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text())
+_CHECKOUT_PUBLIC = Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text())
 
 
 def generate_jenkinsfile(repo_url: str, credentials_id: str) -> str:

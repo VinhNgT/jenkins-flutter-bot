@@ -16,7 +16,7 @@ from fastapi import APIRouter, Request
 
 from .builds.coordinator import BuildCoordinator
 from .config import BuildConfig
-from .schema import registry
+from .schema import get_registry
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -136,7 +136,7 @@ async def restart(request: Request) -> dict[str, Any]:
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the build manager's config field schema."""
-    return registry.serialize()
+    return get_registry().serialize()
 
 
 @control_router.get("/config")
@@ -150,7 +150,7 @@ async def get_config(request: Request) -> dict[str, Any]:
         data = json.loads(config_path.read_text())
 
     secret_lengths: dict[str, int | bool] = {}
-    for key in registry.secret_keys:
+    for key in get_registry().secret_keys:
         value = nested_get(data, key)
         if value not in (None, ""):
             secret_lengths[key] = len(str(value))
@@ -170,7 +170,7 @@ async def put_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    for key in registry.secret_keys:
+    for key in get_registry().secret_keys:
         value = nested_get(payload, key)
         if value is None or value == "":
             parts = key.split(".")

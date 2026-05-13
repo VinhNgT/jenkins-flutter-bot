@@ -10,6 +10,7 @@ import io
 import logging
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote, urlencode
 
 import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -102,9 +103,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 # ---------------------------------------------------------------------------
 
 
-async def _status_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def _status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show service status."""
     query = update.callback_query
     assert query is not None
@@ -454,14 +453,12 @@ async def _drive_receive_client_secret(
         async with httpx.AsyncClient(timeout=10.0) as client:
             await client.put(
                 f"{_api(settings)}/api/config/drive",
-                json={"drive": {"client_id": client_id, "client_secret": client_secret}},
+                json={
+                    "drive": {"client_id": client_id, "client_secret": client_secret}
+                },
             )
     except Exception:
         logger.exception("Failed to save Drive credentials")
-
-    # For headless flow, the user needs to manually use the Google consent URL
-    # with redirect_uri=http://localhost, then paste the code
-    from urllib.parse import quote, urlencode
 
     params = urlencode(
         {
@@ -532,9 +529,7 @@ async def _drive_receive_code(
 # ---------------------------------------------------------------------------
 
 
-async def _back_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def _back_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Return to the admin panel."""
     query = update.callback_query
     assert query is not None
@@ -546,9 +541,7 @@ async def _back_callback(
     )
 
 
-async def _cancel_command(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def _cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel any active conversation."""
     await update.message.reply_text("Cancelled.")  # type: ignore[union-attr]
     return ConversationHandler.END
@@ -585,7 +578,9 @@ def register_handlers(app: Any) -> None:
         ],
         states={
             DRIVE_CLIENT_ID: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, _drive_receive_client_id)
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND, _drive_receive_client_id
+                )
             ],
             DRIVE_CLIENT_SECRET: [
                 MessageHandler(
@@ -603,9 +598,7 @@ def register_handlers(app: Any) -> None:
     # Simple callback queries
     app.add_handler(CallbackQueryHandler(_status_callback, pattern="^status$"))
     app.add_handler(CallbackQueryHandler(_services_callback, pattern="^services$"))
-    app.add_handler(
-        CallbackQueryHandler(_service_action_callback, pattern="^svc_")
-    )
+    app.add_handler(CallbackQueryHandler(_service_action_callback, pattern="^svc_"))
     app.add_handler(CallbackQueryHandler(_export_env_callback, pattern="^export_env$"))
     app.add_handler(
         CallbackQueryHandler(_jenkinsfile_callback, pattern="^jenkinsfile$")

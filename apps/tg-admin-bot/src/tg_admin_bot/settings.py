@@ -33,7 +33,5 @@ class Settings:
         return cls(
             bot_token=token,
             admin_chat_id=chat_id,
-            config_hub_url=os.environ.get(
-                "CONFIG_HUB_URL", "http://config-hub:9000"
-            ),
+            config_hub_url=os.environ.get("CONFIG_HUB_URL", "http://config-hub:9000"),
         )

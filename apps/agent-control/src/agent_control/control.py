@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from config_schema import deep_merge, nested_get, nested_set
 
-from .config import AgentConfig
+from .config import AgentConfig, _DEFAULT_CONFIG_PATH
+from .schema import get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -168,28 +171,19 @@ async def agent_status(request: Request) -> dict[str, Any]:
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the agent module's config field schema."""
-    from .schema import registry
-
-    return registry.serialize()
+    return get_registry().serialize()
 
 
 @control_router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    import json
-
-    from .config import _DEFAULT_CONFIG_PATH
-    from .schema import registry
-
-    secret_keys = registry.secret_keys
+    secret_keys = get_registry().secret_keys
 
     data: dict[str, Any] = {}
     if _DEFAULT_CONFIG_PATH.exists():
         data = json.loads(_DEFAULT_CONFIG_PATH.read_text())
 
     # Mask secrets, track lengths
-    from config_schema import nested_get, nested_set
-
     secret_lengths: dict[str, int | bool] = {}
     for key in secret_keys:
         value = nested_get(data, key)
@@ -205,17 +199,10 @@ async def get_config() -> dict[str, Any]:
 @control_router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
-    import json
-
-    from config_schema import deep_merge, nested_get
-
-    from .config import _DEFAULT_CONFIG_PATH
-    from .schema import registry
-
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values
-    secret_keys = registry.secret_keys
+    secret_keys = get_registry().secret_keys
     for key in secret_keys:
         value = nested_get(payload, key)
         if value is None or value == "":
@@ -241,4 +228,3 @@ async def put_config(request: Request) -> dict[str, Any]:
     _DEFAULT_CONFIG_PATH.write_text(json.dumps(merged, indent=2))
 
     return {"status": "saved"}
-

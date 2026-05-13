@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .schema import registry
+from .schema import get_registry
 
 
 @dataclass(frozen=True)
@@ -29,5 +29,5 @@ class BuildConfig:
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> BuildConfig:
         """Resolve config from all sources."""
-        values = registry.resolve(config_path)
+        values = get_registry().resolve(config_path)
         return cls(**values)

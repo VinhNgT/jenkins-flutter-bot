@@ -13,18 +13,20 @@ Loaded at model discretion when the task involves service-to-service communicati
 
 The bot acts as a thin trigger layer. The full flow:
 
-1. User requests a build via Telegram → bot generates a unique `request_id`
-2. Bot POSTs to Jenkins `/buildWithParameters` with `BRANCH`, `BOT_CALLBACK_URL`, `BOT_REQUEST_ID`, `BOT_JOB_ID`
-3. Bot stores a `PendingBuild` in memory + persists to JSON for crash recovery
-4. Jenkins pipeline runs on the flutter-agent, then POSTs results back to the bot's webhook
-5. Bot matches `request_id`, uploads APK to Drive, sends the link to Telegram
-6. Bot enforces `max_recent_builds` retention — evicts oldest entries and deletes their Drive files
+1. User sends `/build` (or `/build <ref>`) → bot shows branch picker or triggers directly
+2. Bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, callback URL, `request_id`, `job_id`
+3. Build-manager queues the job, triggers Jenkins (`POST /buildWithParameters`), and registers the `request_id`
+4. Bot stores a `PendingBuild` in memory + persists to JSON for crash recovery
+5. Jenkins pipeline runs on the flutter-agent, then POSTs results back to the build-manager webhook
+6. Build-manager stores the result and notifies the tg-bot webhook
+7. Bot matches `request_id`, uploads APK to file-manager (`POST /api/files/upload`), sends Drive link to Telegram
+8. Bot enforces `max_recent_builds` retention — evicts oldest entries and deletes their Drive files via file-manager
 
 ---
 
 ## Webhook Protocol
 
-Jenkins POSTs to `/webhook/build-complete` as multipart form data with two fields:
+Jenkins POSTs to the build-manager (and ultimately the bot) as multipart form data with two fields:
 
 - **`metadata`**: JSON string with `request_id`, `job_id`, `status`, `commit_hash`, and optionally `logs` (failure only)
 - **`artifact`** (optional): the built APK file (success only)
@@ -43,49 +45,65 @@ The `request_id` is a 128-bit random token per build. It acts as webhook authent
 
 ## Service Control
 
-Both `stack-manager` and `tg-admin-bot` control services via `ServiceClient` from `stack-manager`:
+`config-hub` and `tg-admin-bot` control services via `ServiceClient` in `config-hub`:
 
 ```
 Client → POST /control/{start|stop|restart} → target service
 Client → GET /control/status → target service
 Client → GET /control/schema → target service (returns fields + infra partitions)
+Client → GET/PUT /control/config → target service (read/write config)
 ```
 
-If a service is down, its schema returns `null` and the stack-manager frontend shows "Loading..." for that tab.
+If a service is down, its schema returns `null` and the config-hub frontend shows "Loading..." for that tab.
+
+### Scope-to-Service Translation
+
+The config-hub exposes UI scopes (`bot`, `agent`, `drive`, `builds`) that differ from internal service names for the `drive` scope. The mapping lives exclusively in `config-hub/manager.py:_SCOPE_TO_SERVICE`:
+
+| UI Scope | Internal Service |
+|----------|-----------------|
+| `bot` | `bot` |
+| `agent` | `agent` |
+| `drive` | `file_manager` |
+| `builds` | `builds` |
+
+Do not move or duplicate this mapping. Do not rename `file-manager` internals to `drive`.
 
 ---
 
 ## Google Drive OAuth
 
-OAuth is handled by `DriveOAuth` in `stack-manager` via two mechanisms:
+OAuth is handled by `file-manager` (`/api/auth/*`) via two mechanisms, both proxied through config-hub (`/api/drive/*`):
 
-1. **Browser-redirect flow** — used by `stack-manager` (web dashboard with popup callback)
+1. **Browser-redirect flow** — used by the web dashboard (popup callback at `http://<host>:9000/api/drive/oauth/callback`)
 2. **Headless code-paste flow** — used by `tg-admin-bot` (no browser available)
 
-Both flows produce the same `oauth.json` token file on the shared `bot-config` volume. The bot never initiates OAuth — it only reads and refreshes tokens.
+Both flows produce the same stored token in file-manager's data volume. The bot never initiates OAuth — it only uploads files after a successful build.
 
 ### Key Design Decisions
 
 - **`_pending_flow` is in-memory only** — the OAuth flow object contains PKCE state that can't be serialized. If the service restarts mid-flow, the flow is lost and must be restarted. This is by design.
-- **Frontend-only "Connecting" state** — the stack-manager popup flow is tracked entirely by the frontend via a `<dialog>` modal. Do NOT add a backend `auth_pending` flag.
+- **Frontend-only "Connecting" state** — the config-hub popup flow is tracked entirely by the frontend via a `<dialog>` modal. Do NOT add a backend `auth_pending` flag.
 - **`OAUTHLIB_INSECURE_TRANSPORT`** — automatically set when the redirect URI uses `http://` (local/Docker development).
 
 ---
 
 ## Config Transfer
 
-Both `stack-manager` and `tg-admin-bot` support symmetric config transfer via `stack-manager`:
+Both `config-hub` and `tg-admin-bot` support symmetric config transfer:
 
-- **Export**: packages all JSON configs + `oauth.json` + generated `.env` files into a `.tar.gz`
-- **Import**: extracts a `.tar.gz`, writes configs, triggers automatic service restarts
+- **Export**: packages all JSON configs + generated `.env` files into a `.tar.gz`
+- **Import**: extracts a `.tar.gz`, applies configs to each owning service via `PUT /control/config`, triggers service restarts
 
 Only `.tar.gz` imports are accepted — this prevents partial or inconsistent config states.
+
+OAuth tokens are **not** included in config exports — they are environment-specific and must be re-authorized after import.
 
 ---
 
 ## Drive File Access
 
-Each uploaded APK is made individually public — the Drive **folder** stays private. Key constraints:
+Each uploaded APK is made individually accessible — the Drive **folder** stays private. Key constraints:
 
 - Per-file `anyone/reader` permission, set immediately after upload
 - Do NOT set `anyone/reader` on the folder — this would expose the entire build history
@@ -95,12 +113,12 @@ Each uploaded APK is made individually public — the Drive **folder** stays pri
 
 ## Build State Management
 
-The bot maintains two slim registries:
+Build state is split across two services:
 
-- **Pending builds** — `dict[str, PendingBuild]` with TTL-based expiration and JSON persistence. Each `request_id` is consumed exactly once.
-- **Tracked builds** — `list[TrackedBuild]` recording `request_id` + Drive file info. Used to filter Jenkins queries to bot-triggered builds only and to manage Drive file cleanup.
+- **tg-bot** — maintains `PendingBuild` records (in-memory + JSON persistence) keyed by `request_id`. Each token is consumed exactly once on webhook receipt.
+- **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links.
 
-Jenkins owns all build metadata (status, duration, branch, commit). The bot's local state is limited to what it needs for webhook matching and Drive lifecycle.
+Jenkins owns all raw build metadata (status, duration, branch, commit). The bot queries build-manager for summaries — it never queries Jenkins directly for build info.
 
 ---
 

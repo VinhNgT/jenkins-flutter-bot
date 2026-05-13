@@ -34,7 +34,7 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 
 - **All FastAPI services** share `fastapi` + `uvicorn`. The `tg-admin-bot` is the exception — it uses only `python-telegram-bot[ext]` with no HTTP server.
 - **All apps** depend on `config-schema` (shared library) for declarative config fields.
-- **`tg-admin-bot`** is a pure HTTP client to `stack-manager` — its only dependencies are `httpx` and `python-telegram-bot`.
+- **`tg-admin-bot`** is a pure HTTP client to `config-hub` — its only dependencies are `httpx` and `python-telegram-bot`.
 - **Blocking I/O libraries** (e.g., `google-api-python-client`) are wrapped with `asyncio.to_thread()`. See `communication-flows.md` for details.
 
 Check each app's `pyproject.toml` for the authoritative dependency list.
@@ -45,7 +45,7 @@ Check each app's `pyproject.toml` for the authoritative dependency list.
 
 ### Service Apps
 
-The three FastAPI service apps (`tg-jenkins-bot`, `stack-manager`, `agent-control`) follow the same module pattern:
+FastAPI service apps follow the same module pattern:
 
 | Module | Role |
 |--------|------|
@@ -54,11 +54,15 @@ The three FastAPI service apps (`tg-jenkins-bot`, `stack-manager`, `agent-contro
 | `config.py` | Typed frozen Config dataclass (delegates to `schema.py`) |
 | `control.py` | Manager class + `/control/*` routes + `GET /control/schema` |
 
-The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`) for domain-specific logic.
+This pattern applies to: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`.
+
+`config-hub` is an exception — it owns no schema and instead proxies config I/O to the above services.
+
+The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`, `git/`) for domain-specific logic.
 
 ### Admin Bot
 
-`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `stack-manager` HTTP API via `httpx` and `settings.py` for a flat `Settings` dataclass.
+`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `config-hub` HTTP API via `httpx` and `settings.py` for a flat `Settings` dataclass.
 
 One library lives in `libs/` using PyPA `src` layout:
 

@@ -11,7 +11,7 @@ This is the core architectural reference for the **jenkins-flutter-bot** monorep
 
 ## What This Project Is
 
-A self-hosted CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins and delivers APKs through Google Drive. Five containerized services coordinate over an internal Docker network.
+A self-hosted CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins and delivers APKs through Google Drive. Seven containerized services coordinate over an internal Docker network.
 
 **It is NOT a build system.** It is a thin orchestration layer around Jenkins. All cloning, compiling, and artifact packaging is delegated to a Jenkins pipeline running on a Flutter-capable agent.
 
@@ -21,7 +21,7 @@ A self-hosted CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins
 
 The monorepo uses a **uv workspace** with two top-level directories for code:
 
-- **`apps/`** — Four deployable Python applications, each with a Dockerfile, `pyproject.toml`, and `src/<package>/` layout.
+- **`apps/`** — Seven deployable Python applications, each with a Dockerfile, `pyproject.toml`, and `src/<package>/` layout.
 - **`libs/`** — One shared workspace library consumed by the apps.
 - **`infra/`** — Docker Compose files, Dockerfiles, and per-service environment file templates.
 - **`scripts/`** — Developer utilities (env example generation, version tagging).
@@ -30,10 +30,13 @@ The monorepo uses a **uv workspace** with two top-level directories for code:
 
 | Directory | Package | Role |
 |-----------|---------|------|
-| `tg-jenkins-bot` | `tg_jenkins_bot` | Telegram bot — build trigger + webhook receiver + Drive upload |
-| `stack-manager` | `stack_manager` | Central operational hub — config, service control, Drive OAuth, web dashboard |
-| `tg-admin-bot` | `tg_admin_bot` | Headless Telegram admin bot — HTTP client to stack-manager |
+| `tg-jenkins-bot` | `tg_jenkins_bot` | Telegram bot — slash commands, webhook receiver, Drive upload |
+| `config-hub` | `config_hub` | Central operational hub — config proxy, service control, web dashboard |
+| `build-manager` | `build_manager` | Build orchestration — Jenkins trigger, job/state tracking |
+| `file-manager` | `file_manager` | Storage backend — Google Drive OAuth, APK upload/download |
+| `tg-admin-bot` | `tg_admin_bot` | Headless Telegram admin bot — HTTP client to config-hub |
 | `agent-control` | `agent_control` | HTTP control wrapper for the Jenkins agent subprocess |
+| `mock-jenkins` | `mock_jenkins` | Dev/test mock — simulates Jenkins + agent-control APIs |
 
 ### Libs
 
@@ -43,8 +46,8 @@ The monorepo uses a **uv workspace** with two top-level directories for code:
 
 ### Naming Conventions
 
-- **Directory names**: `kebab-case` (e.g., `tg-jenkins-bot`, `stack-manager`).
-- **Python packages**: `snake_case` matching the directory name (e.g., `tg_jenkins_bot`, `stack_manager`).
+- **Directory names**: `kebab-case` (e.g., `tg-jenkins-bot`, `config-hub`).
+- **Python packages**: `snake_case` matching the directory name (e.g., `tg_jenkins_bot`, `config_hub`).
 - **Source layout**: All apps and libraries use PyPA `src` layout — code lives under `src/<package_name>/`.
 
 ---
@@ -53,50 +56,58 @@ The monorepo uses a **uv workspace** with two top-level directories for code:
 
 ### Service Topology
 
-Five services on a shared Docker bridge network. Only Jenkins and stack-manager are exposed to the host:
+Seven services on a shared Docker bridge network. Only Jenkins and config-hub are exposed to the host:
 
 ```mermaid
 graph TD
     TU["Telegram User"] -- polling --> BOT["tg-bot :9090 (internal)"]
-    BA["Browser Admin"] -- ":9000" --> SM["stack-manager :9000 (exposed)"]
+    BA["Browser Admin"] -- ":9000" --> CH["config-hub :9000 (exposed)"]
     TA["Telegram Admin"] -- polling --> TAB["tg-admin-bot (internal)"]
 
-    SM -- "/control/*" --> BOT
-    SM -- "/control/*" --> AGT["flutter-agent :9091 (internal)"]
-    TAB -- "HTTP API" --> SM
+    CH -- "/control/*" --> BOT
+    CH -- "/control/*" --> AGT["flutter-agent :9091 (internal)"]
+    CH -- "/control/*" --> FM["file-manager :9092 (internal)"]
+    CH -- "/control/*" --> BM["build-manager :9010 (internal)"]
+    TAB -- "HTTP API" --> CH
 
-    BOT -- "REST trigger" --> JNK["jenkins :8080 (exposed)"]
+    BOT -- "REST trigger" --> BM
+    BM -- "REST trigger" --> JNK["jenkins :8080 (exposed)"]
     JNK -- "dispatches build" --> AGT
     AGT -- "webhook result" --> BOT
+    BOT -- "upload APK" --> FM
 ```
 
 ### Service Roles
 
 | Service | Port | Exposed | Role |
 |---------|------|---------|------|
-| `tg-bot` | 9090 | No | Telegram polling bot + FastAPI webhook/control server |
-| `stack-manager` | 9000 | Yes | Central operational hub — config, service control, Drive OAuth, web dashboard |
+| `config-hub` | 9000 | Yes | Central operational hub — config proxy, service control, web dashboard |
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
+| `tg-bot` | 9090 | No | Telegram polling bot + FastAPI webhook/control server |
 | `flutter-agent` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
-| `tg-admin-bot` | — | No | Headless Telegram admin bot — pure HTTP client to stack-manager |
+| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
+| `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
+| `tg-admin-bot` | — | No | Headless Telegram admin bot — pure HTTP client to config-hub |
 
 ### Design Principles
 
-1. **Thin Trigger Layer** — The bot owns zero build logic. It triggers Jenkins via REST, registers a `request_id`, and waits for a webhook callback.
+1. **Thin Trigger Layer** — The bot owns zero build logic. It delegates build requests to the build-manager, which triggers Jenkins via REST. All cloning, compiling, and packaging happens in the Jenkins pipeline.
 
-2. **Centralized Operations** — `stack-manager` is the single source of truth for all configuration volumes, service control, and Drive OAuth. It proxies `/control/*` calls to bot and agent. Other consumers (`tg-admin-bot`) interact via its HTTP API — no direct library dependencies or volume mounts needed.
+2. **Centralized Operations** — `config-hub` is the single entry point for all configuration, service control, and Drive OAuth. It proxies `/control/*` calls to each owning service. Other consumers (`tg-admin-bot`) interact via its HTTP API — no direct library dependencies or volume mounts needed.
 
 3. **No Docker-out-of-Docker** — `docker.sock` is never mounted into any container. This is intentional for security and portability.
 
-4. **FastAPI Everywhere** — All service APIs use FastAPI: the bot, stack-manager, and agent-control. The `tg-admin-bot` is the exception — it runs as a Telegram polling bot only with no HTTP server.
+4. **FastAPI Everywhere** — All service APIs use FastAPI: tg-bot, config-hub, build-manager, file-manager, and agent-control. The `tg-admin-bot` is the only exception — it runs as a Telegram polling bot with no HTTP server.
 
-5. **Jenkins-Synced, Bot-Scoped** — The bot queries Jenkins REST API for live build details but only for builds it triggered. It maintains a slim local registry of its own triggered builds — Jenkins owns all build metadata. No information about non-bot-triggered builds is ever exposed to Telegram.
+5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for webhook matching and Drive file lifecycle. No information about non-bot-triggered builds is ever exposed to Telegram.
 
 6. **uv Workspace** — Single `pyproject.toml` + `uv.lock` at the root. All members share a unified lockfile. Shared code lives in `libs/`. Dev tools are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12).
 
-7. **Hub-and-Spoke Management** — `stack-manager` (web dashboard + API) is the central hub. `tg-admin-bot` (headless Telegram bot) is a lightweight spoke that proxies all operations through `stack-manager`'s HTTP API. The admin bot has no config volume mounts and no library dependencies on operational logic.
+7. **Hub-and-Spoke Management** — `config-hub` (web dashboard + API) is the central hub. `tg-admin-bot` (headless Telegram bot) is a lightweight spoke that proxies all operations through `config-hub`'s HTTP API. The admin bot has no config volume mounts and no library dependencies on operational logic.
 
-8. **Partitioned Configuration** — Runtime configuration (portable) is separated from infrastructure fields (environment-specific). Each service's schema declares both `*_FIELDS` (portable) and `*_INFRA` (environment-specific) tuples. Infrastructure fields are excluded from config exports/imports.
+8. **Partitioned Configuration** — Runtime configuration (portable) is separated from infrastructure fields (environment-specific). Each service's schema declares both `*_FIELDS` (portable) and `*_INFRA` (environment-specific) tuples. Infrastructure fields are excluded from config exports/imports. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
+
+9. **Scope ≠ Service Name** — `config-hub` exposes UI scope names (`bot`, `agent`, `drive`, `builds`) that may differ from internal service names. The `drive` scope maps to the `file-manager` service — the scope is named after the feature (Drive), the service is named after the implementation pattern (file-manager, storage-agnostic). This translation lives only in `config-hub/manager.py:_SCOPE_TO_SERVICE`.
 
 ---
 
@@ -105,13 +116,14 @@ graph TD
 These are architectural boundaries. Do not violate them.
 
 1. **Do NOT mount `docker.sock`** into any container.
-2. **Do NOT add build logic** to the Telegram bot — builds happen in Jenkins pipelines.
-3. **Do NOT bypass the config precedence chain** — always use `Config.resolve()` / `AgentConfig.resolve()`.
-4. **Do NOT expose bot or agent ports to the host** — only `jenkins:8080` and `stack-manager:9000` are host-facing.
+2. **Do NOT add build logic** to the Telegram bot or config-hub — builds happen in Jenkins pipelines.
+3. **Do NOT bypass the config precedence chain** — always use the service's own `Config.resolve()` method.
+4. **Do NOT expose bot, agent, file-manager, or build-manager ports to the host** — only `jenkins:8080` and `config-hub:9000` are host-facing.
 5. **Do NOT use synchronous blocking I/O** in async code paths without wrapping with `asyncio.to_thread()`.
-6. **Do NOT store secrets in code or Dockerfiles** — use env vars, `.env`, or stack-manager JSON files.
+6. **Do NOT store secrets in code or Dockerfiles** — use env vars, `.env`, or service JSON config files.
 7. **Do NOT replace deep merge with full overwrite** in config save logic.
 8. **Do NOT leak non-bot build info to Telegram** — the bot strictly filters to its own triggered builds (matched by `BOT_REQUEST_ID`). No build counts, build numbers, or metadata from manual Jenkins triggers may appear in Telegram messages.
+9. **Do NOT rename `file-manager` internals to `drive`** — the service is storage-backend agnostic. The `drive` name belongs only to the UI scope layer in config-hub.
 
 ---
 
@@ -121,6 +133,7 @@ The architecture supports these evolutions without structural changes:
 
 - **External Jenkins** — the `jenkins` service in docker-compose is a **development/testing convenience**. In production, point `JENKINS_URL` to an external Jenkins instance and remove the `jenkins` service.
 - **Multiple agents** — add more agent services with different `JENKINS_AGENT_NAME` values.
+- **Additional storage backends** — file-manager is designed to support backends beyond Google Drive. Add a new backend under `file_manager/backends/`.
 - **Additional build targets** — iOS, web, etc. The bot just needs the artifact file and metadata from the webhook.
 - **Notification channels** — the build completion handlers can extend to Slack, email, etc.
 - **Additional shared libraries** — add new packages under `libs/` and they are automatically picked up by the workspace via the `libs/*` member glob.

@@ -14,10 +14,13 @@ Triggered when editing Dockerfiles, docker-compose files, compose.sh, or env fil
 
 For the authoritative volume list, see `docker-compose.yml`. Key design decisions:
 
-- **`bot-config`** is mounted in both `stack-manager` and `tg-bot` at the same path (`/config/bot/`) so `oauth.json` is accessible from both containers. `tg-admin-bot` also mounts it.
-- **`drive-config`** holds Drive OAuth client credentials (`drive.json`) — separate from bot config because Drive credentials are managed by `stack-manager` / `tg-admin-bot`, not by the bot itself.
-- **`bot-data`** holds runtime state (pending builds, build history) — only mounted in `tg-bot`.
-- Jenkins home data stays in its own volume, decoupled from all other services.
+- Each service has its own isolated data volume — no volumes are shared between services.
+- **`bot-data`** holds tg-bot runtime state (pending builds, build history) + bot JSON config.
+- **`agent-data`** holds the agent JSON config.
+- **`build-manager-data`** holds build registry state + build-manager JSON config.
+- **`storage-data`** holds Drive OAuth tokens + file-manager JSON config.
+- **`jenkins-data`** holds Jenkins home — decoupled from all other services.
+- Config crosses service boundaries via HTTP (`/control/config`), not via shared mounts.
 
 ---
 
@@ -26,11 +29,11 @@ For the authoritative volume list, see `docker-compose.yml`. Key design decision
 All services share a single Docker bridge network. Only two ports are exposed to the host:
 
 - **`jenkins:8080`** — Jenkins web UI
-- **`stack-manager:9000`** — Config dashboard + Drive OAuth callback
+- **`config-hub:9000`** — Config dashboard + Drive OAuth callback
 
-Bot (`9090`) and agent (`9091`) ports are internal only. `tg-admin-bot` has no HTTP server.
+Bot (`9090`), flutter-agent (`9091`), file-manager (`9092`), and build-manager (`9010`) ports are internal only. `tg-admin-bot` has no HTTP server.
 
-Do not expose bot or agent ports to the host.
+Do not expose bot, agent, file-manager, or build-manager ports to the host.
 
 ---
 
@@ -46,14 +49,17 @@ The `tg-admin-bot` uses `ADMIN_BOT_TOKEN` and `ADMIN_CHAT_ID` via `${VAR:-}` int
 
 ## Dev vs Production Compose
 
-Two compose modes via `compose.sh`:
+Three compose modes via `compose.sh`:
 
 ```bash
 ./compose.sh [args]          # Dev — builds images locally from source
 ./compose.sh prod [args]     # Prod — pulls pre-built images from GHCR
+./compose.sh mock [args]     # Mock — replaces flutter-agent + jenkins with mock-jenkins
 ```
 
 **Production mode** overlays `docker-compose.prod.yml`, which replaces `build:` with `image:` pointing to GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
+
+**Mock mode** overlays `docker-compose.mock.yml`, which replaces the real `flutter-agent` and `jenkins` with the `mock-jenkins` service. Used for local development and testing without a real Jenkins install.
 
 The `jenkins` service has **no** prod override — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the service.
 
@@ -71,7 +77,7 @@ All apps are built and pushed to GHCR with both the exact version tag and `lates
 
 ## Docker Build Patterns
 
-### Standard Apps (tg-bot, stack-manager, tg-admin-bot)
+### Standard Apps (tg-bot, config-hub, build-manager, file-manager, tg-admin-bot, agent-control)
 
 All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions:
 
@@ -90,6 +96,15 @@ Key conventions and the *why*:
 - **uv is kept in runtime** — the base image (`jenkins/inbound-agent`) lacks Python 3.12, so uv manages both Python installation and dependencies
 - **`platform: linux/amd64`** in docker-compose — Flutter does not support Android release builds on Linux ARM64; x86_64 emulation is required on Apple Silicon hosts
 - **Gradle memory tuning** — daemon disabled, JVM heap capped. See the Dockerfile comments for rationale.
+
+### mock-jenkins (Dev Only)
+
+A single container running two FastAPI servers:
+
+- **Port 8080** — mock Jenkins API (build trigger, status)
+- **Port 9091** — mock agent-control API (mirrors real `flutter-agent` `/control/*` endpoints)
+
+Exists only in `docker-compose.mock.yml`. Never appears in prod or dev compose files.
 
 ---
 

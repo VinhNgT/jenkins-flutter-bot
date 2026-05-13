@@ -1,6 +1,18 @@
 # 🔧 Agent Control
 
-An HTTP control wrapper for the Jenkins inbound agent subprocess. Provides a FastAPI control API (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`, `/control/schema`) so config-hub can manage the agent without Docker socket access.
+An HTTP control wrapper for the Jenkins inbound agent subprocess. Provides a FastAPI control API so config-hub can manage the agent lifecycle and configuration without Docker socket access.
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/control/status` | GET | Returns running state and process info |
+| `/control/start` | POST | Spawns the Jenkins inbound agent process |
+| `/control/stop` | POST | Gracefully terminates the agent (SIGTERM → SIGKILL) |
+| `/control/restart` | POST | Stop + start in sequence |
+| `/control/schema` | GET | Returns the declarative config field schema |
+| `/control/config` | GET | Returns current config values (secrets masked) |
+| `/control/config` | PUT | Saves config values (deep merge) |
 
 ## How It Works
 
@@ -14,6 +26,24 @@ On startup failure, the FastAPI server stays running — the control API remains
 
 ## Configuration
 
-Agent configuration follows the same declarative schema system as all other services. Fields are declared in `schema.py` and resolved via the standard precedence chain.
+Agent configuration follows the same declarative schema system as all other services. Fields are declared in `schema.py` and resolved via the standard precedence chain:
 
-The `JENKINS_URL` and `JENKINS_AGENT_NAME` are infrastructure fields — typically set in `docker-compose.yml`, not in the dashboard.
+```
+JSON config file (dashboard) > Environment Variable > .env file > Hardcoded default
+```
+
+Config is stored at `/app/data/agent.json` inside the container (mounted from the `agent-data` volume).
+
+### Infrastructure Fields (set in docker-compose, not the dashboard)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JENKINS_URL` | `http://jenkins:8080` | Jenkins controller URL |
+| `JENKINS_AGENT_NAME` | `flutter-agent` | Node name registered in Jenkins |
+| `JENKINS_WEB_SOCKET` | `true` | Use WebSocket transport |
+
+### Runtime Fields (managed via the dashboard)
+
+| Field | Description |
+|-------|-------------|
+| Agent Secret | The secret token from the Jenkins node configuration page |

@@ -260,21 +260,17 @@ async def get_schema() -> dict[str, Any]:
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
     import json
-    import os
-    from pathlib import Path
 
     from config_schema import nested_get, nested_set
 
+    from .config import _DEFAULT_CONFIG_PATH
     from .schema import BOT_FIELDS, BOT_INFRA
 
     secret_keys = tuple(f.key for f in BOT_FIELDS + BOT_INFRA if f.secret)
 
-    config_path_str = os.environ.get("CONFIG_PATH")
-    config_path = Path(config_path_str) if config_path_str else None
-
     data: dict[str, Any] = {}
-    if config_path and config_path.exists():
-        data = json.loads(config_path.read_text())
+    if _DEFAULT_CONFIG_PATH.exists():
+        data = json.loads(_DEFAULT_CONFIG_PATH.read_text())
 
     secret_lengths: dict[str, int | bool] = {}
     for key in secret_keys:
@@ -292,17 +288,11 @@ async def get_config() -> dict[str, Any]:
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
     import json
-    import os
-    from pathlib import Path
 
     from config_schema import deep_merge, nested_get
 
+    from .config import _DEFAULT_CONFIG_PATH
     from .schema import BOT_FIELDS, BOT_INFRA
-
-    config_path_str = os.environ.get("CONFIG_PATH")
-    if not config_path_str:
-        return {"status": "error", "detail": "CONFIG_PATH not set"}
-    config_path = Path(config_path_str)
 
     payload = await request.json()
 
@@ -324,12 +314,12 @@ async def put_config(request: Request) -> dict[str, Any]:
 
     # Deep merge with existing
     existing: dict[str, Any] = {}
-    if config_path.exists():
-        existing = json.loads(config_path.read_text())
+    if _DEFAULT_CONFIG_PATH.exists():
+        existing = json.loads(_DEFAULT_CONFIG_PATH.read_text())
 
     merged = deep_merge(existing, payload)
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(merged, indent=2))
+    _DEFAULT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _DEFAULT_CONFIG_PATH.write_text(json.dumps(merged, indent=2))
 
     return {"status": "saved"}
 

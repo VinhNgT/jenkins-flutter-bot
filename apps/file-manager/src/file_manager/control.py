@@ -12,7 +12,7 @@ from config_schema import deep_merge, serialize_schema
 from fastapi import APIRouter, Request
 
 from .backends.google_drive import GoogleDriveBackend
-from .config import StorageConfig
+from .config import StorageConfig, _DEFAULT_CONFIG_PATH
 from .schema import (
     MODULE_DESCRIPTION,
     MODULE_TITLE,
@@ -45,15 +45,12 @@ class StorageManager:
     def backend(self) -> GoogleDriveBackend | None:
         return self._backend
 
-    def _config_path(self) -> Path | None:
+    def _config_path(self) -> Path:
         val = os.environ.get("CONFIG_PATH")
-        return Path(val) if val else None
+        return Path(val) if val else _DEFAULT_CONFIG_PATH
 
     def _token_path(self) -> Path:
-        config_path = self._config_path()
-        if config_path is not None:
-            return config_path.parent / "oauth.json"
-        return Path("data") / "oauth.json"
+        return self._config_path().parent / "oauth.json"
 
     def start(self) -> None:
         """Resolve config and initialise the storage backend."""
@@ -105,7 +102,7 @@ async def get_config(request: Request) -> dict[str, Any]:
     """Return current config values with secrets masked."""
     mgr = _manager(request)
     config_path = mgr._config_path()
-    if config_path is None or not config_path.exists():
+    if not config_path.exists():
         return {"values": {}, "secret_lengths": {}}
 
     data = json.loads(config_path.read_text())
@@ -138,8 +135,6 @@ async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
     mgr = _manager(request)
     config_path = mgr._config_path()
-    if config_path is None:
-        return {"status": "error", "detail": "CONFIG_PATH not set"}
 
     payload = await request.json()
 

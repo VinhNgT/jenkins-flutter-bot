@@ -174,9 +174,6 @@ async def put_config(request: Request) -> dict[str, Any]:
     manager: BuildManager = request.app.state.manager
     config_path = manager.settings.config_path
 
-    if not config_path:
-        return {"status": "error", "detail": "CONFIG_PATH not set"}
-
     payload = await request.json()
 
     # Strip empty/None secrets to avoid overwriting existing values

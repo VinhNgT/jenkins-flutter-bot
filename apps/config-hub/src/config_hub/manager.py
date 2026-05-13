@@ -19,7 +19,7 @@ from .settings import Settings
 logger = logging.getLogger(__name__)
 
 # All services whose config and schema are proxied through config-hub.
-_PROXIED_SERVICES = ("bot", "agent", "file_manager", "orchestrator")
+_PROXIED_SERVICES = ("bot", "agent", "file_manager", "builds")
 
 # Scope name → internal service name mapping.
 # The web UI uses these scope names in API calls.
@@ -27,7 +27,7 @@ _SCOPE_TO_SERVICE = {
     "bot": "bot",
     "agent": "agent",
     "storage": "file_manager",
-    "orchestrator": "orchestrator",
+    "builds": "builds",
 }
 
 
@@ -44,7 +44,7 @@ class ConfigHubManager:
             bot_url=settings.bot_control_url,
             agent_url=settings.agent_control_url,
             file_manager_url=settings.file_manager_url,
-            orchestrator_url=settings.orchestrator_url,
+            build_manager_url=settings.build_manager_url,
         )
         self.fm_client = httpx.AsyncClient(timeout=10.0)
 
@@ -192,11 +192,11 @@ class ConfigHubManager:
     # ------------------------------------------------------------------
 
     async def get_jenkinsfile(self) -> dict[str, Any]:
-        """Generate Jenkinsfile variants from current orchestrator config."""
-        orch_config = await self.services.get_config("orchestrator")
+        """Generate Jenkinsfile variants from current build manager config."""
+        orch_config = await self.services.get_config("builds")
         values = orch_config.get("values", {}) if orch_config else {}
 
-        # Extract git repo URL and credentials from orchestrator config
+        # Extract git repo URL and credentials from build manager config
         git_section = values.get("git", {})
         jenkins_section = values.get("jenkins", {})
         repo_url = git_section.get("repo_url", "")

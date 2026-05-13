@@ -1,7 +1,7 @@
 [project]
-name = "build-orchestrator"
+name = "build-manager"
 version = "0.2.0-dev.2"
-description = "Build lifecycle coordinator — triggers Jenkins, receives webhooks, uploads artifacts"
+description = "Build lifecycle manager — triggers Jenkins, receives webhooks, uploads artifacts"
 requires-python = ">=3.12"
 dependencies = [
     "config-schema",
@@ -15,7 +15,7 @@ dependencies = [
 config-schema = { workspace = true }
 
 [project.scripts]
-build-orchestrator = "build_orchestrator.main:cli"
+build-manager = "build_manager.main:cli"
 
 [build-system]
 requires = ["hatchling"]

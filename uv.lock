@@ -11,7 +11,7 @@ resolution-markers = [
 [manifest]
 members = [
     "agent-control",
-    "build-orchestrator",
+    "build-manager",
     "config-hub",
     "config-schema",
     "file-manager",
@@ -129,9 +129,9 @@ wheels = [
 ]
 
 [[package]]
-name = "build-orchestrator"
+name = "build-manager"
 version = "0.2.0.dev2"
-source = { editable = "apps/build-orchestrator" }
+source = { editable = "apps/build-manager" }
 dependencies = [
     { name = "config-schema" },
     { name = "fastapi" },

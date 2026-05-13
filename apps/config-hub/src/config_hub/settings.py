@@ -14,13 +14,13 @@ class Settings:
         BOT_CONTROL_URL           — Base URL of the tg-bot control API
         AGENT_CONTROL_URL         — Base URL of the agent-control API
         FILE_MANAGER_URL          — Base URL of the file-manager API
-        ORCHESTRATOR_URL          — Base URL of the build-orchestrator API
+        BUILD_MANAGER_URL         — Base URL of the build-manager API
     """
 
     bot_control_url: str | None
     agent_control_url: str | None
     file_manager_url: str | None
-    orchestrator_url: str | None
+    build_manager_url: str | None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -29,5 +29,5 @@ class Settings:
             bot_control_url=os.environ.get("BOT_CONTROL_URL") or None,
             agent_control_url=os.environ.get("AGENT_CONTROL_URL") or None,
             file_manager_url=os.environ.get("FILE_MANAGER_URL") or None,
-            orchestrator_url=os.environ.get("ORCHESTRATOR_URL") or None,
+            build_manager_url=os.environ.get("BUILD_MANAGER_URL") or None,
         )

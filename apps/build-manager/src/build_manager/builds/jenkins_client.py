@@ -71,7 +71,7 @@ class JenkinsClient:
         """Fetch recent builds from Jenkins with their parameters.
 
         Returns up to ``count`` builds.  The caller is responsible for
-        filtering to only orchestrator-triggered builds (by matching
+        filtering to only build-manager-triggered builds (by matching
         ``request_id``).
         """
         tree = (

@@ -1,7 +1,7 @@
 """Bot lifecycle management and HTTP control routes.
 
-The bot is a thin Telegram frontend — all build orchestration is
-delegated to the build-orchestrator service via :class:`OrchClient`.
+The bot is a thin Telegram frontend — all build management is
+delegated to the build-manager service via :class:`BuildClient`.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from .bot.handlers import (
     text_branch_handler,
 )
 from .config import Config
-from .orch_client import OrchClient
+from .build_client import BuildClient
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class BotManager:
         self._application: Application | None = None
         self._bot_context: BotContext | None = None
         self._config: Config | None = None
-        self._orch_client: OrchClient | None = None
+        self._build_client: BuildClient | None = None
         self._last_error: str | None = None
 
     @property
@@ -87,15 +87,15 @@ class BotManager:
             missing = []
             if not config.telegram_token:
                 missing.append("TELEGRAM_BOT_TOKEN")
-            if not config.orchestrator_url:
-                missing.append("ORCHESTRATOR_URL")
+            if not config.build_manager_url:
+                missing.append("BUILD_MANAGER_URL")
             if missing:
                 raise ValueError(
                     f"Missing required configuration: {', '.join(missing)}"
                 )
 
             try:
-                orch_client = OrchClient(config.orchestrator_url)
+                build_client = BuildClient(config.build_manager_url)
 
                 # Two-step construction: application.bot is only available
                 # after _build_application() runs, so we build a bootstrap
@@ -103,13 +103,13 @@ class BotManager:
                 # context once the application object exists.
                 bootstrap_context = BotContext(
                     config=config,
-                    orch_client=orch_client,
+                    build_client=build_client,
                     bot=None,  # type: ignore[arg-type]
                 )
                 application = _build_application(bootstrap_context)
                 bot_context = BotContext(
                     config=config,
-                    orch_client=orch_client,
+                    build_client=build_client,
                     bot=application.bot,
                 )
                 application.bot_data["bot_context"] = bot_context
@@ -133,7 +133,7 @@ class BotManager:
                 self._application = application
                 self._bot_context = bot_context
                 self._config = config
-                self._orch_client = orch_client
+                self._build_client = build_client
                 self._last_error = None
                 logger.info("Telegram bot started")
             except Exception as exc:
@@ -155,13 +155,13 @@ class BotManager:
             await application.shutdown()
 
             # Close reusable HTTP clients
-            if self._orch_client:
-                await self._orch_client.close()
+            if self._build_client:
+                await self._build_client.close()
 
             self._application = None
             self._bot_context = None
             self._config = None
-            self._orch_client = None
+            self._build_client = None
 
     async def restart(self, config: Config) -> None:
         """Restart the Telegram polling application."""
@@ -335,7 +335,7 @@ async def put_config(request: Request) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Build event callback (from build-orchestrator)
+# Build event callback (from build-manager)
 # ---------------------------------------------------------------------------
 
 callback_event_router = APIRouter(tags=["callback"])
@@ -343,7 +343,7 @@ callback_event_router = APIRouter(tags=["callback"])
 
 @callback_event_router.post("/callback/build-result")
 async def handle_build_result(request: Request) -> dict[str, str]:
-    """Receive a build result forwarded by the build-orchestrator.
+    """Receive a build result forwarded by the build-manager.
 
     Expected JSON payload::
 

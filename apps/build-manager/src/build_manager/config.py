@@ -1,4 +1,4 @@
-"""Typed frozen config dataclass for the build orchestrator."""
+"""Typed frozen config dataclass for the build manager."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .schema import ORCHESTRATOR_FIELDS, ORCHESTRATOR_INFRA, resolve_fields
+from .schema import BUILD_FIELDS, BUILD_INFRA, resolve_fields
 
 
 @dataclass(frozen=True)
-class OrchestratorConfig:
-    """Resolved build orchestrator configuration.
+class BuildConfig:
+    """Resolved build manager configuration.
 
-    Use ``OrchestratorConfig.resolve()`` to build an instance from the
+    Use ``BuildConfig.resolve()`` to build an instance from the
     standard config precedence chain (JSON → env → defaults).
     """
 
@@ -28,8 +28,8 @@ class OrchestratorConfig:
     self_url: str
 
     @classmethod
-    def resolve(cls, config_path: Path | None = None) -> OrchestratorConfig:
+    def resolve(cls, config_path: Path | None = None) -> BuildConfig:
         """Resolve config from all sources."""
-        all_fields = ORCHESTRATOR_FIELDS + ORCHESTRATOR_INFRA
+        all_fields = BUILD_FIELDS + BUILD_INFRA
         values: dict[str, Any] = resolve_fields(all_fields, config_path)
         return cls(**{f.attr: values.get(f.attr, "") for f in all_fields})

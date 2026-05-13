@@ -1,4 +1,4 @@
-"""Build orchestrator settings — resolved from environment variables."""
+"""Build manager settings — resolved from environment variables."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ class Settings:
         FILE_MANAGER_URL  — Base URL of the file-manager service
         SELF_URL          — This service's own URL (for webhook callbacks)
         BUILD_DATA_PATH   — Directory for build state persistence
-        CONFIG_PATH       — Path to orchestrator config JSON file
+        CONFIG_PATH       — Path to build manager config JSON file
     """
 
     file_manager_url: str
@@ -31,7 +31,7 @@ class Settings:
             file_manager_url=os.environ.get(
                 "FILE_MANAGER_URL", "http://file-manager:9092"
             ),
-            self_url=os.environ.get("SELF_URL", "http://build-orchestrator:9010"),
+            self_url=os.environ.get("SELF_URL", "http://build-manager:9010"),
             build_data_path=Path(
                 os.environ.get("BUILD_DATA_PATH", "data/builds")
             ),

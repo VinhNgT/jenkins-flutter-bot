@@ -270,7 +270,7 @@ async def _on_confirm_cancel(
     context: ContextTypes.DEFAULT_TYPE,
     data: str,
 ) -> None:
-    """Execute: cancel the build via build-orchestrator."""
+    """Execute: cancel the build via build-manager."""
     assert update.callback_query is not None
     request_id = data.removeprefix("cancel:confirm:")
     ctx = _get_ctx(context)
@@ -285,11 +285,11 @@ async def _on_confirm_cancel(
             logger.exception("Failed to edit stale cancel confirm")
         return
 
-    # Cancel via build-orchestrator (best-effort)
+    # Cancel via build-manager (best-effort)
     try:
-        await ctx.orch_client.cancel_build(request_id)
+        await ctx.build_client.cancel_build(request_id)
     except Exception:
-        logger.exception("Failed to cancel build via build-orchestrator")
+        logger.exception("Failed to cancel build via build-manager")
 
     try:
         await update.callback_query.edit_message_text(

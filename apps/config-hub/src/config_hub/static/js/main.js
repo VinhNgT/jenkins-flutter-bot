@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Render dynamic forms from schemas
   if (schemas) {
     if (schemas.bot) renderSchemaForm('schema-container-bot', 'bot', schemas.bot);
-    if (schemas.orchestrator) renderSchemaForm('schema-container-orchestrator', 'orchestrator', schemas.orchestrator);
+    if (schemas.builds) renderSchemaForm('schema-container-builds', 'builds', schemas.builds);
     if (schemas.agent) renderSchemaForm('schema-container-agent', 'agent', schemas.agent);
     if (schemas.drive) renderSchemaForm('schema-container-drive', 'drive', schemas.drive);
   }
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Populate values into rendered forms
   if (config) {
     populateScope('bot', config.bot, config._secrets_set?.bot);
-    populateScope('orchestrator', config.orchestrator, config._secrets_set?.orchestrator);
+    populateScope('builds', config.builds, config._secrets_set?.builds);
     populateScope('agent', config.agent, config._secrets_set?.agent);
     populateScope('drive', config.drive, config._secrets_set?.drive);
   }
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = collectScope(scope);
       const result = await API.saveScope(scope, data);
       if (result) {
-        const label = { bot: 'Bot', orchestrator: 'Orchestrator', agent: 'Agent', drive: 'Drive' }[scope] || scope;
+        const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', drive: 'Drive' }[scope] || scope;
         Toast.show(`${label} config saved`, 'success');
         const freshConfig = await API.getConfig();
         if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const freshConfig = await API.getConfig();
       if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
       if (scope === 'drive') await refreshDriveCard();
-      const label = { bot: 'Bot', orchestrator: 'Orchestrator', agent: 'Agent', drive: 'Drive' }[scope] || scope;
+      const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', drive: 'Drive' }[scope] || scope;
       Toast.show(`${label} config reloaded`, 'info');
       return;
     }

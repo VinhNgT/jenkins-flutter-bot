@@ -47,7 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT_FILES: list[Path] = [
     REPO_ROOT / "pyproject.toml",
     REPO_ROOT / "apps" / "tg-jenkins-bot"      / "pyproject.toml",
-    REPO_ROOT / "apps" / "build-orchestrator"   / "pyproject.toml",
+    REPO_ROOT / "apps" / "build-manager"        / "pyproject.toml",
     REPO_ROOT / "apps" / "config-hub"           / "pyproject.toml",
     REPO_ROOT / "apps" / "file-manager"         / "pyproject.toml",
     REPO_ROOT / "apps" / "agent-control"        / "pyproject.toml",

@@ -1,4 +1,4 @@
-"""Declarative schema for the build orchestrator configuration module.
+"""Declarative schema for the build manager configuration module.
 
 Owns the Jenkins connection and Git repository field declarations.
 """
@@ -9,16 +9,16 @@ from config_schema import FieldDef, resolve_fields, serialize_schema  # noqa: F4
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator field declarations
+# Build manager field declarations
 # ---------------------------------------------------------------------------
 
-MODULE_TITLE = "Build Orchestrator Configuration"
+MODULE_TITLE = "Build Manager Configuration"
 MODULE_DESCRIPTION = (
-    "Configures the build orchestrator's connection to Jenkins and the"
+    "Configures the build manager's connection to Jenkins and the"
     " Git repository used for builds."
 )
 
-ORCHESTRATOR_FIELDS: tuple[FieldDef, ...] = (
+BUILD_FIELDS: tuple[FieldDef, ...] = (
     # ── Jenkins ──
     FieldDef(
         key="jenkins.url",
@@ -100,9 +100,9 @@ ORCHESTRATOR_FIELDS: tuple[FieldDef, ...] = (
 # Infrastructure fields (environment-specific, not portable)
 # ---------------------------------------------------------------------------
 
-ORCHESTRATOR_INFRA: tuple[FieldDef, ...] = (
+BUILD_INFRA: tuple[FieldDef, ...] = (
     FieldDef(
-        key="orchestrator.file_manager_url",
+        key="infra.file_manager_url",
         env_var="FILE_MANAGER_URL",
         attr="file_manager_url",
         label="File Manager URL",
@@ -111,17 +111,17 @@ ORCHESTRATOR_INFRA: tuple[FieldDef, ...] = (
         default="http://file-manager:9092",
     ),
     FieldDef(
-        key="orchestrator.self_url",
+        key="infra.self_url",
         env_var="SELF_URL",
         attr="self_url",
         label="Self URL",
         group="Infrastructure",
         description="This service's own URL (used in webhook callbacks)",
-        default="http://build-orchestrator:9010",
+        default="http://build-manager:9010",
     ),
 )
 
 # Derived constants
-ORCHESTRATOR_SECRET_FIELDS = tuple(
-    f.key for f in ORCHESTRATOR_FIELDS if f.secret
+BUILD_SECRET_FIELDS = tuple(
+    f.key for f in BUILD_FIELDS if f.secret
 )

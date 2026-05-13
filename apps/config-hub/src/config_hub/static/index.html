@@ -35,7 +35,7 @@
         <div class="sidebar-divider"></div>
         <span class="sidebar-label">Configuration</span>
         <button class="sidebar-btn" data-tab="bot" role="tab" aria-selected="false">Telegram Bot</button>
-        <button class="sidebar-btn" data-tab="orchestrator" role="tab" aria-selected="false">Build Orchestrator</button>
+        <button class="sidebar-btn" data-tab="builds" role="tab" aria-selected="false">Build Manager</button>
         <button class="sidebar-btn" data-tab="agent" role="tab" aria-selected="false">Jenkins Agent</button>
         <button class="sidebar-btn" data-tab="drive" role="tab" aria-selected="false">Google Drive</button>
         <div class="sidebar-divider"></div>
@@ -57,9 +57,9 @@
                 <span class="badge badge--loading">Loading…</span>
               </div>
             </div>
-            <div class="card status-card" id="card-orchestrator">
+            <div class="card status-card" id="card-builds">
               <div class="status-header">
-                <h3>Build Orchestrator</h3>
+                <h3>Build Manager</h3>
                 <span class="badge badge--loading">Loading…</span>
               </div>
             </div>
@@ -95,10 +95,10 @@
           </div>
         </section>
 
-        <!-- ===== Build Orchestrator Config (dynamic) ===== -->
-        <section id="panel-orchestrator" class="tab-panel" role="tabpanel" hidden>
-          <div id="schema-container-orchestrator">
-            <p class="text-muted">Loading orchestrator schema…</p>
+        <!-- ===== Build Manager Config (dynamic) ===== -->
+        <section id="panel-builds" class="tab-panel" role="tabpanel" hidden>
+          <div id="schema-container-builds">
+            <p class="text-muted">Loading build manager schema…</p>
           </div>
         </section>
 

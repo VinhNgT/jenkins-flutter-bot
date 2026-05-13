@@ -1,6 +1,6 @@
-"""Build orchestrator — coordinates Jenkins, file-manager, and frontends.
+"""Build coordinator — coordinates Jenkins, file-manager, and frontends.
 
-The ``BuildOrchestrator`` is the central coordinator for the build lifecycle.
+The ``BuildCoordinator`` is the central coordinator for the build lifecycle.
 It triggers builds on Jenkins, receives webhook callbacks when builds complete,
 delegates artifact upload to the file-manager service, and forwards results
 to registered frontend callback URLs.
@@ -21,10 +21,10 @@ from .state import BuildTracker
 logger = logging.getLogger(__name__)
 
 
-class BuildOrchestrator:
+class BuildCoordinator:
     """Coordinates the full build lifecycle.
 
-    Owned by ``OrchestratorManager`` and attached to ``app.state``.
+    Owned by ``BuildManager`` and attached to ``app.state``.
 
     Flow:
         1. Frontend calls ``trigger_build(branch, callback_url)``

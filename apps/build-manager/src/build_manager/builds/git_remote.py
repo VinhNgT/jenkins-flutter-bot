@@ -17,7 +17,7 @@ _TIMEOUT = 5.0
 class GitRemoteClient:
     """Queries a GitLab instance for the latest commit on a branch.
 
-    Used by the build orchestrator to detect duplicate builds — if the
+    Used by the build coordinator to detect duplicate builds — if the
     remote HEAD matches the last built commit, the build is redundant.
 
     All methods are fail-safe: network errors, auth failures, and

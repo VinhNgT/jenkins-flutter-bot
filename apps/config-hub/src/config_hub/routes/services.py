@@ -10,7 +10,7 @@ from ..manager import ConfigHubManager
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
-_MANAGED_SERVICES = {"bot", "agent", "file_manager", "orchestrator"}
+_MANAGED_SERVICES = {"bot", "agent", "file_manager", "builds"}
 
 
 @router.get("/status")
@@ -21,7 +21,7 @@ async def get_service_status(request: Request) -> dict[str, Any]:
         "bot": await manager.services.status("bot"),
         "agent": await manager.services.status("agent"),
         "file_manager": await manager.services.status("file_manager"),
-        "orchestrator": await manager.services.status("orchestrator"),
+        "builds": await manager.services.status("builds"),
     }
 
 

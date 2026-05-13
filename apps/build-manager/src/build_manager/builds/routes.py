@@ -18,15 +18,15 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 
 from .jenkins_client import JenkinsTriggerError
-from .orchestrator import BuildOrchestrator
+from .coordinator import BuildCoordinator
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/builds", tags=["builds"])
 
 
-def _orchestrator(request: Request) -> BuildOrchestrator:
-    return request.app.state.orchestrator
+def _coordinator(request: Request) -> BuildCoordinator:
+    return request.app.state.coordinator
 
 
 @router.post("/trigger")
@@ -43,10 +43,10 @@ async def trigger_build(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="branch is required")
 
     callback_url = body.get("callback_url", "")
-    orch = _orchestrator(request)
+    coord = _coordinator(request)
 
     try:
-        result = await orch.trigger_build(
+        result = await coord.trigger_build(
             branch, frontend_callback_url=callback_url
         )
         return result
@@ -88,10 +88,10 @@ async def build_webhook(
             tmp.write(await artifact.read())
             artifact_path = tmp.name
 
-    orch = _orchestrator(request)
+    coord = _coordinator(request)
 
     try:
-        return await orch.handle_webhook(meta, artifact_path)
+        return await coord.handle_webhook(meta, artifact_path)
     finally:
         # Clean up temp file if upload failed or was handled
         if artifact_path and os.path.exists(artifact_path):
@@ -101,8 +101,8 @@ async def build_webhook(
 @router.get("/pending")
 async def list_pending(request: Request) -> dict[str, Any]:
     """List all in-flight builds."""
-    orch = _orchestrator(request)
-    pending = orch.tracker.list_pending()
+    coord = _coordinator(request)
+    pending = coord.tracker.list_pending()
     return {
         "builds": {
             k: {
@@ -117,8 +117,8 @@ async def list_pending(request: Request) -> dict[str, Any]:
 @router.get("/recent")
 async def list_recent(request: Request, count: int = 10) -> dict[str, Any]:
     """List recent completed builds."""
-    orch = _orchestrator(request)
-    builds = orch.tracker.recent_builds(count)
+    coord = _coordinator(request)
+    builds = coord.tracker.recent_builds(count)
     return {
         "builds": [
             {
@@ -138,8 +138,8 @@ async def list_recent(request: Request, count: int = 10) -> dict[str, Any]:
 @router.post("/{request_id}/cancel")
 async def cancel_build(request: Request, request_id: str) -> dict[str, str]:
     """Cancel a pending build."""
-    orch = _orchestrator(request)
-    result = await orch.cancel_build(request_id)
+    coord = _coordinator(request)
+    result = await coord.cancel_build(request_id)
     if result["status"] == "not_found":
         raise HTTPException(status_code=404, detail="Build not found")
     return result
@@ -147,6 +147,6 @@ async def cancel_build(request: Request, request_id: str) -> dict[str, str]:
 
 @router.get("/status")
 async def build_status(request: Request) -> dict[str, Any]:
-    """Return a summary of the build orchestrator state."""
-    orch = _orchestrator(request)
-    return orch.tracker.to_dict()
+    """Return a summary of the build manager state."""
+    coord = _coordinator(request)
+    return coord.tracker.to_dict()

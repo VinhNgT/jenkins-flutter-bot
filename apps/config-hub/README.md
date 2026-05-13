@@ -9,7 +9,7 @@ Centralized configuration proxy and web dashboard for the Jenkins Flutter Bot ec
 - **Service Control** — start, stop, restart, and check status of all managed services via their `/control/*` APIs
 - **Drive OAuth** — proxies browser-redirect and headless code-exchange flows to file-manager
 - **Config Export/Import** — tarball-based portable configuration transfer
-- **Jenkinsfile Generation** — renders customized Jenkins pipelines from current orchestrator config
+- **Jenkinsfile Generation** — renders customized Jenkins pipelines from current build manager config
 
 ## Architecture
 
@@ -17,7 +17,7 @@ Config-hub owns **zero domain schemas**. It proxies all config I/O to the owning
 
 ```
 config-hub (FastAPI + StaticFiles)
-    ├─ /api/config/*       Config CRUD (proxied to bot, agent, file-manager, orchestrator)
+    ├─ /api/config/*       Config CRUD (proxied to bot, agent, file-manager, build-manager)
     ├─ /api/services/*     Service control proxying
     ├─ /api/drive/*        OAuth flows (proxied to file-manager)
     ├─ /api/export/*       Tarball export
@@ -34,7 +34,7 @@ config-hub (FastAPI + StaticFiles)
 | `BOT_CONTROL_URL` | Base URL of the tg-bot control API |
 | `AGENT_CONTROL_URL` | Base URL of the agent-control API |
 | `FILE_MANAGER_URL` | Base URL of the file-manager control API |
-| `ORCHESTRATOR_URL` | Base URL of the build-orchestrator control API |
+| `BUILD_MANAGER_URL` | Base URL of the build-manager control API |
 
 ## Running
 

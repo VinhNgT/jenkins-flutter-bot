@@ -21,8 +21,8 @@ from config_schema import FieldDef, resolve_fields, serialize_schema  # noqa: F4
 MODULE_TITLE = "Telegram Bot Configuration"
 MODULE_DESCRIPTION = (
     "Configures the Telegram bot that receives <code>/build</code> commands"
-    " and delivers build notifications. Build orchestration is handled"
-    " by the build-orchestrator service."
+    " and delivers build notifications. Build management is handled"
+    " by the build-manager service."
 )
 
 BOT_FIELDS: tuple[FieldDef, ...] = (
@@ -149,17 +149,17 @@ BOT_INFRA: tuple[FieldDef, ...] = (
         attr="bot_service_url",
         label="Bot Service URL",
         group="Infrastructure",
-        description="Internal URL for this service (build-orchestrator POSTs build results here)",
+        description="Internal URL for this service (build-manager POSTs build results here)",
         default="http://tg-bot:9090",
     ),
     FieldDef(
-        key="bot.orchestrator_url",
-        env_var="ORCHESTRATOR_URL",
-        attr="orchestrator_url",
-        label="Build Orchestrator URL",
+        key="bot.build_manager_url",
+        env_var="BUILD_MANAGER_URL",
+        attr="build_manager_url",
+        label="Build Manager URL",
         group="Infrastructure",
-        description="Internal URL of the build-orchestrator service",
-        default="http://build-orchestrator:9010",
+        description="Internal URL of the build-manager service",
+        default="http://build-manager:9010",
         required=True,
     ),
 )

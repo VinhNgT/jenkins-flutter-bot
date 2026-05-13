@@ -100,7 +100,7 @@ async function refreshDashboard() {
   if (status) {
     document.getElementById('status-grid').innerHTML =
       renderServiceCard('Telegram Bot', 'bot', status.bot) +
-      renderServiceCard('Build Orchestrator', 'orchestrator', status.orchestrator) +
+      renderServiceCard('Build Manager', 'builds', status.builds) +
       renderServiceCard('Jenkins Agent', 'agent', status.agent) +
       renderServiceCard('File Manager', 'file_manager', status.file_manager);
   }

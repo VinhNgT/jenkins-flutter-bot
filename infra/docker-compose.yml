@@ -16,21 +16,21 @@ services:
     networks:
       - jenkins
 
-  build-orchestrator:
+  build-manager:
     build:
       context: ..
-      dockerfile: apps/build-orchestrator/Dockerfile
-    container_name: build-orchestrator
+      dockerfile: apps/build-manager/Dockerfile
+    container_name: build-manager
     restart: on-failure
     environment:
-      CONFIG_PATH: /app/data/orchestrator.json
-      SELF_URL: http://build-orchestrator:9010
+      CONFIG_PATH: /app/data/builds.json
+      SELF_URL: http://build-manager:9010
       FILE_MANAGER_URL: http://file-manager:9092
       BUILD_DATA_PATH: /app/data
     expose:
       - "9010"
     volumes:
-      - orchestrator-data:/app/data
+      - build-manager-data:/app/data
     depends_on:
       - file-manager
     networks:
@@ -48,12 +48,12 @@ services:
       BOT_CONTROL_URL: http://tg-bot:9090
       AGENT_CONTROL_URL: http://flutter-agent:9091
       FILE_MANAGER_URL: http://file-manager:9092
-      ORCHESTRATOR_URL: http://build-orchestrator:9010
+      BUILD_MANAGER_URL: http://build-manager:9010
     depends_on:
       - tg-bot
       - flutter-agent
       - file-manager
-      - build-orchestrator
+      - build-manager
     networks:
       - jenkins
 
@@ -69,7 +69,7 @@ services:
     environment:
       CONFIG_PATH: /app/data/bot.json
       BOT_SERVICE_URL: "http://tg-bot:9090"
-      ORCHESTRATOR_URL: "http://build-orchestrator:9010"
+      BUILD_MANAGER_URL: "http://build-manager:9010"
     expose:
       - "9090"
     volumes:
@@ -133,7 +133,7 @@ volumes:
   jenkins-data:
   bot-data:
   agent-data:
-  orchestrator-data:
+  build-manager-data:
   storage-data:
 
 networks:

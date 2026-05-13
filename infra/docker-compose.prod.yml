@@ -4,9 +4,9 @@
 # Pin a specific release:  IMAGE_TAG=v1.2.3 ./compose.sh prod up -d
 
 services:
-  build-orchestrator:
+  build-manager:
     build: !reset null
-    image: ghcr.io/vinhngt/jenkins-flutter-bot/build-orchestrator:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/build-manager:${IMAGE_TAG:-latest}
 
   config-hub:
     build: !reset null

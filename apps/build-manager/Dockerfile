@@ -12,10 +12,10 @@ COPY libs/config-schema/pyproject.toml libs/config-schema/
 COPY libs/config-schema/src libs/config-schema/src
 
 # This app
-COPY apps/build-orchestrator/pyproject.toml apps/build-orchestrator/
-COPY apps/build-orchestrator/src apps/build-orchestrator/src
+COPY apps/build-manager/pyproject.toml apps/build-manager/
+COPY apps/build-manager/src apps/build-manager/src
 
-RUN uv sync --frozen --no-dev --no-editable --package build-orchestrator
+RUN uv sync --frozen --no-dev --no-editable --package build-manager
 
 FROM python:3.12-slim
 
@@ -25,4 +25,4 @@ COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["build-orchestrator"]
+CMD ["build-manager"]

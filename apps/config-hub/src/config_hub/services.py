@@ -1,7 +1,7 @@
 """HTTP client for service control APIs on the internal network.
 
 Proxies lifecycle, schema, and config operations to bot, agent,
-file-manager, and build-orchestrator services.
+file-manager, and build-manager services.
 """
 
 from __future__ import annotations
@@ -25,12 +25,12 @@ class ServiceClient:
         bot_url: str | None,
         agent_url: str | None,
         file_manager_url: str | None = None,
-        orchestrator_url: str | None = None,
+        build_manager_url: str | None = None,
     ) -> None:
         self._bot_url = bot_url
         self._agent_url = agent_url
         self._file_manager_url = file_manager_url
-        self._orchestrator_url = orchestrator_url
+        self._build_manager_url = build_manager_url
 
     def _service_url(self, service: str) -> str | None:
         if service == "bot":
@@ -39,8 +39,8 @@ class ServiceClient:
             return self._agent_url
         if service == "file_manager":
             return self._file_manager_url
-        if service == "orchestrator":
-            return self._orchestrator_url
+        if service == "builds":
+            return self._build_manager_url
         raise ValueError(f"Unknown service: {service}")
 
     async def _control(

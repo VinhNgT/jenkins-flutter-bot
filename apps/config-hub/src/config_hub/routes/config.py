@@ -30,7 +30,7 @@ async def save_config(scope: str, request: Request) -> dict[str, Any]:
     """Save config for a scope using deep merge to preserve unmodified keys."""
     manager: ConfigHubManager = request.app.state.manager
 
-    if scope not in {"bot", "agent", "storage", "orchestrator"}:
+    if scope not in {"bot", "agent", "storage", "builds"}:
         return {"error": f"Unknown scope: {scope}"}
 
     incoming: dict[str, Any] = await request.json()

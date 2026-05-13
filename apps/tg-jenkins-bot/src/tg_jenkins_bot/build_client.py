@@ -1,6 +1,6 @@
-"""Build Orchestrator API client.
+"""Build Manager API client.
 
-Provides a typed async interface to the build-orchestrator service.
+Provides a typed async interface to the build-manager service.
 The bot delegates all build lifecycle operations here — triggering,
 cancelling, querying recent builds, and checking status.
 """
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class BuildResult:
-    """A completed build returned by the orchestrator API."""
+    """A completed build returned by the build manager API."""
 
     request_id: str
     branch: str
@@ -29,8 +29,8 @@ class BuildResult:
     download_url: str = ""
 
 
-class OrchClientError(Exception):
-    """Raised when a build-orchestrator API call fails.
+class BuildClientError(Exception):
+    """Raised when a build-manager API call fails.
 
     Carries a ``user_message`` suitable for Telegram display.
     """
@@ -40,8 +40,8 @@ class OrchClientError(Exception):
         self.user_message = user_message
 
 
-class OrchClient:
-    """Async HTTP client for the build-orchestrator API."""
+class BuildClient:
+    """Async HTTP client for the build-manager API."""
 
     def __init__(self, base_url: str) -> None:
         self._base_url = base_url.rstrip("/")
@@ -54,11 +54,11 @@ class OrchClient:
     async def trigger_build(
         self, branch: str, callback_url: str
     ) -> dict[str, Any]:
-        """Trigger a build via the orchestrator.
+        """Trigger a build via the build manager.
 
         Returns ``{request_id, status}`` on success.
 
-        Raises ``OrchClientError`` on failure.
+        Raises ``BuildClientError`` on failure.
         """
         url = f"{self._base_url}/api/builds/trigger"
         try:
@@ -67,8 +67,8 @@ class OrchClient:
                 json={"branch": branch, "callback_url": callback_url},
             )
         except Exception as exc:
-            logger.exception("Failed to reach build-orchestrator for trigger")
-            raise OrchClientError(
+            logger.exception("Failed to reach build-manager for trigger")
+            raise BuildClientError(
                 detail=f"Connection failed: {exc}",
                 user_message=(
                     "The build server isn't responding. Try again in a few minutes."
@@ -79,25 +79,25 @@ class OrchClient:
             return resp.json()
 
         detail = resp.json().get("detail", resp.text[:200])
-        raise OrchClientError(
+        raise BuildClientError(
             detail=f"HTTP {resp.status_code}: {detail}",
             user_message=detail,
         )
 
     async def cancel_build(self, request_id: str) -> dict[str, str]:
-        """Cancel a pending build via the orchestrator."""
+        """Cancel a pending build via the build manager."""
         url = f"{self._base_url}/api/builds/{request_id}/cancel"
         try:
             resp = await self._client.post(url)
             return resp.json()
         except Exception:
-            logger.exception("Failed to cancel build via orchestrator")
+            logger.exception("Failed to cancel build via build-manager")
             return {"status": "error"}
 
     async def get_recent_builds(
         self, count: int = 5
     ) -> list[BuildResult]:
-        """Fetch recent completed builds from the orchestrator."""
+        """Fetch recent completed builds from the build manager."""
         url = f"{self._base_url}/api/builds/recent"
         try:
             resp = await self._client.get(url, params={"count": count})
@@ -124,7 +124,7 @@ class OrchClient:
             return []
 
     async def get_build_status(self) -> dict[str, Any]:
-        """Fetch build orchestrator status."""
+        """Fetch build manager status."""
         url = f"{self._base_url}/api/builds/status"
         try:
             resp = await self._client.get(url)

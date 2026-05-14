@@ -85,12 +85,13 @@ Open **http://localhost:9000** and follow the **[Setup Guide](docs/setup-guide.m
 | [file-manager](apps/file-manager/) | Storage backend — Google Drive OAuth, APK upload/download links | [README](apps/file-manager/README.md) |
 | [tg-admin-bot](apps/tg-admin-bot/) | Headless Telegram admin bot — proxies to config-hub API | [README](apps/tg-admin-bot/README.md) |
 | [agent-control](apps/agent-control/) | HTTP control wrapper for the Jenkins agent subprocess | [README](apps/agent-control/README.md) |
+| [mock-jenkins](apps/mock-jenkins/) | Dev/test mock — simulates Jenkins + agent-control APIs | [README](apps/mock-jenkins/README.md) |
 
 ## Libraries
 
 | Library | Description | Docs |
 |---------|-------------|------|
-| [config-schema](libs/config-schema/) | Declarative `FieldDef` schema framework | [README](libs/config-schema/README.md) |
+| [config-core](libs/config-core/) | Pydantic `ServiceSettings` base + declarative config framework | [README](libs/config-core/README.md) |
 
 ---
 

@@ -1,43 +1,40 @@
 ---
 trigger: glob
-globs: **/config*.py, **/schema*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/schema-renderer.js, **/env_io.py, **/config_store.py
-description: Declarative configuration schema, secret masking, deep merge, config transfer, and dynamic UI rendering.
+globs: "**/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/schema-renderer.js, **/env_io.py, **/config_store.py"
+description: Pydantic configuration system, secret masking, deep merge, config transfer, and dynamic UI rendering.
 ---
 
 # Configuration & Secrets
 
-Triggered when editing config-related files. Covers the declarative schema system, configuration precedence chain, secret handling, and the config-hub frontend conventions.
+Triggered when editing config-related files. Covers the Pydantic configuration system, precedence chain, secret handling, and the config-hub frontend conventions.
 
 ---
 
-## Declarative Configuration Schema
+## Configuration Architecture
 
-Configuration is defined **declaratively** in per-module `schema.py` files. Each field is a `FieldDef` dataclass (defined in `config-schema` library) containing all metadata needed for resolution, UI rendering, and environment variable mapping.
+All services use `ServiceSettings` (from `config-core`) as the base class for their configuration. Each service's `config.py` declares a `ServiceSettings` subclass with Pydantic fields.
 
 ### Schema Ownership
 
 Each service owns its field declarations and exposes them via `GET /control/schema`:
 
-| Service | Declares | Config Class | Schema Endpoint |
-|---------|----------|--------------|-----------------| 
-| `tg-bot` | `BOT_FIELDS` + `BOT_INFRA` | `Config` | `GET /control/schema` |
-| `agent-control` | `AGENT_FIELDS` + `AGENT_INFRA` | `AgentConfig` | `GET /control/schema` |
-| `file-manager` | `STORAGE_FIELDS` + `STORAGE_INFRA` | — | `GET /control/schema` |
-| `build-manager` | `BUILD_FIELDS` + `BUILD_INFRA` | — | `GET /control/schema` |
+| Service | Config Class | Schema Endpoint |
+|---------|-------------|-----------------|
+| `tg-bot` | `BotConfig` | `GET /control/schema` |
+| `agent-control` | `AgentConfig` | `GET /control/schema` |
+| `file-manager` | `StorageConfig` | `GET /control/schema` |
+| `build-manager` | `BuildConfig` | `GET /control/schema` |
 
-`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend.
-
-The shared `FieldDef` dataclass, `resolve_fields()`, and `serialize_schema()` live in `config_schema`.
+`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend. `tg-admin-bot` has no schema or control API — all its fields are infrastructure-only.
 
 ### Adding a New Config Field
 
-Add a `FieldDef` to the owning module's `schema.py` and the corresponding attribute to `config.py`. Everything else — UI rendering, help text, defaults, required markers, secret masking — is derived automatically from the schema.
+Add a Pydantic `Field()` to the owning module's `config.py` `ServiceSettings` subclass. Everything else — UI rendering, help text, defaults, required markers, secret masking — is derived automatically from the field's `json_schema_extra` metadata.
 
 ### Schema Flow
 
 ```
-schema.py (FieldDef declarations)
-    → config.py (resolve_fields() → typed Config dataclass)
+config.py (ServiceSettings subclass with Field() declarations)
     → control.py (GET /control/schema → serialized JSON)
     → config-hub (fetches schemas from all services → schema-renderer.js renders forms)
 ```
@@ -46,11 +43,10 @@ schema.py (FieldDef declarations)
 
 ## Partitioned Schema: Runtime vs Infrastructure
 
-Each service's schema declares **two separate field tuples**: `*_FIELDS` (portable) and `*_INFRA` (environment-specific).
+Each service's `ServiceSettings` subclass uses `json_schema_extra` to tag fields:
 
-**Runtime fields** are portable — they travel with config exports/imports.
-
-**Infrastructure fields** are environment-specific network plumbing (e.g., `JENKINS_URL`, `SELF_URL`, `FILE_MANAGER_URL`). They are excluded from config exports and managed per deployment via `docker-compose.yml` or per-service `infra/env/*.env` files.
+- **Runtime fields** (no tag or `infra: False`) — portable, travel with config exports/imports.
+- **Infrastructure fields** (`infra: True`) — environment-specific network plumbing (e.g., `JENKINS_URL`, `SELF_URL`, `FILE_MANAGER_URL`). Excluded from config exports, managed per deployment via `docker-compose.yml` or `infra/env/*.env` files.
 
 The `GET /control/schema` endpoint returns both partitions so consumers can handle them appropriately.
 
@@ -66,7 +62,7 @@ JSON Config File (Web UI)  >  Environment Variable  >  .env file  >  Hardcoded D
 
 Resolution is **infallible** — it always returns a value, never raises. Validation of required fields is the responsibility of the manager classes, not the config layer.
 
-Do not bypass this chain. If you need a new config value, add a `FieldDef` to the owning module's `schema.py`.
+Do not bypass this chain. Use `ServiceSettings.load()` — never read env vars or JSON directly in business logic.
 
 ---
 
@@ -89,7 +85,7 @@ OAuth tokens are stored separately by file-manager in its own data volume and ar
 
 ## Secret Masking
 
-Secret fields are identified dynamically from the schema (`secret: True` on the `FieldDef`). The config-hub strips secret values before sending to the browser and tracks which secrets are set (by character length). On save, `None`/empty secret fields are cleaned from the payload so `deep_merge()` preserves existing values.
+Secret fields are identified via `json_schema_extra={"secret": True}` on the Pydantic field. The config-hub strips secret values before sending to the browser and tracks which secrets are set (by character length). On save, `None`/empty secret fields are cleaned from the payload so `deep_merge()` preserves existing values.
 
 ---
 
@@ -103,7 +99,7 @@ This is critical for the config-hub workflow. Do not replace deep merge with a f
 
 ## Dynamic UI Rendering
 
-The config-hub renders forms dynamically from service schemas. It fetches schemas from all four owning services via HTTP and `schema-renderer.js` generates form elements from the `FieldDef` metadata.
+The config-hub renders forms dynamically from service schemas. It fetches schemas from all four owning services via HTTP and `schema-renderer.js` generates form elements from the field metadata.
 
 ### Frontend Form Convention
 

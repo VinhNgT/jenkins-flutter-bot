@@ -42,7 +42,7 @@ The monorepo uses a **uv workspace** to manage its microservices, with two top-l
 
 | Directory | Package | Role |
 |-----------|---------|------|
-| `config-schema` | `config_schema` | Declarative `FieldDef` dataclass, `resolve_fields()`, `serialize_schema()` |
+| `config-core` | `config_core` | `ServiceSettings` Pydantic base, `FieldDef` dataclass, shared config I/O helpers |
 
 ### Naming Conventions
 
@@ -105,7 +105,7 @@ graph TD
 
 7. **Hub-and-Spoke Management** — `config-hub` (web dashboard + API) is the central hub. `tg-admin-bot` (headless Telegram bot) is a lightweight spoke that proxies all operations through `config-hub`'s HTTP API. The admin bot has no config volume mounts and no library dependencies on operational logic.
 
-8. **Partitioned Configuration** — Runtime configuration (portable) is separated from infrastructure fields (environment-specific). Each service's schema declares both `*_FIELDS` (portable) and `*_INFRA` (environment-specific) tuples. Infrastructure fields are excluded from config exports/imports. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
+8. **Pydantic Configuration** — All services use `ServiceSettings` (from `config-core`) as the base class for their configuration. Each service's `config.py` declares a `ServiceSettings` subclass with Pydantic fields. Fields are tagged portable or infrastructure via `json_schema_extra`. Infrastructure fields are excluded from config exports/imports. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
 
 9. **Scope ≠ Service Name** — `config-hub` exposes UI scope names (`bot`, `agent`, `drive`, `builds`) that may differ from internal service names. The `drive` scope maps to the `file-manager` service — the scope is named after the feature (Drive), the service is named after the implementation pattern (file-manager, storage-agnostic). This translation lives only in `config-hub/manager.py:_SCOPE_TO_SERVICE`.
 
@@ -117,7 +117,7 @@ These are architectural boundaries. Do not violate them.
 
 1. **Do NOT mount `docker.sock`** into any container.
 2. **Do NOT add build logic** to the Telegram bot or config-hub — builds happen in Jenkins pipelines.
-3. **Do NOT bypass the config precedence chain** — always use the service's own `Config.resolve()` method.
+3. **Do NOT bypass the config precedence chain** — always use the service's own `ServiceSettings.load()` method.
 4. **Do NOT expose bot, agent, file-manager, or build-manager ports to the host** — only `jenkins:8080` and `config-hub:9000` are host-facing.
 5. **Do NOT use synchronous blocking I/O** in async code paths without wrapping with `asyncio.to_thread()`.
 6. **Do NOT store secrets in code or Dockerfiles** — use env vars, `.env`, or service JSON config files.

@@ -1,12 +1,12 @@
 ---
 trigger: glob
-globs: **/.agents/rules/*.md
-description: Meta-guide for authoring and maintaining AI agent rule files in this repository.
+globs: "**/.agents/rules/*.md, **/README.md"
+description: MUST read before creating or editing any documentation, rule files, or READMEs. Defines the principles for writing durable, useful agent guidelines.
 ---
 
-# Writing AI Agent Guidelines
+# Doc Style Guide
 
-Loaded at model discretion when creating or editing `.agents/rules/` files. Defines the principles and anti-patterns for writing durable, useful agent guidelines.
+Read this before creating or editing any `.agents/rules/` file or `README.md`. Defines the principles and anti-patterns for writing durable, useful documentation.
 
 ---
 
@@ -51,7 +51,7 @@ A good rule file should remain accurate for months, not days. Before writing a s
 
 Describe the *shape* of things, not every instance. For example:
 
-> **Good:** "Each service's `schema.py` declares two tuples: `*_FIELDS` (portable) and `*_INFRA` (environment-specific)."
+> **Good:** "Each service's `config.py` declares a `ServiceSettings` subclass with fields tagged as portable or infrastructure."
 
 > **Bad:** "BOT_FIELDS contains 12 entries: telegram.bot_token, telegram.allowed_chat_ids, telegram.admin_contact, ..."
 
@@ -61,7 +61,7 @@ The first sentence stays accurate when fields are added. The second is instantly
 
 The highest-value content in a guide is the list of things an agent must NOT do. Constraints prevent expensive mistakes. State them clearly and explain the rationale:
 
-> **Do NOT expose bot or agent ports to the host** — only `jenkins:8080` and `stack-manager:9000` are host-facing.
+> **Do NOT expose bot or agent ports to the host** — only `jenkins:8080` and `config-hub:9000` are host-facing.
 
 The constraint is the rule. The explanation prevents the agent from "helpfully" overriding it.
 
@@ -84,6 +84,7 @@ Each rule file covers a single concern domain:
 | `config-and-secrets.md` | Schema system, precedence chain, secret masking |
 | `docker-and-infra.md` | Containers, volumes, networking, CI/CD pipeline |
 | `communication-flows.md` | Service-to-service protocols, OAuth, build flow |
+| `doc-style-guide.md` | Meta-guide — how to write and maintain rule files |
 
 ### Trigger Metadata
 
@@ -115,9 +116,9 @@ Duplication creates drift. If the same fact appears in two files, it will eventu
 
 ### 1. Tutorial-Style Walkthroughs
 
-❌ "First, open `schema.py`. Then add a FieldDef with key='foo.bar'. Then open `config.py` and add `bar: str` to the dataclass..."
+❌ "First, open `config.py`. Then add a `Field()` with the right metadata. Then open `control.py` and wire it up..."
 
-✅ "To add a new config field, add a `FieldDef` to the owning module's `schema.py` and the corresponding attribute to `config.py`. Everything else is derived automatically."
+✅ "To add a new config field, add a Pydantic `Field()` to the owning module's `config.py`. Everything else — UI rendering, env var mapping, defaults — is derived automatically."
 
 The second version tells the agent *what to do* without prescribing *exactly how*, which lets it adapt to the current state of the code.
 
@@ -145,7 +146,7 @@ When making significant architectural changes, review rule files for staleness:
 
 1. **Service count** — did you add or remove a service? Update `general-guide.md` topology.
 2. **Volume layout** — did you rename or add volumes? Update `docker-and-infra.md`.
-3. **Shared libraries** — did you extract or add a library? Update `coding-conventions.md` and `general-guide.md`.
+3. **Shared libraries** — did you extract or rename a library? Update `coding-conventions.md` and `general-guide.md`.
 4. **Config scopes** — did you rename or add a config scope? Update `config-and-secrets.md`.
 5. **Communication patterns** — did you add a new service-to-service flow? Update `communication-flows.md`.
 6. **Hard constraints** — did you establish a new boundary? Add it to `general-guide.md`.

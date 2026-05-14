@@ -1,7 +1,7 @@
 ---
 trigger: glob
 description: Python coding conventions, tooling, and project structure patterns.
-globs: **/*.py
+globs: "**/*.py"
 ---
 
 # Coding Conventions
@@ -32,9 +32,9 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 
 ### Key Dependency Patterns
 
-- **All FastAPI services** share `fastapi` + `uvicorn`. The `tg-admin-bot` is the exception — it uses only `python-telegram-bot[ext]` with no HTTP server.
-- **All apps** depend on `config-schema` (shared library) for declarative config fields.
-- **`tg-admin-bot`** is a pure HTTP client to `config-hub` — its only dependencies are `httpx` and `python-telegram-bot`.
+- **All FastAPI services** share `fastapi` + `uvicorn`. The `tg-admin-bot` is the only exception — it uses only `python-telegram-bot[ext]` with no HTTP server.
+- **All apps** depend on `config-core` (shared library) for `ServiceSettings` and config I/O helpers.
+- **`tg-admin-bot`** is a pure HTTP client to `config-hub` — its primary dependencies are `httpx`, `python-telegram-bot`, and `config-core`.
 - **Blocking I/O libraries** (e.g., `google-api-python-client`) are wrapped with `asyncio.to_thread()`. See `communication-flows.md` for details.
 
 Check each app's `pyproject.toml` for the authoritative dependency list.
@@ -50,23 +50,24 @@ FastAPI service apps follow the same module pattern:
 | Module | Role |
 |--------|------|
 | `main.py` | FastAPI app factory, lifespan, CLI entry |
-| `schema.py` | `FieldDef` tuple declarations (imports from `config_schema`) |
-| `config.py` | Typed frozen Config dataclass (delegates to `schema.py`) |
+| `config.py` | Pydantic `ServiceSettings` subclass — field declarations + resolution |
 | `control.py` | Manager class + `/control/*` routes + `GET /control/schema` |
 
-This pattern applies to: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`.
+This pattern applies to all FastAPI services: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`.
 
-`config-hub` is an exception — it owns no schema and instead proxies config I/O to the above services.
+`config-hub` is an exception to the control pattern — it owns no schema and instead proxies config I/O to the above services.
 
 The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`, `git/`) for domain-specific logic.
 
 ### Admin Bot
 
-`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `config-hub` HTTP API via `httpx` and `settings.py` for a flat `Settings` dataclass.
+`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `config-hub` HTTP API via `httpx`, using `config.py` with an `AdminBotConfig(ServiceSettings)` class for its own infrastructure settings.
+
+### Shared Library
 
 One library lives in `libs/` using PyPA `src` layout:
 
-- **`config-schema`** — `FieldDef` dataclass, `resolve_fields()`, `serialize_schema()`, `nested_get()`. The authoritative source for the config resolution algorithm.
+- **`config-core`** — `ServiceSettings` Pydantic base class, `FieldDef` dataclass, `resolve_fields()`, `serialize_schema()`, `nested_get()`, `get_secret_keys()`, `read_masked_config()`, `save_config_with_merge()`.
 
 ---
 
@@ -76,13 +77,11 @@ One library lives in `libs/` using PyPA `src` layout:
 
 All function signatures should have parameter types and return types. Use `from __future__ import annotations` to enable the `X | Y` union syntax everywhere.
 
-### Data Classes
+### Data Classes vs Pydantic Models
 
-Use frozen dataclasses for value objects like `Config`, `AgentConfig`, `PendingBuild`, and `Settings`. This makes them hashable and prevents accidental mutation.
-
-### State Management
-
-Mutable state lives in manager classes (`BotManager`, `AgentManager`) attached to `app.state`. Avoid global mutable state at module level.
+- **Config classes** inherit from `ServiceSettings` (Pydantic) — see `config-and-secrets.md` for the pattern.
+- **Value objects** like `PendingBuild` use frozen dataclasses — hashable and mutation-safe.
+- Avoid global mutable state at module level; mutable state lives in manager classes attached to `app.state`.
 
 ### Logging
 

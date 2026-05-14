@@ -185,12 +185,12 @@ def generate_env_files(
     agent_config: dict[str, Any],
     bot_schema: dict[str, Any] | None,
     agent_schema: dict[str, Any] | None,
-    drive_config: dict[str, Any] | None = None,
-    drive_schema: dict[str, Any] | None = None,
+    file_manager_config: dict[str, Any] | None = None,
+    file_manager_schema: dict[str, Any] | None = None,
 ) -> tuple[dict[str, str], list[str]]:
     """Generate per-service env file contents.
 
-    Returns ``({"bot.env": "...", "agent.env": "...", "drive.env": "..."}, warnings)``.
+    Returns ``({"bot.env": "...", "agent.env": "...", "file_manager.env": "..."}, warnings)``.
     """
     files: dict[str, str] = {}
     all_warnings: list[str] = []
@@ -207,13 +207,13 @@ def generate_env_files(
     files["agent.env"] = "\n".join(agent_lines)
     all_warnings.extend(agent_warnings)
 
-    # Drive env file (OAuth credentials)
-    if drive_schema and drive_config is not None:
-        drive_lines, drive_warnings = _build_env_lines(
-            drive_schema, drive_config, "Google Drive"
+    # File manager env file (currently Google Drive OAuth credentials)
+    if file_manager_schema and file_manager_config is not None:
+        fm_lines, fm_warnings = _build_env_lines(
+            file_manager_schema, file_manager_config, "Google Drive"
         )
-        files["drive.env"] = "\n".join(drive_lines)
-        all_warnings.extend(drive_warnings)
+        files["file_manager.env"] = "\n".join(fm_lines)
+        all_warnings.extend(fm_warnings)
 
     return files, all_warnings
 
@@ -350,7 +350,7 @@ def _parse_env_content(
     content: str,
     bot_lookup: dict[str, dict[str, Any]],
     agent_lookup: dict[str, dict[str, Any]],
-    drive_lookup: dict[str, dict[str, Any]] | None = None,
+    file_manager_lookup: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[
     dict[str, Any],
     dict[str, Any],
@@ -360,9 +360,9 @@ def _parse_env_content(
     list[str],
     list[str],
 ]:
-    """Parse env file content and route values to bot/agent/drive patches.
+    """Parse env file content and route values to bot/agent/file_manager patches.
 
-    Returns (bot_patch, agent_patch, drive_patch, applied, skipped_empty,
+    Returns (bot_patch, agent_patch, file_manager_patch, applied, skipped_empty,
              unrecognized, parse_errors).
     """
     applied: list[str] = []
@@ -371,9 +371,9 @@ def _parse_env_content(
     parse_errors: list[str] = []
     bot_patch: dict[str, Any] = {}
     agent_patch: dict[str, Any] = {}
-    drive_patch: dict[str, Any] = {}
+    file_manager_patch: dict[str, Any] = {}
 
-    _drive_lookup = drive_lookup or {}
+    _file_manager_lookup = file_manager_lookup or {}
 
     for line_num, raw_line in enumerate(content.splitlines(), start=1):
         line = raw_line.strip()
@@ -391,7 +391,7 @@ def _parse_env_content(
         # Resolve the value from whichever capture group matched
         value = match.group(2) or match.group(3) or match.group(4) or ""
 
-        # Look up in bot schema, then agent schema, then drive schema
+        # Look up in bot schema, then agent schema, then file_manager schema
         if env_var in bot_lookup:
             field_def = bot_lookup[env_var]
             target_patch = bot_patch
@@ -400,10 +400,10 @@ def _parse_env_content(
             field_def = agent_lookup[env_var]
             target_patch = agent_patch
             scope = "agent"
-        elif env_var in _drive_lookup:
-            field_def = _drive_lookup[env_var]
-            target_patch = drive_patch
-            scope = "drive"
+        elif env_var in _file_manager_lookup:
+            field_def = _file_manager_lookup[env_var]
+            target_patch = file_manager_patch
+            scope = "file_manager"
         else:
             unrecognized.append(f"{env_var} (not in any schema, ignored)")
             continue
@@ -422,7 +422,7 @@ def _parse_env_content(
     return (
         bot_patch,
         agent_patch,
-        drive_patch,
+        file_manager_patch,
         applied,
         skipped_empty,
         unrecognized,
@@ -437,8 +437,8 @@ def import_tarball(
     bot_config_path: Path | None,
     agent_config_path: Path | None,
     oauth_dest_path: Path | None = None,
-    drive_schema: dict[str, Any] | None = None,
-    drive_config_path: Path | None = None,
+    file_manager_schema: dict[str, Any] | None = None,
+    file_manager_config_path: Path | None = None,
 ) -> ImportResult:
     """Extract a config tarball and import env files + oauth.json.
 
@@ -448,7 +448,7 @@ def import_tarball(
     """
     bot_lookup = _build_env_lookup(bot_schema)
     agent_lookup = _build_env_lookup(agent_schema)
-    drive_lookup = _build_env_lookup(drive_schema)
+    file_manager_lookup = _build_env_lookup(file_manager_schema)
 
     all_applied: list[str] = []
     all_skipped: list[str] = []
@@ -459,7 +459,7 @@ def import_tarball(
 
     bot_patch: dict[str, Any] = {}
     agent_patch: dict[str, Any] = {}
-    drive_patch: dict[str, Any] = {}
+    file_manager_patch: dict[str, Any] = {}
 
     try:
         with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
@@ -478,20 +478,20 @@ def import_tarball(
                         continue
                     content = f.read().decode("utf-8", errors="replace")
 
-                    bp, ap, dp, applied, skipped, unrec, errors = _parse_env_content(
-                        content, bot_lookup, agent_lookup, drive_lookup
+                    bp, ap, fmp, applied, skipped, unrec, errors = _parse_env_content(
+                        content, bot_lookup, agent_lookup, file_manager_lookup
                     )
                     bot_doc = ConfigDocument(bot_patch)
                     bot_doc.merge(bp)
                     bot_patch = bot_doc.data
-                    
+
                     agent_doc = ConfigDocument(agent_patch)
                     agent_doc.merge(ap)
                     agent_patch = agent_doc.data
-                    
-                    drive_doc = ConfigDocument(drive_patch)
-                    drive_doc.merge(dp)
-                    drive_patch = drive_doc.data
+
+                    fm_doc = ConfigDocument(file_manager_patch)
+                    fm_doc.merge(fmp)
+                    file_manager_patch = fm_doc.data
                     all_applied.extend(applied)
                     all_skipped.extend(skipped)
                     all_unrecognized.extend(unrec)
@@ -526,17 +526,17 @@ def import_tarball(
         doc.merge(agent_patch)
         write_json(agent_config_path, doc.data)
 
-    if drive_patch and drive_config_path:
-        existing = load_json(drive_config_path)
+    if file_manager_patch and file_manager_config_path:
+        existing = load_json(file_manager_config_path)
         doc = ConfigDocument(existing)
-        doc.merge(drive_patch)
-        write_json(drive_config_path, doc.data)
+        doc.merge(file_manager_patch)
+        write_json(file_manager_config_path, doc.data)
 
     # Warn about required fields still missing after import
     for lookup, config_path, scope in [
         (bot_lookup, bot_config_path, "bot"),
         (agent_lookup, agent_config_path, "agent"),
-        (drive_lookup, drive_config_path, "drive"),
+        (file_manager_lookup, file_manager_config_path, "file_manager"),
     ]:
         if not config_path:
             continue
@@ -562,6 +562,6 @@ def import_tarball(
         configs={
             "bot": bot_patch,
             "agent": agent_patch,
-            "file_manager": drive_patch,
+            "file_manager": file_manager_patch,
         },
     )

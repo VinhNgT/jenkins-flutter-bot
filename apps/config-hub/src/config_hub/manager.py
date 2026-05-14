@@ -26,12 +26,14 @@ from .services import ServiceClient
 logger = logging.getLogger(__name__)
 
 # Maps UI scope names → internal ServiceClient service names.
-# Most scopes match directly; the exception is "drive" which is the feature
-# name visible in the UI, backed by the generic "file_manager" service.
+# All scopes currently map directly to their service name.  This table exists
+# as a seam: if a scope ever needs to diverge from its service name (e.g. a
+# second storage backend exposed under a different scope), this is the only
+# place to change it.
 _SCOPE_TO_SERVICE: dict[str, str] = {
     "bot": "bot",
     "agent": "agent",
-    "drive": "file_manager",
+    "file_manager": "file_manager",
     "builds": "builds",
 }
 
@@ -148,8 +150,8 @@ class ConfigHubManager:
             agent_config=configs.get("agent", {}),
             bot_schema=schemas.get("bot"),
             agent_schema=schemas.get("agent"),
-            drive_config=configs.get("drive", {}),
-            drive_schema=schemas.get("drive"),
+            file_manager_config=configs.get("file_manager", {}),
+            file_manager_schema=schemas.get("file_manager"),
         )
         compose_vars = {
             "bot": generate_compose_vars(
@@ -176,8 +178,8 @@ class ConfigHubManager:
             agent_config=configs.get("agent", {}),
             bot_schema=schemas.get("bot"),
             agent_schema=schemas.get("agent"),
-            drive_config=configs.get("drive", {}),
-            drive_schema=schemas.get("drive"),
+            file_manager_config=configs.get("file_manager", {}),
+            file_manager_schema=schemas.get("file_manager"),
         )
         return build_export_tarball(files)
 
@@ -193,8 +195,8 @@ class ConfigHubManager:
             agent_schema=await self.services.schema("agent"),
             bot_config_path=None,
             agent_config_path=None,
-            drive_schema=await self.services.schema("file_manager"),
-            drive_config_path=None,
+            file_manager_schema=await self.services.schema("file_manager"),
+            file_manager_config_path=None,
         )
 
         # Save each scope's config to the owning service

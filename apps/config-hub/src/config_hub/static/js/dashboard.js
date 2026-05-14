@@ -81,7 +81,7 @@ async function refreshDriveCard() {
   }
 
   if (!drive.configured) {
-    el.textContent = 'OAuth credentials not configured. Go to the Google Drive tab to set up.';
+    el.textContent = 'OAuth credentials not configured. Enter your Client ID and Secret above, then save.';
     toggleBtn.innerHTML = `${Icons.cloud}Connect Google Drive`;
     toggleBtn.disabled = true;
     disconnectBtn.disabled = true;

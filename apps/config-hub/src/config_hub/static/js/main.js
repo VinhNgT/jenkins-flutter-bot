@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (schemas.bot) renderSchemaForm('schema-container-bot', 'bot', schemas.bot);
     if (schemas.builds) renderSchemaForm('schema-container-builds', 'builds', schemas.builds);
     if (schemas.agent) renderSchemaForm('schema-container-agent', 'agent', schemas.agent);
-    if (schemas.drive) renderSchemaForm('schema-container-drive', 'drive', schemas.drive);
+    if (schemas.file_manager) renderSchemaForm('schema-container-file_manager', 'file_manager', schemas.file_manager);
   }
 
   // Populate the GitHub header link from schema + config
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateScope('bot', config.bot, config._secrets_set?.bot);
     populateScope('builds', config.builds, config._secrets_set?.builds);
     populateScope('agent', config.agent, config._secrets_set?.agent);
-    populateScope('drive', config.drive, config._secrets_set?.drive);
+    populateScope('file_manager', config.file_manager, config._secrets_set?.file_manager);
   }
 
   // ─── Delegated save/reload handlers ───────────────────────────
@@ -76,11 +76,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = collectScope(scope);
       const result = await API.saveScope(scope, data);
       if (result) {
-        const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', drive: 'Drive' }[scope] || scope;
+        const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', file_manager: 'Google Drive' }[scope] || scope;
         Toast.show(`${label} config saved`, 'success');
         const freshConfig = await API.getConfig();
         if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
-        if (scope === 'drive') await refreshDriveCard();
+        if (scope === 'file_manager') await refreshDriveCard();
       }
       return;
     }
@@ -91,8 +91,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const scope = reloadBtn.dataset.reload;
       const freshConfig = await API.getConfig();
       if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
-      if (scope === 'drive') await refreshDriveCard();
-      const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', drive: 'Drive' }[scope] || scope;
+      if (scope === 'file_manager') await refreshDriveCard();
+      const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', file_manager: 'Google Drive' }[scope] || scope;
       Toast.show(`${label} config reloaded`, 'info');
       return;
     }

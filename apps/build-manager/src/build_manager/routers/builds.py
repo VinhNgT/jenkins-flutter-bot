@@ -18,20 +18,16 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 
-from .jenkins_client import JenkinsTriggerError
-from .coordinator import BuildCoordinator
+from ..dependencies import CoordinatorDep
+from ..builds.jenkins_client import JenkinsTriggerError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/builds", tags=["builds"])
 
 
-def _coordinator(request: Request) -> BuildCoordinator:
-    return request.app.state.coordinator
-
-
 @router.post("/trigger")
-async def trigger_build(request: Request) -> dict[str, Any]:
+async def trigger_build(coord: CoordinatorDep, request: Request) -> dict[str, Any]:
     """Trigger a new build.
 
     Expects JSON: ``{branch: "main", callback_url: "http://..."}``
@@ -44,7 +40,6 @@ async def trigger_build(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="branch is required")
 
     callback_url = body.get("callback_url", "")
-    coord = _coordinator(request)
 
     try:
         result = await coord.trigger_build(branch, frontend_callback_url=callback_url)
@@ -55,6 +50,7 @@ async def trigger_build(request: Request) -> dict[str, Any]:
 
 @router.post("/webhook")
 async def build_webhook(
+    coord: CoordinatorDep,
     request: Request,
     metadata: str | None = None,
     artifact: UploadFile | None = None,
@@ -85,8 +81,6 @@ async def build_webhook(
             tmp.write(await artifact.read())
             artifact_path = tmp.name
 
-    coord = _coordinator(request)
-
     try:
         return await coord.handle_webhook(meta, artifact_path)
     finally:
@@ -96,9 +90,8 @@ async def build_webhook(
 
 
 @router.get("/pending")
-async def list_pending(request: Request) -> dict[str, Any]:
+async def list_pending(coord: CoordinatorDep) -> dict[str, Any]:
     """List all in-flight builds."""
-    coord = _coordinator(request)
     pending = coord.tracker.list_pending()
     return {
         "builds": {
@@ -112,9 +105,8 @@ async def list_pending(request: Request) -> dict[str, Any]:
 
 
 @router.get("/recent")
-async def list_recent(request: Request, count: int = 10) -> dict[str, Any]:
+async def list_recent(coord: CoordinatorDep, count: int = 10) -> dict[str, Any]:
     """List recent completed builds."""
-    coord = _coordinator(request)
     builds = coord.tracker.recent_builds(count)
     return {
         "builds": [
@@ -133,9 +125,8 @@ async def list_recent(request: Request, count: int = 10) -> dict[str, Any]:
 
 
 @router.post("/{request_id}/cancel")
-async def cancel_build(request: Request, request_id: str) -> dict[str, str]:
+async def cancel_build(coord: CoordinatorDep, request_id: str) -> dict[str, str]:
     """Cancel a pending build."""
-    coord = _coordinator(request)
     result = await coord.cancel_build(request_id)
     if result["status"] == "not_found":
         raise HTTPException(status_code=404, detail="Build not found")
@@ -143,7 +134,6 @@ async def cancel_build(request: Request, request_id: str) -> dict[str, str]:
 
 
 @router.get("/status")
-async def build_status(request: Request) -> dict[str, Any]:
+async def build_status(coord: CoordinatorDep) -> dict[str, Any]:
     """Return a summary of the build manager state."""
-    coord = _coordinator(request)
     return coord.tracker.to_dict()

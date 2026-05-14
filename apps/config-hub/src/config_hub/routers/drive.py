@@ -8,9 +8,8 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.templating import Jinja2Templates
 
-from ..manager import ConfigHubManager
+from ..dependencies import ManagerDep, TemplatesDep
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +17,8 @@ router = APIRouter(prefix="/api/drive", tags=["drive"])
 
 
 @router.get("/status")
-async def get_drive_status(request: Request) -> dict[str, Any]:
+async def get_drive_status(manager: ManagerDep) -> dict[str, Any]:
     """Return current Google Drive connection status from file-manager."""
-    manager: ConfigHubManager = request.app.state.manager
     try:
         resp = await manager.fm_client.get(
             f"{manager.settings.file_manager_url}/api/auth/status"
@@ -33,10 +31,8 @@ async def get_drive_status(request: Request) -> dict[str, Any]:
 
 
 @router.post("/connect/start")
-async def start_drive_connect(request: Request) -> dict[str, Any]:
+async def start_drive_connect(manager: ManagerDep, request: Request) -> dict[str, Any]:
     """Start the Drive OAuth flow via file-manager — returns the auth URL."""
-    manager: ConfigHubManager = request.app.state.manager
-
     # Build the redirect URI from the current request context so the
     # OAuth callback comes back to *this* service (config-hub), which
     # then proxies the exchange to file-manager.
@@ -59,12 +55,11 @@ async def start_drive_connect(request: Request) -> dict[str, Any]:
 
 
 @router.post("/connect/exchange")
-async def exchange_drive_code(request: Request) -> dict[str, Any]:
+async def exchange_drive_code(manager: ManagerDep, request: Request) -> dict[str, Any]:
     """Exchange a manually-pasted auth code for tokens (headless flow).
 
     Used by tg-admin-bot via the config-hub API.
     """
-    manager: ConfigHubManager = request.app.state.manager
     body = await request.json()
 
     try:
@@ -84,14 +79,14 @@ async def exchange_drive_code(request: Request) -> dict[str, Any]:
 
 
 @router.get("/oauth/callback", name="drive_oauth_callback")
-async def drive_oauth_callback(request: Request) -> Any:
+async def drive_oauth_callback(
+    manager: ManagerDep, templates: TemplatesDep, request: Request
+) -> Any:
     """Handle the Google OAuth redirect callback.
 
     Receives the OAuth redirect from Google, then proxies the full
     callback URL to file-manager for token exchange.
     """
-    manager: ConfigHubManager = request.app.state.manager
-    templates: Jinja2Templates = request.app.state.templates
     error = request.query_params.get("error")
 
     if error:
@@ -162,9 +157,8 @@ async def drive_oauth_callback(request: Request) -> Any:
 
 
 @router.delete("/token")
-async def disconnect_drive(request: Request) -> dict[str, Any]:
+async def disconnect_drive(manager: ManagerDep) -> dict[str, Any]:
     """Disconnect Drive by deleting OAuth tokens via file-manager."""
-    manager: ConfigHubManager = request.app.state.manager
     try:
         resp = await manager.fm_client.delete(
             f"{manager.settings.file_manager_url}/api/auth/token"

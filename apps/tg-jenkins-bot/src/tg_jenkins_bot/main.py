@@ -1,4 +1,4 @@
-"""Entry point — runs the FastAPI control/callback server."""
+"""Tg-jenkins-bot — FastAPI app factory and CLI."""
 
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from .control import BotManager, callback_event_router, control_router
+from .manager import BotManager
+from .routers.callbacks import router as callbacks_router
+from .routers.control import router as control_router
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    await app.state.manager.stop()
+    try:
+        await app.state.manager.stop()
+    except Exception:
+        logger.exception("Error during shutdown")
 
 
 def create_app() -> FastAPI:
@@ -32,7 +37,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="tg-jenkins-bot", lifespan=lifespan)
     app.state.manager = BotManager()
     app.include_router(control_router)
-    app.include_router(callback_event_router)
+    app.include_router(callbacks_router)
     return app
 
 

@@ -1,4 +1,8 @@
-"""Agent lifecycle management and HTTP control routes."""
+"""Agent lifecycle management.
+
+Manages the Jenkins inbound agent subprocess — spawning, stopping, and
+reporting status.  Attached to ``app.state.manager`` during lifespan.
+"""
 
 from __future__ import annotations
 
@@ -7,10 +11,7 @@ import os
 import subprocess
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
-from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
-
-from .config import AgentConfig, _DEFAULT_CONFIG_PATH
+from .config import AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -122,75 +123,3 @@ class AgentManager:
             "running": self.running,
             "last_error": self._last_error,
         }
-
-
-control_router = APIRouter(prefix="/control", tags=["control"])
-
-
-def _get_manager(request: Request) -> AgentManager:
-    return request.app.state.manager
-
-
-@control_router.post("/start")
-async def start_agent(request: Request) -> dict[str, Any]:
-    """Start the Jenkins agent if it is not already running."""
-    manager = _get_manager(request)
-    try:
-        await manager.start()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return manager.status()
-
-
-@control_router.post("/stop")
-async def stop_agent(request: Request) -> dict[str, Any]:
-    """Stop the Jenkins agent if it is running."""
-    manager = _get_manager(request)
-    await manager.stop()
-    return manager.status()
-
-
-@control_router.post("/restart")
-async def restart_agent(request: Request) -> dict[str, Any]:
-    """Restart the Jenkins agent using the current resolved config."""
-    manager = _get_manager(request)
-    try:
-        await manager.restart()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return manager.status()
-
-
-@control_router.get("/status")
-async def agent_status(request: Request) -> dict[str, Any]:
-    """Report whether the Jenkins agent is configured and running."""
-    return _get_manager(request).status()
-
-
-@control_router.get("/schema")
-async def get_schema() -> dict[str, Any]:
-    """Return the agent module's config field schema."""
-    return get_frontend_schema(
-        AgentConfig,
-        title="Jenkins Agent Configuration",
-        description=(
-            "Configures the Flutter build agent that connects to Jenkins as an"
-            " inbound node. The agent runs inside Docker with Flutter and Android"
-            " SDKs pre-installed. Obtain the agent secret from the node's status"
-            " page in Jenkins after creating the node."
-        )
-    )
-
-
-@control_router.get("/config")
-async def get_config() -> dict[str, Any]:
-    """Return current config values with secrets masked."""
-    return read_masked_config(AgentConfig, _DEFAULT_CONFIG_PATH)
-
-
-@control_router.put("/config")
-async def put_config(request: Request) -> dict[str, Any]:
-    """Save config values with deep merge to preserve existing fields."""
-    payload = await request.json()
-    save_config_with_merge(AgentConfig, _DEFAULT_CONFIG_PATH, payload)
-    return {"status": "saved"}

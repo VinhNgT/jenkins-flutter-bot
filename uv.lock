@@ -756,6 +756,7 @@ source = { editable = "apps/mock-jenkins" }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "pydantic-settings" },
     { name = "python-multipart" },
     { name = "uvicorn" },
 ]
@@ -764,6 +765,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "httpx", specifier = ">=0.27.0" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "uvicorn", specifier = ">=0.29.0" },
 ]

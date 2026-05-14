@@ -117,8 +117,6 @@ _AGENT_SCHEMA: dict[str, Any] = {
 # FastAPI agent control mock
 # ---------------------------------------------------------------------------
 
-agent_app = FastAPI(title="mock-agent-control")
-
 
 def _status_response() -> dict[str, Any]:
     """Return a mock status that shows the agent as configured and running."""
@@ -129,54 +127,48 @@ def _status_response() -> dict[str, Any]:
     }
 
 
-@agent_app.get("/control/status")
-async def agent_status() -> dict[str, Any]:
-    """Report the mock agent as running."""
-    return _status_response()
+def create_app() -> FastAPI:
+    """Application factory for the mock agent-control server."""
+    app = FastAPI(title="mock-agent-control")
 
+    @app.get("/control/status")
+    async def agent_status() -> dict[str, Any]:
+        """Report the mock agent as running."""
+        return _status_response()
 
-@agent_app.get("/control/schema")
-async def agent_schema() -> dict[str, Any]:
-    """Return the agent config schema (identical to real agent-control)."""
-    return _AGENT_SCHEMA
+    @app.get("/control/schema")
+    async def agent_schema() -> dict[str, Any]:
+        """Return the agent config schema (identical to real agent-control)."""
+        return _AGENT_SCHEMA
 
+    @app.post("/control/start")
+    async def agent_start() -> dict[str, Any]:
+        """No-op start — agent is always running in mock mode."""
+        return _status_response()
 
-@agent_app.post("/control/start")
-async def agent_start() -> dict[str, Any]:
-    """No-op start — agent is always running in mock mode."""
-    return _status_response()
+    @app.post("/control/stop")
+    async def agent_stop() -> dict[str, Any]:
+        """No-op stop — agent is always running in mock mode."""
+        return _status_response()
 
+    @app.get("/control/config")
+    async def agent_get_config() -> dict[str, Any]:
+        """Return empty config — no file is written in mock mode."""
+        secret_keys = [f["key"] for f in _AGENT_SCHEMA["fields"] if f.get("secret")]
+        secret_lengths = {key: False for key in secret_keys}
+        return {"values": {}, "secret_lengths": secret_lengths}
 
-@agent_app.post("/control/stop")
-async def agent_stop() -> dict[str, Any]:
-    """No-op stop — agent is always running in mock mode."""
-    return _status_response()
+    @app.put("/control/config")
+    async def agent_put_config() -> dict[str, Any]:
+        """No-op config save — mock mode has no persistent config file."""
+        return {"status": "ok"}
 
+    @app.post("/control/restart")
+    async def agent_restart() -> dict[str, Any]:
+        """No-op restart — agent is always running in mock mode."""
+        return _status_response()
 
-@agent_app.get("/control/config")
-async def agent_get_config() -> dict[str, Any]:
-    """Return empty config — no file is written in mock mode."""
-    # Secret keys from the inline schema that need secret_lengths tracking.
-    secret_keys = [f["key"] for f in _AGENT_SCHEMA["fields"] if f.get("secret")]
-    secret_lengths = {key: False for key in secret_keys}
-    return {"values": {}, "secret_lengths": secret_lengths}
-
-
-@agent_app.put("/control/config")
-async def agent_put_config() -> dict[str, Any]:
-    """No-op config save — mock mode has no persistent config file."""
-    return {"status": "ok"}
-
-
-@agent_app.post("/control/restart")
-async def agent_restart() -> dict[str, Any]:
-    """No-op restart — agent is always running in mock mode."""
-    return _status_response()
-
-
-# ---------------------------------------------------------------------------
-# CLI entry point
-# ---------------------------------------------------------------------------
+    return app
 
 
 def cli() -> None:
@@ -186,4 +178,4 @@ def cli() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
     )
     logger.info("Starting mock-agent-control on port %d", MOCK_AGENT_PORT)
-    uvicorn.run(agent_app, host="0.0.0.0", port=MOCK_AGENT_PORT)
+    uvicorn.run(create_app(), host="0.0.0.0", port=MOCK_AGENT_PORT)

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .manager import ConfigHubManager
-from .routes import config, drive, export, jenkinsfile, pages, services, version
+from .routers import config, drive, export, jenkinsfile, pages, services, version
 
 logger = logging.getLogger(__name__)
 

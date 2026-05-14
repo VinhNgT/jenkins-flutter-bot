@@ -1,4 +1,4 @@
-"""File-manager entry point — FastAPI app factory and CLI."""
+"""File-manager — FastAPI app factory and CLI."""
 
 from __future__ import annotations
 
@@ -9,8 +9,9 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from .control import StorageManager, control_router
-from .routes import auth, files
+from .manager import StorageManager
+from .routers import auth, files
+from .routers.control import router as control_router
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.exception("StorageManager not auto-started")
 
     yield
+
+    try:
+        await app.state.manager.stop()
+    except Exception:
+        logger.exception("Error during shutdown")
 
 
 def create_app() -> FastAPI:

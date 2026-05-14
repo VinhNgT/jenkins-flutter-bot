@@ -4,25 +4,23 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, File, Request, UploadFile
+from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import Response
 
-from ..manager import ConfigHubManager
+from ..dependencies import ManagerDep
 
 router = APIRouter(prefix="/api", tags=["config-transfer"])
 
 
 @router.get("/export/env")
-async def export_env(request: Request) -> dict[str, Any]:
+async def export_env(manager: ManagerDep) -> dict[str, Any]:
     """Generate per-service env file contents for preview."""
-    manager: ConfigHubManager = request.app.state.manager
     return await manager.export_env()
 
 
 @router.get("/export/tarball", response_model=None)
-async def export_tarball(request: Request) -> Response:
+async def export_tarball(manager: ManagerDep) -> Response:
     """Download a .tar.gz containing all config files."""
-    manager: ConfigHubManager = request.app.state.manager
     tarball = await manager.export_tarball()
     return Response(
         content=tarball,
@@ -33,10 +31,9 @@ async def export_tarball(request: Request) -> Response:
 
 @router.post("/import/tarball")
 async def import_config_tarball(
-    request: Request,
+    manager: ManagerDep,
     file: UploadFile = File(...),
 ) -> dict[str, Any]:
     """Import configuration from a .tar.gz export."""
-    manager: ConfigHubManager = request.app.state.manager
     raw = await file.read()
     return await manager.import_tarball(raw)

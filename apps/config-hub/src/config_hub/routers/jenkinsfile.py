@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
-from ..manager import ConfigHubManager
+from ..dependencies import ManagerDep
 
 router = APIRouter(prefix="/api", tags=["jenkinsfile"])
 
 
 @router.get("/jenkinsfile")
-async def get_jenkinsfile(request: Request) -> dict[str, Any]:
+async def get_jenkinsfile(manager: ManagerDep) -> dict[str, Any]:
     """Generate a Jenkinsfile pipeline script from current config."""
-    manager: ConfigHubManager = request.app.state.manager
     return await manager.get_jenkinsfile()

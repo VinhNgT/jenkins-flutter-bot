@@ -1,4 +1,4 @@
-"""Entry point — runs the FastAPI control server for the Jenkins agent."""
+"""Agent-control — FastAPI app factory and CLI."""
 
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from .control import AgentManager, control_router
+from .manager import AgentManager
+from .routers.control import router as control_router
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    await app.state.manager.stop()
+    try:
+        await app.state.manager.stop()
+    except Exception:
+        logger.exception("Error during shutdown")
 
 
 def create_app() -> FastAPI:
@@ -36,7 +40,7 @@ def create_app() -> FastAPI:
 
 
 def cli() -> None:
-    """CLI entry point."""
+    """CLI entry point for the agent-control service."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",

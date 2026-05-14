@@ -1,4 +1,4 @@
-"""Bot lifecycle management and HTTP control routes.
+"""Bot lifecycle management.
 
 The bot is a thin Telegram frontend — all build management is
 delegated to the build-manager service via :class:`BuildClient`.
@@ -9,9 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any
-
-from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
-from fastapi import APIRouter, HTTPException, Request
 
 from telegram.ext import (
     Application,
@@ -32,7 +29,7 @@ from .bot.handlers import (
     text_branch_handler,
 )
 from .build_client import BuildClient
-from .config import _DEFAULT_CONFIG_PATH, BotConfig
+from .config import BotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -185,122 +182,3 @@ class BotManager:
             "running": self.running,
             "last_error": self._last_error,
         }
-
-
-control_router = APIRouter(prefix="/control", tags=["control"])
-
-
-def _get_manager(request: Request) -> BotManager:
-    return request.app.state.manager
-
-
-@control_router.post("/start")
-async def start_bot(request: Request) -> dict[str, Any]:
-    """Start the Telegram bot if it is not already running."""
-    manager = _get_manager(request)
-    try:
-        await manager.start()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return manager.status()
-
-
-@control_router.post("/stop")
-async def stop_bot(request: Request) -> dict[str, Any]:
-    """Stop the Telegram bot if it is running."""
-    manager = _get_manager(request)
-    await manager.stop()
-    return manager.status()
-
-
-@control_router.post("/restart")
-async def restart_bot(request: Request) -> dict[str, Any]:
-    """Restart the Telegram bot using the current resolved config."""
-    manager = _get_manager(request)
-    try:
-        await manager.restart()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return manager.status()
-
-
-@control_router.get("/status")
-async def bot_status(request: Request) -> dict[str, Any]:
-    """Report whether the Telegram bot is configured and running."""
-    return _get_manager(request).status()
-
-
-@control_router.get("/schema")
-async def get_schema() -> dict[str, Any]:
-    """Return the bot module's config field schema."""
-    return get_frontend_schema(
-        BotConfig,
-        title="Telegram Bot Configuration",
-        description=(
-            "Configures the Telegram bot interface. You need a Bot Token from"
-            " @BotFather. You must also specify which chat IDs are allowed to"
-            " use the bot to prevent unauthorized access."
-        )
-    )
-
-
-@control_router.get("/config")
-async def get_config() -> dict[str, Any]:
-    """Return current config values with secrets masked."""
-    return read_masked_config(BotConfig, _DEFAULT_CONFIG_PATH)
-
-
-@control_router.put("/config")
-async def put_config(request: Request) -> dict[str, Any]:
-    """Save config values with deep merge to preserve existing fields."""
-    payload = await request.json()
-    save_config_with_merge(BotConfig, _DEFAULT_CONFIG_PATH, payload)
-    return {"status": "saved"}
-
-
-# ---------------------------------------------------------------------------
-# Build event callback (from build-manager)
-# ---------------------------------------------------------------------------
-
-callback_event_router = APIRouter(tags=["callback"])
-
-
-@callback_event_router.post("/callback/build-result")
-async def handle_build_result(request: Request) -> dict[str, str]:
-    """Receive a build result forwarded by the build-manager.
-
-    Expected JSON payload::
-
-        {
-            "request_id": "abc123",
-            "branch": "main",
-            "commit_hash": "abc1234",
-            "result": "success",
-            "triggered_at": 1715500000.0,
-            "completed_at": 1715501000.0,
-            "download_url": "https://..."
-        }
-    """
-    manager = _get_manager(request)
-    ctx = manager.bot_context
-    if ctx is None:
-        return {"status": "ignored", "reason": "bot not running"}
-
-    body = await request.json()
-    request_id = body.get("request_id", "")
-    result = body.get("result", "")
-
-    pending = ctx.consume_pending(request_id)
-    if pending is None:
-        logger.info(
-            "Build result for unknown request_id=%s — ignoring",
-            request_id[:8],
-        )
-        return {"status": "ignored", "reason": "no pending build"}
-
-    if result == "success":
-        await ctx.on_build_success(pending, body)
-    else:
-        await ctx.on_build_failure(pending, body)
-
-    return {"status": "processed"}

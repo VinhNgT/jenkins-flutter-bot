@@ -45,17 +45,19 @@ Check each app's `pyproject.toml` for the authoritative dependency list.
 
 ### Service Apps
 
-FastAPI service apps follow the same module pattern:
+FastAPI service apps follow the official [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) structure:
 
 | Module | Role |
 |--------|------|
 | `main.py` | FastAPI app factory, lifespan, CLI entry |
 | `config.py` | Pydantic `ServiceSettings` subclass — field declarations + resolution |
-| `control.py` | Manager class + `/control/*` routes + `GET /control/schema` |
+| `manager.py` | Service lifecycle class — startup, shutdown, and domain resources |
+| `dependencies.py` | Shared `Depends()` callables using `Annotated` type aliases |
+| `routers/` | Route modules, each defining an `APIRouter` — no business logic |
 
-This pattern applies to all FastAPI services: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`.
+This structure applies to all FastAPI services: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`, and `mock-jenkins`.
 
-`config-hub` is an exception to the control pattern — it owns no schema and instead proxies config I/O to the above services.
+`config-hub` is an exception to the config pattern — it owns no schema and instead proxies config I/O to the owning services. `mock-jenkins` uses `pydantic-settings.BaseSettings` directly instead of `ServiceSettings`.
 
 The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`, `git/`) for domain-specific logic.
 
@@ -89,9 +91,18 @@ Use `logging.getLogger(__name__)` consistently. No `print()` statements — the 
 
 ### File Organization
 
-- One concern per module: `config.py`, `control.py`, `bot/handlers.py`, `jenkins/client.py`, etc.
+- One concern per module: `config.py`, `manager.py`, `dependencies.py`, `routers/control.py`, etc.
 - Use `TYPE_CHECKING` imports to avoid circular dependencies between modules.
 - Each module that defines routes creates its own `APIRouter` — `main.py` just includes them.
+
+### Dependency Injection
+
+Route handlers receive shared resources via FastAPI's standard [dependency injection](https://fastapi.tiangolo.com/tutorial/dependencies/):
+
+- Dependency callables live in `dependencies.py`, not in router files.
+- Type aliases use `Annotated` for clean signatures: `ManagerDep = Annotated[Manager, Depends(get_manager)]`.
+- Sub-dependencies chain from `ManagerDep` to add guard logic (e.g. HTTP 503 if a required resource is not running).
+- Do not use middleware for dependency injection — use `Depends()`.
 
 ---
 

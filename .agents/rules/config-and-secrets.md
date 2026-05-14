@@ -35,7 +35,7 @@ Add a Pydantic `Field()` to the owning module's `config.py` `ServiceSettings` su
 
 ```
 config.py (ServiceSettings subclass with Field() declarations)
-    → control.py (GET /control/schema → serialized JSON)
+    → routers/control.py (GET /control/schema → serialized JSON)
     → config-hub (fetches schemas from all services → schema-renderer.js renders forms)
 ```
 

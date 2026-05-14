@@ -124,6 +124,7 @@ Jenkins owns all raw build metadata (status, duration, branch, commit). The bot 
 
 ## BotManager Lifecycle
 
+- Defined in `manager.py`, injected into routes via `ManagerDep` from `dependencies.py`
 - Uses an `asyncio.Lock` for safe concurrent start/stop from the control API
 - On startup failure, the FastAPI server stays running — the control API remains available for retries
 - `BotContext` with injected dependencies is stored in `Application.bot_data`

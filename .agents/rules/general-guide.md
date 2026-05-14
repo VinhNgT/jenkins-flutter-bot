@@ -97,7 +97,7 @@ graph TD
 
 3. **No Docker-out-of-Docker** — `docker.sock` is never mounted into any container. This is intentional for security and portability.
 
-4. **FastAPI Everywhere** — All service APIs use FastAPI: tg-bot, config-hub, build-manager, file-manager, and agent-control. The `tg-admin-bot` is the only exception — it runs as a Telegram polling bot with no HTTP server.
+4. **FastAPI Everywhere** — All service APIs use FastAPI, structured per the official [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) pattern: `main.py` (app factory) → `dependencies.py` (`Depends` + `Annotated`) → `routers/` (`APIRouter` per domain). See `coding-conventions.md` for the module table. The `tg-admin-bot` is the only exception — it runs as a Telegram polling bot with no HTTP server.
 
 5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for webhook matching and Drive file lifecycle. No information about non-bot-triggered builds is ever exposed to Telegram.
 

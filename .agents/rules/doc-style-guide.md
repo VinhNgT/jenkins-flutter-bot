@@ -116,7 +116,7 @@ Duplication creates drift. If the same fact appears in two files, it will eventu
 
 ### 1. Tutorial-Style Walkthroughs
 
-❌ "First, open `config.py`. Then add a `Field()` with the right metadata. Then open `control.py` and wire it up..."
+❌ "First, open `config.py`. Then add a `Field()` with the right metadata. Then open `routers/control.py` and wire it up..."
 
 ✅ "To add a new config field, add a Pydantic `Field()` to the owning module's `config.py`. Everything else — UI rendering, env var mapping, defaults — is derived automatically."
 

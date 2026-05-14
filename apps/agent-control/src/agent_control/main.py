@@ -18,13 +18,13 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage agent lifecycle on startup/shutdown."""
     try:
-        app.state.manager.start()
+        await app.state.manager.start()
     except Exception:
         logger.exception("Agent not auto-started")
 
     yield
 
-    app.state.manager.stop()
+    await app.state.manager.stop()
 
 
 def create_app() -> FastAPI:

@@ -125,9 +125,7 @@ def _status_response() -> dict[str, Any]:
     return {
         "configured": True,
         "running": True,
-        "pid": 1,
         "last_error": None,
-        "agent_name": os.environ.get("JENKINS_AGENT_NAME", "flutter-agent"),
     }
 
 

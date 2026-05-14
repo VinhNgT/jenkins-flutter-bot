@@ -25,7 +25,7 @@ from telegram.ext import (
 )
 
 if TYPE_CHECKING:
-    from .settings import Settings
+    from .config import AdminBotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,9 @@ def _admin_version() -> str:
         return "unknown"
 
 
-def _api(settings: Settings) -> str:
+def _api(config: AdminBotConfig) -> str:
     """Return the config-hub base URL."""
-    return settings.config_hub_url
+    return config.config_hub_url
 
 
 # ---------------------------------------------------------------------------
@@ -56,11 +56,11 @@ IMPORT_WAITING = 10
 # ---------------------------------------------------------------------------
 
 
-def _ensure_authorized(settings: Settings, update: Update) -> bool:
+def _ensure_authorized(config: AdminBotConfig, update: Update) -> bool:
     """Return True if the chat is authorized, False otherwise."""
     if not update.effective_chat:
         return False
-    return update.effective_chat.id == settings.admin_chat_id
+    return update.effective_chat.id == config.admin_chat_id
 
 
 # ---------------------------------------------------------------------------
@@ -87,8 +87,8 @@ _ADMIN_KEYBOARD = InlineKeyboardMarkup(
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /admin command — show the admin control panel."""
-    settings: Settings = context.bot_data["settings"]
-    if not _ensure_authorized(settings, update):
+    config: AdminBotConfig = context.bot_data["config"]
+    if not _ensure_authorized(config, update):
         return
 
     await update.message.reply_text(  # type: ignore[union-attr]
@@ -109,10 +109,10 @@ async def _status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     assert query is not None
     await query.answer()
 
-    settings: Settings = context.bot_data["settings"]
+    config: AdminBotConfig = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{_api(settings)}/api/services/status")
+            resp = await client.get(f"{_api(config)}/api/services/status")
             resp.raise_for_status()
             data = resp.json()
     except Exception:
@@ -188,11 +188,11 @@ async def _service_action_callback(
         return
     _, action, service = parts
 
-    settings: Settings = context.bot_data["settings"]
+    config: AdminBotConfig = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                f"{_api(settings)}/api/services/{service}/{action}"
+                f"{_api(config)}/api/services/{service}/{action}"
             )
             resp.raise_for_status()
             result = resp.json()
@@ -225,10 +225,10 @@ async def _export_env_callback(
     assert query is not None
     await query.answer("Generating config tarball…")
 
-    settings: Settings = context.bot_data["settings"]
+    config: AdminBotConfig = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(f"{_api(settings)}/api/export/tarball")
+            resp = await client.get(f"{_api(config)}/api/export/tarball")
             resp.raise_for_status()
             tarball_bytes = resp.content
     except Exception:
@@ -268,8 +268,8 @@ async def _import_env_receive(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive and process the uploaded config tarball."""
-    settings: Settings = context.bot_data["settings"]
-    if not _ensure_authorized(settings, update):
+    config: AdminBotConfig = context.bot_data["config"]
+    if not _ensure_authorized(config, update):
         return ConversationHandler.END
 
     doc = update.message.document  # type: ignore[union-attr]
@@ -285,7 +285,7 @@ async def _import_env_receive(
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
-                f"{_api(settings)}/api/import/tarball",
+                f"{_api(config)}/api/import/tarball",
                 files={"file": ("config.tar.gz", bytes(raw), "application/gzip")},
             )
             resp.raise_for_status()
@@ -357,10 +357,10 @@ async def _jenkinsfile_callback(
     assert query is not None
     await query.answer("Generating Jenkinsfile…")
 
-    settings: Settings = context.bot_data["settings"]
+    config: AdminBotConfig = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{_api(settings)}/api/jenkinsfile")
+            resp = await client.get(f"{_api(config)}/api/jenkinsfile")
             resp.raise_for_status()
             data = resp.json()
     except Exception:
@@ -389,10 +389,10 @@ async def _drive_setup_callback(
     assert query is not None
     await query.answer()
 
-    settings: Settings = context.bot_data["settings"]
+    config: AdminBotConfig = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{_api(settings)}/api/drive/status")
+            resp = await client.get(f"{_api(config)}/api/drive/status")
             resp.raise_for_status()
             status = resp.json()
     except Exception:
@@ -424,8 +424,8 @@ async def _drive_receive_client_id(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive client_id, ask for client_secret."""
-    settings: Settings = context.bot_data["settings"]
-    if not _ensure_authorized(settings, update):
+    config: AdminBotConfig = context.bot_data["config"]
+    if not _ensure_authorized(config, update):
         return ConversationHandler.END
 
     client_id = update.message.text.strip()  # type: ignore[union-attr]
@@ -441,8 +441,8 @@ async def _drive_receive_client_secret(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive client_secret, generate consent URL via config-hub."""
-    settings: Settings = context.bot_data["settings"]
-    if not _ensure_authorized(settings, update):
+    config: AdminBotConfig = context.bot_data["config"]
+    if not _ensure_authorized(config, update):
         return ConversationHandler.END
 
     client_secret = update.message.text.strip()  # type: ignore[union-attr]
@@ -452,7 +452,7 @@ async def _drive_receive_client_secret(
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             await client.put(
-                f"{_api(settings)}/api/config/drive",
+                f"{_api(config)}/api/config/drive",
                 json={
                     "drive": {"client_id": client_id, "client_secret": client_secret}
                 },
@@ -490,8 +490,8 @@ async def _drive_receive_code(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive OAuth code, exchange for tokens via config-hub API."""
-    settings: Settings = context.bot_data["settings"]
-    if not _ensure_authorized(settings, update):
+    config: AdminBotConfig = context.bot_data["config"]
+    if not _ensure_authorized(config, update):
         return ConversationHandler.END
 
     code = update.message.text.strip()  # type: ignore[union-attr]
@@ -501,7 +501,7 @@ async def _drive_receive_code(
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
-                f"{_api(settings)}/api/drive/connect/exchange",
+                f"{_api(config)}/api/drive/connect/exchange",
                 json={
                     "code": code,
                     "client_id": client_id,

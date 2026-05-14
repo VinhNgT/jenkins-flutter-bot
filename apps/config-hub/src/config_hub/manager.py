@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from .config import HubConfig
 from .env_io import (
     build_export_tarball,
     generate_compose_vars,
@@ -21,7 +22,6 @@ from .env_io import (
 )
 from .jenkins_pipeline import generate_jenkinsfile
 from .services import ServiceClient
-from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -43,19 +43,42 @@ class ConfigHubManager:
     Routes call methods on this class rather than wiring up raw dependencies.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        self.settings = settings
+    def __init__(self) -> None:
+        config = HubConfig.load()
         self.services = ServiceClient(
-            bot_url=settings.bot_control_url,
-            agent_url=settings.agent_control_url,
-            file_manager_url=settings.file_manager_url,
-            build_manager_url=settings.build_manager_url,
+            bot_url=config.bot_control_url,
+            agent_url=config.agent_control_url,
+            file_manager_url=config.file_manager_url,
+            build_manager_url=config.build_manager_url,
         )
         self.fm_client = httpx.AsyncClient(timeout=10.0)
 
-    async def close(self) -> None:
+    async def start(self) -> None:
+        """No-op — config-hub has no daemon to start."""
+
+    async def stop(self) -> None:
         """Shut down reusable HTTP clients."""
         await self.fm_client.aclose()
+
+    async def restart(self) -> None:
+        """Restart the manager — re-resolve config and rebuild clients."""
+        await self.stop()
+        config = HubConfig.load()
+        self.services = ServiceClient(
+            bot_url=config.bot_control_url,
+            agent_url=config.agent_control_url,
+            file_manager_url=config.file_manager_url,
+            build_manager_url=config.build_manager_url,
+        )
+        self.fm_client = httpx.AsyncClient(timeout=10.0)
+
+    def status(self) -> dict[str, Any]:
+        """Return standardized status — config-hub is always running."""
+        return {
+            "configured": True,
+            "running": True,
+            "last_error": None,
+        }
 
     # ------------------------------------------------------------------
     # Schema aggregation (proxied from all services)

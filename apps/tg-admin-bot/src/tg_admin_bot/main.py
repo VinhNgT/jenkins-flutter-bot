@@ -6,18 +6,18 @@ import logging
 
 from telegram.ext import Application
 
+from .config import AdminBotConfig
 from .handlers import register_handlers
-from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
 
-def build_application(settings: Settings) -> Application:  # type: ignore[type-arg]
+def build_application(config: AdminBotConfig) -> Application:  # type: ignore[type-arg]
     """Build and configure the Telegram Application."""
-    app = Application.builder().token(settings.bot_token).build()
+    app = Application.builder().token(config.bot_token).build()
 
     # Wire shared state into bot_data
-    app.bot_data["settings"] = settings
+    app.bot_data["config"] = config
 
     register_handlers(app)
     return app
@@ -27,18 +27,18 @@ def cli() -> None:
     """CLI entry point for the admin bot."""
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
     )
 
-    settings = Settings.from_env()
+    config = AdminBotConfig.load()
 
-    if not settings.bot_token:
+    if not config.bot_token:
         logger.error("ADMIN_BOT_TOKEN is not set — cannot start.")
         return
-    if not settings.admin_chat_id:
+    if not config.admin_chat_id:
         logger.error("ADMIN_CHAT_ID is not set — cannot start.")
         return
 
-    logger.info("Starting admin bot (chat_id=%d)…", settings.admin_chat_id)
-    app = build_application(settings)
+    logger.info("Starting admin bot (chat_id=%d)…", config.admin_chat_id)
+    app = build_application(config)
     app.run_polling(drop_pending_updates=True)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -11,22 +11,22 @@ from fastapi import FastAPI
 
 from .builds import routes as build_routes
 from .control import BuildManager, control_router
-from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan — initialise and tear down shared resources."""
-    manager: BuildManager = app.state.manager
     try:
-        manager.start()
+        await app.state.manager.start()
     except Exception:
         logger.exception("Failed to start build manager on boot")
+
     yield
+
     try:
-        await manager.stop()
+        await app.state.manager.stop()
     except Exception:
         logger.exception("Error stopping build manager")
 
@@ -34,14 +34,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="Build Manager",
+        title="build-manager",
         docs_url="/api/docs",
-        lifespan=_lifespan,
+        lifespan=lifespan,
     )
 
-    # --- Settings & Manager ---
-    settings = Settings.from_env()
-    manager = BuildManager(settings)
+    manager = BuildManager()
     app.state.manager = manager
 
     # Expose coordinator on app.state for build routes
@@ -51,7 +49,6 @@ def create_app() -> FastAPI:
             request.app.state.coordinator = manager.coordinator
         return await call_next(request)
 
-    # --- Routers ---
     app.include_router(control_router)
     app.include_router(build_routes.router)
 
@@ -60,6 +57,12 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the build-manager service."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
-    app = create_app()
-    uvicorn.run(app, host="0.0.0.0", port=9010)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    )
+    uvicorn.run(
+        create_app(),
+        host="0.0.0.0",
+        port=9010,
+    )

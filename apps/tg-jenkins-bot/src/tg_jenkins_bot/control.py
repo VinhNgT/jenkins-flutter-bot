@@ -7,11 +7,10 @@ delegated to the build-manager service via :class:`BuildClient`.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import Any
 
-from config_core import ConfigDocument, get_frontend_schema
+from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
 from fastapi import APIRouter, HTTPException, Request
 
 from telegram.ext import (
@@ -33,7 +32,7 @@ from .bot.handlers import (
     text_branch_handler,
 )
 from .build_client import BuildClient
-from .config import _DEFAULT_CONFIG_PATH, Config
+from .config import _DEFAULT_CONFIG_PATH, BotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +67,7 @@ class BotManager:
         self._lock = asyncio.Lock()
         self._application: Application | None = None
         self._bot_context: BotContext | None = None
-        self._config: Config | None = None
+        self._config: BotConfig | None = None
         self._build_client: BuildClient | None = None
         self._last_error: str | None = None
 
@@ -87,7 +86,7 @@ class BotManager:
                 return
 
             try:
-                config = Config.resolve()
+                config = BotConfig.resolve()
             except ValueError as e:
                 self._last_error = str(e)
                 logger.error("Configuration missing: %s", e)
@@ -173,7 +172,7 @@ class BotManager:
         the web UI.
         """
         try:
-            config = Config.resolve()
+            config = BotConfig.resolve()
             return bool(config.telegram_token)
         except Exception:
             logger.exception("Failed to resolve bot config during status check")
@@ -184,9 +183,6 @@ class BotManager:
         return {
             "configured": self._is_configured(),
             "running": self.running,
-            "pending_builds": (
-                self._bot_context.pending_count if self._bot_context else 0
-            ),
             "last_error": self._last_error,
         }
 
@@ -234,20 +230,11 @@ async def bot_status(request: Request) -> dict[str, Any]:
     return _get_manager(request).status()
 
 
-def _get_secret_keys() -> list[str]:
-    keys = []
-    for name, field in Config.model_fields.items():
-        extra = field.json_schema_extra or {}
-        if extra.get("secret"):
-            keys.append(extra.get("json_key", name))
-    return keys
-
-
 @control_router.get("/schema")
 async def get_schema() -> dict[str, Any]:
     """Return the bot module's config field schema."""
     return get_frontend_schema(
-        Config,
+        BotConfig,
         title="Telegram Bot Configuration",
         description=(
             "Configures the Telegram bot interface. You need a Bot Token from"
@@ -260,59 +247,14 @@ async def get_schema() -> dict[str, Any]:
 @control_router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    secret_keys = _get_secret_keys()
-
-    data: dict[str, Any] = {}
-    if _DEFAULT_CONFIG_PATH.exists():
-        data = json.loads(_DEFAULT_CONFIG_PATH.read_text())
-        
-    doc = ConfigDocument(data)
-
-    secret_lengths: dict[str, int | bool] = {}
-    for key in secret_keys:
-        value = doc.get(key)
-        if value not in (None, ""):
-            secret_lengths[key] = len(str(value))
-            doc.set(key, None)
-        else:
-            secret_lengths[key] = False
-
-    return {"values": doc.data, "secret_lengths": secret_lengths}
+    return read_masked_config(BotConfig, _DEFAULT_CONFIG_PATH)
 
 
 @control_router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
     payload = await request.json()
-    payload_doc = ConfigDocument(payload)
-
-    # Strip empty/None secrets to avoid overwriting existing values
-    secret_keys = _get_secret_keys()
-    for key in secret_keys:
-        value = payload_doc.get(key)
-        if value is None or value == "":
-            parts = key.split(".")
-            container: Any = payload_doc.data
-            for part in parts[:-1]:
-                if isinstance(container, dict):
-                    container = container.get(part, {})
-                else:
-                    container = None
-                    break
-            if isinstance(container, dict):
-                container.pop(parts[-1], None)
-
-    # Deep merge with existing
-    existing: dict[str, Any] = {}
-    if _DEFAULT_CONFIG_PATH.exists():
-        existing = json.loads(_DEFAULT_CONFIG_PATH.read_text())
-
-    doc = ConfigDocument(existing)
-    doc.merge(payload_doc.data)
-    
-    _DEFAULT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _DEFAULT_CONFIG_PATH.write_text(json.dumps(doc.data, indent=2))
-
+    save_config_with_merge(BotConfig, _DEFAULT_CONFIG_PATH, payload)
     return {"status": "saved"}
 
 

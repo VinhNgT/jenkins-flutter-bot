@@ -142,3 +142,92 @@ class ConfigDocument:
             else:
                 merged[k] = v
         return merged
+
+
+# ---------------------------------------------------------------------------
+# Shared config I/O helpers — used by all schema-owning services
+# ---------------------------------------------------------------------------
+
+
+def get_secret_keys(cls: type[BaseModel]) -> list[str]:
+    """Extract dotted keys for all secret fields from a Pydantic model.
+
+    Returns the ``json_key`` (or field name) for every field whose
+    ``json_schema_extra`` marks it as ``secret: True``.
+    """
+    keys: list[str] = []
+    for name, field in cls.model_fields.items():
+        extra = field.json_schema_extra or {}
+        if extra.get("secret"):
+            keys.append(extra.get("json_key", name))
+    return keys
+
+
+def read_masked_config(
+    config_cls: type[BaseModel],
+    path: Path,
+) -> dict[str, Any]:
+    """Read a JSON config file and mask secret values.
+
+    Returns ``{"values": <dict>, "secret_lengths": <dict>}`` where
+    secret values are replaced with ``None`` and their original lengths
+    are tracked for the dashboard UI.
+    """
+    data: dict[str, Any] = {}
+    if path.exists():
+        data = json.loads(path.read_text())
+
+    doc = ConfigDocument(data)
+    secret_keys = get_secret_keys(config_cls)
+
+    secret_lengths: dict[str, int | bool] = {}
+    for key in secret_keys:
+        value = doc.get(key)
+        if value not in (None, ""):
+            secret_lengths[key] = len(str(value))
+            doc.set(key, None)
+        else:
+            secret_lengths[key] = False
+
+    return {"values": doc.data, "secret_lengths": secret_lengths}
+
+
+def save_config_with_merge(
+    config_cls: type[BaseModel],
+    path: Path,
+    payload: dict[str, Any],
+) -> None:
+    """Strip empty secrets from *payload*, deep-merge with existing, and write.
+
+    Empty or ``None`` secret values are removed from the payload before
+    merging so that ``deep_merge()`` preserves existing secret values.
+    """
+    payload_doc = ConfigDocument(payload)
+    secret_keys = get_secret_keys(config_cls)
+
+    # Strip empty/None secrets to avoid overwriting existing values
+    for key in secret_keys:
+        value = payload_doc.get(key)
+        if value is None or value == "":
+            parts = key.split(".")
+            container: Any = payload_doc.data
+            for part in parts[:-1]:
+                if isinstance(container, dict):
+                    container = container.get(part, {})
+                else:
+                    container = None
+                    break
+            if isinstance(container, dict):
+                container.pop(parts[-1], None)
+
+    # Deep merge with existing
+    existing: dict[str, Any] = {}
+    if path.exists():
+        existing = json.loads(path.read_text())
+
+    doc = ConfigDocument(existing)
+    doc.merge(payload_doc.data)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc.data, indent=2))
+

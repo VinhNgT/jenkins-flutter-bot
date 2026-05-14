@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import subprocess
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from config_core import ConfigDocument, get_frontend_schema
+from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
 
 from .config import AgentConfig, _DEFAULT_CONFIG_PATH
 
@@ -41,7 +40,7 @@ class AgentManager:
     def running(self) -> bool:
         return self._process is not None and self._process.poll() is None
 
-    def start(self) -> None:
+    async def start(self) -> None:
         """Spawn the Jenkins inbound agent as a child process."""
         if self.running:
             return
@@ -86,7 +85,7 @@ class AgentManager:
             logger.exception("Failed to start Jenkins agent")
             raise
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         """Send SIGTERM, wait 5s, then SIGKILL if needed."""
         if not self._process:
             return
@@ -102,6 +101,11 @@ class AgentManager:
             self._process = None
             self._config = None
 
+    async def restart(self) -> None:
+        """Restart the Jenkins agent."""
+        await self.stop()
+        await self.start()
+
     def _is_configured(self) -> bool:
         """Check whether the required config fields are present."""
         try:
@@ -113,13 +117,10 @@ class AgentManager:
 
     def status(self) -> dict[str, Any]:
         """Return the current agent manager status."""
-        active_config = self._config if self.running else None
         return {
             "configured": self._is_configured(),
             "running": self.running,
-            "pid": self._process.pid if self.running and self._process else None,
             "last_error": self._last_error,
-            "agent_name": active_config.agent_name if active_config else None,
         }
 
 
@@ -135,7 +136,7 @@ async def start_agent(request: Request) -> dict[str, Any]:
     """Start the Jenkins agent if it is not already running."""
     manager = _get_manager(request)
     try:
-        manager.start()
+        await manager.start()
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return manager.status()
@@ -145,7 +146,7 @@ async def start_agent(request: Request) -> dict[str, Any]:
 async def stop_agent(request: Request) -> dict[str, Any]:
     """Stop the Jenkins agent if it is running."""
     manager = _get_manager(request)
-    manager.stop()
+    await manager.stop()
     return manager.status()
 
 
@@ -154,8 +155,7 @@ async def restart_agent(request: Request) -> dict[str, Any]:
     """Restart the Jenkins agent using the current resolved config."""
     manager = _get_manager(request)
     try:
-        manager.stop()
-        manager.start()
+        await manager.restart()
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return manager.status()
@@ -165,15 +165,6 @@ async def restart_agent(request: Request) -> dict[str, Any]:
 async def agent_status(request: Request) -> dict[str, Any]:
     """Report whether the Jenkins agent is configured and running."""
     return _get_manager(request).status()
-
-
-def _get_secret_keys() -> list[str]:
-    keys = []
-    for name, field in AgentConfig.model_fields.items():
-        extra = field.json_schema_extra or {}
-        if extra.get("secret"):
-            keys.append(extra.get("json_key", name))
-    return keys
 
 
 @control_router.get("/schema")
@@ -194,54 +185,12 @@ async def get_schema() -> dict[str, Any]:
 @control_router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    data: dict[str, Any] = {}
-    if _DEFAULT_CONFIG_PATH.exists():
-        data = json.loads(_DEFAULT_CONFIG_PATH.read_text())
-
-    doc = ConfigDocument(data)
-    secret_lengths: dict[str, int | bool] = {}
-    for key in _get_secret_keys():
-        value = doc.get(key)
-        if value not in (None, ""):
-            secret_lengths[key] = len(str(value))
-            doc.set(key, None)
-        else:
-            secret_lengths[key] = False
-
-    return {"values": doc.data, "secret_lengths": secret_lengths}
+    return read_masked_config(AgentConfig, _DEFAULT_CONFIG_PATH)
 
 
 @control_router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
     payload = await request.json()
-    payload_doc = ConfigDocument(payload)
-
-    # Strip empty/None secrets to avoid overwriting existing values
-    for key in _get_secret_keys():
-        value = payload_doc.get(key)
-        if value is None or value == "":
-            # Walk and remove
-            parts = key.split(".")
-            container: Any = payload_doc.data
-            for part in parts[:-1]:
-                if isinstance(container, dict):
-                    container = container.get(part, {})
-                else:
-                    container = None
-                    break
-            if isinstance(container, dict):
-                container.pop(parts[-1], None)
-
-    # Deep merge with existing
-    existing: dict[str, Any] = {}
-    if _DEFAULT_CONFIG_PATH.exists():
-        existing = json.loads(_DEFAULT_CONFIG_PATH.read_text())
-
-    doc = ConfigDocument(existing)
-    doc.merge(payload_doc.data)
-
-    _DEFAULT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _DEFAULT_CONFIG_PATH.write_text(json.dumps(doc.data, indent=2))
-
+    save_config_with_merge(AgentConfig, _DEFAULT_CONFIG_PATH, payload)
     return {"status": "saved"}

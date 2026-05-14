@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage storage manager lifecycle on startup/shutdown."""
     try:
-        app.state.manager.start()
+        await app.state.manager.start()
     except Exception:
         logger.exception("StorageManager not auto-started")
 

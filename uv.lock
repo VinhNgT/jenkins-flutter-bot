@@ -1128,12 +1128,14 @@ name = "tg-admin-bot"
 version = "0.2.0.dev2"
 source = { editable = "apps/tg-admin-bot" }
 dependencies = [
+    { name = "config-core" },
     { name = "httpx" },
     { name = "python-telegram-bot", extra = ["ext"] },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "config-core", editable = "libs/config-core" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "python-telegram-bot", extras = ["ext"], specifier = ">=21.0" },
 ]

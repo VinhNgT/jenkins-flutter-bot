@@ -1,1 +1,1 @@
-# Mock Jenkins server for local development
+"""Mock Jenkins server for local development."""

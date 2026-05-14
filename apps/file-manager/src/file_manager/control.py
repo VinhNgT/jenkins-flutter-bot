@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-from pathlib import Path
 from typing import Any
 
-from config_core import ConfigDocument, get_frontend_schema
-from fastapi import APIRouter, Request
+from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
+from fastapi import APIRouter, HTTPException, Request
 
 from .backends.google_drive import GoogleDriveBackend
 from .config import StorageConfig, _DEFAULT_CONFIG_PATH
@@ -29,6 +26,7 @@ class StorageManager:
     def __init__(self) -> None:
         self._config: StorageConfig | None = None
         self._backend: GoogleDriveBackend | None = None
+        self._last_error: str | None = None
 
     @property
     def config(self) -> StorageConfig | None:
@@ -38,30 +36,53 @@ class StorageManager:
     def backend(self) -> GoogleDriveBackend | None:
         return self._backend
 
-    def _config_path(self) -> Path:
-        val = os.environ.get("CONFIG_PATH")
-        return Path(val) if val else _DEFAULT_CONFIG_PATH
+    @property
+    def running(self) -> bool:
+        return self._backend is not None
 
-    def _token_path(self) -> Path:
-        return self._config_path().parent / "oauth.json"
+    def _token_path(self):
+        return _DEFAULT_CONFIG_PATH.parent / "oauth.json"
 
-    def start(self) -> None:
+    async def start(self) -> None:
         """Resolve config and initialise the storage backend."""
-        config_path = self._config_path()
         try:
-            self._config = StorageConfig.resolve(config_path)
+            self._config = StorageConfig.resolve()
         except ValueError as e:
+            self._last_error = str(e)
             logger.error("Configuration missing: %s", e)
             return
 
         self._backend = GoogleDriveBackend(self._token_path())
+        self._last_error = None
         logger.info("StorageManager started")
 
-    def reload_config(self) -> None:
-        """Re-resolve configuration from disk."""
-        config_path = self._config_path()
-        self._config = StorageConfig.resolve(config_path)
-        logger.info("StorageManager config reloaded")
+    async def stop(self) -> None:
+        """Shut down the storage backend."""
+        self._backend = None
+        self._config = None
+        logger.info("StorageManager stopped")
+
+    async def restart(self) -> None:
+        """Stop and re-start with fresh config."""
+        await self.stop()
+        await self.start()
+
+    def _is_configured(self) -> bool:
+        """Check whether the minimum required config fields are present."""
+        try:
+            config = StorageConfig.resolve()
+            return bool(config.drive_client_id and config.drive_client_secret)
+        except Exception:
+            logger.exception("Failed to resolve storage config during status check")
+            return False
+
+    def status(self) -> dict[str, Any]:
+        """Return the current storage manager status."""
+        return {
+            "configured": self._is_configured(),
+            "running": self.running,
+            "last_error": self._last_error,
+        }
 
 
 # --------------------------------------------------------------------------
@@ -69,34 +90,49 @@ class StorageManager:
 # --------------------------------------------------------------------------
 
 
-def _manager(request: Request) -> StorageManager:
+def _get_manager(request: Request) -> StorageManager:
     return request.app.state.manager
 
 
 @control_router.get("/status")
-async def status(request: Request) -> dict[str, Any]:
-    mgr = _manager(request)
-    running = mgr.backend is not None
-    result: dict[str, Any] = {"running": running}
-    if running and mgr.config:
-        result["storage"] = mgr.backend.status(  # type: ignore[union-attr]
-            client_id=mgr.config.drive_client_id,
-            client_secret=mgr.config.drive_client_secret,
-        )
-    return result
+async def get_status(request: Request) -> dict[str, Any]:
+    """Return storage manager status."""
+    return _get_manager(request).status()
 
 
-def _get_secret_keys() -> list[str]:
-    keys = []
-    for name, field in StorageConfig.model_fields.items():
-        extra = field.json_schema_extra or {}
-        if extra.get("secret"):
-            keys.append(extra.get("json_key", name))
-    return keys
+@control_router.post("/start")
+async def start_manager(request: Request) -> dict[str, Any]:
+    """Start the storage manager."""
+    manager = _get_manager(request)
+    try:
+        await manager.start()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return manager.status()
+
+
+@control_router.post("/stop")
+async def stop_manager(request: Request) -> dict[str, Any]:
+    """Stop the storage manager."""
+    manager = _get_manager(request)
+    await manager.stop()
+    return manager.status()
+
+
+@control_router.post("/restart")
+async def restart_manager(request: Request) -> dict[str, Any]:
+    """Restart the storage manager with fresh config."""
+    manager = _get_manager(request)
+    try:
+        await manager.restart()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return manager.status()
 
 
 @control_router.get("/schema")
-async def schema() -> dict[str, Any]:
+async def get_schema() -> dict[str, Any]:
+    """Return the file storage config field schema."""
     return get_frontend_schema(
         StorageConfig,
         title="File Storage Configuration",
@@ -109,83 +145,14 @@ async def schema() -> dict[str, Any]:
 
 
 @control_router.get("/config")
-async def get_config(request: Request) -> dict[str, Any]:
+async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    mgr = _manager(request)
-    config_path = mgr._config_path()
-    if not config_path.exists():
-        return {"values": {}, "secret_lengths": {}}
-
-    data = json.loads(config_path.read_text())
-    doc = ConfigDocument(data)
-
-    # Mask secrets
-    secret_lengths: dict[str, int | bool] = {}
-    for key in _get_secret_keys():
-        value = doc.get(key)
-        if value not in (None, ""):
-            secret_lengths[key] = len(str(value))
-            doc.set(key, None)
-        else:
-            secret_lengths[key] = False
-
-    return {"values": doc.data, "secret_lengths": secret_lengths}
+    return read_masked_config(StorageConfig, _DEFAULT_CONFIG_PATH)
 
 
 @control_router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
-    mgr = _manager(request)
-    config_path = mgr._config_path()
-
     payload = await request.json()
-    payload_doc = ConfigDocument(payload)
-
-    # Strip empty/None secrets to avoid overwriting existing values
-    for key in _get_secret_keys():
-        value = payload_doc.get(key)
-        if value is None or value == "":
-            parts = key.split(".")
-            container: Any = payload_doc.data
-            for part in parts[:-1]:
-                if isinstance(container, dict):
-                    container = container.get(part, {})
-                else:
-                    container = None
-                    break
-            if isinstance(container, dict):
-                container.pop(parts[-1], None)
-
-    # Deep merge with existing
-    existing: dict[str, Any] = {}
-    if config_path.exists():
-        existing = json.loads(config_path.read_text())
-
-    doc = ConfigDocument(existing)
-    doc.merge(payload_doc.data)
-
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(doc.data, indent=2))
-
-    mgr.reload_config()
+    save_config_with_merge(StorageConfig, _DEFAULT_CONFIG_PATH, payload)
     return {"status": "saved"}
-
-
-@control_router.post("/start")
-async def start(request: Request) -> dict[str, Any]:
-    mgr = _manager(request)
-    mgr.start()
-    return {"status": "started"}
-
-
-@control_router.post("/stop")
-async def stop(request: Request) -> dict[str, Any]:
-    # Storage manager doesn't have a heavy stop procedure
-    return {"status": "stopped"}
-
-
-@control_router.post("/restart")
-async def restart(request: Request) -> dict[str, Any]:
-    mgr = _manager(request)
-    mgr.start()
-    return {"status": "restarted"}

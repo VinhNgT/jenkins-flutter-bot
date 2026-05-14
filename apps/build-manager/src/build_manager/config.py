@@ -6,6 +6,8 @@ from pathlib import Path
 from pydantic import Field
 from config_core import ServiceSettings
 
+_DEFAULT_CONFIG_PATH = Path("/app/data/builds.json")
+
 
 class BuildConfig(ServiceSettings):
     """Resolved build manager configuration.
@@ -83,6 +85,7 @@ class BuildConfig(ServiceSettings):
     jenkins_url: str = Field("", json_schema_extra={"infra": True})
     file_manager_url: str = Field("http://file-manager:9092", json_schema_extra={"infra": True})
     self_url: str = Field("http://build-manager:9010", json_schema_extra={"infra": True})
+    build_data_path: Path = Field(Path("/app/data"), json_schema_extra={"infra": True})
 
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> BuildConfig:

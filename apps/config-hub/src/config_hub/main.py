@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -14,7 +14,6 @@ from fastapi.templating import Jinja2Templates
 
 from .manager import ConfigHubManager
 from .routes import config, drive, export, jenkinsfile, pages, services, version
-from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,23 +23,27 @@ TEMPLATE_DIR = PACKAGE_DIR / "templates"
 
 
 @asynccontextmanager
-async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application lifespan — tear down shared resources on shutdown."""
-    yield
-    manager: ConfigHubManager = app.state.manager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage hub lifecycle on startup/shutdown."""
     try:
-        await manager.close()
+        await app.state.manager.start()
     except Exception:
-        logger.exception("Error closing manager")
+        logger.exception("Hub not auto-started")
+
+    yield
+
+    try:
+        await app.state.manager.stop()
+    except Exception:
+        logger.exception("Error stopping manager")
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    app = FastAPI(title="Config Hub", docs_url="/api/docs", lifespan=_lifespan)
+    app = FastAPI(title="config-hub", docs_url="/api/docs", lifespan=lifespan)
 
-    # --- Settings & Manager ---
-    settings = Settings.from_env()
-    manager = ConfigHubManager(settings)
+    # --- Manager ---
+    manager = ConfigHubManager()
     app.state.manager = manager
     app.state.templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
@@ -61,6 +64,12 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the config-hub service."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
-    app = create_app()
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    )
+    uvicorn.run(
+        create_app(),
+        host="0.0.0.0",
+        port=9000,
+    )

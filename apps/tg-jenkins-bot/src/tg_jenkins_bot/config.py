@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
 from config_core import ServiceSettings
@@ -12,7 +11,7 @@ from config_core import ServiceSettings
 _DEFAULT_CONFIG_PATH = Path("/app/data/bot.json")
 
 
-class Config(ServiceSettings):
+class BotConfig(ServiceSettings):
     """Bot configuration resolved from config file, env, and defaults."""
 
     # Telegram
@@ -115,13 +114,9 @@ class Config(ServiceSettings):
         return v
 
     @classmethod
-    def resolve(cls, config_path: Path | None = None) -> Config:
+    def resolve(cls, config_path: Path | None = None) -> BotConfig:
         """Build config with priority: file > env > defaults."""
         return cls.load()
-
-    @property
-    def bot_webhook_port(self) -> int:
-        return urlparse(self.bot_service_url).port or 9090
 
     @property
     def bot_callback_url(self) -> str:

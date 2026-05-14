@@ -9,15 +9,9 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from .config import Config
 from .control import BotManager, callback_event_router, control_router
 
 logger = logging.getLogger(__name__)
-
-
-def _resolve_listen_port() -> int:
-    """Resolve listen port through the full config precedence chain."""
-    return Config.resolve().bot_webhook_port
 
 
 @asynccontextmanager
@@ -43,7 +37,7 @@ def create_app() -> FastAPI:
 
 
 def cli() -> None:
-    """CLI entry point."""
+    """CLI entry point for the tg-jenkins-bot service."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
@@ -51,5 +45,5 @@ def cli() -> None:
     uvicorn.run(
         create_app(),
         host="0.0.0.0",
-        port=_resolve_listen_port(),
+        port=9090,
     )

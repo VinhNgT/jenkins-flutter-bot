@@ -4,9 +4,13 @@ version = "0.2.0-dev.2"
 description = "Telegram admin bot for managing the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [
+    "config-core",
     "httpx>=0.27.0",
     "python-telegram-bot[ext]>=21.0",
 ]
+
+[tool.uv.sources]
+config-core = { workspace = true }
 
 [project.scripts]
 tg-admin-bot = "tg_admin_bot.main:cli"

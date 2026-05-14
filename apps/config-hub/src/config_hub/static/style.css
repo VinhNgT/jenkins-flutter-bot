@@ -314,6 +314,15 @@ a:hover { text-decoration: underline; }
 .badge--connected::before { background: var(--green); }
 .badge--disconnected { color: var(--amber); }
 .badge--disconnected::before { background: var(--amber); }
+.badge--not-configured { color: var(--amber); }
+.badge--not-configured::before { background: var(--amber); }
+
+.badge-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
 
 /* === Form layout === */
 .form-grid {

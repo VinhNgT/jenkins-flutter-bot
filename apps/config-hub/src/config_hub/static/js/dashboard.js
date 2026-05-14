@@ -15,8 +15,6 @@ function renderServiceCard(name, key, status) {
   const label = badgeLabel(status);
   const details = [];
 
-  if (status.configured !== undefined)
-    details.push(`Configured: ${status.configured ? 'Yes' : 'No'}`);
   if (status.drive_connected !== undefined)
     details.push(`Drive: ${status.drive_connected ? 'Connected' : 'No'}`);
   if (status.pending_builds !== undefined)
@@ -35,11 +33,18 @@ function renderServiceCard(name, key, status) {
     ? `<div class="status-details">${details.map((d) => `<p>${d}</p>`).join('')}</div>`
     : '';
 
+  const configuredBadge = status.configured === false
+    ? `<span class="badge badge--not-configured">Not Configured</span>`
+    : '';
+
   return `
     <div class="card status-card" id="card-${key}">
       <div class="status-header">
         <h3>${name}</h3>
-        <span class="badge ${cls}">${label}</span>
+        <div class="badge-group">
+          ${configuredBadge}
+          <span class="badge ${cls}">${label}</span>
+        </div>
       </div>
       ${detailsHtml}
       <div class="status-controls">

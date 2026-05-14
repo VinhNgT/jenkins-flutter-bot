@@ -302,20 +302,18 @@ a:hover { text-decoration: underline; }
   border-radius: 50%;
 }
 
-.badge--running { color: var(--green); }
-.badge--running::before { background: var(--green); }
-.badge--stopped { color: var(--red); }
-.badge--stopped::before { background: var(--red); }
-.badge--unavailable { color: var(--amber); }
-.badge--unavailable::before { background: var(--amber); }
-.badge--loading { color: var(--ink-tertiary); }
-.badge--loading::before { background: var(--ink-tertiary); }
-.badge--connected { color: var(--green); }
-.badge--connected::before { background: var(--green); }
+.badge--running  { color: var(--green); }
+.badge--running::before  { background: var(--green); }
+.badge--awaiting { color: var(--amber); }
+.badge--awaiting::before { background: var(--amber); }
+.badge--offline  { color: var(--ink-tertiary); }
+.badge--offline::before  { background: var(--ink-tertiary); }
+.badge--loading  { color: var(--ink-tertiary); }
+.badge--loading::before  { background: var(--ink-tertiary); }
+.badge--connected    { color: var(--green); }
+.badge--connected::before    { background: var(--green); }
 .badge--disconnected { color: var(--amber); }
 .badge--disconnected::before { background: var(--amber); }
-.badge--not-configured { color: var(--amber); }
-.badge--not-configured::before { background: var(--amber); }
 
 .badge-group {
   display: flex;

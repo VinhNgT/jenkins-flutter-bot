@@ -1,18 +1,35 @@
 /* Dashboard tab — status cards, drive status, and polling. */
 
+/**
+ * Derive one of exactly three mutually-exclusive health states:
+ *   offline            — service did not respond
+ *   awaiting-config    — service responded but is not fully configured / not running
+ *   running            — service is responding, configured, and running
+ */
+function serviceHealthState(status) {
+  if (status.available === false) return 'offline';
+  if (status.running && status.configured !== false) return 'running';
+  return 'awaiting-config';
+}
+
 function badgeClass(status) {
-  if (status.available === false) return 'badge--unavailable';
-  return status.running ? 'badge--running' : 'badge--stopped';
+  const state = serviceHealthState(status);
+  if (state === 'offline')         return 'badge--offline';
+  if (state === 'awaiting-config') return 'badge--awaiting';
+  return 'badge--running';
 }
 
 function badgeLabel(status) {
-  if (status.available === false) return 'Unavailable';
-  return status.running ? 'Running' : 'Stopped';
+  const state = serviceHealthState(status);
+  if (state === 'offline')         return 'Offline';
+  if (state === 'awaiting-config') return 'Awaiting configuration';
+  return 'Running';
 }
 
 function renderServiceCard(name, key, status) {
   const cls = badgeClass(status);
   const label = badgeLabel(status);
+  const state = serviceHealthState(status);
   const details = [];
 
   if (status.drive_connected !== undefined)
@@ -25,7 +42,7 @@ function renderServiceCard(name, key, status) {
     details.push(`PID: ${status.pid}`);
 
   const error = status.last_error ?? status.detail ?? null;
-  if (error && error !== 'none' && status.available !== false) {
+  if (error && error !== 'none' && state !== 'offline') {
     details.push(`Error: ${error}`);
   }
 
@@ -33,33 +50,31 @@ function renderServiceCard(name, key, status) {
     ? `<div class="status-details">${details.map((d) => `<p>${d}</p>`).join('')}</div>`
     : '';
 
-  const configuredBadge = status.configured === false
-    ? `<span class="badge badge--not-configured">Not Configured</span>`
-    : '';
+  // Buttons: only enabled when the service can actually act on the command.
+  const canStart   = state === 'awaiting-config' && status.configured !== false;
+  const canRestart = state === 'running';
+  const canStop    = state === 'running';
 
   return `
     <div class="card status-card" id="card-${key}">
       <div class="status-header">
         <h3>${name}</h3>
-        <div class="badge-group">
-          ${configuredBadge}
-          <span class="badge ${cls}">${label}</span>
-        </div>
+        <span class="badge ${cls}">${label}</span>
       </div>
       ${detailsHtml}
       <div class="status-controls">
         <button
           class="btn btn-accent btn-sm"
-          onclick="controlService('${key}','${status.running ? 'restart' : 'start'}')"
-          ${(!status.configured || status.available === false) ? 'disabled' : ''}>
-          ${status.running
+          onclick="controlService('${key}','${canRestart ? 'restart' : 'start'}')"
+          ${(!canStart && !canRestart) ? 'disabled' : ''}>
+          ${canRestart
             ? `${Icons.restart}Restart`
             : `${Icons.play}Start`}
         </button>
         <button
           class="btn btn-danger btn-sm"
           onclick="controlService('${key}','stop')"
-          ${(!status.running || status.available === false) ? 'disabled' : ''}>
+          ${!canStop ? 'disabled' : ''}>
           ${Icons.stop}Stop
         </button>
       </div>

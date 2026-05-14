@@ -21,7 +21,7 @@ async def get_drive_status(manager: ManagerDep) -> dict[str, Any]:
     """Return current Google Drive connection status from file-manager."""
     try:
         resp = await manager.fm_client.get(
-            f"{manager.settings.file_manager_url}/api/auth/status"
+            f"{manager.file_manager_url}/api/auth/status"
         )
         resp.raise_for_status()
         return resp.json()
@@ -40,7 +40,7 @@ async def start_drive_connect(manager: ManagerDep, request: Request) -> dict[str
 
     try:
         resp = await manager.fm_client.post(
-            f"{manager.settings.file_manager_url}/api/auth/connect/start",
+            f"{manager.file_manager_url}/api/auth/connect/start",
             json={"redirect_uri": callback_url},
         )
         resp.raise_for_status()
@@ -64,7 +64,7 @@ async def exchange_drive_code(manager: ManagerDep, request: Request) -> dict[str
 
     try:
         resp = await manager.fm_client.post(
-            f"{manager.settings.file_manager_url}/api/auth/connect/exchange",
+            f"{manager.file_manager_url}/api/auth/connect/exchange",
             json=body,
         )
         resp.raise_for_status()
@@ -114,7 +114,7 @@ async def drive_oauth_callback(
     # Forward the full callback URL to file-manager for token exchange
     try:
         resp = await manager.fm_client.post(
-            f"{manager.settings.file_manager_url}/api/auth/callback",
+            f"{manager.file_manager_url}/api/auth/callback",
             json={"authorization_response": str(request.url)},
         )
         resp.raise_for_status()
@@ -161,7 +161,7 @@ async def disconnect_drive(manager: ManagerDep) -> dict[str, Any]:
     """Disconnect Drive by deleting OAuth tokens via file-manager."""
     try:
         resp = await manager.fm_client.delete(
-            f"{manager.settings.file_manager_url}/api/auth/token"
+            f"{manager.file_manager_url}/api/auth/token"
         )
         resp.raise_for_status()
         return resp.json()

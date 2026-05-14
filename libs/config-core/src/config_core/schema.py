@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Type
+from typing import Self
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -64,7 +65,7 @@ class ServiceSettings(BaseSettings):
         return (JsonConfigSettingsSource(settings_cls), env_settings, dotenv_settings, init_settings)
 
     @classmethod
-    def load(cls) -> "ServiceSettings":
+    def load(cls) -> Self:
         """Load configuration using the defined precedence."""
         # load_dotenv is called in the source, but doing it here ensures it's available
         load_dotenv()
@@ -76,14 +77,15 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
     fields = []
     
     for name, field in cls.model_fields.items():
-        extra = field.json_schema_extra or {}
-        
+        raw_extra = field.json_schema_extra or {}
+        extra: dict[str, Any] = raw_extra if isinstance(raw_extra, dict) else {}
+
         # Skip infrastructure fields
         if extra.get("infra", False):
             continue
 
-        field_def = {
-            "key": extra.get("json_key", name), # Dotted key if nested, or just name
+        field_def: dict[str, Any] = {
+            "key": extra.get("json_key", name),  # Dotted key if nested, or just name
             "label": field.title or name.replace("_", " ").title(),
             "group": extra.get("group", "General"),
             "description": field.description or "",
@@ -93,7 +95,7 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
             "required": field.is_required(),
             "field_type": extra.get("field_type", "password" if extra.get("secret", False) else "text"),
             "choices": extra.get("choices", []),
-            "value_type": "str", # Simplified, since pydantic parses everything
+            "value_type": "str",  # Simplified, since pydantic parses everything
         }
         fields.append(field_def)
 
@@ -157,9 +159,12 @@ def get_secret_keys(cls: type[BaseModel]) -> list[str]:
     """
     keys: list[str] = []
     for name, field in cls.model_fields.items():
-        extra = field.json_schema_extra or {}
+        raw_extra = field.json_schema_extra or {}
+        extra: dict[str, Any] = raw_extra if isinstance(raw_extra, dict) else {}
         if extra.get("secret"):
-            keys.append(extra.get("json_key", name))
+            key = extra.get("json_key", name)
+            if isinstance(key, str):
+                keys.append(key)
     return keys
 
 

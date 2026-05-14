@@ -67,7 +67,7 @@ class AgentConfig(ServiceSettings):
         json_schema_extra={
             "group": "Agent Connection",
             "field_type": "select",
-            "choices": [("true", "Enabled (default)"), ("false", "Disabled (TCP)")],
+            "choices": [["true", "Enabled (default)"], ["false", "Disabled (TCP)"]],
             "infra": True,
             "json_key": "JENKINS_WEB_SOCKET",
         },
@@ -87,4 +87,4 @@ class AgentConfig(ServiceSettings):
     @classmethod
     def resolve(cls, config_path: Path | None = None) -> AgentConfig:
         """Build config with priority: file > env > defaults."""
-        return cls.load(config_path or _DEFAULT_CONFIG_PATH)
+        return cls.load()

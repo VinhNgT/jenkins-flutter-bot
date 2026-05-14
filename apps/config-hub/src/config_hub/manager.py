@@ -45,6 +45,7 @@ class ConfigHubManager:
 
     def __init__(self) -> None:
         config = HubConfig.load()
+        self.file_manager_url: str | None = config.file_manager_url
         self.services = ServiceClient(
             bot_url=config.bot_control_url,
             agent_url=config.agent_control_url,
@@ -64,6 +65,7 @@ class ConfigHubManager:
         """Restart the manager — re-resolve config and rebuild clients."""
         await self.stop()
         config = HubConfig.load()
+        self.file_manager_url = config.file_manager_url
         self.services = ServiceClient(
             bot_url=config.bot_control_url,
             agent_url=config.agent_control_url,

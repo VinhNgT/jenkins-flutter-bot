@@ -132,7 +132,6 @@ class BotManager:
                 logger.info("Telegram bot started")
             except Exception as exc:
                 self._last_error = str(exc)
-                logger.exception("Failed to start Telegram bot")
                 raise
 
     async def stop(self) -> None:

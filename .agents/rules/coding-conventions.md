@@ -108,6 +108,25 @@ Route handlers receive shared resources via FastAPI's standard [dependency injec
 
 ## Error Handling
 
-1. **Never suppress exceptions silently.** An `except` block that swallows an exception must call `logger.exception()` to preserve the full traceback. Never use `logger.info()` or `logger.warning()` to report a caught exception.
-2. **Log once — at the terminal catch site.** Do NOT call `logger.exception()` before re-raising. Log-then-re-raise produces the same traceback twice in the output. Let the top-level handler (e.g. FastAPI lifespan, a route's `except` block) log it once.
-3. **Keep services available.** FastAPI lifespan hooks and optional operations catch errors and continue so the control API stays up for retries. Webhook handlers return `{"status": "ignored"}` for unrecognized callbacks and always clean up temp files.
+Follows FastAPI's official [Handling Errors](https://fastapi.tiangolo.com/tutorial/handling-errors/) pattern.
+
+### Manager Startup
+
+Each service's `manager.py` defines a `StartupError` exception. The manager raises it on any failure — config missing, invalid credentials, subprocess crash — and **never logs**. The caller decides what to do:
+
+1. **Global `@app.exception_handler(StartupError)`** registered in `create_app()` converts startup failures to HTTP 400 `{"detail": "..."}` responses. Control routes contain **no try/except boilerplate** — `StartupError` propagates naturally to the global handler.
+2. **Lifespan is the single logging site.** Catches `StartupError` and logs with `logger.warning()` (no traceback — startup failures are expected when config isn't filled in yet). Never re-raises — the control API stays up for retries.
+3. **Shutdown** failures use `logger.exception()` — they are always unexpected.
+
+### Status Checks
+
+`_is_configured()` methods catch config resolution failures and return `False` **without logging**. The config state is communicated via the `/control/status` response; logging it on every poll is noise.
+
+### Service-to-Service HTTP
+
+`ServiceClient` (config-hub) logs downstream HTTP failures with `logger.warning()` (no traceback) at the terminal catch site. The return value communicates the error to the caller. Full tracebacks are noise here because these failures are expected during initial setup.
+
+### Terminal Catch Sites
+
+Bot Telegram API handlers, Drive OAuth flows, and Jenkins client calls are **terminal catch sites** — the operation failed, we log it, and continue. These correctly use `logger.exception()` because there is no caller to propagate to. Do not change these.
+

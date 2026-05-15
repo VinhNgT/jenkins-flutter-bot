@@ -120,7 +120,7 @@ Each service's `manager.py` defines a `StartupError` exception. The manager rais
 
 ### Status Checks
 
-`_is_configured()` methods catch config resolution failures and return `False` **without logging**. The config state is communicated via the `/control/status` response; logging it on every poll is noise.
+`status()` methods attempt `Settings.load()` inline and capture the exception as `config_error`. This communicates both the `configured` boolean and the specific validation failure in a single `/control/status` response, **without logging** — logging it on every poll is noise.
 
 ### Service-to-Service HTTP
 

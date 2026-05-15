@@ -54,6 +54,15 @@ Client → GET /control/schema → target service
 Client → GET/PUT /control/config → target service (read/write config)
 ```
 
+The `/control/status` response carries four fields:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `configured` | `bool` | Whether `Settings.load()` succeeds (all required fields present) |
+| `running` | `bool` | Whether the managed subprocess/resource is active |
+| `last_error` | `str \| null` | Last runtime error from a `start()` attempt |
+| `config_error` | `str \| null` | Current config validation error (`null` when configured) |
+
 If a service is down, its schema returns `null` and the config-hub frontend shows "Loading..." for that tab.
 
 ### Scope-to-Service Translation

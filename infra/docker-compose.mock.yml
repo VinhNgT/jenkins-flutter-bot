@@ -42,6 +42,10 @@ services:
     expose:
       - "9091"
     env_file: !reset []
-    volumes: !reset []
+    volumes:
+      - mock-agent-data:/app/data
     networks:
       - jenkins
+
+volumes:
+  mock-agent-data:

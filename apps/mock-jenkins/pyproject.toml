@@ -4,12 +4,18 @@ version = "0.2.0-dev.1"
 description = "Mock Jenkins server for local development and testing"
 requires-python = ">=3.12"
 dependencies = [
+    "agent-control",
+    "config-core",
     "fastapi>=0.111.0",
     "httpx>=0.27.0",
     "pydantic-settings>=2.0.0",
     "python-multipart>=0.0.9",
     "uvicorn>=0.29.0",
 ]
+
+[tool.uv.sources]
+config-core = { workspace = true }
+agent-control = { workspace = true }
 
 [project.scripts]
 mock-jenkins = "mock_jenkins.main:cli"

@@ -54,6 +54,7 @@ async def job_api(manager: ManagerDep, job_name: str, tree: str = "") -> dict[st
     for b in reversed(manager.build_history[-20:]):
         builds_json.append(
             {
+                "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
                 "number": b.build_number,
                 "result": b.result if not b.building else None,
                 "building": b.building,
@@ -168,6 +169,10 @@ async def queue_item_info(manager: ManagerDep, queue_id: int) -> dict[str, Any] 
         "blocked": False,
         "buildable": build.building,
     }
+
+    if build.cancelled:
+        result["cancelled"] = True
+        result["buildable"] = False
 
     # Build has started (immediately in our mock)
     result["executable"] = {

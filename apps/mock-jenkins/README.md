@@ -24,6 +24,16 @@ This replaces both the `jenkins` and `flutter-agent` services with a single
 `mock-jenkins` container, enabling full end-to-end development without a real
 Jenkins installation.
 
+## Agent Config Lifecycle
+
+The mock agent-control API uses the **real** `AgentConfig` schema from the
+`agent-control` package. This means:
+
+- The schema served to config-hub is always in sync — no hardcoded copies to drift.
+- Config saves via `PUT /control/config` are persisted to the `mock-agent-data` volume.
+- The agent secret is a required field — without it, the mock reports `configured: false`
+  and `/control/start` returns an error, matching real agent-control behaviour.
+
 ## Build Simulation
 
 When triggered, the mock simulates a build lifecycle:

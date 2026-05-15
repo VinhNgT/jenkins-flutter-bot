@@ -7,7 +7,15 @@ WORKDIR /app
 # Workspace root
 COPY pyproject.toml uv.lock ./
 
-# This app (no shared libs needed — mock-jenkins is standalone)
+# Shared libs
+COPY libs/config-core/pyproject.toml libs/config-core/
+COPY libs/config-core/src libs/config-core/src
+
+# Workspace dep: agent-control (for schema imports)
+COPY apps/agent-control/pyproject.toml apps/agent-control/
+COPY apps/agent-control/src apps/agent-control/src
+
+# This app
 COPY apps/mock-jenkins/pyproject.toml apps/mock-jenkins/
 COPY apps/mock-jenkins/src apps/mock-jenkins/src
 

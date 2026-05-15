@@ -50,7 +50,7 @@ The `request_id` is a 128-bit random token per build. It acts as webhook authent
 ```
 Client → POST /control/{start|stop|restart} → target service
 Client → GET /control/status → target service
-Client → GET /control/schema → target service (returns fields + infra partitions)
+Client → GET /control/schema → target service
 Client → GET/PUT /control/config → target service (read/write config)
 ```
 

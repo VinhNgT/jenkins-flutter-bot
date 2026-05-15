@@ -30,7 +30,7 @@ A migration script is required only when:
 
 - **Use `deep_merge()`, never a full overwrite** — a migration transforms specific keys; all untouched keys must be preserved.
 - **Use `load_json` / `write_json` from `config_hub.config_store`** — they handle missing files gracefully and enforce consistent JSON formatting.
-- **Do NOT touch infra fields** — infrastructure fields (`infra: True`) live outside the JSON config files. Never read from or write to `.env` files in a migration script.
+- **Do NOT touch bootstrap fields** — fields in `BootstrapSettings` subclasses live outside JSON config files (env-only). Never read from or write to `.env` files in a migration script.
 - **Do NOT hard-code Docker volume paths** — accept paths from env vars or CLI args. The authoritative paths are in the compose files and `infra/` env templates.
 - **Do NOT rely on `ServiceSettings.load()`** in the migration — it reads the new schema. The migration operates on raw JSON against the *old* structure.
 - **Do NOT delete stale keys** — the config layer silently ignores unknown keys, so orphaned keys are harmless. Document the loss rather than surgically deleting.

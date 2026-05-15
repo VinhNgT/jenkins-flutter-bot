@@ -12,20 +12,23 @@ Triggered when editing config-related files. Covers the Pydantic configuration s
 
 ## Configuration Architecture
 
-All services use `ServiceSettings` (from `config-core`) as the base class for their configuration. Each service's `config.py` declares a `ServiceSettings` subclass with Pydantic fields.
+Two base classes from `config-core` partition configuration by lifecycle:
+
+- **`BootstrapSettings`** — env-only, resolved once at process start. Hard crash if invalid. Used by services with no dashboard-editable state (`config-hub`, `tg-admin-bot`).
+- **`ServiceSettings`** — JSON > env, loaded on demand by managers. Soft fail → pending state. All fields are visible in the dashboard. Used by services that expose `/control/schema`.
 
 ### Schema Ownership
 
-Each service owns its field declarations and exposes them via `GET /control/schema`:
+Each schema-owning service declares a `ServiceSettings` subclass and exposes it via `GET /control/schema`:
 
 | Service | Config Class | Schema Endpoint |
 |---------|-------------|-----------------|
-| `tg-bot` | `BotConfig` | `GET /control/schema` |
-| `agent-control` | `AgentConfig` | `GET /control/schema` |
-| `file-manager` | `StorageConfig` | `GET /control/schema` |
-| `build-manager` | `BuildConfig` | `GET /control/schema` |
+| `tg-bot` | `BotSettings` | `GET /control/schema` |
+| `agent-control` | `AgentSettings` | `GET /control/schema` |
+| `file-manager` | `StorageSettings` | `GET /control/schema` |
+| `build-manager` | `BuildSettings` | `GET /control/schema` |
 
-`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend. `tg-admin-bot` has no schema or control API — all its fields are infrastructure-only.
+`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend. `tg-admin-bot` uses `AdminBotBootstrap(BootstrapSettings)` — env-only, no schema, no control API.
 
 ### Adding a New Config Field
 
@@ -41,28 +44,23 @@ config.py (ServiceSettings subclass with Field() declarations)
 
 ---
 
-## Partitioned Schema: Runtime vs Infrastructure
-
-Each service's `ServiceSettings` subclass uses `json_schema_extra` to tag fields:
-
-- **Runtime fields** (no tag or `infra: False`) — portable, travel with config exports/imports.
-- **Infrastructure fields** (`infra: True`) — environment-specific network plumbing (e.g., `JENKINS_URL`, `SELF_URL`, `FILE_MANAGER_URL`). Excluded from config exports, managed per deployment via `docker-compose.yml` or `infra/env/*.env` files.
-
-The `GET /control/schema` endpoint returns both partitions so consumers can handle them appropriately.
-
----
-
 ## Config Precedence Chain
 
-All services resolve configuration in the same strict order:
+**`ServiceSettings`** (dashboard-editable) resolves in strict order:
 
 ```
-JSON Config File (Web UI)  >  Environment Variable  >  .env file  >  Hardcoded Default
+JSON Config File (Web UI)  >  Environment Variable  >  .env file  >  Default
 ```
 
-Resolution is **infallible** — it always returns a value, never raises. Validation of required fields is the responsibility of the manager classes, not the config layer.
+**`BootstrapSettings`** (env-only) resolves:
 
-Do not bypass this chain. Use `ServiceSettings.load()` — never read env vars or JSON directly in business logic.
+```
+Environment Variable  >  .env file  >  Default
+```
+
+Both classes raise `ValidationError` if required fields (fields with no default) are missing. For `BootstrapSettings` this is a hard crash at process start. For `ServiceSettings` the error is caught by the manager, which enters a pending state — the control API stays up for retries.
+
+Do not bypass these chains. Use `.load()` — never read env vars or JSON directly in business logic.
 
 ---
 

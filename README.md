@@ -91,7 +91,7 @@ Open **http://localhost:9000** and follow the **[Setup Guide](docs/setup-guide.m
 
 | Library | Description | Docs |
 |---------|-------------|------|
-| [config-core](libs/config-core/) | Pydantic `ServiceSettings` base + declarative config framework | [README](libs/config-core/README.md) |
+| [config-core](libs/config-core/) | Pydantic `BootstrapSettings` / `ServiceSettings` bases + declarative config framework | [README](libs/config-core/README.md) |
 
 ---
 

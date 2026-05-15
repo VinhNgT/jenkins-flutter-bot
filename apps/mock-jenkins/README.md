@@ -26,7 +26,7 @@ Jenkins installation.
 
 ## Agent Config Lifecycle
 
-The mock agent-control API uses the **real** `AgentConfig` schema from the
+The mock agent-control API uses the **real** `AgentSettings` schema from the
 `agent-control` package. This means:
 
 - The schema served to config-hub is always in sync — no hardcoded copies to drift.

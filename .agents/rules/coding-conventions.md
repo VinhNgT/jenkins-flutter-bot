@@ -33,7 +33,7 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 ### Key Dependency Patterns
 
 - **All FastAPI services** share `fastapi` + `uvicorn`. The `tg-admin-bot` is the only exception — it uses only `python-telegram-bot[ext]` with no HTTP server.
-- **All apps** depend on `config-core` (shared library) for `ServiceSettings` and config I/O helpers.
+- **All apps** depend on `config-core` (shared library) for `BootstrapSettings` / `ServiceSettings` and config I/O helpers.
 - **`tg-admin-bot`** is a pure HTTP client to `config-hub` — its primary dependencies are `httpx`, `python-telegram-bot`, and `config-core`.
 - **Blocking I/O libraries** (e.g., `google-api-python-client`) are wrapped with `asyncio.to_thread()`. See `communication-flows.md` for details.
 
@@ -50,26 +50,26 @@ FastAPI service apps follow the official [Bigger Applications](https://fastapi.t
 | Module | Role |
 |--------|------|
 | `main.py` | FastAPI app factory, lifespan, CLI entry |
-| `config.py` | Pydantic `ServiceSettings` subclass — field declarations + resolution |
+| `config.py` | Pydantic `ServiceSettings` or `BootstrapSettings` subclass — field declarations + resolution |
 | `manager.py` | Service lifecycle class — startup, shutdown, and domain resources |
 | `dependencies.py` | Shared `Depends()` callables using `Annotated` type aliases |
 | `routers/` | Route modules, each defining an `APIRouter` — no business logic |
 
 This structure applies to all FastAPI services: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`, and `mock-jenkins`.
 
-`config-hub` is an exception to the config pattern — it owns no schema and instead proxies config I/O to the owning services. `mock-jenkins` uses `pydantic-settings.BaseSettings` directly instead of `ServiceSettings`.
+`config-hub` and `tg-admin-bot` use `BootstrapSettings` (env-only, no JSON file) since they have no dashboard-editable config. `mock-jenkins` imports the real `AgentSettings` from `agent-control` for its mock agent-control server.
 
 The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`, `git/`) for domain-specific logic.
 
 ### Admin Bot
 
-`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `config-hub` HTTP API via `httpx`, using `config.py` with an `AdminBotConfig(ServiceSettings)` class for its own infrastructure settings.
+`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `config-hub` HTTP API via `httpx`, using `config.py` with an `AdminBotBootstrap(BootstrapSettings)` class for its env-only settings.
 
 ### Shared Library
 
 One library lives in `libs/` using PyPA `src` layout:
 
-- **`config-core`** — `ServiceSettings` Pydantic base class, `FieldDef` dataclass, `resolve_fields()`, `serialize_schema()`, `nested_get()`, `get_secret_keys()`, `read_masked_config()`, `save_config_with_merge()`.
+- **`config-core`** — `BootstrapSettings` and `ServiceSettings` Pydantic base classes, `get_frontend_schema()`, `ConfigDocument`, `get_secret_keys()`, `read_masked_config()`, `save_config_with_merge()`.
 
 ---
 

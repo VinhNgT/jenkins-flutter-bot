@@ -105,7 +105,7 @@ A single container running two FastAPI servers:
 - **Port 8080** — mock Jenkins API (build trigger, status)
 - **Port 9091** — mock agent-control API (mirrors real `flutter-agent` `/control/*` endpoints)
 
-The mock agent-control server uses the **real** `AgentConfig` schema from `agent-control` (not a hardcoded copy), so the schema served to config-hub is always in sync. Config is persisted to the `mock-agent-data` volume. Start/restart validate the config and fail if the agent secret is missing — matching real agent-control behaviour.
+The mock agent-control server uses the **real** `AgentSettings` schema from `agent-control` (not a hardcoded copy), so the schema served to config-hub is always in sync. Config is persisted to the `mock-agent-data` volume. Start/restart validate the config and fail if the agent secret is missing — matching real agent-control behaviour.
 
 Exists only in `docker-compose.mock.yml`. Never appears in prod or dev compose files.
 

@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import uvicorn
 from agent_control.config import AgentSettings, _DEFAULT_CONFIG_PATH
-from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
+from config_core import format_validation_error, get_frontend_schema, read_masked_config, save_config_with_merge
 from fastapi import FastAPI, Request
 from pydantic import ValidationError
 from starlette.responses import JSONResponse
@@ -44,24 +46,22 @@ class MockAgentState:
         self._running: bool = False
         self._last_error: str | None = None
 
-    def _is_configured(self) -> bool:
-        """Check whether required config fields are present."""
-        try:
-            AgentSettings.load()
-            return True
-        except Exception:
-            return False
-
     @property
     def running(self) -> bool:
         return self._running
 
     def status(self) -> dict[str, Any]:
         """Return the current agent status."""
+        config_error: str | None = None
+        try:
+            AgentSettings.load()
+        except Exception as exc:
+            config_error = format_validation_error(exc)
         return {
-            "configured": self._is_configured(),
+            "configured": config_error is None,
             "running": self._running,
             "last_error": self._last_error,
+            "config_error": config_error,
         }
 
     async def start(self) -> None:
@@ -95,14 +95,27 @@ class MockAgentState:
 # ---------------------------------------------------------------------------
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage mock agent lifecycle on startup/shutdown."""
+    try:
+        await app.state.manager.start()
+    except StartupError:
+        logger.warning(
+            "Mock agent not auto-started: %s",
+            app.state.manager.status()["last_error"],
+        )
+    yield
+
+
 def create_app() -> FastAPI:
     """Application factory for the mock agent-control server."""
     # Ensure AgentSettings.load() can find the same JSON file that
     # save_config_with_merge writes to (via _DEFAULT_CONFIG_PATH).
     os.environ.setdefault("CONFIG_PATH", str(_DEFAULT_CONFIG_PATH))
 
-    app = FastAPI(title="mock-agent-control")
-    state = MockAgentState()
+    app = FastAPI(title="mock-agent-control", lifespan=lifespan)
+    app.state.manager = MockAgentState()
 
     @app.exception_handler(StartupError)
     async def handle_startup_error(
@@ -111,10 +124,10 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     @app.get("/control/status")
-    async def agent_status() -> dict[str, Any]:
+    async def agent_status(request: Request) -> dict[str, Any]:
         """Report the current agent status."""
         logger.info("GET /control/status")
-        return state.status()
+        return request.app.state.manager.status()
 
     @app.get("/control/schema")
     async def agent_schema() -> dict[str, Any]:
@@ -132,25 +145,25 @@ def create_app() -> FastAPI:
         )
 
     @app.post("/control/start")
-    async def agent_start() -> dict[str, Any]:
+    async def agent_start(request: Request) -> dict[str, Any]:
         """Start the mock agent — validates config first."""
         logger.info("POST /control/start")
-        await state.start()
-        return state.status()
+        await request.app.state.manager.start()
+        return request.app.state.manager.status()
 
     @app.post("/control/stop")
-    async def agent_stop() -> dict[str, Any]:
+    async def agent_stop(request: Request) -> dict[str, Any]:
         """Stop the mock agent."""
         logger.info("POST /control/stop")
-        await state.stop()
-        return state.status()
+        await request.app.state.manager.stop()
+        return request.app.state.manager.status()
 
     @app.post("/control/restart")
-    async def agent_restart() -> dict[str, Any]:
+    async def agent_restart(request: Request) -> dict[str, Any]:
         """Restart the mock agent — re-validates config."""
         logger.info("POST /control/restart")
-        await state.restart()
-        return state.status()
+        await request.app.state.manager.restart()
+        return request.app.state.manager.status()
 
     @app.get("/control/config")
     async def agent_get_config() -> dict[str, Any]:
@@ -177,3 +190,4 @@ def cli() -> None:
     )
     logger.info("Starting mock-agent-control on port %d", MOCK_AGENT_PORT)
     uvicorn.run(create_app(), host="0.0.0.0", port=MOCK_AGENT_PORT)
+

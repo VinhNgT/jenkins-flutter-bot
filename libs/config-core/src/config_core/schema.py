@@ -259,3 +259,36 @@ def save_config_with_merge(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(doc.data, indent=2))
 
+
+def format_validation_error(exc: Exception) -> str:
+    """Format a config validation error for the dashboard UI.
+
+    Converts raw Pydantic ``ValidationError`` into human-readable
+    summaries (e.g. "Missing required fields: secret, token").
+    Falls back to ``str(exc)`` for non-Pydantic exceptions.
+    """
+    from pydantic import ValidationError
+
+    if not isinstance(exc, ValidationError):
+        return str(exc)
+
+    errors = exc.errors()
+    missing = [
+        ".".join(str(loc) for loc in e["loc"])
+        for e in errors
+        if e["type"] == "missing"
+    ]
+    other = [
+        f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}"
+        for e in errors
+        if e["type"] != "missing"
+    ]
+
+    parts: list[str] = []
+    if missing:
+        parts.append(f"Missing required fields: {', '.join(missing)}")
+    if other:
+        parts.extend(other)
+
+    return "; ".join(parts) if parts else str(exc)
+

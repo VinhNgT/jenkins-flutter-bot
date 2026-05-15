@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from config_core import format_validation_error
 from pydantic import ValidationError
 
 from .backends.google_drive import GoogleDriveBackend
@@ -67,18 +68,16 @@ class StorageManager:
         await self.stop()
         await self.start()
 
-    def _is_configured(self) -> bool:
-        """Check whether required config fields are present."""
-        try:
-            StorageSettings.load()
-            return True
-        except Exception:
-            return False
-
     def status(self) -> dict[str, Any]:
         """Return the current storage manager status."""
+        config_error: str | None = None
+        try:
+            StorageSettings.load()
+        except Exception as exc:
+            config_error = format_validation_error(exc)
         return {
-            "configured": self._is_configured(),
+            "configured": config_error is None,
             "running": self.running,
             "last_error": self._last_error,
+            "config_error": config_error,
         }

@@ -41,8 +41,12 @@ function renderServiceCard(name, key, status) {
   if (status.pid)
     details.push(`PID: ${status.pid}`);
 
+  if (status.config_error && state === 'awaiting-config') {
+    details.push(`${status.config_error}`);
+  }
+
   const error = status.last_error ?? status.detail ?? null;
-  if (error && error !== 'none' && state !== 'offline') {
+  if (error && error !== 'none' && state !== 'offline' && !status.config_error) {
     details.push(`Error: ${error}`);
   }
 

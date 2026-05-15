@@ -60,9 +60,12 @@ class ServiceClient:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.request(method, target)
-                response.raise_for_status()
                 data = response.json()
                 data["available"] = True
+                if not response.is_success:
+                    # Service responded but rejected the action (e.g. 400
+                    # from a failed start). Preserve the error detail.
+                    data.setdefault("detail", response.text)
                 return data
         except Exception as exc:
             logger.warning("Failed to reach %s at %s: %s", service, target, exc)

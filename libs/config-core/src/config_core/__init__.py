@@ -13,4 +13,5 @@ from config_core.schema import (
     get_secret_keys as get_secret_keys,
     read_masked_config as read_masked_config,
     save_config_with_merge as save_config_with_merge,
+    format_validation_error as format_validation_error,
 )

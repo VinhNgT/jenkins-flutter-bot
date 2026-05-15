@@ -108,6 +108,6 @@ Route handlers receive shared resources via FastAPI's standard [dependency injec
 
 ## Error Handling
 
-1. **Never suppress exceptions.** Every `except` block must log with a full traceback via `logger.exception()`. Never use `logger.info()` or `logger.warning()` inside an `except` block.
-2. **Always include tracebacks.** Use `logger.exception()` — the standard Python idiom for logging caught exceptions with full stack traces.
+1. **Never suppress exceptions silently.** An `except` block that swallows an exception must call `logger.exception()` to preserve the full traceback. Never use `logger.info()` or `logger.warning()` to report a caught exception.
+2. **Log once — at the terminal catch site.** Do NOT call `logger.exception()` before re-raising. Log-then-re-raise produces the same traceback twice in the output. Let the top-level handler (e.g. FastAPI lifespan, a route's `except` block) log it once.
 3. **Keep services available.** FastAPI lifespan hooks and optional operations catch errors and continue so the control API stays up for retries. Webhook handlers return `{"status": "ignored"}` for unrecognized callbacks and always clean up temp files.

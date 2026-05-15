@@ -20,6 +20,7 @@ For the authoritative volume list, see `docker-compose.yml`. Key design decision
 - **`build-manager-data`** holds build registry state + build-manager JSON config.
 - **`storage-data`** holds Drive OAuth tokens + file-manager JSON config.
 - **`jenkins-data`** holds Jenkins home — decoupled from all other services.
+- **`mock-agent-data`** (mock mode only) holds the agent JSON config used by the mock agent-control server.
 - Config crosses service boundaries via HTTP (`/control/config`), not via shared mounts.
 
 ---
@@ -103,6 +104,8 @@ A single container running two FastAPI servers:
 
 - **Port 8080** — mock Jenkins API (build trigger, status)
 - **Port 9091** — mock agent-control API (mirrors real `flutter-agent` `/control/*` endpoints)
+
+The mock agent-control server uses the **real** `AgentConfig` schema from `agent-control` (not a hardcoded copy), so the schema served to config-hub is always in sync. Config is persisted to the `mock-agent-data` volume. Start/restart validate the config and fail if the agent secret is missing — matching real agent-control behaviour.
 
 Exists only in `docker-compose.mock.yml`. Never appears in prod or dev compose files.
 

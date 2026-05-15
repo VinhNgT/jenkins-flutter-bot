@@ -9,8 +9,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from pydantic import ValidationError
+
 from .backends.google_drive import GoogleDriveBackend
-from .config import StorageConfig, _DEFAULT_CONFIG_PATH
+from .config import StorageSettings, _DEFAULT_CONFIG_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +25,12 @@ class StorageManager:
     """Manages the storage backend lifecycle and configuration."""
 
     def __init__(self) -> None:
-        self._config: StorageConfig | None = None
+        self._config: StorageSettings | None = None
         self._backend: GoogleDriveBackend | None = None
         self._last_error: str | None = None
 
     @property
-    def config(self) -> StorageConfig | None:
+    def config(self) -> StorageSettings | None:
         return self._config
 
     @property
@@ -45,8 +47,8 @@ class StorageManager:
     async def start(self) -> None:
         """Resolve config and initialise the storage backend."""
         try:
-            self._config = StorageConfig.resolve()
-        except ValueError as e:
+            self._config = StorageSettings.load()
+        except (ValueError, ValidationError) as e:
             self._last_error = str(e)
             raise StartupError(str(e)) from e
 
@@ -66,10 +68,10 @@ class StorageManager:
         await self.start()
 
     def _is_configured(self) -> bool:
-        """Check whether the minimum required config fields are present."""
+        """Check whether required config fields are present."""
         try:
-            config = StorageConfig.resolve()
-            return bool(config.drive_client_id and config.drive_client_secret)
+            StorageSettings.load()
+            return True
         except Exception:
             return False
 

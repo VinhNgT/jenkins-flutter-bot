@@ -7,17 +7,14 @@ from pathlib import Path
 from pydantic import Field
 from config_core import ServiceSettings
 
-# Default config file path inside the container.  Can be overridden via the
-# CONFIG_PATH environment variable for local development outside Docker.
 _DEFAULT_CONFIG_PATH = Path("/app/data/storage.json")
 
 
-class StorageConfig(ServiceSettings):
+class StorageSettings(ServiceSettings):
     """Storage configuration resolved from config file, env, and defaults."""
 
     # OAuth credentials
     drive_client_id: str = Field(
-        "",
         title="Drive Client ID",
         description="OAuth 2.0 client ID from Google Cloud Console",
         json_schema_extra={
@@ -36,7 +33,6 @@ class StorageConfig(ServiceSettings):
     )
 
     drive_client_secret: str = Field(
-        "",
         title="Drive Client Secret",
         description="OAuth 2.0 client secret",
         json_schema_extra={
@@ -53,7 +49,6 @@ class StorageConfig(ServiceSettings):
 
     # Storage settings
     drive_folder_name: str = Field(
-        "",
         title="Drive Folder Name",
         description="Drive folder for build artifacts (auto-created if missing)",
         json_schema_extra={
@@ -61,8 +56,3 @@ class StorageConfig(ServiceSettings):
             "json_key": "drive.folder_name",
         },
     )
-
-    @classmethod
-    def resolve(cls, config_path: Path | None = None) -> StorageConfig:
-        """Build config with priority: file > env > defaults."""
-        return cls.load()

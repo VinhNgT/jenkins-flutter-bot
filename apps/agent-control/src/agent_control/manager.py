@@ -11,7 +11,9 @@ import os
 import subprocess
 from typing import Any
 
-from .config import AgentConfig
+from pydantic import ValidationError
+
+from .config import AgentSettings
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ class AgentManager:
     def __init__(self) -> None:
         self._process: subprocess.Popen[str] | None = None
         self._last_error: str | None = None
-        self._config: AgentConfig | None = None
+        self._config: AgentSettings | None = None
 
     @property
     def running(self) -> bool:
@@ -51,15 +53,10 @@ class AgentManager:
             return
 
         try:
-            config = AgentConfig.resolve()
-        except ValueError as e:
+            config = AgentSettings.load()
+        except (ValueError, ValidationError) as e:
             self._last_error = str(e)
             raise StartupError(str(e)) from e
-
-        if not config.secret:
-            msg = "Missing required configuration: JENKINS_SECRET"
-            self._last_error = msg
-            raise StartupError(msg)
 
         command = [
             "/usr/local/bin/jenkins-agent",
@@ -112,10 +109,10 @@ class AgentManager:
         await self.start()
 
     def _is_configured(self) -> bool:
-        """Check whether the required config fields are present."""
+        """Check whether required config fields are present."""
         try:
-            config = AgentConfig.resolve()
-            return bool(config.secret)
+            AgentSettings.load()
+            return True
         except Exception:
             return False
 

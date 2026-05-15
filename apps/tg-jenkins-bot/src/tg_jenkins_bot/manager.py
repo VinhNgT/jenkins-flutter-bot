@@ -10,6 +10,8 @@ import asyncio
 import logging
 from typing import Any
 
+from pydantic import ValidationError
+
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -29,7 +31,7 @@ from .bot.handlers import (
     text_branch_handler,
 )
 from .build_client import BuildClient
-from .config import BotConfig
+from .config import BotSettings
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +70,7 @@ class BotManager:
         self._lock = asyncio.Lock()
         self._application: Application | None = None
         self._bot_context: BotContext | None = None
-        self._config: BotConfig | None = None
+        self._config: BotSettings | None = None
         self._build_client: BuildClient | None = None
         self._last_error: str | None = None
 
@@ -87,8 +89,8 @@ class BotManager:
                 return
 
             try:
-                config = BotConfig.resolve()
-            except ValueError as e:
+                config = BotSettings.load()
+            except (ValueError, ValidationError) as e:
                 self._last_error = str(e)
                 raise StartupError(str(e)) from e
 
@@ -166,14 +168,10 @@ class BotManager:
         await self.start()
 
     def _is_configured(self) -> bool:
-        """Check whether the required user-supplied config fields are present.
-
-        Only checks runtime fields (BOT_FIELDS) that users must configure via
-        the web UI.
-        """
+        """Check whether required config fields are present."""
         try:
-            config = BotConfig.resolve()
-            return bool(config.telegram_token)
+            BotSettings.load()
+            return True
         except Exception:
             return False
 

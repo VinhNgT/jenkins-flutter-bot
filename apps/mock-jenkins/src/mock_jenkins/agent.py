@@ -1,7 +1,7 @@
 """Mock agent-control server — emulates the flutter-agent's control API.
 
 Serves the same /control/* endpoints that config-hub queries, using the
-real AgentConfig schema to stay in sync automatically.  Unlike the real
+real AgentSettings schema to stay in sync automatically.  Unlike the real
 agent-control (which manages a Jenkins subprocess), this mock simply
 tracks configured/running state so the dashboard lifecycle is testable.
 """
@@ -13,9 +13,10 @@ import os
 from typing import Any
 
 import uvicorn
-from agent_control.config import AgentConfig, _DEFAULT_CONFIG_PATH
+from agent_control.config import AgentSettings, _DEFAULT_CONFIG_PATH
 from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
 from fastapi import FastAPI, Request
+from pydantic import ValidationError
 from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -44,10 +45,10 @@ class MockAgentState:
         self._last_error: str | None = None
 
     def _is_configured(self) -> bool:
-        """Check whether the required config fields are present."""
+        """Check whether required config fields are present."""
         try:
-            config = AgentConfig.resolve()
-            return bool(config.secret)
+            AgentSettings.load()
+            return True
         except Exception:
             return False
 
@@ -69,15 +70,10 @@ class MockAgentState:
             return
 
         try:
-            config = AgentConfig.resolve()
-        except ValueError as e:
+            AgentSettings.load()
+        except (ValueError, ValidationError) as e:
             self._last_error = str(e)
             raise StartupError(str(e)) from e
-
-        if not config.secret:
-            msg = "Missing required configuration: JENKINS_SECRET"
-            self._last_error = msg
-            raise StartupError(msg)
 
         self._running = True
         self._last_error = None
@@ -101,7 +97,7 @@ class MockAgentState:
 
 def create_app() -> FastAPI:
     """Application factory for the mock agent-control server."""
-    # Ensure AgentConfig.resolve() can find the same JSON file that
+    # Ensure AgentSettings.load() can find the same JSON file that
     # save_config_with_merge writes to (via _DEFAULT_CONFIG_PATH).
     os.environ.setdefault("CONFIG_PATH", str(_DEFAULT_CONFIG_PATH))
 
@@ -122,10 +118,10 @@ def create_app() -> FastAPI:
 
     @app.get("/control/schema")
     async def agent_schema() -> dict[str, Any]:
-        """Return the agent config schema (from real AgentConfig)."""
+        """Return the agent config schema (from real AgentSettings)."""
         logger.info("GET /control/schema")
         return get_frontend_schema(
-            AgentConfig,
+            AgentSettings,
             title="Jenkins Agent Configuration",
             description=(
                 "Configures the Flutter build agent that connects to Jenkins as an"
@@ -160,14 +156,14 @@ def create_app() -> FastAPI:
     async def agent_get_config() -> dict[str, Any]:
         """Return current config values with secrets masked."""
         logger.info("GET /control/config")
-        return read_masked_config(AgentConfig, _DEFAULT_CONFIG_PATH)
+        return read_masked_config(AgentSettings, _DEFAULT_CONFIG_PATH)
 
     @app.put("/control/config")
     async def agent_put_config(request: Request) -> dict[str, Any]:
         """Save config values with deep merge."""
         logger.info("PUT /control/config")
         payload = await request.json()
-        save_config_with_merge(AgentConfig, _DEFAULT_CONFIG_PATH, payload)
+        save_config_with_merge(AgentSettings, _DEFAULT_CONFIG_PATH, payload)
         return {"status": "saved"}
 
     return app

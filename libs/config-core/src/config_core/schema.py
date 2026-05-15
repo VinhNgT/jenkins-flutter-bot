@@ -1,7 +1,8 @@
 """Shared configuration schema primitives based on Pydantic.
 
 This module provides:
-  - ``ServiceSettings``   — BaseSettings class enforcing JSON > Env precedence
+  - ``BootstrapSettings`` — Env-only config resolved once at process start (hard crash)
+  - ``ServiceSettings``   — JSON > Env config loaded on demand by managers (soft fail)
   - ``get_frontend_schema`` — Adapter to convert Pydantic schema to config-hub UI format
   - ``ConfigDocument``      — Object-oriented wrapper for dict manipulation
 """
@@ -43,8 +44,33 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
             return {}
 
 
+class BootstrapSettings(BaseSettings):
+    """Config resolved once at process start. Hard crash if invalid.
+
+    Sources: Environment Variables > .env file > Defaults
+    No JSON file — not editable via the dashboard.
+    """
+
+    model_config = SettingsConfigDict(
+        env_nested_delimiter="__",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
+    @classmethod
+    def load(cls) -> Self:
+        """Load bootstrap config from env vars. Raises ValidationError if invalid."""
+        load_dotenv()
+        return cls()
+
+
 class ServiceSettings(BaseSettings):
-    """Base configuration class enforcing JSON > Environment > Default precedence."""
+    """Config loaded on demand by service managers. Soft fail → pending state.
+
+    Sources: JSON Config File > Environment Variables > .env file > Defaults
+    All fields are visible in the dashboard and re-read on manager restart.
+    Missing required fields raise ValidationError (caught by manager).
+    """
 
     model_config = SettingsConfigDict(
         env_nested_delimiter="__",
@@ -66,8 +92,7 @@ class ServiceSettings(BaseSettings):
 
     @classmethod
     def load(cls) -> Self:
-        """Load configuration using the defined precedence."""
-        # load_dotenv is called in the source, but doing it here ensures it's available
+        """Load config from JSON + env. Raises ValidationError if invalid."""
         load_dotenv()
         return cls()
 
@@ -80,9 +105,7 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
         raw_extra = field.json_schema_extra or {}
         extra: dict[str, Any] = raw_extra if isinstance(raw_extra, dict) else {}
 
-        # Skip infrastructure fields
-        if extra.get("infra", False):
-            continue
+        # All ServiceSettings fields are visible in the dashboard
 
         field_def: dict[str, Any] = {
             "key": extra.get("json_key", name),  # Dotted key if nested, or just name

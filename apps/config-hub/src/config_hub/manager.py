@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from .config import HubConfig
+from .config import HubBootstrap
 from .env_io import (
     build_export_tarball,
     generate_compose_vars,
@@ -46,7 +46,7 @@ class ConfigHubManager:
     """
 
     def __init__(self) -> None:
-        config = HubConfig.load()
+        config = HubBootstrap.load()
         self.file_manager_url: str | None = config.file_manager_url
         self.services = ServiceClient(
             bot_url=config.bot_control_url,
@@ -66,7 +66,7 @@ class ConfigHubManager:
     async def restart(self) -> None:
         """Restart the manager — re-resolve config and rebuild clients."""
         await self.stop()
-        config = HubConfig.load()
+        config = HubBootstrap.load()
         self.file_manager_url = config.file_manager_url
         self.services = ServiceClient(
             bot_url=config.bot_control_url,

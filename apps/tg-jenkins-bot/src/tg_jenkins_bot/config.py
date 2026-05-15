@@ -11,12 +11,11 @@ from config_core import ServiceSettings
 _DEFAULT_CONFIG_PATH = Path("/app/data/bot.json")
 
 
-class BotConfig(ServiceSettings):
+class BotSettings(ServiceSettings):
     """Bot configuration resolved from config file, env, and defaults."""
 
     # Telegram
     telegram_token: str = Field(
-        "",
         title="Bot Token",
         description="Token from @BotFather",
         json_schema_extra={
@@ -31,7 +30,6 @@ class BotConfig(ServiceSettings):
         },
     )
     allowed_chat_ids: list[int] = Field(
-        default_factory=list,
         title="Allowed Chat IDs",
         description="Comma-separated list of chat IDs allowed to use the bot",
         json_schema_extra={
@@ -95,9 +93,19 @@ class BotConfig(ServiceSettings):
         },
     )
 
-    # Infrastructure
-    bot_service_url: str = Field("http://tg-bot:9090", json_schema_extra={"infra": True})
-    build_manager_url: str = Field("http://build-manager:9010", json_schema_extra={"infra": True})
+    # Advanced (deployment topology — configurable but rarely changed)
+    bot_service_url: str = Field(
+        "http://tg-bot:9090",
+        title="Bot Service URL",
+        description="Internal URL for this service's webhook endpoint",
+        json_schema_extra={"group": "Advanced", "json_key": "bot.service_url"},
+    )
+    build_manager_url: str = Field(
+        "http://build-manager:9010",
+        title="Build Manager URL",
+        description="Internal URL of the build-manager service",
+        json_schema_extra={"group": "Advanced", "json_key": "bot.build_manager_url"},
+    )
 
     @field_validator("branch_list", mode="before")
     @classmethod
@@ -112,11 +120,6 @@ class BotConfig(ServiceSettings):
         if isinstance(v, str):
             return [int(x.strip()) for x in v.split(",") if x.strip()]
         return v
-
-    @classmethod
-    def resolve(cls, config_path: Path | None = None) -> BotConfig:
-        """Build config with priority: file > env > defaults."""
-        return cls.load()
 
     @property
     def bot_callback_url(self) -> str:

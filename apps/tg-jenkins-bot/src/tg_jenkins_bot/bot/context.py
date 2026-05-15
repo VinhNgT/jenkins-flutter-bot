@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 if TYPE_CHECKING:
-    from ..config import BotConfig
+    from ..config import BotSettings
     from ..build_client import BuildClient
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ class BotContext:
 
     def __init__(
         self,
-        config: BotConfig,
+        config: BotSettings,
         build_client: BuildClient,
         bot: Bot | None,
     ) -> None:

@@ -1,17 +1,14 @@
-"""Agent configuration resolved from declarative schema."""
-
 from __future__ import annotations
 
 from pathlib import Path
+
 from pydantic import Field
 from config_core import ServiceSettings
 
-# Default config file path inside the container. Can be overridden via the
-# CONFIG_PATH environment variable for local development outside Docker.
 _DEFAULT_CONFIG_PATH = Path("/app/data/agent.json")
 
 
-class AgentConfig(ServiceSettings):
+class AgentSettings(ServiceSettings):
     """Jenkins inbound agent configuration."""
 
     # ── Agent Connection ──
@@ -32,7 +29,6 @@ class AgentConfig(ServiceSettings):
     )
 
     secret: str = Field(
-        "",
         title="Agent Secret",
         description="Authentication secret from the Jenkins node",
         json_schema_extra={
@@ -49,14 +45,14 @@ class AgentConfig(ServiceSettings):
         },
     )
 
-    # ── Infra ──
+    # ── Advanced (deployment topology) ──
     jenkins_url: str = Field(
         "http://jenkins:8080",
         title="Jenkins URL",
         description="Same Jenkins controller URL used for the agent's inbound connection",
         json_schema_extra={
-            "group": "Agent Connection",
-            "infra": True,
+            "group": "Advanced",
+            "json_key": "agent.jenkins_url",
         },
     )
 
@@ -65,10 +61,9 @@ class AgentConfig(ServiceSettings):
         title="WebSocket Mode",
         description="WebSocket recommended; disable only for direct TCP tunnels",
         json_schema_extra={
-            "group": "Agent Connection",
+            "group": "Advanced",
             "field_type": "select",
             "choices": [["true", "Enabled (default)"], ["false", "Disabled (TCP)"]],
-            "infra": True,
             "json_key": "JENKINS_WEB_SOCKET",
         },
     )
@@ -78,13 +73,7 @@ class AgentConfig(ServiceSettings):
         title="Tunnel",
         description="TCP tunnel endpoint (only when WebSocket is disabled)",
         json_schema_extra={
-            "group": "Agent Connection",
-            "infra": True,
+            "group": "Advanced",
             "json_key": "JENKINS_TUNNEL",
         },
     )
-
-    @classmethod
-    def resolve(cls, config_path: Path | None = None) -> AgentConfig:
-        """Build config with priority: file > env > defaults."""
-        return cls.load()

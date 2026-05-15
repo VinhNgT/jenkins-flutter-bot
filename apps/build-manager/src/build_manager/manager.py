@@ -9,8 +9,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from pydantic import ValidationError
+
 from .builds.coordinator import BuildCoordinator
-from .config import BuildConfig
+from .config import BuildSettings
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +38,8 @@ class BuildManager:
     async def start(self) -> None:
         """Initialise the coordinator from the current config."""
         try:
-            config = BuildConfig.resolve()
-        except ValueError as e:
+            config = BuildSettings.load()
+        except (ValueError, ValidationError) as e:
             self._last_error = str(e)
             raise StartupError(str(e)) from e
 
@@ -47,14 +49,12 @@ class BuildManager:
             file_manager_url=config.file_manager_url,
         )
 
-        # Initialise Jenkins client if credentials are available
-        if config.jenkins_url and config.jenkins_user and config.jenkins_api_token:
-            coord.init_jenkins(
-                url=config.jenkins_url,
-                user=config.jenkins_user,
-                api_token=config.jenkins_api_token,
-                job_name=config.jenkins_job_name,
-            )
+        coord.init_jenkins(
+            url=config.jenkins_url,
+            user=config.jenkins_user,
+            api_token=config.jenkins_api_token,
+            job_name=config.jenkins_job_name,
+        )
 
         self._coordinator = coord
         self._last_error = None
@@ -77,10 +77,10 @@ class BuildManager:
         return self._coordinator is not None
 
     def _is_configured(self) -> bool:
-        """Check whether the minimum required config fields are present."""
+        """Check whether required config fields are present."""
         try:
-            config = BuildConfig.resolve()
-            return bool(config.jenkins_url and config.jenkins_user)
+            BuildSettings.load()
+            return True
         except Exception:
             return False
 

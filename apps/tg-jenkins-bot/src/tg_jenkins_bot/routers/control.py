@@ -7,7 +7,7 @@ from typing import Any
 from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
 from fastapi import APIRouter, Request
 
-from ..config import BotConfig, _DEFAULT_CONFIG_PATH
+from ..config import BotSettings, _DEFAULT_CONFIG_PATH
 from ..dependencies import ManagerDep
 
 router = APIRouter(prefix="/control", tags=["control"])
@@ -44,7 +44,7 @@ async def bot_status(manager: ManagerDep) -> dict[str, Any]:
 async def get_schema() -> dict[str, Any]:
     """Return the bot module's config field schema."""
     return get_frontend_schema(
-        BotConfig,
+        BotSettings,
         title="Telegram Bot Configuration",
         description=(
             "Configures the Telegram bot interface. You need a Bot Token from"
@@ -57,12 +57,12 @@ async def get_schema() -> dict[str, Any]:
 @router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    return read_masked_config(BotConfig, _DEFAULT_CONFIG_PATH)
+    return read_masked_config(BotSettings, _DEFAULT_CONFIG_PATH)
 
 
 @router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
     payload = await request.json()
-    save_config_with_merge(BotConfig, _DEFAULT_CONFIG_PATH, payload)
+    save_config_with_merge(BotSettings, _DEFAULT_CONFIG_PATH, payload)
     return {"status": "saved"}

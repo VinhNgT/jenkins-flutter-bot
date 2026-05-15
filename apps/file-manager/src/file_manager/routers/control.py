@@ -7,7 +7,7 @@ from typing import Any
 from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
 from fastapi import APIRouter, Request
 
-from ..config import StorageConfig, _DEFAULT_CONFIG_PATH
+from ..config import StorageSettings, _DEFAULT_CONFIG_PATH
 from ..dependencies import ManagerDep
 
 router = APIRouter(prefix="/control", tags=["control"])
@@ -44,7 +44,7 @@ async def restart_manager(manager: ManagerDep) -> dict[str, Any]:
 async def get_schema() -> dict[str, Any]:
     """Return the file storage config field schema."""
     return get_frontend_schema(
-        StorageConfig,
+        StorageSettings,
         title="File Storage Configuration",
         description=(
             "Configures the storage backend used for uploading build artifacts."
@@ -57,12 +57,12 @@ async def get_schema() -> dict[str, Any]:
 @router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Return current config values with secrets masked."""
-    return read_masked_config(StorageConfig, _DEFAULT_CONFIG_PATH)
+    return read_masked_config(StorageSettings, _DEFAULT_CONFIG_PATH)
 
 
 @router.put("/config")
 async def put_config(request: Request) -> dict[str, Any]:
     """Save config values with deep merge to preserve existing fields."""
     payload = await request.json()
-    save_config_with_merge(StorageConfig, _DEFAULT_CONFIG_PATH, payload)
+    save_config_with_merge(StorageSettings, _DEFAULT_CONFIG_PATH, payload)
     return {"status": "saved"}

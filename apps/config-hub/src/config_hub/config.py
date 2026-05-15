@@ -1,31 +1,19 @@
-"""Config-hub configuration — inter-service URLs resolved via Pydantic."""
+"""Config-hub bootstrap — inter-service URLs resolved at process start."""
 
 from __future__ import annotations
 
 from pydantic import Field
-from config_core import ServiceSettings
+from config_core import BootstrapSettings
 
 
-class HubConfig(ServiceSettings):
-    """Resolved config-hub configuration.
+class HubBootstrap(BootstrapSettings):
+    """Resolved config-hub bootstrap configuration.
 
-    All fields are infrastructure-only — config-hub owns no user-facing
-    schema (it proxies schemas from the owning services).
+    All fields are env-only — config-hub owns no user-facing schema
+    (it proxies schemas from the owning services).
     """
 
-    bot_control_url: str | None = Field(
-        None,
-        json_schema_extra={"infra": True},
-    )
-    agent_control_url: str | None = Field(
-        None,
-        json_schema_extra={"infra": True},
-    )
-    file_manager_url: str | None = Field(
-        None,
-        json_schema_extra={"infra": True},
-    )
-    build_manager_url: str | None = Field(
-        None,
-        json_schema_extra={"infra": True},
-    )
+    bot_control_url: str | None = Field(None)
+    agent_control_url: str | None = Field(None)
+    file_manager_url: str | None = Field(None)
+    build_manager_url: str | None = Field(None)

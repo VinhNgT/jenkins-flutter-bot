@@ -25,7 +25,7 @@ from telegram.ext import (
 )
 
 if TYPE_CHECKING:
-    from .config import AdminBotConfig
+    from .config import AdminBotBootstrap
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def _admin_version() -> str:
         return "unknown"
 
 
-def _api(config: AdminBotConfig) -> str:
+def _api(config: AdminBotBootstrap) -> str:
     """Return the config-hub base URL."""
     return config.config_hub_url
 
@@ -56,7 +56,7 @@ IMPORT_WAITING = 10
 # ---------------------------------------------------------------------------
 
 
-def _ensure_authorized(config: AdminBotConfig, update: Update) -> bool:
+def _ensure_authorized(config: AdminBotBootstrap, update: Update) -> bool:
     """Return True if the chat is authorized, False otherwise."""
     if not update.effective_chat:
         return False
@@ -87,7 +87,7 @@ _ADMIN_KEYBOARD = InlineKeyboardMarkup(
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /admin command — show the admin control panel."""
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     if not _ensure_authorized(config, update):
         return
 
@@ -109,7 +109,7 @@ async def _status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     assert query is not None
     await query.answer()
 
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{_api(config)}/api/services/status")
@@ -188,7 +188,7 @@ async def _service_action_callback(
         return
     _, action, service = parts
 
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
@@ -225,7 +225,7 @@ async def _export_env_callback(
     assert query is not None
     await query.answer("Generating config tarball…")
 
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(f"{_api(config)}/api/export/tarball")
@@ -268,7 +268,7 @@ async def _import_env_receive(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive and process the uploaded config tarball."""
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     if not _ensure_authorized(config, update):
         return ConversationHandler.END
 
@@ -357,7 +357,7 @@ async def _jenkinsfile_callback(
     assert query is not None
     await query.answer("Generating Jenkinsfile…")
 
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{_api(config)}/api/jenkinsfile")
@@ -389,7 +389,7 @@ async def _drive_setup_callback(
     assert query is not None
     await query.answer()
 
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{_api(config)}/api/drive/status")
@@ -424,7 +424,7 @@ async def _drive_receive_client_id(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive client_id, ask for client_secret."""
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     if not _ensure_authorized(config, update):
         return ConversationHandler.END
 
@@ -441,7 +441,7 @@ async def _drive_receive_client_secret(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive client_secret, generate consent URL via config-hub."""
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     if not _ensure_authorized(config, update):
         return ConversationHandler.END
 
@@ -490,7 +490,7 @@ async def _drive_receive_code(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive OAuth code, exchange for tokens via config-hub API."""
-    config: AdminBotConfig = context.bot_data["config"]
+    config: AdminBotBootstrap = context.bot_data["config"]
     if not _ensure_authorized(config, update):
         return ConversationHandler.END
 

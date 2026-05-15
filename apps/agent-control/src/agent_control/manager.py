@@ -29,6 +29,10 @@ _JENKINS_AGENT_ENV_VARS = {
 }
 
 
+class StartupError(Exception):
+    """Raised when the agent manager fails to start."""
+
+
 class AgentManager:
     """Manage the Jenkins inbound agent subprocess."""
 
@@ -50,11 +54,12 @@ class AgentManager:
             config = AgentConfig.resolve()
         except ValueError as e:
             self._last_error = str(e)
-            logger.error("Configuration missing: %s", e)
-            return
+            raise StartupError(str(e)) from e
 
         if not config.secret:
-            raise ValueError("Missing required configuration: JENKINS_SECRET")
+            msg = "Missing required configuration: JENKINS_SECRET"
+            self._last_error = msg
+            raise StartupError(msg)
 
         command = [
             "/usr/local/bin/jenkins-agent",
@@ -83,8 +88,7 @@ class AgentManager:
             self._last_error = None
         except Exception as exc:
             self._last_error = str(exc)
-            logger.exception("Failed to start Jenkins agent")
-            raise
+            raise StartupError(str(exc)) from exc
 
     async def stop(self) -> None:
         """Send SIGTERM, wait 5s, then SIGKILL if needed."""
@@ -113,7 +117,6 @@ class AgentManager:
             config = AgentConfig.resolve()
             return bool(config.secret)
         except Exception:
-            logger.exception("Failed to resolve agent config during status check")
             return False
 
     def status(self) -> dict[str, Any]:

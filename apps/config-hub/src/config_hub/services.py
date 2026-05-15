@@ -64,8 +64,8 @@ class ServiceClient:
                 data = response.json()
                 data["available"] = True
                 return data
-        except Exception:
-            logger.exception("Failed to reach %s at %s", service, target)
+        except Exception as exc:
+            logger.warning("Failed to reach %s at %s: %s", service, target, exc)
             return {
                 "available": False,
                 "running": False,
@@ -98,8 +98,8 @@ class ServiceClient:
                 response = await client.get(f"{url}/control/schema")
                 response.raise_for_status()
                 return response.json()
-        except Exception:
-            logger.exception("Failed to fetch schema from %s", service)
+        except Exception as exc:
+            logger.warning("Failed to fetch schema from %s: %s", service, exc)
             return None
 
     async def get_config(self, service: str) -> dict[str, Any] | None:
@@ -112,8 +112,8 @@ class ServiceClient:
                 response = await client.get(f"{url}/control/config")
                 response.raise_for_status()
                 return response.json()
-        except Exception:
-            logger.exception("Failed to fetch config from %s", service)
+        except Exception as exc:
+            logger.warning("Failed to fetch config from %s: %s", service, exc)
             return None
 
     async def put_config(self, service: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -126,6 +126,6 @@ class ServiceClient:
                 response = await client.put(f"{url}/control/config", json=payload)
                 response.raise_for_status()
                 return response.json()
-        except Exception:
-            logger.exception("Failed to save config to %s", service)
+        except Exception as exc:
+            logger.warning("Failed to save config to %s: %s", service, exc)
             return {"status": "error", "detail": f"Cannot reach {service}"}

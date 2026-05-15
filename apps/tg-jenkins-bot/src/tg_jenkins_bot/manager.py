@@ -34,6 +34,10 @@ from .config import BotConfig
 logger = logging.getLogger(__name__)
 
 
+class StartupError(Exception):
+    """Raised when the bot manager fails to start."""
+
+
 def _build_application(bot_context: BotContext) -> Application:
     """Create a Telegram application wired with the handler architecture."""
     application = ApplicationBuilder().token(bot_context.config.telegram_token).build()
@@ -86,8 +90,8 @@ class BotManager:
                 config = BotConfig.resolve()
             except ValueError as e:
                 self._last_error = str(e)
-                logger.error("Configuration missing: %s", e)
-                return
+                raise StartupError(str(e)) from e
+
             try:
                 build_client = BuildClient(config.build_manager_url)
 
@@ -132,7 +136,7 @@ class BotManager:
                 logger.info("Telegram bot started")
             except Exception as exc:
                 self._last_error = str(exc)
-                raise
+                raise StartupError(str(exc)) from exc
 
     async def stop(self) -> None:
         """Gracefully stop the Telegram polling application."""
@@ -171,7 +175,6 @@ class BotManager:
             config = BotConfig.resolve()
             return bool(config.telegram_token)
         except Exception:
-            logger.exception("Failed to resolve bot config during status check")
             return False
 
     def status(self) -> dict[str, Any]:

@@ -25,10 +25,7 @@ TEMPLATE_DIR = PACKAGE_DIR / "templates"
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage hub lifecycle on startup/shutdown."""
-    try:
-        await app.state.manager.start()
-    except Exception:
-        logger.exception("Hub not auto-started")
+    await app.state.manager.start()
 
     yield
 

@@ -15,7 +15,8 @@ from typing import Any
 import uvicorn
 from agent_control.config import AgentConfig, _DEFAULT_CONFIG_PATH
 from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,10 @@ MOCK_AGENT_PORT = int(os.environ.get("MOCK_AGENT_PORT", "9091"))
 # ---------------------------------------------------------------------------
 # Mock agent state — mirrors real AgentManager's lifecycle
 # ---------------------------------------------------------------------------
+
+
+class StartupError(Exception):
+    """Raised when the mock agent fails to start."""
 
 
 class MockAgentState:
@@ -44,7 +49,6 @@ class MockAgentState:
             config = AgentConfig.resolve()
             return bool(config.secret)
         except Exception:
-            logger.exception("Failed to resolve agent config during status check")
             return False
 
     @property
@@ -68,11 +72,12 @@ class MockAgentState:
             config = AgentConfig.resolve()
         except ValueError as e:
             self._last_error = str(e)
-            logger.error("Configuration missing: %s", e)
-            return
+            raise StartupError(str(e)) from e
 
         if not config.secret:
-            raise ValueError("Missing required configuration: JENKINS_SECRET")
+            msg = "Missing required configuration: JENKINS_SECRET"
+            self._last_error = msg
+            raise StartupError(msg)
 
         self._running = True
         self._last_error = None
@@ -103,6 +108,12 @@ def create_app() -> FastAPI:
     app = FastAPI(title="mock-agent-control")
     state = MockAgentState()
 
+    @app.exception_handler(StartupError)
+    async def handle_startup_error(
+        request: Request, exc: StartupError,
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
     @app.get("/control/status")
     async def agent_status() -> dict[str, Any]:
         """Report the current agent status."""
@@ -128,10 +139,7 @@ def create_app() -> FastAPI:
     async def agent_start() -> dict[str, Any]:
         """Start the mock agent — validates config first."""
         logger.info("POST /control/start")
-        try:
-            await state.start()
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await state.start()
         return state.status()
 
     @app.post("/control/stop")
@@ -145,10 +153,7 @@ def create_app() -> FastAPI:
     async def agent_restart() -> dict[str, Any]:
         """Restart the mock agent — re-validates config."""
         logger.info("POST /control/restart")
-        try:
-            await state.restart()
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await state.restart()
         return state.status()
 
     @app.get("/control/config")

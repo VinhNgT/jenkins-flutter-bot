@@ -15,6 +15,10 @@ from .config import BuildConfig
 logger = logging.getLogger(__name__)
 
 
+class StartupError(Exception):
+    """Raised when the build manager fails to start."""
+
+
 class BuildManager:
     """Manages the build coordinator lifecycle and configuration."""
 
@@ -35,8 +39,7 @@ class BuildManager:
             config = BuildConfig.resolve()
         except ValueError as e:
             self._last_error = str(e)
-            logger.error("Configuration missing: %s", e)
-            return
+            raise StartupError(str(e)) from e
 
         coord = BuildCoordinator(
             data_dir=config.build_data_path,
@@ -79,7 +82,6 @@ class BuildManager:
             config = BuildConfig.resolve()
             return bool(config.jenkins_url and config.jenkins_user)
         except Exception:
-            logger.exception("Failed to resolve build config during status check")
             return False
 
     def status(self) -> dict[str, Any]:

@@ -15,6 +15,10 @@ from .config import StorageConfig, _DEFAULT_CONFIG_PATH
 logger = logging.getLogger(__name__)
 
 
+class StartupError(Exception):
+    """Raised when the storage manager fails to start."""
+
+
 class StorageManager:
     """Manages the storage backend lifecycle and configuration."""
 
@@ -44,8 +48,7 @@ class StorageManager:
             self._config = StorageConfig.resolve()
         except ValueError as e:
             self._last_error = str(e)
-            logger.error("Configuration missing: %s", e)
-            return
+            raise StartupError(str(e)) from e
 
         self._backend = GoogleDriveBackend(self._token_path())
         self._last_error = None
@@ -68,7 +71,6 @@ class StorageManager:
             config = StorageConfig.resolve()
             return bool(config.drive_client_id and config.drive_client_secret)
         except Exception:
-            logger.exception("Failed to resolve storage config during status check")
             return False
 
     def status(self) -> dict[str, Any]:

@@ -7,9 +7,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
 
-from .manager import BuildManager
+from .manager import BuildManager, StartupError
 from .routers.builds import router as builds_router
 from .routers.control import router as control_router
 
@@ -21,8 +22,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan — initialise and tear down shared resources."""
     try:
         await app.state.manager.start()
-    except Exception:
-        logger.exception("Failed to start build manager on boot")
+    except StartupError:
+        logger.warning(
+            "Build manager not auto-started: %s",
+            app.state.manager.status()["last_error"],
+        )
 
     yield
 
@@ -41,6 +45,12 @@ def create_app() -> FastAPI:
     )
 
     app.state.manager = BuildManager()
+
+    @app.exception_handler(StartupError)
+    async def handle_startup_error(
+        request: Request, exc: StartupError,
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     app.include_router(control_router)
     app.include_router(builds_router)

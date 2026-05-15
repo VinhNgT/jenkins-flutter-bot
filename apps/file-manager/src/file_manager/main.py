@@ -7,9 +7,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
 
-from .manager import StorageManager
+from .manager import StorageManager, StartupError
 from .routers import auth, files
 from .routers.control import router as control_router
 
@@ -21,8 +22,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage storage manager lifecycle on startup/shutdown."""
     try:
         await app.state.manager.start()
-    except Exception:
-        logger.exception("StorageManager not auto-started")
+    except StartupError:
+        logger.warning(
+            "StorageManager not auto-started: %s",
+            app.state.manager.status()["last_error"],
+        )
 
     yield
 
@@ -36,6 +40,12 @@ def create_app() -> FastAPI:
     """Create the FastAPI app hosting file and auth routes."""
     app = FastAPI(title="file-manager", lifespan=lifespan)
     app.state.manager = StorageManager()
+
+    @app.exception_handler(StartupError)
+    async def handle_startup_error(
+        request: Request, exc: StartupError,
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     # --- API routers ---
     app.include_router(control_router)

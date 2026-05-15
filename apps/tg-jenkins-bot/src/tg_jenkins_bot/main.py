@@ -7,9 +7,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
 
-from .manager import BotManager
+from .manager import BotManager, StartupError
 from .routers.callbacks import router as callbacks_router
 from .routers.control import router as control_router
 
@@ -21,8 +22,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage bot lifecycle on startup/shutdown."""
     try:
         await app.state.manager.start()
-    except Exception:
-        logger.exception("Bot not auto-started")
+    except StartupError:
+        logger.warning("Bot not auto-started: %s", app.state.manager.status()["last_error"])
 
     yield
 
@@ -36,6 +37,13 @@ def create_app() -> FastAPI:
     """Create the FastAPI app hosting callback and control routes."""
     app = FastAPI(title="tg-jenkins-bot", lifespan=lifespan)
     app.state.manager = BotManager()
+
+    @app.exception_handler(StartupError)
+    async def handle_startup_error(
+        request: Request, exc: StartupError,
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
     app.include_router(control_router)
     app.include_router(callbacks_router)
     return app

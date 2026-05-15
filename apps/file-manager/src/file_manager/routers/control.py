@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from ..config import StorageConfig, _DEFAULT_CONFIG_PATH
 from ..dependencies import ManagerDep
@@ -22,10 +22,7 @@ async def get_status(manager: ManagerDep) -> dict[str, Any]:
 @router.post("/start")
 async def start_manager(manager: ManagerDep) -> dict[str, Any]:
     """Start the storage manager."""
-    try:
-        await manager.start()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.start()
     return manager.status()
 
 
@@ -39,10 +36,7 @@ async def stop_manager(manager: ManagerDep) -> dict[str, Any]:
 @router.post("/restart")
 async def restart_manager(manager: ManagerDep) -> dict[str, Any]:
     """Restart the storage manager with fresh config."""
-    try:
-        await manager.restart()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.restart()
     return manager.status()
 
 

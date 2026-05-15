@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from ..config import BotConfig, _DEFAULT_CONFIG_PATH
 from ..dependencies import ManagerDep
@@ -16,10 +16,7 @@ router = APIRouter(prefix="/control", tags=["control"])
 @router.post("/start")
 async def start_bot(manager: ManagerDep) -> dict[str, Any]:
     """Start the Telegram bot if it is not already running."""
-    try:
-        await manager.start()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.start()
     return manager.status()
 
 
@@ -33,10 +30,7 @@ async def stop_bot(manager: ManagerDep) -> dict[str, Any]:
 @router.post("/restart")
 async def restart_bot(manager: ManagerDep) -> dict[str, Any]:
     """Restart the Telegram bot using the current resolved config."""
-    try:
-        await manager.restart()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.restart()
     return manager.status()
 
 

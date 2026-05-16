@@ -124,8 +124,7 @@ def compute_next(current: str, cmd: str, base: str | None, label: str | None) ->
         case "major":
             return str(v.bump_major())
         case "pre":
-            if v.prerelease is None:
-                # Starting from stable: must specify which component to target.
+            if base is not None:
                 match base:
                     case "patch":
                         v = v.bump_patch()
@@ -135,10 +134,15 @@ def compute_next(current: str, cmd: str, base: str | None, label: str | None) ->
                         v = v.bump_major()
                     case _:
                         raise SystemExit(
-                            f"  {RED}error:{RESET} starting a pre-release from a stable version "
-                            f"requires a base bump.\n"
+                            f"  {RED}error:{RESET} invalid base bump '{base}'.\n"
                             f"  Usage: pre patch|minor|major [dev|rc]"
                         )
+            elif v.prerelease is None:
+                raise SystemExit(
+                    f"  {RED}error:{RESET} starting a pre-release from a stable version "
+                    f"requires a base bump.\n"
+                    f"  Usage: pre patch|minor|major [dev|rc]"
+                )
             return str(v.bump_prerelease(label))
         case "release":
             if v.prerelease is None:
@@ -205,6 +209,37 @@ def assert_tag_free(version: str) -> None:
             f"  {RED}✗ tag {tag} already exists on remote.{RESET}\n"
             f"    Delete it there:  git push origin --delete {tag}"
         )
+
+
+def assert_clean_and_synced() -> None:
+    """Fail early if working directory is dirty or branch is behind remote."""
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True, text=True, cwd=REPO_ROOT,
+    )
+    if status.stdout.strip():
+        raise SystemExit(
+            f"  {RED}✗ working directory is not clean.{RESET}\n"
+            f"    Commit or stash your changes first."
+        )
+
+    print(f"  {CYAN}Fetching remote to check sync status...{RESET}")
+    subprocess.run(["git", "fetch", "--quiet"], cwd=REPO_ROOT)
+    
+    upstream = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "@{u}"],
+        capture_output=True, text=True, cwd=REPO_ROOT,
+    )
+    if upstream.returncode == 0:
+        behind = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD..@{u}"],
+            capture_output=True, text=True, cwd=REPO_ROOT,
+        )
+        if behind.returncode == 0 and int(behind.stdout.strip() or "0") > 0:
+            raise SystemExit(
+                f"  {RED}✗ branch is behind remote.{RESET}\n"
+                f"    Run 'git pull' before releasing."
+            )
 
 
 def github_actions_url() -> str:
@@ -279,6 +314,11 @@ def _menu_items(current: str) -> list[_MenuItem]:
         items.append(("patch      ", "patch", None, None))
         items.append(("minor      ", "minor", None, None))
         items.append(("major      ", "major", None, None))
+        
+        # New base pre-releases
+        for b in ("patch", "minor", "major"):
+            for phase in _PRE_PHASES:
+                items.append((f"pre {b} {phase}  ", "pre", b, phase))
     else:
         # Stable bumps
         items.append(("patch          ", "patch", None, None))
@@ -353,6 +393,7 @@ def main() -> None:
 
     # Pre-flight: fail before touching anything if the tag already exists
     assert_tag_free(new)
+    assert_clean_and_synced()
 
     # Summary line
     print(f"\n  {BOLD}{current}{RESET}  →  {BOLD}{CYAN}{new}{RESET}  ({describe(cmd, pre_base, pre_label)})\n")

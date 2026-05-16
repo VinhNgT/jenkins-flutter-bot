@@ -30,7 +30,7 @@ The monorepo uses a **uv workspace** to manage its microservices, with two top-l
 
 | Directory | Package | Role |
 |-----------|---------|------|
-| `tg-jenkins-bot` | `tg_jenkins_bot` | Telegram bot — slash commands, webhook receiver, Drive upload |
+| `tg-jenkins-bot` | `tg_jenkins_bot` | Telegram bot — slash commands, webhook callback, notification rendering |
 | `config-hub` | `config_hub` | Central operational hub — config proxy, service control, web dashboard |
 | `build-manager` | `build_manager` | Build orchestration — Jenkins trigger, job/state tracking |
 | `file-manager` | `file_manager` | Storage backend — Google Drive OAuth, APK upload/download |
@@ -60,23 +60,38 @@ Seven services on a shared Docker bridge network. Only Jenkins and config-hub ar
 
 ```mermaid
 graph TD
-    BOT["tg-bot :9090 (internal)"]
-    AGT["flutter-agent :9091 (internal)"]
-    FM["file-manager :9092 (internal)"]
-    BM["build-manager :9010 (internal)"]
+    subgraph users["Users"]
+        TU["Telegram User"]
+        BA["Browser Admin"]
+        TA["Telegram Admin"]
+    end
 
-    TU["Telegram User"] -- polling --> BOT
-    BA["Browser Admin"] -- ":9000" --> CH["config-hub :9000 (exposed)"]
-    TA["Telegram Admin"] -- polling --> TAB["tg-admin-bot (internal)"]
+    subgraph ops["Ops  (optional)"]
+        CH["config-hub :9000 ★"]
+        TAB["tg-admin-bot"]
+    end
 
-    CH -- "/control/*" --> BOT & AGT & FM & BM
-    TAB -- "HTTP API" --> CH
+    subgraph managed["Managed Services"]
+        BOT["tg-bot :9090"]
+        BM["build-manager :9010"]
+        FM["file-manager :9092"]
+        AGT["flutter-agent :9091"]
+    end
 
-    BOT -- "REST trigger" --> BM
-    BM -- "REST trigger" --> JNK["jenkins :8080 (exposed)"]
-    JNK -- "dispatches build" --> AGT
-    AGT -- "webhook result" --> BOT
-    BOT -- "upload APK" --> FM
+    JNK["jenkins :8080 ★"]
+
+    TU -- polling --> BOT
+    BA --> CH
+    TA -- polling --> TAB
+    TAB -. "HTTP API" .-> CH
+    CH -. "configures & controls" .-> managed
+
+    BOT -- trigger --> BM
+    BM -- trigger --> JNK
+    JNK -- dispatches --> AGT
+    AGT -- webhook --> BM
+    BM -- upload --> FM
+    BM -- callback --> BOT
 ```
 
 ### Service Roles
@@ -85,7 +100,7 @@ graph TD
 |---------|------|---------|------|
 | `config-hub` | 9000 | Yes | Central operational hub — config proxy, service control, web dashboard |
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
-| `tg-bot` | 9090 | No | Telegram polling bot + FastAPI webhook/control server |
+| `tg-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
 | `flutter-agent` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 | `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
@@ -101,7 +116,7 @@ graph TD
 
 4. **FastAPI Everywhere** — All service APIs use FastAPI, structured per the official [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) pattern: `main.py` (app factory) → `dependencies.py` (`Depends` + `Annotated`) → `routers/` (`APIRouter` per domain). See `coding-conventions.md` for the module table. The `tg-admin-bot` is the only exception — it runs as a Telegram polling bot with no HTTP server.
 
-5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for webhook matching and Drive file lifecycle. No information about non-bot-triggered builds is ever exposed to Telegram.
+5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for webhook matching and inline message editing. No information about non-bot-triggered builds is ever exposed to Telegram.
 
 6. **uv Workspace** — Single `pyproject.toml` + `uv.lock` at the root. All members share a unified lockfile. Shared code lives in `libs/`. Dev tools are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12).
 

@@ -15,7 +15,7 @@ Build orchestration service for the Jenkins Flutter Bot. Acts as the intermediar
 1. Telegram bot sends a `POST /builds/trigger` request with a branch and callback URL
 2. build-manager queues the job, triggers Jenkins via REST, and registers the `request_id`
 3. Jenkins calls back to build-manager on completion (success or failure)
-4. build-manager stores the result and notifies the tg-bot webhook
+4. build-manager stores the result, uploads APK to Drive via file-manager (if successful), enforces `max_recent_builds` retention, and notifies the tg-bot webhook
 
 The build-manager owns zero build logic — all cloning, compiling, and packaging is delegated to the Jenkins pipeline.
 

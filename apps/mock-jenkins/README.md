@@ -40,6 +40,6 @@ When triggered, the mock simulates a build lifecycle:
 
 1. Returns a queue item ID immediately
 2. Transitions to a build number after a short delay
-3. Fires a webhook back to the bot with a fake APK URL
+3. Fires a webhook back to the build-manager with a fake APK URL
 
-This allows testing the full build-trigger → webhook → Drive upload flow locally.
+This allows testing the full build-trigger → webhook → Drive upload → callback flow locally.

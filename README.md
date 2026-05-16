@@ -12,45 +12,45 @@
 
 ```mermaid
 graph TD
-    subgraph Users
+    subgraph users["Users"]
         TU["Telegram User"]
         BA["Browser Admin"]
         TA["Telegram Admin"]
     end
 
-    subgraph Management
-        CH["config-hub :9000 (exposed)"]
-        TAB["tg-admin-bot (internal)"]
+    subgraph ops["Ops  (optional)"]
+        CH["config-hub :9000 ★"]
+        TAB["tg-admin-bot"]
     end
 
-    subgraph Managed Services
-        BOT["tg-bot :9090 (internal)"]
-        AGT["flutter-agent :9091 (internal)"]
-        FM["file-manager :9092 (internal)"]
-        BM["build-manager :9010 (internal)"]
+    subgraph managed["Managed Services"]
+        BOT["tg-bot :9090"]
+        BM["build-manager :9010"]
+        FM["file-manager :9092"]
+        AGT["flutter-agent :9091"]
     end
 
-    JNK["jenkins :8080 (exposed)"]
+    JNK["jenkins :8080 ★"]
 
     TU -- polling --> BOT
-    BA -- ":9000" --> CH
+    BA --> CH
     TA -- polling --> TAB
+    TAB -. "HTTP API" .-> CH
+    CH -. "configures & controls" .-> managed
 
-    CH -- "/control/*" --> BOT & AGT & FM & BM
-    TAB -- "HTTP API" --> CH
-
-    BOT -- "REST trigger" --> BM
-    BM -- "REST trigger" --> JNK
-    JNK -- "dispatches build" --> AGT
-    AGT -- "webhook (build result)" --> BOT
-    BOT -- "upload APK" --> FM
+    BOT -- trigger --> BM
+    BM -- trigger --> JNK
+    JNK -- dispatches --> AGT
+    AGT -- webhook --> BM
+    BM -- upload --> FM
+    BM -- callback --> BOT
 ```
 
 | Service | Port | Exposed | Role |
 |---------|------|---------|------|
 | `config-hub` | 9000 | Yes | Central operational hub — config proxy, service control, web dashboard |
 | `jenkins` | 8080 | Yes | Jenkins controller (dev/testing — can be external) |
-| `tg-bot` | 9090 | No | Telegram bot — slash commands, webhook receiver |
+| `tg-bot` | 9090 | No | Telegram bot — slash commands, notification rendering |
 | `flutter-agent` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs |
 | `file-manager` | 9092 | No | Storage backend — Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job tracking |
@@ -76,7 +76,7 @@ Open **http://localhost:9000** and follow the **[Setup Guide](docs/setup-guide.m
 
 | App | Description | Docs |
 |-----|-------------|------|
-| [tg-jenkins-bot](apps/tg-jenkins-bot/) | Telegram bot — slash-command interface, webhook receiver, Drive upload | [README](apps/tg-jenkins-bot/README.md) |
+| [tg-jenkins-bot](apps/tg-jenkins-bot/) | Telegram bot — slash-command interface, notification rendering | [README](apps/tg-jenkins-bot/README.md) |
 | [config-hub](apps/config-hub/) | Central operational hub — config proxy, service control, web dashboard | [README](apps/config-hub/README.md) |
 | [build-manager](apps/build-manager/) | Build orchestration — Jenkins trigger, job/state tracking | [README](apps/build-manager/README.md) |
 | [file-manager](apps/file-manager/) | Storage backend — Google Drive OAuth, APK upload/download links | [README](apps/file-manager/README.md) |

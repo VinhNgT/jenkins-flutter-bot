@@ -12,13 +12,13 @@ services:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/config-hub:${IMAGE_TAG:-latest}
 
-  tg-bot:
+  tg-jenkins-bot:
     build: !reset null
-    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-bot:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-jenkins-bot:${IMAGE_TAG:-latest}
 
-  flutter-agent:
+  agent-control:
     build: !reset null
-    image: ghcr.io/vinhngt/jenkins-flutter-bot/flutter-agent:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/agent-control:${IMAGE_TAG:-latest}
 
   file-manager:
     build: !reset null

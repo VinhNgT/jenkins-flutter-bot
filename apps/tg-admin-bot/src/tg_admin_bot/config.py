@@ -18,6 +18,4 @@ class AdminBotBootstrap(BootstrapSettings):
         json_schema_extra={"secret": True},
     )
     admin_chat_id: int = Field()
-    config_hub_url: str = Field(
-        "http://config-hub:9000",
-    )
+    config_hub_url: str = Field()

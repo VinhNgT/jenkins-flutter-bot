@@ -10,24 +10,24 @@ Requires ``uv sync`` so all workspace packages are importable.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Type
 
-from agent_control.schema import registry as agent_registry
-from file_manager.schema import registry as storage_registry
-from tg_jenkins_bot.schema import registry as bot_registry
-from config_schema import RuntimeFieldDef, InfraFieldDef, ConfigRegistry
+from pydantic_core import PydanticUndefined
+from pydantic_settings import BaseSettings
+
+from agent_control.config import AgentSettings
+from build_manager.config import BuildSettings
+from config_hub.config import HubBootstrap
+from file_manager.config import StorageSettings
+from tg_admin_bot.config import AdminBotBootstrap
+from tg_jenkins_bot.config import BotSettings
 
 
-def _generate_example(registry: ConfigRegistry) -> str:
-    """Generate a self-documenting .env.example from FieldDef declarations.
-
-    Portable fields are emitted first with their defaults.
-    Infrastructure-only fields are appended in a separate section,
-    always commented out and always empty — they document all possible
-    env vars the container accepts.
-    """
+def _generate_example(cls: Type[BaseSettings], title: str) -> str:
+    """Generate a self-documenting .env.example from Pydantic models."""
     lines: list[str] = [
         f"# {'─' * 50}",
-        f"# {registry.title}",
+        f"# {title}",
         f"# {'─' * 50}",
         "#",
         "# This example is generated from the schema definitions.",
@@ -35,63 +35,37 @@ def _generate_example(registry: ConfigRegistry) -> str:
         "# To regenerate:  uv run python scripts/gen_env_examples.py",
     ]
 
-    # Group portable fields by UI group
-    portable: dict[str, list[RuntimeFieldDef]] = {}
-    for f in registry.runtime_fields:
-        if not f.env_var:
-            continue
-        portable.setdefault(f.group, []).append(f)
+    # Group fields by UI group
+    groups: dict[str, list[tuple[str, Any]]] = {}
+    for name, field in cls.model_fields.items():
+        extra = field.json_schema_extra or {}
+        if not isinstance(extra, dict):
+            extra = {}
+        group = extra.get("group", "General")
+        groups.setdefault(group, []).append((name, field))
 
-    # Group infra fields by UI group
-    infra: dict[str, list[InfraFieldDef]] = {}
-    for f_infra in registry.infra_fields:
-        if not f_infra.env_var:
-            continue
-        infra.setdefault(f_infra.group, []).append(f_infra)
-
-    # --- Portable fields ---
-    for group_name, group_fields in portable.items():
+    for group_name, group_fields in groups.items():
         lines.append("")
         lines.append(f"# ── {group_name} ──")
 
-        for f in group_fields:
+        for name, field in group_fields:
             lines.append("")
-            req_tag = " (required)" if f.required else ""
-            lines.append(f"# {f.label}{req_tag}")
-            if f.description:
-                lines.append(f"# {f.description}")
+            req_tag = " (required)" if field.is_required() else ""
+            label = field.title or name.replace("_", " ").title()
+            lines.append(f"# {label}{req_tag}")
+            
+            if field.description:
+                lines.append(f"# {field.description}")
 
+            env_var = name.upper()
+            
             # Required fields are uncommented to signal they need filling.
             # Optional fields are commented out; show default if one exists.
-            if f.required:
-                lines.append(f"{f.env_var}=")
-            elif f.default:
-                lines.append(f"# {f.env_var}={f.default}")
+            if field.is_required():
+                lines.append(f"{env_var}=")
             else:
-                lines.append(f"# {f.env_var}=")
-
-    # --- Infrastructure fields ---
-    if infra:
-        lines.append("")
-        lines.append(f"# {'─' * 50}")
-        lines.append("# Infrastructure (environment-specific, not portable)")
-        lines.append("# These settings are tied to your deployment topology.")
-        lines.append("# Prefer docker-compose `environment:` section; .env is also acceptable.")
-        lines.append(f"# {'─' * 50}")
-
-        for group_name, infra_group_fields in infra.items():
-            lines.append("")
-            lines.append(f"# ── {group_name} ──")
-
-            for f_infra in infra_group_fields:
-                lines.append("")
-                req_tag = " (required)" if f_infra.required else ""
-                lines.append(f"# {f_infra.label}{req_tag}")
-                if f_infra.description:
-                    lines.append(f"# {f_infra.description}")
-                if f_infra.default:
-                    lines.append(f"# Default: {f_infra.default}")
-                lines.append(f"# {f_infra.env_var}=")
+                default_val = field.default if field.default is not PydanticUndefined else ""
+                lines.append(f"# {env_var}={default_val}")
 
     lines.append("")
     return "\n".join(lines)
@@ -102,13 +76,16 @@ def main() -> None:
     env_dir.mkdir(parents=True, exist_ok=True)
 
     examples = [
-        (env_dir / "bot.env.example", bot_registry),
-        (env_dir / "agent.env.example", agent_registry),
-        (env_dir / "storage.env.example", storage_registry),
+        (env_dir / "tg-jenkins-bot.env.example", BotSettings, "Telegram Bot Config"),
+        (env_dir / "agent-control.env.example", AgentSettings, "Agent Control Config"),
+        (env_dir / "file-manager.env.example", StorageSettings, "File Manager Config"),
+        (env_dir / "build-manager.env.example", BuildSettings, "Build Manager Config"),
+        (env_dir / "config-hub.env.example", HubBootstrap, "Config Hub Infra"),
+        (env_dir / "tg-admin-bot.env.example", AdminBotBootstrap, "Admin Bot Infra"),
     ]
 
-    for path, reg in examples:
-        path.write_text(_generate_example(reg))
+    for path, cls, title in examples:
+        path.write_text(_generate_example(cls, title))
         print(f"✓ Generated {path.relative_to(Path.cwd())}")
 
 

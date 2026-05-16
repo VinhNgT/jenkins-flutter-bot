@@ -90,16 +90,22 @@ class BotSettings(ServiceSettings):
 
     # Advanced (deployment topology — configurable but rarely changed)
     bot_service_url: str = Field(
-        "http://tg-bot:9090",
         title="Bot Service URL",
         description="Internal URL for this service's webhook endpoint",
-        json_schema_extra={"group": "Advanced", "json_key": "bot.service_url"},
+        json_schema_extra={
+            "group": "Advanced",
+            "help_html": "Internal URL where this bot receives webhooks (e.g., <code>http://tg-jenkins-bot:9090</code>). Normally provided by the deployment environment.",
+            "json_key": "bot.service_url",
+        },
     )
     build_manager_url: str = Field(
-        "http://build-manager:9010",
         title="Build Manager URL",
         description="Internal URL of the build-manager service",
-        json_schema_extra={"group": "Advanced", "json_key": "bot.build_manager_url"},
+        json_schema_extra={
+            "group": "Advanced",
+            "help_html": "Internal URL of the build-manager service (e.g., <code>http://build-manager:9010</code>). Normally provided by the deployment environment.",
+            "json_key": "bot.build_manager_url",
+        },
     )
 
     @field_validator("branch_list", mode="before")

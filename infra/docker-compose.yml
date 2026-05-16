@@ -22,9 +22,13 @@ services:
       dockerfile: apps/build-manager/Dockerfile
     container_name: build-manager
     restart: on-failure
+    env_file:
+      - path: env/build-manager.env
+        required: false
     environment:
       SELF_URL: http://build-manager:9010
       FILE_MANAGER_URL: http://file-manager:9092
+      JENKINS_URL: http://jenkins:8080
     expose:
       - "9010"
     volumes:
@@ -40,32 +44,35 @@ services:
       dockerfile: apps/config-hub/Dockerfile
     container_name: config-hub
     restart: on-failure
+    env_file:
+      - path: env/config-hub.env
+        required: false
     ports:
       - "9000:9000"
     environment:
-      BOT_CONTROL_URL: http://tg-bot:9090
-      AGENT_CONTROL_URL: http://flutter-agent:9091
+      BOT_CONTROL_URL: http://tg-jenkins-bot:9090
+      AGENT_CONTROL_URL: http://agent-control:9091
       FILE_MANAGER_URL: http://file-manager:9092
       BUILD_MANAGER_URL: http://build-manager:9010
     depends_on:
-      - tg-bot
-      - flutter-agent
+      - tg-jenkins-bot
+      - agent-control
       - file-manager
       - build-manager
     networks:
       - jenkins
 
-  tg-bot:
+  tg-jenkins-bot:
     build:
       context: ..
       dockerfile: apps/tg-jenkins-bot/Dockerfile
-    container_name: tg-bot
+    container_name: tg-jenkins-bot
     restart: on-failure
     env_file:
-      - path: env/bot.env
+      - path: env/tg-jenkins-bot.env
         required: false
     environment:
-      BOT_SERVICE_URL: "http://tg-bot:9090"
+      BOT_SERVICE_URL: "http://tg-jenkins-bot:9090"
       BUILD_MANAGER_URL: "http://build-manager:9010"
     expose:
       - "9090"
@@ -74,20 +81,18 @@ services:
     networks:
       - jenkins
 
-  flutter-agent:
+  agent-control:
     platform: linux/amd64
     build:
       context: ..
       dockerfile: infra/Dockerfile.flutter-agent
-    container_name: flutter-agent
+    container_name: agent-control
     restart: on-failure
     env_file:
-      - path: env/agent.env
+      - path: env/agent-control.env
         required: false
     environment:
       JENKINS_URL: http://jenkins:8080
-      JENKINS_AGENT_NAME: flutter-agent
-      JENKINS_WEB_SOCKET: "true"
     expose:
       - "9091"
     volumes:
@@ -101,6 +106,9 @@ services:
       dockerfile: apps/file-manager/Dockerfile
     container_name: file-manager
     restart: on-failure
+    env_file:
+      - path: env/file-manager.env
+        required: false
     expose:
       - "9092"
     volumes:
@@ -114,6 +122,9 @@ services:
       dockerfile: apps/tg-admin-bot/Dockerfile
     container_name: tg-admin-bot
     restart: on-failure
+    env_file:
+      - path: env/tg-admin-bot.env
+        required: false
     environment:
       ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN:-}
       ADMIN_CHAT_ID: ${ADMIN_CHAT_ID:-}

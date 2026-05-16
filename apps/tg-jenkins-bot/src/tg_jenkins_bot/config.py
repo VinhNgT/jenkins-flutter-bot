@@ -68,27 +68,22 @@ class BotSettings(ServiceSettings):
         300,
         title="Session TTL (seconds)",
         description="How long menu sessions stay active",
-        json_schema_extra={"group": "Application", "json_key": "bot.session_ttl"},
+        json_schema_extra={"group": "Advanced", "json_key": "bot.session_ttl"},
     )
     build_timeout: int = Field(
-        1800,
-        title="Build Timeout (seconds)",
+        30,
+        title="Build Timeout (minutes)",
         description="How long before a pending build is considered dead",
-        json_schema_extra={"group": "Application", "json_key": "bot.build_timeout"},
+        json_schema_extra={"group": "Advanced", "json_key": "bot.build_timeout"},
     )
 
     # Project
     github_url: str = Field(
         "",
         title="GitHub Repository URL",
-        description="Used to generate links to commits in Telegram messages",
+        description="Public web URL of the repository. Used to add a GitHub link to the bot's welcome message.",
         json_schema_extra={
             "group": "Project",
-            "help_html": (
-                "The public web URL of your GitHub repository."
-                " Used only by the bot to make commit hashes clickable in Telegram."
-                " Example: <code>https://github.com/my-org/my-repo</code>."
-            ),
             "json_key": "project.github_url",
         },
     )

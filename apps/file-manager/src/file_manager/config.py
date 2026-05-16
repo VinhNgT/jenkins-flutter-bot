@@ -49,6 +49,7 @@ class StorageSettings(ServiceSettings):
 
     # Storage settings
     drive_folder_name: str = Field(
+        "Flutter Builds",
         title="Drive Folder Name",
         description="Drive folder for build artifacts (auto-created if missing)",
         json_schema_extra={

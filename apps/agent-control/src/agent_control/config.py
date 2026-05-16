@@ -51,7 +51,7 @@ class AgentSettings(ServiceSettings):
         title="Jenkins URL",
         description="Same Jenkins controller URL used for the agent's inbound connection",
         json_schema_extra={
-            "group": "Advanced",
+            "group": "Agent Connection",
             "json_key": "agent.jenkins_url",
         },
     )

@@ -44,43 +44,13 @@ class BuildSettings(ServiceSettings):
             "json_key": "jenkins.job_name",
         },
     )
-    jenkins_credentials_id: str = Field(
-        "",
-        title="Jenkins Credentials ID",
-        description="Jenkins credential ID for private repository checkout",
-        json_schema_extra={
-            "group": "Jenkins",
-            "help_html": (
-                "Only needed for private repositories. This is the ID of a"
-                " Jenkins credential that grants access to the Git repository."
-                " Leave blank for public repositories."
-            ),
-            "json_key": "jenkins.credentials_id",
-        },
-    )
-
-    # ── Git ──
-    git_repo_url: str = Field(
-        title="Git Repository URL",
-        description="Clone URL of the Flutter project repository",
-        json_schema_extra={
-            "group": "Git",
-            "help_html": (
-                "The URL that Jenkins will use to clone the repository."
-                " For public repos use HTTPS, for private repos use the"
-                " URL matching your Jenkins credential type."
-            ),
-            "json_key": "git.repo_url",
-        },
-    )
-
     # ── Advanced (deployment topology) ──
     jenkins_url: str = Field(
-        "",
+        "http://jenkins:8080",
         title="Jenkins URL",
         description="Jenkins controller URL for API calls",
         json_schema_extra={
-            "group": "Advanced",
+            "group": "Jenkins",
             "json_key": "jenkins.url",
         },
     )

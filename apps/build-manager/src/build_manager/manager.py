@@ -50,6 +50,8 @@ class BuildManager:
             data_dir=config.build_data_path,
             self_url=config.self_url,
             file_manager_url=config.file_manager_url,
+            max_recent_builds=config.max_recent_builds,
+            build_timeout=config.build_timeout,
         )
 
         coord.init_jenkins(

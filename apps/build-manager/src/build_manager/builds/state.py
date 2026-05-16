@@ -49,8 +49,9 @@ class BuildTracker:
     State is persisted to JSON files so builds survive service restarts.
     """
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, data_dir: Path, *, max_recent_builds: int = 3) -> None:
         self._data_dir = data_dir
+        self._max_recent_builds = max_recent_builds
         self._pending_path = data_dir / "pending_builds.json"
         self._completed_path = data_dir / "completed_builds.json"
         self._pending: dict[str, PendingBuild] = self._load_pending()
@@ -174,8 +175,14 @@ class BuildTracker:
         completed_at: float,
         download_url: str = "",
         file_id: str = "",
-    ) -> CompletedBuild:
-        """Record a completed build."""
+    ) -> tuple[CompletedBuild, list[CompletedBuild]]:
+        """Record a completed build and enforce retention.
+
+        Returns ``(new_build, evicted_builds)`` where ``evicted_builds``
+        is the list of builds that were removed to stay within
+        ``max_recent_builds``.  The caller is responsible for cleaning up
+        external resources (e.g. Drive files) for evicted builds.
+        """
         completed = CompletedBuild(
             request_id=request_id,
             branch=branch,
@@ -187,8 +194,14 @@ class BuildTracker:
             file_id=file_id,
         )
         self._completed.append(completed)
+
+        # Enforce retention — evict oldest builds beyond the limit
+        evicted: list[CompletedBuild] = []
+        while len(self._completed) > self._max_recent_builds:
+            evicted.append(self._completed.pop(0))
+
         self._save_completed()
-        return completed
+        return completed, evicted
 
     def recent_builds(
         self, count: int = 10, *, success_only: bool = False

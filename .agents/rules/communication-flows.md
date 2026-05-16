@@ -16,11 +16,13 @@ The bot acts as a thin trigger layer. The full flow:
 1. User sends `/build` (or `/build <ref>`) → bot shows branch picker or triggers directly
 2. Bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, callback URL, `request_id`, `job_id`
 3. Build-manager queues the job, triggers Jenkins (`POST /buildWithParameters`), and registers the `request_id`
-4. Bot stores a `PendingBuild` in memory + persists to JSON for crash recovery
-5. Jenkins pipeline runs on the flutter-agent, then POSTs results back to the build-manager webhook
-6. Build-manager stores the result and notifies the tg-bot webhook
-7. Bot matches `request_id`, uploads APK to file-manager (`POST /api/files/upload`), sends Drive link to Telegram
-8. Bot enforces `max_recent_builds` retention — evicts oldest entries and deletes their Drive files via file-manager
+4. Build-manager starts a per-build timeout task (`asyncio.sleep`)
+5. Bot stores a `PendingBuild` in memory (request_id → chat_id/message_id for inline editing)
+6. Jenkins pipeline runs on the flutter-agent, then POSTs results back to the build-manager webhook
+7. Build-manager cancels the timeout task, uploads APK to file-manager (`POST /api/files/upload`), records the `download_url`, enforces `max_recent_builds` retention (deletes old Drive files via `DELETE /api/files/{file_id}`), and forwards the result to the bot's callback URL
+8. Bot matches `request_id` and sends the download link to the originating Telegram chat
+
+If the timeout task fires before the webhook arrives, build-manager records a `timeout` completion and notifies the bot's callback URL with `result: "timeout"`.
 
 ---
 
@@ -127,8 +129,8 @@ Each uploaded APK is made individually accessible — the Drive **folder** stays
 
 Build state is split across two services:
 
-- **tg-bot** — maintains `PendingBuild` records (in-memory + JSON persistence) keyed by `request_id`. Each token is consumed exactly once on webhook receipt.
-- **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links.
+- **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links. Owns build timeout detection (per-build `asyncio` tasks) and retention enforcement (`max_recent_builds` eviction with Drive file cleanup).
+- **tg-bot** — maintains `PendingBuild` records (in-memory only) keyed by `request_id`. Each record maps a `request_id` to a Telegram `chat_id` and `message_id` for inline message editing. These are consumed on callback receipt.
 
 Jenkins owns all raw build metadata (status, duration, branch, commit). The bot queries build-manager for summaries — it never queries Jenkins directly for build info.
 

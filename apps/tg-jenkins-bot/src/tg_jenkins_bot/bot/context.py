@@ -187,7 +187,6 @@ class BotContext:
         message_id: int | None = None,
     ) -> None:
         """Track a Telegram-triggered build."""
-        self._cleanup_expired()
         self._pending[request_id] = PendingBuild(
             request_id=request_id,
             chat_id=chat_id,
@@ -202,14 +201,12 @@ class BotContext:
 
     def list_pending(self) -> dict[str, PendingBuild]:
         """Return a snapshot of all pending builds."""
-        self._cleanup_expired()
         return dict(self._pending)
 
     def consume_pending(self, request_id: str | None) -> PendingBuild | None:
         """Look up and remove a pending build. Returns None if not found."""
         if not request_id:
             return None
-        self._cleanup_expired()
         return self._pending.pop(request_id, None)
 
     def find_pending_for_branch(self, ref: str) -> tuple[str, PendingBuild] | None:
@@ -221,57 +218,6 @@ class BotContext:
             if pending.ref == ref:
                 return request_id, pending
         return None
-
-    def _cleanup_expired(self) -> list[tuple[str, PendingBuild]]:
-        """Remove pending builds older than TTL. Returns expired builds."""
-        timeout_seconds = self.config.build_timeout * 60
-        if timeout_seconds <= 0:
-            return []
-
-        now = time.time()
-        expired = [
-            (request_id, pending)
-            for request_id, pending in self._pending.items()
-            if now - pending.triggered_at > timeout_seconds
-        ]
-        for request_id, _pending in expired:
-            del self._pending[request_id]
-        return expired
-
-    async def cleanup_expired_with_notification(self) -> None:
-        """Remove expired pending builds and notify users about timeouts."""
-        expired = self._cleanup_expired()
-        if not expired or not self.bot:
-            return
-
-        timeout_min = self.config.build_timeout
-        for _rid, pending in expired:
-            try:
-                app_name = _escape(self.config.app_name)
-                text = (
-                    f"⏰ <b>{app_name} build timed out</b>\n"
-                    "\n"
-                    f"The build on <code>{_escape(pending.ref)}</code>"
-                    f" didn't complete within {timeout_min} minutes.\n"
-                    f"{self._admin_hint()}"
-                )
-                if pending.message_id:
-                    try:
-                        await self.bot.edit_message_text(
-                            text,
-                            chat_id=pending.chat_id,
-                            message_id=pending.message_id,
-                            parse_mode="HTML",
-                        )
-                    except Exception:
-                        logger.exception("Failed to edit timed-out build message")
-                await self.bot.send_message(
-                    pending.chat_id,
-                    text,
-                    parse_mode="HTML",
-                )
-            except Exception:
-                logger.exception("Failed to notify about timed-out build")
 
     # ------------------------------------------------------------------
     # Build result handlers (called by callback route)
@@ -350,6 +296,32 @@ class BotContext:
             f"❌ <b>{app_name} build failed</b>\n"
             f"\n"
             f"Something went wrong on <code>{_escape(pending.ref)}</code>.\n"
+            f"{self._admin_hint()}"
+        )
+
+        await self._edit_build_message(pending, text)
+        await self.bot.send_message(
+            pending.chat_id,
+            text,
+            parse_mode="HTML",
+        )
+
+    async def on_build_timeout(
+        self,
+        pending: PendingBuild,
+        result: dict,
+    ) -> None:
+        """Handle timed-out build — notify user."""
+        if not self.bot:
+            logger.error("Cannot notify — bot instance is not available")
+            return
+
+        app_name = _escape(self.config.app_name)
+        text = (
+            f"⏰ <b>{app_name} build timed out</b>\n"
+            f"\n"
+            f"The build on <code>{_escape(pending.ref)}</code>"
+            f" didn't complete in time.\n"
             f"{self._admin_hint()}"
         )
 

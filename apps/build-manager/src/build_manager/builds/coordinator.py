@@ -4,6 +4,10 @@ The ``BuildCoordinator`` is the central coordinator for the build lifecycle.
 It triggers builds on Jenkins, receives webhook callbacks when builds complete,
 delegates artifact upload to the file-manager service, and forwards results
 to registered frontend callback URLs.
+
+Owns:
+  - Per-build timeout tasks (no polling — each build carries its own deadline)
+  - Build retention enforcement (evicts old builds, deletes Drive files)
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ from typing import Any
 import httpx
 
 from .jenkins_client import JenkinsClient, JenkinsTriggerError
-from .state import BuildTracker
+from .state import BuildTracker, CompletedBuild
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +34,11 @@ class BuildCoordinator:
     Flow:
         1. Frontend calls ``trigger_build(branch, callback_url)``
         2. Orchestrator triggers Jenkins and registers a ``PendingBuild``
-        3. Jenkins agent runs the build, then POSTs to the webhook
-        4. Orchestrator receives webhook, uploads artifact via file-manager
-        5. Orchestrator forwards the result to the frontend callback URL
+        3. Per-build timeout task starts (``asyncio.sleep``)
+        4. Jenkins agent runs the build, then POSTs to the webhook
+        5. Orchestrator cancels the timeout task, uploads artifact via
+           file-manager, enforces retention (deletes old Drive files)
+        6. Orchestrator forwards the result to the frontend callback URL
     """
 
     def __init__(
@@ -41,13 +47,17 @@ class BuildCoordinator:
         data_dir: Path,
         self_url: str,
         file_manager_url: str,
+        max_recent_builds: int = 3,
+        build_timeout: int = 30,
     ) -> None:
         self._data_dir = data_dir
         self._self_url = self_url.rstrip("/")
         self._file_manager_url = file_manager_url.rstrip("/")
-        self._tracker = BuildTracker(data_dir)
+        self._build_timeout = build_timeout
+        self._tracker = BuildTracker(data_dir, max_recent_builds=max_recent_builds)
         self._jenkins: JenkinsClient | None = None
         self._http = httpx.AsyncClient(timeout=30.0)
+        self._timeout_tasks: dict[str, asyncio.Task[None]] = {}
 
     @property
     def tracker(self) -> BuildTracker:
@@ -68,7 +78,12 @@ class BuildCoordinator:
         return f"{self._self_url}/api/builds/webhook"
 
     async def close(self) -> None:
-        """Shut down HTTP clients."""
+        """Shut down HTTP clients and cancel pending timeout tasks."""
+        # Cancel all outstanding timeout tasks
+        for task in self._timeout_tasks.values():
+            task.cancel()
+        self._timeout_tasks.clear()
+
         if self._jenkins:
             await self._jenkins.close()
         await self._http.aclose()
@@ -109,6 +124,9 @@ class BuildCoordinator:
             frontend_callback_url=frontend_callback_url,
         )
 
+        # Start per-build timeout task
+        self._start_timeout_task(request_id)
+
         logger.info(
             "Build triggered: request_id=%s branch=%s queue_id=%d",
             request_id,
@@ -116,6 +134,69 @@ class BuildCoordinator:
             queue_id,
         )
         return {"request_id": request_id, "status": "queued"}
+
+    # ------------------------------------------------------------------
+    # Timeout management
+    # ------------------------------------------------------------------
+
+    def _start_timeout_task(self, request_id: str) -> None:
+        """Spawn an asyncio task that fires after build_timeout minutes."""
+        timeout_seconds = self._build_timeout * 60
+        if timeout_seconds <= 0:
+            return
+        task = asyncio.create_task(self._timeout_worker(request_id, timeout_seconds))
+        self._timeout_tasks[request_id] = task
+
+    def _cancel_timeout_task(self, request_id: str) -> None:
+        """Cancel the timeout task for a build (webhook arrived in time)."""
+        task = self._timeout_tasks.pop(request_id, None)
+        if task is not None:
+            task.cancel()
+
+    async def _timeout_worker(self, request_id: str, timeout_seconds: float) -> None:
+        """Sleep until the build deadline, then handle timeout."""
+        try:
+            await asyncio.sleep(timeout_seconds)
+        except asyncio.CancelledError:
+            return  # Webhook arrived — build completed normally
+
+        # Timer fired — build timed out
+        self._timeout_tasks.pop(request_id, None)
+        await self._handle_timeout(request_id)
+
+    async def _handle_timeout(self, request_id: str) -> None:
+        """Handle a build that exceeded its timeout.
+
+        Consumes the pending record, records a timeout completion,
+        and notifies the frontend callback.
+        """
+        pending = self._tracker.consume_pending(request_id)
+        if pending is None:
+            return  # Already consumed by a webhook or cancellation
+
+        now = time.time()
+        logger.warning(
+            "Build timed out: request_id=%s branch=%s (%.0fs elapsed)",
+            request_id,
+            pending.branch,
+            now - pending.triggered_at,
+        )
+
+        completed, evicted = self._tracker.record_completed(
+            request_id,
+            branch=pending.branch,
+            commit_hash="",
+            result="timeout",
+            triggered_at=pending.triggered_at,
+            completed_at=now,
+        )
+
+        # Evict old builds (best-effort)
+        await self._evict_builds(evicted)
+
+        # Notify frontend
+        if pending.frontend_callback_url:
+            await self._notify_frontend(pending.frontend_callback_url, completed)
 
     # ------------------------------------------------------------------
     # Webhook handler
@@ -128,14 +209,20 @@ class BuildCoordinator:
     ) -> dict[str, str]:
         """Process a build-complete webhook from the Jenkins agent.
 
-        1. Match to a pending build
-        2. If success + artifact, upload via file-manager
-        3. Record as completed
-        4. Forward result to the frontend callback URL
+        1. Cancel the timeout task for this build
+        2. Match to a pending build
+        3. If success + artifact, upload via file-manager
+        4. Record as completed, enforce retention
+        5. Delete Drive files for evicted builds
+        6. Forward result to the frontend callback URL
 
         Returns ``{status: "processed"|"ignored"}``.
         """
         request_id = metadata.get("request_id", "")
+
+        # Cancel the timeout — webhook arrived in time
+        self._cancel_timeout_task(request_id)
+
         pending = self._tracker.consume_pending(request_id)
         if pending is None:
             logger.warning("Webhook for unknown request_id: %s", request_id)
@@ -157,8 +244,8 @@ class BuildCoordinator:
             except Exception:
                 logger.exception("Artifact upload failed for %s", request_id)
 
-        # Record in completed builds
-        completed = self._tracker.record_completed(
+        # Record in completed builds (enforces retention)
+        completed, evicted = self._tracker.record_completed(
             request_id,
             branch=pending.branch,
             commit_hash=commit_hash,
@@ -168,6 +255,9 @@ class BuildCoordinator:
             download_url=download_url,
             file_id=file_id,
         )
+
+        # Delete Drive files for evicted builds (best-effort)
+        await self._evict_builds(evicted)
 
         # Forward to frontend callback
         if pending.frontend_callback_url:
@@ -187,10 +277,41 @@ class BuildCoordinator:
         resp.raise_for_status()
         return resp.json()
 
+    async def _evict_builds(self, evicted: list[CompletedBuild]) -> None:
+        """Delete Drive files for evicted builds.
+
+        Best-effort — failures are logged but never propagated.
+        """
+        for build in evicted:
+            if not build.file_id:
+                continue
+            try:
+                url = f"{self._file_manager_url}/api/files/{build.file_id}"
+                resp = await self._http.delete(url)
+                if resp.status_code < 400:
+                    logger.info(
+                        "Evicted build %s — deleted Drive file %s",
+                        build.request_id,
+                        build.file_id,
+                    )
+                else:
+                    logger.error(
+                        "Failed to delete Drive file %s for evicted build %s: %d",
+                        build.file_id,
+                        build.request_id,
+                        resp.status_code,
+                    )
+            except Exception:
+                logger.exception(
+                    "Failed to delete Drive file %s for evicted build %s",
+                    build.file_id,
+                    build.request_id,
+                )
+
     async def _notify_frontend(
         self,
         callback_url: str,
-        completed: Any,
+        completed: CompletedBuild,
     ) -> None:
         """Forward a build result to the frontend's callback URL.
 
@@ -222,6 +343,9 @@ class BuildCoordinator:
 
     async def cancel_build(self, request_id: str) -> dict[str, str]:
         """Cancel a pending build — stop Jenkins and remove from tracking."""
+        # Cancel the timeout task
+        self._cancel_timeout_task(request_id)
+
         pending = self._tracker.get_pending(request_id)
         if pending is None:
             return {"status": "not_found"}

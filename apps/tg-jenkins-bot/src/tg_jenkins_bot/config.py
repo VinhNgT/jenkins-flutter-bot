@@ -70,12 +70,6 @@ class BotSettings(ServiceSettings):
         description="How long menu sessions stay active",
         json_schema_extra={"group": "Advanced", "json_key": "bot.session_ttl"},
     )
-    build_timeout: int = Field(
-        30,
-        title="Build Timeout (minutes)",
-        description="How long before a pending build is considered dead",
-        json_schema_extra={"group": "Advanced", "json_key": "bot.build_timeout"},
-    )
 
     # Project
     github_url: str = Field(

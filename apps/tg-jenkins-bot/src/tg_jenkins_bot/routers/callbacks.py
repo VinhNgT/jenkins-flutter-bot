@@ -47,6 +47,8 @@ async def handle_build_result(manager: ManagerDep, request: Request) -> dict[str
 
     if result == "success":
         await ctx.on_build_success(pending, body)
+    elif result == "timeout":
+        await ctx.on_build_timeout(pending, body)
     else:
         await ctx.on_build_failure(pending, body)
 

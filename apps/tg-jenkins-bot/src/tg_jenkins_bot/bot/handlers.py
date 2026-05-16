@@ -127,13 +127,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not await _ensure_authorized(update, context):
         return
 
-    # Check for expired builds and notify (best-effort)
-    try:
-        await ctx.cleanup_expired_with_notification()
-    except Exception:
-        logger.exception("Failed to clean up expired builds")
-
-    # Current pending builds (after cleanup)
+    # Current pending builds
     pending = ctx.list_pending()
 
     # Fetch build status from build-manager

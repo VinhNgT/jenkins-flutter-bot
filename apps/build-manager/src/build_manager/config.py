@@ -18,6 +18,7 @@ class BuildSettings(ServiceSettings):
         description="Username for Jenkins API authentication",
         json_schema_extra={
             "group": "Jenkins",
+            "help_html": "Your Jenkins username used for authenticating API calls.",
             "json_key": "jenkins.user",
         },
     )
@@ -36,11 +37,11 @@ class BuildSettings(ServiceSettings):
         },
     )
     jenkins_job_name: str = Field(
-        "flutter-build",
         title="Jenkins Job Name",
         description="Name of the Jenkins pipeline job to trigger",
         json_schema_extra={
             "group": "Jenkins",
+            "help_html": "The exact name of the Jenkins pipeline job that the bot should trigger.",
             "json_key": "jenkins.job_name",
         },
     )
@@ -50,6 +51,7 @@ class BuildSettings(ServiceSettings):
         description="Jenkins controller URL for API calls",
         json_schema_extra={
             "group": "Jenkins",
+            "help_html": "URL of the Jenkins controller (e.g., <code>http://jenkins:8080</code> for internal, or <code>https://jenkins.yourdomain.com</code> if external).",
             "json_key": "jenkins.url",
         },
     )
@@ -58,6 +60,7 @@ class BuildSettings(ServiceSettings):
         description="Internal URL of the file-manager service",
         json_schema_extra={
             "group": "Advanced",
+            "help_html": "Internal URL of the file-manager service (e.g., <code>http://file-manager:9092</code>). Normally provided by the deployment environment.",
             "json_key": "builds.file_manager_url",
         },
     )
@@ -66,15 +69,17 @@ class BuildSettings(ServiceSettings):
         description="Internal URL of this service (used for webhook callbacks)",
         json_schema_extra={
             "group": "Advanced",
+            "help_html": "Internal URL of this service (e.g., <code>http://build-manager:9010</code>). Normally provided by the deployment environment.",
             "json_key": "builds.self_url",
         },
     )
     build_data_path: Path = Field(
         Path("/app/data"),
-        title="Build Data Path",
+        title="Internal Storage Directory",
         description="Directory for persistent build state files",
         json_schema_extra={
             "group": "Advanced",
+            "help_html": "The directory inside the container where the build manager persists its state. You normally do not need to change this.",
             "json_key": "builds.data_path",
         },
     )

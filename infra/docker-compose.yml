@@ -28,6 +28,7 @@ services:
     environment:
       SELF_URL: http://build-manager:9010
       FILE_MANAGER_URL: http://file-manager:9092
+      JENKINS_URL: http://jenkins:8080
     expose:
       - "9010"
     volumes:
@@ -92,8 +93,6 @@ services:
         required: false
     environment:
       JENKINS_URL: http://jenkins:8080
-      JENKINS_AGENT_NAME: flutter-agent
-      JENKINS_WEB_SOCKET: "true"
     expose:
       - "9091"
     volumes:

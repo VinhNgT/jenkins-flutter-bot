@@ -38,7 +38,7 @@ services:
     restart: on-failure
     command: ["mock-agent"]
     environment:
-      JENKINS_AGENT_NAME: flutter-agent
+      JENKINS_URL: http://jenkins:8080
     expose:
       - "9091"
     env_file: !reset []

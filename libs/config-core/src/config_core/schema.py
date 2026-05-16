@@ -99,28 +99,60 @@ class ServiceSettings(BaseSettings):
 
 
 def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> dict[str, Any]:
-    """Convert Pydantic model fields to the config-hub frontend schema format."""
+    """Convert Pydantic model fields to the config-hub frontend schema format.
+
+    Defaults are resolved from two transparent sources:
+      1. Hardcoded Pydantic field default
+      2. Environment variable (field name uppercased, matching pydantic-settings)
+
+    A field is only marked ``required`` in the UI when *neither* source
+    provides a value.  For secret fields the env presence suppresses the
+    required marker but the actual value is never revealed.
+    """
     fields = []
     
     for name, field in cls.model_fields.items():
         raw_extra = field.json_schema_extra or {}
         extra: dict[str, Any] = raw_extra if isinstance(raw_extra, dict) else {}
+        is_secret = extra.get("secret", False)
 
         # All ServiceSettings fields are visible in the dashboard
 
-        # Compute a display-safe default. Fields with default_factory have
-        # field.default set to PydanticUndefined — skip those.
-        has_real_default = (
+        # 1. Check for a hardcoded Pydantic default.
+        #    Fields with default_factory have field.default set to
+        #    PydanticUndefined — skip those.
+        has_pydantic_default = (
             not field.is_required()
             and field.default is not None
             and not isinstance(field.default, PydanticUndefinedType)
         )
+
         display_default = ""
-        if has_real_default:
+        if has_pydantic_default:
             if isinstance(field.default, list):
                 display_default = ", ".join(str(x) for x in field.default)
             else:
                 display_default = str(field.default)
+
+        # 2. Check environment for a fallback default.
+        #    This makes deployment-injected values (e.g. JENKINS_URL from
+        #    docker-compose) transparent in the UI — they appear as defaults
+        #    just like hardcoded Pydantic defaults.
+        env_provided = False
+        if not has_pydantic_default:
+            env_val = os.environ.get(name.upper())
+            if env_val:
+                env_provided = True
+                # Show the env value as the display default, but never
+                # reveal secret values.
+                if not is_secret:
+                    display_default = env_val
+
+        # A field is only "required" in the UI when neither a hardcoded
+        # default nor an environment variable provides a value.
+        effectively_required = (
+            field.is_required() and not has_pydantic_default and not env_provided
+        )
 
         field_def: dict[str, Any] = {
             "key": extra.get("json_key", name),  # Dotted key if nested, or just name
@@ -129,9 +161,9 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
             "description": field.description or "",
             "help_html": extra.get("help_html", ""),
             "default": display_default,
-            "secret": extra.get("secret", False),
-            "required": field.is_required(),
-            "field_type": extra.get("field_type", "password" if extra.get("secret", False) else "text"),
+            "secret": is_secret,
+            "required": effectively_required,
+            "field_type": extra.get("field_type", "password" if is_secret else "text"),
             "choices": extra.get("choices", []),
             "value_type": "str",  # Simplified, since pydantic parses everything
         }

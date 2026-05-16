@@ -115,7 +115,12 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
             and field.default is not None
             and not isinstance(field.default, PydanticUndefinedType)
         )
-        display_default = str(field.default) if has_real_default else ""
+        display_default = ""
+        if has_real_default:
+            if isinstance(field.default, list):
+                display_default = ", ".join(str(x) for x in field.default)
+            else:
+                display_default = str(field.default)
 
         field_def: dict[str, Any] = {
             "key": extra.get("json_key", name),  # Dotted key if nested, or just name

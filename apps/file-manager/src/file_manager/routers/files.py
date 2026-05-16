@@ -101,7 +101,7 @@ async def storage_status(manager: ManagerDep) -> dict[str, Any]:
     """Return backend connection status."""
     if manager.backend is None or manager.config is None:
         return {"connected": False, "detail": "not initialised"}
-    return manager.backend.status(
+    return await manager.backend.status(
         client_id=manager.config.drive_client_id,
         client_secret=manager.config.drive_client_secret,
     )

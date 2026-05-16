@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from ..dependencies import ManagerDep
 
@@ -27,5 +27,8 @@ async def get_config(manager: ManagerDep) -> dict[str, Any]:
 async def save_config(scope: str, manager: ManagerDep, request: Request) -> dict[str, Any]:
     """Save config for a scope using deep merge to preserve unmodified keys."""
     incoming: dict[str, Any] = await request.json()
-    await manager.save_scope(scope, incoming)
+    try:
+        await manager.save_scope(scope, incoming)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"status": "ok", "scope": scope}

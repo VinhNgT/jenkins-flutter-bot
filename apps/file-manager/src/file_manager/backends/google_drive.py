@@ -31,8 +31,8 @@ class GoogleDriveBackend:
     """Google Drive implementation of the ``StorageBackend`` protocol.
 
     Handles OAuth token lifecycle and file upload/delete operations.
-    All Drive API calls are offloaded to threads via ``asyncio.to_thread()``
-    to avoid blocking the event loop.
+    All blocking I/O (disk reads, Google API calls) is offloaded to
+    threads via ``asyncio.to_thread()`` to avoid blocking the event loop.
     """
 
     def __init__(self, token_path: Path) -> None:
@@ -113,6 +113,8 @@ class GoogleDriveBackend:
         """Generate the OAuth consent URL and store the flow for callback.
 
         Returns the authorization URL the user should open in a browser.
+        This is CPU-only (URL construction) — no I/O, safe to call from
+        an async context without ``to_thread``.
         """
         flow = self._build_flow(client_id, client_secret, redirect_uri)
         auth_url, _ = flow.authorization_url(
@@ -122,8 +124,8 @@ class GoogleDriveBackend:
         self._pending_flow = flow
         return auth_url
 
-    def exchange_callback(self, authorization_response: str) -> None:
-        """Exchange the browser redirect callback for tokens and save them."""
+    def _exchange_callback_sync(self, authorization_response: str) -> None:
+        """Exchange the browser redirect callback for tokens (blocking)."""
         flow = self._pending_flow
         if flow is None:
             raise RuntimeError(
@@ -133,13 +135,22 @@ class GoogleDriveBackend:
         flow.fetch_token(authorization_response=authorization_response)
         self._save_credentials(flow.credentials)
 
-    def exchange_code(
+    async def exchange_callback(self, authorization_response: str) -> None:
+        """Exchange the browser redirect callback for tokens and save them.
+
+        Offloads the blocking ``fetch_token`` HTTP call to a thread.
+        """
+        await asyncio.to_thread(
+            self._exchange_callback_sync, authorization_response
+        )
+
+    def _exchange_code_sync(
         self,
         code: str,
         client_id: str,
         client_secret: str,
     ) -> None:
-        """Exchange a manually-pasted auth code for tokens and save them."""
+        """Exchange a manually-pasted auth code for tokens (blocking)."""
         self._allow_insecure_transport("http://localhost")
         flow = Flow.from_client_config(
             self._client_config(client_id, client_secret, "http://localhost"),
@@ -149,8 +160,28 @@ class GoogleDriveBackend:
         flow.fetch_token(code=code)
         self._save_credentials(flow.credentials)
 
-    def load_tokens(self, client_id: str, client_secret: str) -> Credentials | None:
-        """Load saved OAuth tokens from disk, refreshing if needed."""
+    async def exchange_code(
+        self,
+        code: str,
+        client_id: str,
+        client_secret: str,
+    ) -> None:
+        """Exchange a manually-pasted auth code for tokens and save them.
+
+        Offloads the blocking ``fetch_token`` HTTP call to a thread.
+        """
+        await asyncio.to_thread(
+            self._exchange_code_sync, code, client_id, client_secret
+        )
+
+    def _load_tokens_sync(
+        self, client_id: str, client_secret: str
+    ) -> Credentials | None:
+        """Load saved OAuth tokens from disk, refreshing if needed (blocking).
+
+        Performs disk reads, a potential HTTP call to Google's token
+        endpoint for refresh, and a disk write — all blocking.
+        """
         if not self._token_path.exists():
             return None
 
@@ -176,16 +207,27 @@ class GoogleDriveBackend:
 
         return creds if creds.valid else None
 
+    async def load_tokens(
+        self, client_id: str, client_secret: str
+    ) -> Credentials | None:
+        """Load saved OAuth tokens, refreshing if needed.
+
+        Offloads blocking disk I/O and Google token refresh to a thread.
+        """
+        return await asyncio.to_thread(
+            self._load_tokens_sync, client_id, client_secret
+        )
+
     def delete_tokens(self) -> bool:
         """Remove the saved OAuth token file."""
-        if not self._token_path.exists():
-            return False
-        self._token_path.unlink()
-        logger.info("Removed Drive OAuth token at %s", self._token_path)
-        return True
+        if self._token_path.exists():
+            self._token_path.unlink()
+            logger.info("Deleted Drive OAuth tokens at %s", self._token_path)
+            return True
+        return False
 
     # ------------------------------------------------------------------
-    # Drive file operations (sync internals wrapped with to_thread)
+    # Drive API helpers (blocking — always called via to_thread)
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -313,7 +355,7 @@ class GoogleDriveBackend:
         ``folder_name``, ``client_id``, and ``client_secret`` are passed
         by the ``StorageManager`` from the resolved config.
         """
-        creds = self.load_tokens(client_id, client_secret)
+        creds = await self.load_tokens(client_id, client_secret)
         if creds is None:
             raise RuntimeError("Google Drive not connected — no valid tokens")
 
@@ -330,7 +372,7 @@ class GoogleDriveBackend:
         client_secret: str = "",
     ) -> None:
         """Delete a file from Google Drive."""
-        creds = self.load_tokens(client_id, client_secret)
+        creds = await self.load_tokens(client_id, client_secret)
         if creds is None:
             raise RuntimeError("Google Drive not connected — no valid tokens")
         await asyncio.to_thread(self._delete_file_sync, creds, file_id)
@@ -342,9 +384,9 @@ class GoogleDriveBackend:
         client_secret: str = "",
     ) -> bool:
         """Return True if valid Drive tokens exist."""
-        return self.load_tokens(client_id, client_secret) is not None
+        return await self.load_tokens(client_id, client_secret) is not None
 
-    def status(
+    async def status(
         self,
         *,
         client_id: str = "",
@@ -352,6 +394,6 @@ class GoogleDriveBackend:
     ) -> dict[str, Any]:
         """Return current OAuth connection status."""
         return {
-            "connected": self.load_tokens(client_id, client_secret) is not None,
+            "connected": await self.load_tokens(client_id, client_secret) is not None,
             "token_path": str(self._token_path),
         }

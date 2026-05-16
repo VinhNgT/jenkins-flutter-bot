@@ -8,6 +8,7 @@ to registered frontend callback URLs.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from pathlib import Path
@@ -177,11 +178,12 @@ class BuildCoordinator:
     async def _upload_artifact(self, artifact_path: str) -> dict[str, Any]:
         """Upload a build artifact to the file-manager service."""
         url = f"{self._file_manager_url}/api/files/upload"
-        with open(artifact_path, "rb") as f:
-            resp = await self._http.post(
-                url,
-                files={"file": (Path(artifact_path).name, f)},
-            )
+        path = Path(artifact_path)
+        content = await asyncio.to_thread(path.read_bytes)
+        resp = await self._http.post(
+            url,
+            files={"file": (path.name, content)},
+        )
         resp.raise_for_status()
         return resp.json()
 

@@ -452,7 +452,7 @@ async def _drive_receive_client_secret(
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             await client.put(
-                f"{_api(config)}/api/config/drive",
+                f"{_api(config)}/api/config/file_manager",
                 json={
                     "drive": {"client_id": client_id, "client_secret": client_secret}
                 },

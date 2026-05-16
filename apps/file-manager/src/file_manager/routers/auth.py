@@ -19,7 +19,7 @@ async def auth_status(manager: ManagerDep) -> dict[str, Any]:
     """Return current OAuth connection status."""
     if manager.backend is None or manager.config is None:
         return {"connected": False, "detail": "not initialised"}
-    return manager.backend.status(
+    return await manager.backend.status(
         client_id=manager.config.drive_client_id,
         client_secret=manager.config.drive_client_secret,
     )
@@ -62,7 +62,7 @@ async def connect_exchange(manager: ManagerDep, request: Request) -> dict[str, s
         raise HTTPException(status_code=400, detail="code required")
 
     try:
-        manager.backend.exchange_code(
+        await manager.backend.exchange_code(
             code=code,
             client_id=manager.config.drive_client_id,
             client_secret=manager.config.drive_client_secret,
@@ -84,7 +84,7 @@ async def oauth_callback(manager: ManagerDep, request: Request) -> dict[str, str
         raise HTTPException(status_code=503, detail="Storage backend not initialised")
 
     try:
-        manager.backend.exchange_callback(str(request.url))
+        await manager.backend.exchange_callback(str(request.url))
         return {"status": "connected"}
     except Exception:
         logger.exception("OAuth callback exchange failed")
@@ -107,7 +107,7 @@ async def oauth_callback_proxy(manager: ManagerDep, request: Request) -> dict[st
         raise HTTPException(status_code=400, detail="authorization_response required")
 
     try:
-        manager.backend.exchange_callback(authorization_response)
+        await manager.backend.exchange_callback(authorization_response)
         return {"status": "connected"}
     except Exception:
         logger.exception("Proxied OAuth callback exchange failed")

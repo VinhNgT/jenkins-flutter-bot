@@ -39,6 +39,6 @@ class StorageBackend(Protocol):
         """Return True if the backend is authenticated and reachable."""
         ...
 
-    def status(self) -> dict[str, Any]:
+    async def status(self) -> dict[str, Any]:
         """Return a JSON-serialisable status summary."""
         ...

@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 class ServiceClient:
     """Call service control endpoints over the internal Docker network.
 
-    Decoupled from any framework — constructor takes raw URLs.
+    Owns a persistent ``httpx.AsyncClient`` for connection reuse.
+    Call :meth:`close` during shutdown to release resources.
     """
 
     def __init__(
@@ -31,6 +32,11 @@ class ServiceClient:
         self._agent_url = agent_url
         self._file_manager_url = file_manager_url
         self._build_manager_url = build_manager_url
+        self._client = httpx.AsyncClient(timeout=5.0)
+
+    async def close(self) -> None:
+        """Shut down the underlying HTTP client."""
+        await self._client.aclose()
 
     def _service_url(self, service: str) -> str | None:
         if service == "bot":
@@ -58,15 +64,14 @@ class ServiceClient:
         method = "GET" if action is None else "POST"
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.request(method, target)
-                data = response.json()
-                data["available"] = True
-                if not response.is_success:
-                    # Service responded but rejected the action (e.g. 400
-                    # from a failed start). Preserve the error detail.
-                    data.setdefault("detail", response.text)
-                return data
+            response = await self._client.request(method, target)
+            data = response.json()
+            data["available"] = True
+            if not response.is_success:
+                # Service responded but rejected the action (e.g. 400
+                # from a failed start). Preserve the error detail.
+                data.setdefault("detail", response.text)
+            return data
         except Exception as exc:
             logger.warning("Failed to reach %s at %s: %s", service, target, exc)
             return {
@@ -97,10 +102,9 @@ class ServiceClient:
         if not url:
             return None
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{url}/control/schema")
-                response.raise_for_status()
-                return response.json()
+            response = await self._client.get(f"{url}/control/schema")
+            response.raise_for_status()
+            return response.json()
         except Exception as exc:
             logger.warning("Failed to fetch schema from %s: %s", service, exc)
             return None
@@ -111,10 +115,9 @@ class ServiceClient:
         if not url:
             return None
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{url}/control/config")
-                response.raise_for_status()
-                return response.json()
+            response = await self._client.get(f"{url}/control/config")
+            response.raise_for_status()
+            return response.json()
         except Exception as exc:
             logger.warning("Failed to fetch config from %s: %s", service, exc)
             return None
@@ -125,10 +128,10 @@ class ServiceClient:
         if not url:
             return {"status": "error", "detail": "service URL not configured"}
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.put(f"{url}/control/config", json=payload)
-                response.raise_for_status()
-                return response.json()
+            response = await self._client.put(f"{url}/control/config", json=payload)
+            response.raise_for_status()
+            return response.json()
         except Exception as exc:
             logger.warning("Failed to save config to %s: %s", service, exc)
             return {"status": "error", "detail": f"Cannot reach {service}"}
+

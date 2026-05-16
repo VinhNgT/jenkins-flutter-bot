@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 from typing import Any
 
 from config_core import format_validation_error
@@ -44,7 +45,7 @@ class StorageManager:
     def running(self) -> bool:
         return self._backend is not None
 
-    def _token_path(self):
+    def _token_path(self) -> Path:
         return _DEFAULT_CONFIG_PATH.parent / "oauth.json"
 
     async def start(self) -> None:

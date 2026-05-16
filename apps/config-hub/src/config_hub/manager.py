@@ -61,6 +61,7 @@ class ConfigHubManager:
 
     async def stop(self) -> None:
         """Shut down reusable HTTP clients."""
+        await self.services.close()
         await self.fm_client.aclose()
 
     async def restart(self) -> None:
@@ -75,6 +76,7 @@ class ConfigHubManager:
             build_manager_url=config.build_manager_url,
         )
         self.fm_client = httpx.AsyncClient(timeout=10.0)
+        logger.info("ConfigHubManager restarted")
 
     def status(self) -> dict[str, Any]:
         """Return standardized status — config-hub is always running."""
@@ -117,11 +119,16 @@ class ConfigHubManager:
         return result
 
     async def save_scope(self, scope: str, payload: dict[str, Any]) -> None:
-        """Proxy a config save to the owning service."""
+        """Proxy a config save to the owning service.
+
+        Raises
+        ------
+        ValueError
+            If *scope* is not a recognised scope name.
+        """
         svc = _SCOPE_TO_SERVICE.get(scope)
         if not svc:
-            logger.error("Unknown config scope: %s", scope)
-            return
+            raise ValueError(f"Unknown config scope: {scope}")
 
         result = await self.services.put_config(svc, payload)
         if result.get("status") == "error":

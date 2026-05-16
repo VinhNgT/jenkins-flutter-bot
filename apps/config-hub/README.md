@@ -33,7 +33,7 @@ UI scope names map to their owning services:
 |------------|---------|
 | `bot` | tg-jenkins-bot |
 | `agent` | agent-control |
-| `drive` | file-manager |
+| `file_manager` | file-manager |
 | `builds` | build-manager |
 
 ## Environment Variables

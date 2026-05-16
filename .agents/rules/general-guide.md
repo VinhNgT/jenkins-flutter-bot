@@ -60,14 +60,16 @@ Seven services on a shared Docker bridge network. Only Jenkins and config-hub ar
 
 ```mermaid
 graph TD
-    TU["Telegram User"] -- polling --> BOT["tg-bot :9090 (internal)"]
+    BOT["tg-bot :9090 (internal)"]
+    AGT["flutter-agent :9091 (internal)"]
+    FM["file-manager :9092 (internal)"]
+    BM["build-manager :9010 (internal)"]
+
+    TU["Telegram User"] -- polling --> BOT
     BA["Browser Admin"] -- ":9000" --> CH["config-hub :9000 (exposed)"]
     TA["Telegram Admin"] -- polling --> TAB["tg-admin-bot (internal)"]
 
-    CH -- "/control/*" --> BOT
-    CH -- "/control/*" --> AGT["flutter-agent :9091 (internal)"]
-    CH -- "/control/*" --> FM["file-manager :9092 (internal)"]
-    CH -- "/control/*" --> BM["build-manager :9010 (internal)"]
+    CH -- "/control/*" --> BOT & AGT & FM & BM
     TAB -- "HTTP API" --> CH
 
     BOT -- "REST trigger" --> BM
@@ -107,7 +109,7 @@ graph TD
 
 8. **Pydantic Configuration** — Two base classes from `config-core` partition the configuration by lifecycle: `BootstrapSettings` (env-only, hard crash at startup) for services with no dashboard-editable state (`config-hub`, `tg-admin-bot`), and `ServiceSettings` (JSON > env, soft fail) for services whose config is editable via the web UI. All `ServiceSettings` fields are visible in the dashboard. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
 
-9. **Scope ≠ Service Name** — `config-hub` exposes UI scope names (`bot`, `agent`, `drive`, `builds`) that may differ from internal service names. The `drive` scope maps to the `file-manager` service — the scope is named after the feature (Drive), the service is named after the implementation pattern (file-manager, storage-agnostic). This translation lives only in `config-hub/manager.py:_SCOPE_TO_SERVICE`.
+9. **Scope = Service Name** — `config-hub` exposes UI scope names (`bot`, `agent`, `file_manager`, `builds`) that map directly to their `ServiceClient` service names. This mapping lives in `config-hub/manager.py:_SCOPE_TO_SERVICE` as a seam for future divergence. Unknown scopes are rejected with HTTP 404.
 
 ---
 
@@ -123,7 +125,7 @@ These are architectural boundaries. Do not violate them.
 6. **Do NOT store secrets in code or Dockerfiles** — use env vars, `.env`, or service JSON config files.
 7. **Do NOT replace deep merge with full overwrite** in config save logic.
 8. **Do NOT leak non-bot build info to Telegram** — the bot strictly filters to its own triggered builds (matched by `BOT_REQUEST_ID`). No build counts, build numbers, or metadata from manual Jenkins triggers may appear in Telegram messages.
-9. **Do NOT rename `file-manager` internals to `drive`** — the service is storage-backend agnostic. The `drive` name belongs only to the UI scope layer in config-hub.
+9. **Do NOT rename `file-manager` internals to `drive`** — the service is storage-backend agnostic. The `drive` name appears only in user-facing labels (UI text, help strings) — the config scope key is `file_manager`.
 
 ---
 

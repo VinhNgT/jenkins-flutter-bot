@@ -124,7 +124,7 @@ Each service's `manager.py` defines a `StartupError` exception. The manager rais
 
 ### Service-to-Service HTTP
 
-`ServiceClient` (config-hub) logs downstream HTTP failures with `logger.warning()` (no traceback) at the terminal catch site. The return value communicates the error to the caller. Full tracebacks are noise here because these failures are expected during initial setup.
+`ServiceClient` (config-hub) owns a persistent `httpx.AsyncClient` for connection reuse across dashboard polls and config proxying. It exposes a `close()` method called during `ConfigHubManager.stop()`. The client logs downstream HTTP failures with `logger.warning()` (no traceback) at the terminal catch site. The return value communicates the error to the caller. Full tracebacks are noise here because these failures are expected during initial setup.
 
 ### Terminal Catch Sites
 

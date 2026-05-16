@@ -101,4 +101,4 @@ The config-hub renders forms dynamically from service schemas. It fetches schema
 
 ### Frontend Form Convention
 
-Dynamic form inputs follow the `scope:dotted.key` naming convention (e.g., `bot:telegram.bot_token`, `drive:drive.client_id`). The scope prefix determines which config section the field belongs to when building the save payload. See `communication-flows.md` for the scope-to-service translation.
+Dynamic form inputs follow the `scope:dotted.key` naming convention (e.g., `bot:telegram.bot_token`, `file_manager:drive.client_id`). The scope prefix determines which config section the field belongs to when building the save payload. See `communication-flows.md` for the scope-to-service translation.

@@ -62,19 +62,22 @@ The `/control/status` response carries four fields:
 | `running` | `bool` | Whether the managed subprocess/resource is active |
 | `last_error` | `str \| null` | Last runtime error from a `start()` attempt |
 | `config_error` | `str \| null` | Current config validation error (`null` when configured) |
+| `started_at` | `float \| null` | UNIX epoch timestamp of the last successful `start()` (for uptime display) |
 
 If a service is down, its schema returns `null` and the config-hub frontend shows "Loading..." for that tab.
 
 ### Scope-to-Service Translation
 
-The config-hub exposes UI scopes (`bot`, `agent`, `drive`, `builds`) that differ from internal service names for the `drive` scope. The mapping lives exclusively in `config-hub/manager.py:_SCOPE_TO_SERVICE`:
+The config-hub exposes UI scopes that map directly to internal service names. The mapping lives exclusively in `config-hub/manager.py:_SCOPE_TO_SERVICE`:
 
 | UI Scope | Internal Service |
 |----------|-----------------|
 | `bot` | `bot` |
 | `agent` | `agent` |
-| `drive` | `file_manager` |
+| `file_manager` | `file_manager` |
 | `builds` | `builds` |
+
+Unknown scopes are rejected with HTTP 404 — `save_scope()` raises `ValueError` for any scope not in the map.
 
 Do not move or duplicate this mapping. Do not rename `file-manager` internals to `drive`.
 
@@ -142,4 +145,4 @@ Jenkins owns all raw build metadata (status, duration, branch, commit). The bot 
 
 ## Async I/O Pattern
 
-Blocking I/O libraries (e.g., `google-api-python-client`) must be wrapped with `asyncio.to_thread()` in async code paths. Apply this pattern to any new blocking I/O added to async services.
+Blocking I/O libraries (e.g., `google-api-python-client`) must be wrapped with `asyncio.to_thread()` in async code paths. The established convention is the `_sync` suffix pattern: the blocking implementation is a private `_method_sync()`, and the public async wrapper calls it via `to_thread()`. See `GoogleDriveBackend` for the canonical example (`_load_tokens_sync` → `load_tokens`, `_exchange_callback_sync` → `exchange_callback`, etc.).

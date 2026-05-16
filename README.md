@@ -36,10 +36,7 @@ graph TD
     BA -- ":9000" --> CH
     TA -- polling --> TAB
 
-    CH -- "/control/*" --> BOT
-    CH -- "/control/*" --> AGT
-    CH -- "/control/*" --> FM
-    CH -- "/control/*" --> BM
+    CH -- "/control/*" --> BOT & AGT & FM & BM
     TAB -- "HTTP API" --> CH
 
     BOT -- "REST trigger" --> BM

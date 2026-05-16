@@ -46,7 +46,6 @@ class BuildSettings(ServiceSettings):
     )
     # ── Advanced (deployment topology) ──
     jenkins_url: str = Field(
-        "http://jenkins:8080",
         title="Jenkins URL",
         description="Jenkins controller URL for API calls",
         json_schema_extra={
@@ -55,7 +54,6 @@ class BuildSettings(ServiceSettings):
         },
     )
     file_manager_url: str = Field(
-        "http://file-manager:9092",
         title="File Manager URL",
         description="Internal URL of the file-manager service",
         json_schema_extra={
@@ -64,7 +62,6 @@ class BuildSettings(ServiceSettings):
         },
     )
     self_url: str = Field(
-        "http://build-manager:9010",
         title="Self URL",
         description="Internal URL of this service (used for webhook callbacks)",
         json_schema_extra={

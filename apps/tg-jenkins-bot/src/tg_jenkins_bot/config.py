@@ -90,13 +90,11 @@ class BotSettings(ServiceSettings):
 
     # Advanced (deployment topology — configurable but rarely changed)
     bot_service_url: str = Field(
-        "http://tg-bot:9090",
         title="Bot Service URL",
         description="Internal URL for this service's webhook endpoint",
         json_schema_extra={"group": "Advanced", "json_key": "bot.service_url"},
     )
     build_manager_url: str = Field(
-        "http://build-manager:9010",
         title="Build Manager URL",
         description="Internal URL of the build-manager service",
         json_schema_extra={"group": "Advanced", "json_key": "bot.build_manager_url"},

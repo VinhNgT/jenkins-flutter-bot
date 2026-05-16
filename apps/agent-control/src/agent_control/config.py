@@ -13,7 +13,6 @@ class AgentSettings(ServiceSettings):
 
     # ── Agent Connection ──
     agent_name: str = Field(
-        "flutter-agent",
         title="Agent Name",
         description="Must match the node name in Jenkins",
         json_schema_extra={
@@ -47,7 +46,6 @@ class AgentSettings(ServiceSettings):
 
     # ── Advanced (deployment topology) ──
     jenkins_url: str = Field(
-        "http://jenkins:8080",
         title="Jenkins URL",
         description="Same Jenkins controller URL used for the agent's inbound connection",
         json_schema_extra={

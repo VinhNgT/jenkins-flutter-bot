@@ -4,7 +4,7 @@
 # The mock-jenkins service uses container_name "jenkins" so the bot's
 # JENKINS_URL (http://jenkins:8080) resolves without any config changes.
 #
-# The flutter-agent is replaced with the mock agent-control API so
+# The agent-control is replaced with the mock agent-control API so
 # config-hub sees the agent as configured and running.
 #
 # Configurable environment:
@@ -28,13 +28,13 @@ services:
     networks:
       - jenkins
 
-  # Replace real flutter-agent with mock agent-control API
-  flutter-agent:
+  # Replace real agent-control with mock agent-control API
+  agent-control:
     platform: !reset ""
     build:
       context: ..
       dockerfile: apps/mock-jenkins/Dockerfile
-    container_name: flutter-agent
+    container_name: agent-control
     restart: on-failure
     command: ["mock-agent"]
     environment:

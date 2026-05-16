@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -45,6 +46,7 @@ class MockAgentState:
     def __init__(self) -> None:
         self._running: bool = False
         self._last_error: str | None = None
+        self._started_at: float | None = None
 
     @property
     def running(self) -> bool:
@@ -53,16 +55,22 @@ class MockAgentState:
     def status(self) -> dict[str, Any]:
         """Return the current agent status."""
         config_error: str | None = None
+        config: AgentSettings | None = None
         try:
-            AgentSettings.load()
+            config = AgentSettings.load()
         except Exception as exc:
             config_error = format_validation_error(exc)
-        return {
+        result: dict[str, Any] = {
             "configured": config_error is None,
             "running": self._running,
             "last_error": self._last_error,
             "config_error": config_error,
         }
+        if config is not None:
+            result["agent_name"] = config.agent_name
+        if self._started_at is not None:
+            result["started_at"] = self._started_at
+        return result
 
     async def start(self) -> None:
         """Simulate starting the agent — validates config first."""
@@ -77,11 +85,13 @@ class MockAgentState:
 
         self._running = True
         self._last_error = None
+        self._started_at = time.time()
         logger.info("Mock agent started (simulated)")
 
     async def stop(self) -> None:
         """Simulate stopping the agent."""
         self._running = False
+        self._started_at = None
         logger.info("Mock agent stopped (simulated)")
 
     async def restart(self) -> None:

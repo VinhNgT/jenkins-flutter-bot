@@ -18,6 +18,7 @@ from typing import Self
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefinedType
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 
@@ -107,13 +108,22 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
 
         # All ServiceSettings fields are visible in the dashboard
 
+        # Compute a display-safe default. Fields with default_factory have
+        # field.default set to PydanticUndefined — skip those.
+        has_real_default = (
+            not field.is_required()
+            and field.default is not None
+            and not isinstance(field.default, PydanticUndefinedType)
+        )
+        display_default = str(field.default) if has_real_default else ""
+
         field_def: dict[str, Any] = {
             "key": extra.get("json_key", name),  # Dotted key if nested, or just name
             "label": field.title or name.replace("_", " ").title(),
             "group": extra.get("group", "General"),
             "description": field.description or "",
             "help_html": extra.get("help_html", ""),
-            "default": str(field.default) if field.default is not None and not field.is_required() else "",
+            "default": display_default,
             "secret": extra.get("secret", False),
             "required": field.is_required(),
             "field_type": extra.get("field_type", "password" if extra.get("secret", False) else "text"),

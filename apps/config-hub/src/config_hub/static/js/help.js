@@ -19,8 +19,7 @@ function closeActivePopover() {
  * @param {HTMLElement} btn  - the ? button clicked
  * @param {string} helpHtml  - rich HTML content to display
  */
-// eslint-disable-next-line no-unused-vars
-function toggleHelp(btn, helpHtml) {
+export function toggleHelp(btn, helpHtml) {
   // If this button's popover is already open, close it.
   if (btn.classList.contains('active')) {
     closeActivePopover();
@@ -58,8 +57,7 @@ function toggleHelp(btn, helpHtml) {
  * Call once on DOMContentLoaded. Help buttons are created dynamically by
  * schema-renderer.js and wire their own click → toggleHelp() listeners.
  */
-// eslint-disable-next-line no-unused-vars
-function initHelpPopovers() {
+export function initHelpPopovers() {
   document.addEventListener('click', (e) => {
     if (!activePopover) return;
     if (e.target.closest('.field-help-popover')) return;

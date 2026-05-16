@@ -1,7 +1,6 @@
 /* Shared SVG icon constants used across the config-ui frontend. */
 
-// eslint-disable-next-line no-unused-vars
-const Icons = {
+export const Icons = {
   play: '<svg class="icon" viewBox="0 0 20 20"><path d="M6.5 4.5v11l9-5.5z"/></svg>',
   stop: '<svg class="icon" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1"/></svg>',
   restart: '<svg class="icon" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0110.472-4.001L12.5 8H18V2l-2.052 2.052A8 8 0 1018 10h-2a6 6 0 01-12 0z"/></svg>',

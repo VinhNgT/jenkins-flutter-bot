@@ -1,7 +1,8 @@
 /* Centralized API client — all fetch calls go through here. */
 
-// eslint-disable-next-line no-unused-vars
-const API = {
+import { Toast } from './toast.js';
+
+export const API = {
   /** @returns {Promise<Object|null>} */
   async getConfig() {
     try {
@@ -28,7 +29,7 @@ const API = {
 
   /**
    * Save config for a single scope.
-   * @param {'bot'|'agent'|'drive'} scope
+   * @param {'bot'|'agent'|'builds'|'file_manager'} scope
    * @param {Object} data
    * @returns {Promise<Object|null>}
    */
@@ -61,7 +62,7 @@ const API = {
   },
 
   /**
-   * @param {'bot'|'agent'} service
+   * @param {'bot'|'agent'|'builds'|'file_manager'} service
    * @param {'start'|'stop'|'restart'} action
    * @returns {Promise<Object|null>}
    */

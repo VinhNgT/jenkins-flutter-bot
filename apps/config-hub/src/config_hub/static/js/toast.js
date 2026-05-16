@@ -1,7 +1,6 @@
 /* Toast notification system. */
 
-// eslint-disable-next-line no-unused-vars
-const Toast = {
+export const Toast = {
   /**
    * Show a toast notification.
    * @param {string} message

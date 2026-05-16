@@ -1,5 +1,19 @@
 /* Entry point — initialize all modules and wire event listeners. */
 
+import { Toast } from './toast.js';
+import { API } from './api.js';
+import { renderSchemaForm } from './schema-renderer.js';
+import { collectScope, populateScope, validateScope, initSecretFields } from './config.js';
+import { initHelpPopovers } from './help.js';
+import { refreshDashboard, refreshDriveCard, controlService, handleStop } from './dashboard.js';
+import { initTabs, switchTab } from './tabs.js';
+import { Icons } from './icons.js';
+
+// Expose to inline onclick handlers in dynamically generated HTML
+window.controlService = controlService;
+window.handleStop = handleStop;
+window.switchTab = switchTab;
+
 async function loadVersion() {
   try {
     const res = await fetch('/api/version');
@@ -61,6 +75,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateScope('file_manager', config.file_manager, config._secrets_set?.file_manager);
   }
 
+  // Show error state if both schema and config fail
+  if (!schemas && !config) {
+    const content = document.querySelector('.content');
+    if (content) {
+      content.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;text-align:center;">
+          <h2 class="panel-title">Unable to Load Dashboard</h2>
+          <p class="panel-desc">Could not connect to the config-hub API. Check that all services are running.</p>
+          <button class="btn btn-accent" onclick="location.reload()">Retry</button>
+        </div>`;
+      return;
+    }
+  }
+
   // ─── Delegated save/reload handlers ───────────────────────────
   // Uses event delegation on dynamic buttons created by schema-renderer.js
   document.addEventListener('click', async (e) => {
@@ -76,8 +104,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = collectScope(scope);
       const result = await API.saveScope(scope, data);
       if (result) {
-        const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', file_manager: 'Google Drive' }[scope] || scope;
+        const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', file_manager: 'File Manager' }[scope] || scope;
         Toast.show(`${label} config saved`, 'success');
+        // Clear unsaved indicator
+        const actionsEl = document.getElementById(`form-actions-${scope}`);
+        if (actionsEl) actionsEl.classList.remove('scope-dirty');
         const freshConfig = await API.getConfig();
         if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
         if (scope === 'file_manager') await refreshDriveCard();
@@ -85,14 +116,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Reload buttons: data-reload="bot|agent|drive"
+    // Reload buttons: data-reload="bot|agent|builds|file_manager"
     const reloadBtn = e.target.closest('[data-reload]');
     if (reloadBtn) {
       const scope = reloadBtn.dataset.reload;
       const freshConfig = await API.getConfig();
       if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
       if (scope === 'file_manager') await refreshDriveCard();
-      const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', file_manager: 'Google Drive' }[scope] || scope;
+      // Clear unsaved indicator
+      const actionsEl = document.getElementById(`form-actions-${scope}`);
+      if (actionsEl) actionsEl.classList.remove('scope-dirty');
+      const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', file_manager: 'File Manager' }[scope] || scope;
       Toast.show(`${label} config reloaded`, 'info');
       return;
     }
@@ -268,6 +302,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!exportData) return '';
     if (tab === 'bot') return exportData.files['bot.env'] || '';
     if (tab === 'agent') return exportData.files['agent.env'] || '';
+    if (tab === 'file_manager') return exportData.files['file_manager.env'] || '';
     if (tab === 'compose') {
       const bot = exportData.compose_vars?.bot || '';
       const agent = exportData.compose_vars?.agent || '';

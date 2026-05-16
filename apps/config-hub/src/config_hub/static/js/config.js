@@ -22,11 +22,10 @@ function nestedGet(target, dottedKey) {
 /**
  * Collect form data for a single scope. Disabled secret inputs (stored,
  * unchanged) are skipped so existing values are preserved on the backend.
- * @param {string} scope - 'bot', 'agent', or 'drive'
+ * @param {string} scope - 'bot', 'agent', 'builds', or 'file_manager'
  * @returns {Object}
  */
-// eslint-disable-next-line no-unused-vars
-function collectScope(scope) {
+export function collectScope(scope) {
   const data = {};
   document.querySelectorAll(`[data-scope="${scope}"] input[name], [data-scope="${scope}"] select[name]`).forEach((el) => {
     // Skip secret fields whose value is stored and unchanged (disabled)
@@ -46,8 +45,7 @@ function collectScope(scope) {
  * @param {Object} data - config data for this scope
  * @param {Object} secretsSet - { "dotted.key": int|false } for this scope
  */
-// eslint-disable-next-line no-unused-vars
-function populateScope(scope, data, secretsSet) {
+export function populateScope(scope, data, secretsSet) {
   document.querySelectorAll(`[data-scope="${scope}"] input[name], [data-scope="${scope}"] select[name]`).forEach((el) => {
     const dottedKey = el.name.split(':')[1];
     if (!dottedKey) return;
@@ -92,8 +90,7 @@ function populateScope(scope, data, secretsSet) {
  * @param {string} scope
  * @returns {{ valid: boolean, missing: string[] }}
  */
-// eslint-disable-next-line no-unused-vars
-function validateScope(scope) {
+export function validateScope(scope) {
   const missing = [];
   document.querySelectorAll(`[data-scope="${scope}"] .field[data-required]`).forEach((field) => {
     const input = field.querySelector('input[name], select[name]');
@@ -117,8 +114,7 @@ function validateScope(scope) {
 /**
  * Initialize secret field Change/Cancel toggle logic.
  */
-// eslint-disable-next-line no-unused-vars
-function initSecretFields() {
+export function initSecretFields() {
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;

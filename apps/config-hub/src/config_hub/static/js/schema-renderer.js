@@ -1,17 +1,17 @@
 /* Dynamic config form rendering from module schemas. */
 
+import { Icons } from './icons.js';
+import { toggleHelp } from './help.js';
 
-
-const SCOPE_LABELS = { bot: 'Bot', agent: 'Agent', ui: 'Drive' };
+const SCOPE_LABELS = { bot: 'Bot', agent: 'Agent', file_manager: 'File Manager', builds: 'Build Manager' };
 
 /**
  * Render a config form panel from a module schema.
  * @param {string} containerId  - target div id (e.g. "schema-container-bot")
- * @param {string} scope        - "bot", "agent", or "drive"
+ * @param {string} scope        - "bot", "agent", "builds", or "file_manager"
  * @param {Object} schema       - { title, description, fields: [...] }
  */
-// eslint-disable-next-line no-unused-vars
-function renderSchemaForm(containerId, scope, schema) {
+export function renderSchemaForm(containerId, scope, schema) {
   const container = document.getElementById(containerId);
   if (!container || !schema) return;
 
@@ -60,11 +60,22 @@ function renderSchemaForm(containerId, scope, schema) {
   const label = SCOPE_LABELS[scope] || scope;
   const actions = document.createElement('div');
   actions.className = 'form-actions';
+  actions.id = `form-actions-${scope}`;
   actions.innerHTML = `
-    <button class="btn btn-accent" data-save="${scope}" type="button">${Icons.save}Save ${label} Config</button>
+    <button class="btn btn-accent" data-save="${scope}" type="button">${Icons.save}Save ${label} Config<span class="save-dot"></span></button>
     <button class="btn btn-secondary" data-reload="${scope}" type="button">${Icons.restart}Reload</button>
   `;
   container.appendChild(actions);
+
+  // Track unsaved changes
+  container.addEventListener('input', () => {
+    const actionsEl = document.getElementById(`form-actions-${scope}`);
+    if (actionsEl) actionsEl.classList.add('scope-dirty');
+  });
+  container.addEventListener('change', () => {
+    const actionsEl = document.getElementById(`form-actions-${scope}`);
+    if (actionsEl) actionsEl.classList.add('scope-dirty');
+  });
 }
 
 /**

@@ -7,6 +7,7 @@ attached to ``app.state``, frozen config resolved on demand.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from config_core import format_validation_error
@@ -29,6 +30,7 @@ class StorageManager:
         self._config: StorageSettings | None = None
         self._backend: GoogleDriveBackend | None = None
         self._last_error: str | None = None
+        self._started_at: float | None = None
 
     @property
     def config(self) -> StorageSettings | None:
@@ -55,12 +57,14 @@ class StorageManager:
 
         self._backend = GoogleDriveBackend(self._token_path())
         self._last_error = None
+        self._started_at = time.time()
         logger.info("StorageManager started")
 
     async def stop(self) -> None:
         """Shut down the storage backend."""
         self._backend = None
         self._config = None
+        self._started_at = None
         logger.info("StorageManager stopped")
 
     async def restart(self) -> None:
@@ -75,9 +79,12 @@ class StorageManager:
             StorageSettings.load()
         except Exception as exc:
             config_error = format_validation_error(exc)
-        return {
+        result: dict[str, Any] = {
             "configured": config_error is None,
             "running": self.running,
             "last_error": self._last_error,
             "config_error": config_error,
         }
+        if self._started_at is not None:
+            result["started_at"] = self._started_at
+        return result

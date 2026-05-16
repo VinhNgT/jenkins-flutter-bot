@@ -59,7 +59,7 @@ class BotSettings(ServiceSettings):
         json_schema_extra={"group": "Application", "json_key": "bot.app_name"},
     )
     branch_list: list[str] = Field(
-        default_factory=lambda: ["main", "develop"],
+        default=["main", "develop"],
         title="Git Branches",
         description="Comma-separated list of branches to show in the build menu",
         json_schema_extra={"group": "Application", "json_key": "bot.branch_list"},

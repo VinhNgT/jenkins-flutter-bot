@@ -7,6 +7,7 @@ Attached to ``app.state.manager`` during lifespan.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from config_core import format_validation_error
@@ -28,6 +29,7 @@ class BuildManager:
     def __init__(self) -> None:
         self._coordinator: BuildCoordinator | None = None
         self._last_error: str | None = None
+        self._started_at: float | None = None
 
     @property
     def coordinator(self) -> BuildCoordinator:
@@ -59,6 +61,7 @@ class BuildManager:
 
         self._coordinator = coord
         self._last_error = None
+        self._started_at = time.time()
         logger.info("Build manager started")
 
     async def stop(self) -> None:
@@ -66,6 +69,7 @@ class BuildManager:
         if self._coordinator is not None:
             await self._coordinator.close()
             self._coordinator = None
+            self._started_at = None
             logger.info("Build manager stopped")
 
     async def restart(self) -> None:
@@ -84,9 +88,14 @@ class BuildManager:
             BuildSettings.load()
         except Exception as exc:
             config_error = format_validation_error(exc)
-        return {
+        result: dict[str, Any] = {
             "configured": config_error is None,
             "running": self.running,
             "last_error": self._last_error,
             "config_error": config_error,
         }
+        if self._coordinator is not None:
+            result["pending_builds"] = self._coordinator.tracker.pending_count
+        if self._started_at is not None:
+            result["started_at"] = self._started_at
+        return result

@@ -37,7 +37,7 @@
         <button class="sidebar-btn" data-tab="bot" role="tab" aria-selected="false">Telegram Bot</button>
         <button class="sidebar-btn" data-tab="builds" role="tab" aria-selected="false">Build Manager</button>
         <button class="sidebar-btn" data-tab="agent" role="tab" aria-selected="false">Jenkins Agent</button>
-        <button class="sidebar-btn" data-tab="file_manager" role="tab" aria-selected="false">Google Drive</button>
+        <button class="sidebar-btn" data-tab="file_manager" role="tab" aria-selected="false">File Manager</button>
         <div class="sidebar-divider"></div>
         <span class="sidebar-label">Tools</span>
         <button class="sidebar-btn" data-tab="jenkinsfile" role="tab" aria-selected="false">Jenkins Pipeline</button>
@@ -50,32 +50,14 @@
         <section id="panel-dashboard" class="tab-panel active" role="tabpanel">
           <h2 class="panel-title">Service Status</h2>
           <p class="panel-desc">Live status of the bot and agent services. Use the controls on each card to start, stop, or restart a service after saving its configuration.</p>
+          <div class="summary-bar" id="summary-bar"></div>
           <div class="status-grid" id="status-grid">
-            <div class="card status-card" id="card-bot">
-              <div class="status-header">
-                <h3>Telegram Bot</h3>
-                <span class="badge badge--loading">Loading…</span>
-              </div>
-            </div>
-            <div class="card status-card" id="card-builds">
-              <div class="status-header">
-                <h3>Build Manager</h3>
-                <span class="badge badge--loading">Loading…</span>
-              </div>
-            </div>
-            <div class="card status-card" id="card-agent">
-              <div class="status-header">
-                <h3>Jenkins Agent</h3>
-                <span class="badge badge--loading">Loading…</span>
-              </div>
-            </div>
-            <div class="card status-card" id="card-file_manager">
-              <div class="status-header">
-                <h3>File Manager</h3>
-                <span class="badge badge--loading">Loading…</span>
-              </div>
-            </div>
+            <div class="skeleton"><div class="skeleton-line skeleton-line--medium"></div><div class="skeleton-line skeleton-line--short"></div></div>
+            <div class="skeleton"><div class="skeleton-line skeleton-line--medium"></div><div class="skeleton-line skeleton-line--short"></div></div>
+            <div class="skeleton"><div class="skeleton-line skeleton-line--medium"></div><div class="skeleton-line skeleton-line--short"></div></div>
+            <div class="skeleton"><div class="skeleton-line skeleton-line--medium"></div><div class="skeleton-line skeleton-line--short"></div></div>
           </div>
+          <div class="last-refreshed" id="last-refreshed"></div>
         </section>
 
         <!-- ===== Telegram Bot Config (dynamic) ===== -->
@@ -203,6 +185,7 @@
           <div class="export-tabs" id="export-tabs" hidden>
             <button class="export-tab active" data-export-tab="bot">bot.env</button>
             <button class="export-tab" data-export-tab="agent">agent.env</button>
+            <button class="export-tab" data-export-tab="file_manager">file_manager.env</button>
             <button class="export-tab" data-export-tab="compose">Compose Vars</button>
           </div>
           <textarea id="export-output" class="export-output" readonly placeholder="Click 'Preview' to generate env file contents…"></textarea>
@@ -212,6 +195,7 @@
             <code class="block-code">tar -xzf jfb-config.tar.gz -C infra/</code>
             <p class="text-muted">
               Creates <code>env/bot.env</code>, <code>env/agent.env</code>,
+              <code>env/file_manager.env</code>,
               and <code>env/oauth.json</code> (if present).
             </p>
           </div>
@@ -260,18 +244,20 @@
       </div>
     </dialog>
 
+    <!-- Confirmation dialog -->
+    <dialog id="confirm-dialog" class="confirm-dialog">
+      <h3 class="confirm-dialog-title"></h3>
+      <p class="confirm-dialog-msg"></p>
+      <div class="confirm-dialog-actions">
+        <button class="btn btn-secondary" data-action="cancel">Cancel</button>
+        <button class="btn btn-danger" data-action="confirm">Confirm</button>
+      </div>
+    </dialog>
+
     <!-- Toast container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- JS modules -->
-    <script src="/static/js/toast.js"></script>
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/icons.js"></script>
-    <script src="/static/js/config.js"></script>
-    <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/tabs.js"></script>
-    <script src="/static/js/help.js"></script>
-    <script src="/static/js/schema-renderer.js"></script>
-    <script src="/static/js/main.js"></script>
+    <!-- JS entry point (ES module — imports all dependencies) -->
+    <script type="module" src="/static/js/main.js"></script>
   </body>
 </html>

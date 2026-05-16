@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import time
 from typing import Any
 
 from config_core import format_validation_error
@@ -43,6 +44,7 @@ class AgentManager:
         self._process: subprocess.Popen[str] | None = None
         self._last_error: str | None = None
         self._config: AgentSettings | None = None
+        self._started_at: float | None = None
 
     @property
     def running(self) -> bool:
@@ -84,6 +86,7 @@ class AgentManager:
             self._process = subprocess.Popen(command, text=True, env=clean_env)
             self._config = config
             self._last_error = None
+            self._started_at = time.time()
         except Exception as exc:
             self._last_error = str(exc)
             raise StartupError(str(exc)) from exc
@@ -103,6 +106,7 @@ class AgentManager:
         finally:
             self._process = None
             self._config = None
+            self._started_at = None
 
     async def restart(self) -> None:
         """Restart the Jenkins agent."""
@@ -116,9 +120,16 @@ class AgentManager:
             AgentSettings.load()
         except Exception as exc:
             config_error = format_validation_error(exc)
-        return {
+        result: dict[str, Any] = {
             "configured": config_error is None,
             "running": self.running,
             "last_error": self._last_error,
             "config_error": config_error,
         }
+        if self._config is not None:
+            result["agent_name"] = self._config.agent_name
+        if self._process is not None:
+            result["pid"] = self._process.pid
+        if self._started_at is not None:
+            result["started_at"] = self._started_at
+        return result

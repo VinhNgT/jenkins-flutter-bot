@@ -1,16 +1,40 @@
 /* Tab navigation — show/hide panels, start/stop polling. */
 
-// eslint-disable-next-line no-unused-vars
-function initTabs() {
+import { Poller, refreshDashboard } from './dashboard.js';
+
+export function initTabs() {
   document.querySelectorAll('[data-tab]').forEach((btn) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
+
+  // Keyboard navigation for sidebar
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    sidebar.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+
+      const buttons = [...sidebar.querySelectorAll('.sidebar-btn[data-tab]')];
+      const focused = document.activeElement;
+      const idx = buttons.indexOf(focused);
+      if (idx === -1) return;
+
+      let next;
+      if (e.key === 'ArrowDown') {
+        next = buttons[(idx + 1) % buttons.length];
+      } else {
+        next = buttons[(idx - 1 + buttons.length) % buttons.length];
+      }
+      next.focus();
+      next.click();
+    });
+  }
+
   const saved = sessionStorage.getItem('activeTab') || 'dashboard';
   switchTab(saved);
 }
 
-// eslint-disable-next-line no-unused-vars
-function switchTab(tabId) {
+export function switchTab(tabId) {
   document.querySelectorAll('.sidebar-btn[data-tab]').forEach((btn) => {
     const isActive = btn.dataset.tab === tabId;
     btn.classList.toggle('active', isActive);

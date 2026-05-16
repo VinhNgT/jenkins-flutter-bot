@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from config_core import format_validation_error
@@ -74,6 +75,7 @@ class BotManager:
         self._config: BotSettings | None = None
         self._build_client: BuildClient | None = None
         self._last_error: str | None = None
+        self._started_at: float | None = None
 
     @property
     def bot_context(self) -> BotContext | None:
@@ -136,6 +138,7 @@ class BotManager:
                 self._config = config
                 self._build_client = build_client
                 self._last_error = None
+                self._started_at = time.time()
                 logger.info("Telegram bot started")
             except Exception as exc:
                 self._last_error = str(exc)
@@ -162,6 +165,7 @@ class BotManager:
             self._bot_context = None
             self._config = None
             self._build_client = None
+            self._started_at = None
 
     async def restart(self) -> None:
         """Restart the Telegram polling application."""
@@ -175,9 +179,12 @@ class BotManager:
             BotSettings.load()
         except Exception as exc:
             config_error = format_validation_error(exc)
-        return {
+        result: dict[str, Any] = {
             "configured": config_error is None,
             "running": self.running,
             "last_error": self._last_error,
             "config_error": config_error,
         }
+        if self._started_at is not None:
+            result["started_at"] = self._started_at
+        return result

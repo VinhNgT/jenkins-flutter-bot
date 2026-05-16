@@ -276,8 +276,6 @@ export async function refreshDashboard() {
   // Update last-refreshed timestamp
   const tsEl = document.getElementById('last-refreshed');
   if (tsEl) tsEl.textContent = `Updated ${new Date().toLocaleTimeString()}`;
-
-  await refreshDriveCard();
 }
 
 /** Stop handler with confirmation modal. */

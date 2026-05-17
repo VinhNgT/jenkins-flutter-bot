@@ -1,0 +1,28 @@
+# Edge override — pulls edge images from GHCR (usually built from main branch).
+# Usage: ./compose.sh edge [args]
+#
+
+services:
+  build-manager:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/build-manager:${IMAGE_TAG:-edge}
+
+  config-hub:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/config-hub:${IMAGE_TAG:-edge}
+
+  tg-jenkins-bot:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-jenkins-bot:${IMAGE_TAG:-edge}
+
+  agent-control:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/agent-control:${IMAGE_TAG:-edge}
+
+  file-manager:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/file-manager:${IMAGE_TAG:-edge}
+
+  tg-admin-bot:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-admin-bot:${IMAGE_TAG:-edge}

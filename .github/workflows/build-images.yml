@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: tg-bot
+          - name: tg-jenkins-bot
             context: .
             dockerfile: apps/tg-jenkins-bot/Dockerfile
             platforms: linux/amd64,linux/arm64
@@ -37,7 +37,7 @@ jobs:
           # apps/agent-control/ — mirrors the docker-compose setup.
           # linux/amd64 only — Flutter does not support Android release
           # builds on Linux ARM64.
-          - name: flutter-agent
+          - name: agent-control
             context: .
             dockerfile: infra/Dockerfile.flutter-agent
             platforms: linux/amd64

@@ -1,6 +1,6 @@
 [project]
 name = "tg-admin-bot"
-version = "0.3.1-dev.4"
+version = "0.3.1-dev.5"
 description = "Telegram admin bot for managing the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [

@@ -117,6 +117,8 @@ services:
       - jenkins
 
   tg-admin-bot:
+    profiles:
+      - disabled
     build:
       context: ..
       dockerfile: apps/tg-admin-bot/Dockerfile

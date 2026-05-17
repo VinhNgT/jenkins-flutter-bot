@@ -3,6 +3,7 @@
 #   ./compose.sh [docker compose args]          — dev (build images locally)
 #   ./compose.sh prod [docker compose args]     — prod (pull images from GHCR)
 #   ./compose.sh edge [docker compose args]     — edge (pull edge images from GHCR)
+#   ./compose.sh hybrid [docker compose args]   — hybrid (build locally, pull agent from GHCR)
 #   ./compose.sh mock [docker compose args]     — mock (fake Jenkins for testing)
 #
 # Examples:
@@ -11,6 +12,7 @@
 #   ./compose.sh prod pull
 #   IMAGE_TAG=v1.2.3 ./compose.sh prod up -d
 #   ./compose.sh edge up -d
+#   ./compose.sh hybrid up -d --build
 #   ./compose.sh mock up -d --build
 #   MOCK_BUILD_DELAY=5 ./compose.sh mock up -d --build
 
@@ -27,6 +29,12 @@ elif [[ "${1:-}" == "edge" ]]; then
   exec docker compose \
     -f docker-compose.yml \
     -f docker-compose.edge.yml \
+    "$@"
+elif [[ "${1:-}" == "hybrid" ]]; then
+  shift
+  exec docker compose \
+    -f docker-compose.yml \
+    -f docker-compose.hybrid.yml \
     "$@"
 elif [[ "${1:-}" == "mock" ]]; then
   shift

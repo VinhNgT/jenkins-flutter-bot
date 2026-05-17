@@ -50,18 +50,21 @@ The `tg-admin-bot` uses `ADMIN_BOT_TOKEN` and `ADMIN_CHAT_ID` via `${VAR:-}` int
 
 ## Dev vs Production Compose
 
-Four compose modes via `compose.sh`:
+Five compose modes via `compose.sh`:
 
 ```bash
 ./compose.sh [args]          # Dev — builds images locally from source
 ./compose.sh prod [args]     # Prod — pulls pre-built images from GHCR
 ./compose.sh edge [args]     # Edge — pulls edge images from GHCR (main branch)
+./compose.sh hybrid [args]   # Hybrid — builds locally except agent-control (pulled from GHCR)
 ./compose.sh mock [args]     # Mock — replaces flutter-agent + jenkins with mock-jenkins
 ```
 
 **Production mode** overlays `docker-compose.prod.yml`, which replaces `build:` with `image:` pointing to GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
 
 **Edge mode** overlays `docker-compose.edge.yml`, pulling `edge` tagged images representing the latest development snapshot.
+
+**Hybrid mode** overlays `docker-compose.hybrid.yml`, which disables the local build for `agent-control` and pulls it from GHCR instead, while building all other services locally.
 
 **Mock mode** overlays `docker-compose.mock.yml`, which replaces the real `flutter-agent` and `jenkins` with the `mock-jenkins` service. Used for local development and testing without a real Jenkins install.
 

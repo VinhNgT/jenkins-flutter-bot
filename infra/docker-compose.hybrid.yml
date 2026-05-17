@@ -1,0 +1,8 @@
+# Hybrid override — builds all services locally except agent-control, which is pulled from GHCR.
+# Usage: ./compose.sh hybrid [args]
+#
+
+services:
+  agent-control:
+    build: !reset null
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/agent-control:${IMAGE_TAG:-edge}

@@ -4,7 +4,12 @@ services:
   # Development/testing convenience — in production, point JENKINS_URL to an
   # external Jenkins instance and remove this service entirely.
   jenkins:
+    # Workaround: Explicitly set image name to avoid cache collision with the 
+    # mock-jenkins service (which shares the 'jenkins' service name).
+    # pull_policy: build prevents 'docker compose pull' from attempting to 
+    # fetch this local-only image from Docker Hub.
     image: jfb-jenkins-local
+    pull_policy: build
     build:
       context: .
       dockerfile: Dockerfile

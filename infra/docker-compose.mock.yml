@@ -14,6 +14,7 @@
 services:
   # Replace real Jenkins with mock
   jenkins:
+    image: jfb-jenkins-mock
     build:
       context: ..
       dockerfile: apps/mock-jenkins/Dockerfile
@@ -30,6 +31,7 @@ services:
 
   # Replace real agent-control with mock agent-control API
   agent-control:
+    image: jfb-agent-control-mock
     platform: !reset ""
     build:
       context: ..

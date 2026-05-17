@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import json
 import os
+import typing
 from pathlib import Path
-from typing import Any, Type
+from typing import Any, Type, get_type_hints
 from typing import Self
 
 from dotenv import load_dotenv
@@ -73,6 +74,8 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
 
         # 2. Flatten the nested JSON into {field_name: value} using
         #    each field's json_key to locate the value.
+        #    Empty strings are skipped so they don't override Pydantic
+        #    defaults or env-var fallbacks for required/typed fields.
         result: dict[str, Any] = {}
         for field_name, field in self.settings_cls.model_fields.items():
             extra = field.json_schema_extra or {}
@@ -80,7 +83,7 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
                 extra = {}
             json_key = extra.get("json_key", field_name)
             value = self._resolve_dotted(raw, json_key)
-            if value is not _MISSING:
+            if value is not _MISSING and value != "":
                 result[field_name] = value
 
         return result
@@ -312,6 +315,79 @@ def read_masked_config(
     return {"values": doc.data, "secret_lengths": secret_lengths}
 
 
+def _resolve_origin_type(annotation: Any) -> type | None:
+    """Unwrap Optional/Union and return the first non-None concrete type.
+
+    Returns ``None`` if the annotation is not a simple concrete type or a
+    straightforward Optional wrapper.
+    """
+    origin = typing.get_origin(annotation)
+    if origin is typing.Union:  # includes Optional[X] == Union[X, None]
+        args = [a for a in typing.get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            return args[0]
+        return None  # complex Union — leave as-is
+    if origin is not None:
+        return None  # generic like List[str], Dict[...] — leave as-is
+    if isinstance(annotation, type):
+        return annotation
+    return None
+
+
+def _coerce_payload_types(
+    config_cls: type[BaseModel],
+    payload: dict[str, Any],
+) -> None:
+    """Coerce string values in *payload* to native Python types in-place.
+
+    The browser always submits form fields as strings.  This converts them
+    to the correct type (int, float, bool, Path) using the model's field
+    annotations so the JSON file stores native values that Pydantic can
+    validate without error.
+    """
+    try:
+        hints = get_type_hints(config_cls)
+    except Exception:  # pragma: no cover — guard against edge cases
+        return
+
+    payload_doc = ConfigDocument(payload)
+
+    for field_name, field in config_cls.model_fields.items():
+        annotation = hints.get(field_name)
+        if annotation is None:
+            continue
+        target_type = _resolve_origin_type(annotation)
+        if target_type is None or target_type is str:
+            continue  # nothing to coerce
+
+        extra = field.json_schema_extra or {}
+        if not isinstance(extra, dict):
+            extra = {}
+        json_key = extra.get("json_key", field_name)
+
+        value = payload_doc.get(json_key)
+        if not isinstance(value, str):
+            continue  # already the right type (or absent)
+        if value == "":
+            continue  # leave empty strings for downstream handling
+
+        try:
+            if target_type is bool:
+                # Interpret common truthy/falsy strings
+                coerced: Any = value.lower() in ("true", "1", "yes", "on")
+            elif target_type is int:
+                coerced = int(value)
+            elif target_type is float:
+                coerced = float(value)
+            elif target_type is Path:
+                coerced = value  # keep as string; Path is fine as str in JSON
+            else:
+                coerced = target_type(value)
+            payload_doc.set(json_key, coerced)
+        except (ValueError, TypeError):
+            pass  # leave as-is; Pydantic will surface a clear error later
+
+
 def save_config_with_merge(
     config_cls: type[BaseModel],
     path: Path,
@@ -321,7 +397,14 @@ def save_config_with_merge(
 
     Empty or ``None`` secret values are removed from the payload before
     merging so that ``deep_merge()`` preserves existing secret values.
+
+    String values are coerced to their native Python type (int, float, bool)
+    before writing so the JSON file stays type-correct and Pydantic can
+    validate it without errors on the next load.
     """
+    # Coerce form strings to native types before any other processing
+    _coerce_payload_types(config_cls, payload)
+
     payload_doc = ConfigDocument(payload)
     secret_keys = get_secret_keys(config_cls)
 

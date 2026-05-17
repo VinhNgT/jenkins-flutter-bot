@@ -125,6 +125,11 @@ class BuildTracker:
     def pending_count(self) -> int:
         return len(self._pending)
 
+    @property
+    def is_queue_full(self) -> bool:
+        """True if the number of pending builds has reached the limit."""
+        return self.pending_count >= self._max_recent_builds
+
     def add_pending(
         self,
         request_id: str,

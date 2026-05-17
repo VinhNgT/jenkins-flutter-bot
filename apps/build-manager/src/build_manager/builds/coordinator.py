@@ -101,6 +101,15 @@ class BuildCoordinator:
 
         Raises ``JenkinsTriggerError`` on failure.
         """
+        if self._tracker.is_queue_full:
+            raise JenkinsTriggerError(
+                detail="Queue full: pending builds == max_recent_builds",
+                user_message=(
+                    "The build queue is full. Please wait for an existing build "
+                    "to finish or cancel one before starting a new build."
+                ),
+            )
+
         if self._jenkins is None:
             raise JenkinsTriggerError(
                 detail="Jenkins client not initialised",

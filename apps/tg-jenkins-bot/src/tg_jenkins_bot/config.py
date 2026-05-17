@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import Field, field_validator
 from config_core import ServiceSettings
@@ -13,6 +13,8 @@ _DEFAULT_CONFIG_PATH = Path("/app/data/bot.json")
 
 class BotSettings(ServiceSettings):
     """Bot configuration resolved from config file, env, and defaults."""
+
+    config_path: ClassVar[Path] = _DEFAULT_CONFIG_PATH
 
     # Telegram
     telegram_token: str = Field(

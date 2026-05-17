@@ -23,26 +23,71 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 
 
 class JsonConfigSettingsSource(PydanticBaseSettingsSource):
-    """Custom settings source that loads JSON config from CONFIG_PATH."""
+    """Custom settings source that loads JSON config.
+
+    Resolves the config file path from (in order):
+      1. ``config_path`` class variable on the settings model
+      2. ``CONFIG_PATH`` environment variable (legacy fallback)
+
+    Reads the nested JSON structure and flattens it into a dict keyed by
+    Pydantic field names, using each field's ``json_schema_extra["json_key"]``
+    to locate the value via its dotted path (e.g. ``"agent.name"`` →
+    ``{"agent": {"name": ...}}``).  Fields without a ``json_key`` are looked
+    up by field name at the top level of the JSON.
+    """
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
         # Implementation is deferred to __call__ to load the whole dict
         return None, "", False
 
+    @staticmethod
+    def _resolve_dotted(data: dict[str, Any], dotted_key: str) -> Any:
+        """Walk a nested dict following a dotted key path.
+
+        Returns a sentinel ``_MISSING`` when the path does not exist so we
+        can distinguish "key absent" from "key present with value None".
+        """
+        current: Any = data
+        for part in dotted_key.split("."):
+            if not isinstance(current, dict) or part not in current:
+                return _MISSING
+            current = current[part]
+        return current
+
     def __call__(self) -> dict[str, Any]:
         load_dotenv()
-        path_str = os.environ.get("CONFIG_PATH")
-        if not path_str:
+
+        # Determine the config file path from the settings class.
+        cls_path = getattr(self.settings_cls, "config_path", None)
+        if cls_path is None:
             return {}
 
-        path = Path(path_str)
+        path = Path(cls_path)
         if not path.exists():
             return {}
 
         try:
-            return json.loads(path.read_text())
+            raw: dict[str, Any] = json.loads(path.read_text())
         except json.JSONDecodeError:
             return {}
+
+        # 2. Flatten the nested JSON into {field_name: value} using
+        #    each field's json_key to locate the value.
+        result: dict[str, Any] = {}
+        for field_name, field in self.settings_cls.model_fields.items():
+            extra = field.json_schema_extra or {}
+            if not isinstance(extra, dict):
+                extra = {}
+            json_key = extra.get("json_key", field_name)
+            value = self._resolve_dotted(raw, json_key)
+            if value is not _MISSING:
+                result[field_name] = value
+
+        return result
+
+
+# Sentinel for missing JSON keys (distinct from None).
+_MISSING = object()
 
 
 class BootstrapSettings(BaseSettings):

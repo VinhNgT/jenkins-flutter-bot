@@ -120,10 +120,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Application factory for the mock agent-control server."""
-    # Ensure AgentSettings.load() can find the same JSON file that
-    # save_config_with_merge writes to (via _DEFAULT_CONFIG_PATH).
-    os.environ.setdefault("CONFIG_PATH", str(_DEFAULT_CONFIG_PATH))
-
     app = FastAPI(title="mock-agent-control", lifespan=lifespan)
     app.state.manager = MockAgentState()
 

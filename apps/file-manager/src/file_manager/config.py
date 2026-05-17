@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import Field
 from config_core import ServiceSettings
@@ -12,6 +13,8 @@ _DEFAULT_CONFIG_PATH = Path("/app/data/storage.json")
 
 class StorageSettings(ServiceSettings):
     """Storage configuration resolved from config file, env, and defaults."""
+
+    config_path: ClassVar[Path] = _DEFAULT_CONFIG_PATH
 
     # OAuth credentials
     drive_client_id: str = Field(

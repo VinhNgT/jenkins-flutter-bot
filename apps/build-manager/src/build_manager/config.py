@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
+
 from pydantic import Field
 from config_core import ServiceSettings
 
@@ -11,6 +13,8 @@ _DEFAULT_CONFIG_PATH = Path("/app/data/builds.json")
 
 class BuildSettings(ServiceSettings):
     """Resolved build manager configuration."""
+
+    config_path: ClassVar[Path] = _DEFAULT_CONFIG_PATH
 
     # ── Jenkins ──
     jenkins_user: str = Field(

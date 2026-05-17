@@ -18,6 +18,9 @@
 
 set -euo pipefail
 
+# Always run from the directory where the script is located
+cd "$(dirname "$0")"
+
 if [[ "${1:-}" == "prod" ]]; then
   shift
   exec docker compose \

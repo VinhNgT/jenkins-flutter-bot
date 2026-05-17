@@ -93,7 +93,8 @@ COPY apps/agent-control/src apps/agent-control/src
 RUN uv sync --frozen --no-dev --no-editable --package agent-control --python 3.12
 ENV PATH="/app/.venv/bin:${PATH}"
 
-RUN chown -R jenkins:jenkins /app /opt/uv-python /home/jenkins/.gradle
+RUN mkdir -p /app/data \
+    && chown -R jenkins:jenkins /app /opt/uv-python /home/jenkins/.gradle
 
 USER jenkins
 

@@ -132,7 +132,8 @@ class ConfigHubManager:
 
         result = await self.services.put_config(svc, payload)
         if result.get("status") == "error":
-            logger.error("Failed to save %s config: %s", scope, result)
+            detail = result.get("detail", "Unknown error")
+            raise RuntimeError(f"Failed to save {scope} config: {detail}")
 
     # ------------------------------------------------------------------
     # Export / Import (TODO: refactor to HTTP-based)

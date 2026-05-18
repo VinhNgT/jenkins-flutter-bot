@@ -394,6 +394,7 @@ class GoogleDriveBackend:
     ) -> dict[str, Any]:
         """Return current OAuth connection status."""
         return {
+            "configured": bool(client_id and client_secret),
             "connected": await self.load_tokens(client_id, client_secret) is not None,
             "token_path": str(self._token_path),
         }

@@ -59,7 +59,7 @@ async def job_api(manager: ManagerDep, job_name: str, tree: str = "") -> dict[st
             {
                 "parameters": [
                     {"name": "BRANCH", "value": b.branch},
-                    {"name": "BOT_REQUEST_ID", "value": b.request_id},
+                    {"name": "BUILD_REQUEST_ID", "value": b.request_id},
                 ]
             },
         ]
@@ -100,7 +100,7 @@ async def trigger_build(
     job_name: str,
     request: Request,
     BRANCH: str = Query(default="main"),
-    BOT_REQUEST_ID: str = Query(default=""),
+    BUILD_REQUEST_ID: str = Query(default=""),
 ) -> Response:
     """Accept a parameterised build trigger — mimics Jenkins 201 response."""
     import logging
@@ -113,7 +113,7 @@ async def trigger_build(
         queue_id=queue_id,
         build_number=build_number,
         branch=BRANCH,
-        request_id=BOT_REQUEST_ID,
+        request_id=BUILD_REQUEST_ID,
     )
 
     manager.register_build(build)
@@ -123,7 +123,7 @@ async def trigger_build(
         build_number,
         queue_id,
         BRANCH,
-        BOT_REQUEST_ID[:8] if BOT_REQUEST_ID else "none",
+        BUILD_REQUEST_ID[:8] if BUILD_REQUEST_ID else "none",
     )
 
     # Jenkins returns 201 with a Location header pointing to the queue item
@@ -236,7 +236,7 @@ async def build_api(
         {
             "parameters": [
                 {"name": "BRANCH", "value": build.branch},
-                {"name": "BOT_REQUEST_ID", "value": build.request_id},
+                {"name": "BUILD_REQUEST_ID", "value": build.request_id},
             ]
         },
     ]

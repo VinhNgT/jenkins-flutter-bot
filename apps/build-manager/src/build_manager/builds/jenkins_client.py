@@ -127,7 +127,7 @@ class JenkinsClient:
                         # commit_hash is populated from the Jenkins Git
                         # plugin's lastBuiltRevision action when available.
                         commit_hash=_extract_commit_hash(raw),
-                        request_id=params.get("BOT_REQUEST_ID", ""),
+                        request_id=params.get("BUILD_REQUEST_ID", ""),
                     )
                 )
             return builds
@@ -151,7 +151,7 @@ class JenkinsClient:
         url = f"{self.job_url}/buildWithParameters"
         params = {
             "BRANCH": branch,
-            "BOT_REQUEST_ID": request_id,
+            "BUILD_REQUEST_ID": request_id,
         }
 
         try:

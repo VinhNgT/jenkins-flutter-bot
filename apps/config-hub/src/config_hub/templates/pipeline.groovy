@@ -7,16 +7,14 @@
 //   https://github.com/VinhNgT/jenkins-flutter-bot
 //
 // HOW IT WORKS:
-//   1. The Telegram bot triggers this pipeline via Jenkins REST API
-//   2. The pipeline checks out the Flutter project from Git
-//   3. Builds a release APK
-//   4. On completion, sends the result back to the bot via webhook
+//   1. The build-manager triggers this pipeline via Jenkins REST API
+//   2. The pipeline checks out the Flutter project and builds a release APK
+//   3. The APK is archived as a Jenkins artifact
+//   4. Build-manager polls the Jenkins API for completion, then downloads
+//      the archived artifact — no outbound HTTP from the agent
 //
 // AGENT REQUIREMENT:
-//   This pipeline requires a Jenkins node with the label 'flutter'.
-//   The flutter-agent container in the stack provides this automatically.
-//   If using an external Jenkins, ensure a node with Flutter + Android SDKs
-//   is labeled 'flutter'.
+//   Requires a Jenkins node labeled 'flutter' with Flutter + Android SDKs.
 //
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -27,14 +25,11 @@ pipeline {
         // Branch to build — injected by the Telegram bot's /build command
         string(name: 'BRANCH', defaultValue: 'main')
 
-        // Internal bot parameters — injected automatically when the bot
-        // triggers a build.  Do NOT set these manually.
-        //   BOT_CALLBACK_URL : webhook URL for build result notification
-        //   BOT_REQUEST_ID   : unique ID to match webhook to the triggering chat
-        //   BOT_JOB_ID       : build identifier for status tracking
-        string(name: 'BOT_CALLBACK_URL', defaultValue: '')
-        string(name: 'BOT_REQUEST_ID', defaultValue: '')
-        string(name: 'BOT_JOB_ID', defaultValue: '')
+        // Internal parameter — injected automatically by the build-manager
+        // when it triggers a build.  Do NOT set this manually.
+        //   BUILD_REQUEST_ID : correlation ID to match this build back to
+        //                      the originating request
+        string(name: 'BUILD_REQUEST_ID', defaultValue: '')
     }
 
     stages {
@@ -48,65 +43,9 @@ $checkout
         }
     }
 
-    // ───────────────────────────────────────────────────────────────────────
-    // Post-build: send results back to the Telegram bot via webhook.
-    //
-    // On success: POST the APK artifact + metadata (request_id, commit hash)
-    // On failure: POST metadata only (request_id, commit hash, last 50 log lines)
-    //
-    // If BOT_CALLBACK_URL is empty (manual Jenkins trigger), no webhook is sent.
-    // ───────────────────────────────────────────────────────────────────────
     post {
         success {
-            script {
-                if (params.BOT_CALLBACK_URL) {
-                    def apkPath = 'build/app/outputs/flutter-apk/app-release.apk'
-                    def commitHash = ''
-                    try {
-                        commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
-                    } catch (e) {
-                        commitHash = ''
-                    }
-                    def metadata = groovy.json.JsonOutput.toJson([
-                        request_id : params.BOT_REQUEST_ID,
-                        job_id     : params.BOT_JOB_ID,
-                        status     : 'success',
-                        commit_hash: commitHash,
-                    ])
-
-                    sh """
-                        curl -X POST "${params.BOT_CALLBACK_URL}" \\
-                            -F 'metadata=${metadata}' \\
-                            -F "artifact=@${apkPath}"
-                    """
-                }
-            }
-        }
-
-        failure {
-            script {
-                if (params.BOT_CALLBACK_URL) {
-                    def commitHash = ''
-                    try {
-                        commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
-                    } catch (e) {
-                        commitHash = ''
-                    }
-                    def logs = currentBuild.rawBuild.getLog(50).join('\n')
-                    def metadata = groovy.json.JsonOutput.toJson([
-                        request_id : params.BOT_REQUEST_ID,
-                        job_id     : params.BOT_JOB_ID,
-                        status     : 'failure',
-                        commit_hash: commitHash,
-                        logs       : logs,
-                    ])
-
-                    sh """
-                        curl -X POST "${params.BOT_CALLBACK_URL}" \\
-                            -F 'metadata=${metadata}'
-                    """
-                }
-            }
+            archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/*.apk'
         }
     }
 }

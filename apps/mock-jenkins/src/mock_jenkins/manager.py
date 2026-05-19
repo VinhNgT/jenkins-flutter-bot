@@ -1,26 +1,27 @@
-"""Mock build manager — owns in-memory state and build simulation logic."""
+"""Mock build manager — owns in-memory state and build simulation logic.
+
+The mock-jenkins is fully passive: it simulates build execution by sleeping
+for a configurable delay, then marks the build as complete.  It never makes
+outbound HTTP requests — build-manager discovers completion by polling the
+mock's Jenkins REST API.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import io
-import json
 import logging
 import random
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
-
-import httpx
 
 from .config import MockJenkinsConfig
 
 logger = logging.getLogger(__name__)
 
 # A tiny byte sequence that starts with the ZIP magic number (PK\x03\x04)
-# followed by "mock-apk" marker.  Not a valid APK but enough for the bot's
-# webhook handler which just saves and forwards the file.
+# followed by "mock-apk" marker.  Not a valid APK but enough for the
+# build-manager's download_artifact handler which just saves and forwards.
 DUMMY_APK = b"PK\x03\x04" + b"mock-jenkins-dummy-apk-artifact" + b"\x00" * 64
 
 
@@ -31,14 +32,13 @@ class MockBuild:
     queue_id: int
     build_number: int
     branch: str
-    callback_url: str
     request_id: str
-    job_id: str
     building: bool = True
     result: str = ""  # "", "SUCCESS", "FAILURE", "ABORTED"
     timestamp: float = field(default_factory=time.time)
     duration_ms: int = 0
     cancelled: bool = False
+    commit_hash: str = field(default_factory=lambda: uuid.uuid4().hex[:40])
     task: asyncio.Task[None] | None = field(default=None, repr=False)
 
 
@@ -76,7 +76,11 @@ class MockBuildManager:
         build.task = asyncio.create_task(self._simulate_build(build))
 
     async def _simulate_build(self, build: MockBuild) -> None:
-        """Simulate a build by waiting, then posting the webhook callback."""
+        """Simulate a build by waiting, then marking it as complete.
+
+        The mock-jenkins is fully passive — it never sends any outbound
+        HTTP requests.  Build-manager discovers completion by polling.
+        """
         try:
             await asyncio.sleep(self.config.mock_build_delay)
 
@@ -87,16 +91,12 @@ class MockBuildManager:
             # Determine success/failure
             if self.config.mock_failure_rate > 0 and random.random() < self.config.mock_failure_rate:
                 build.result = "FAILURE"
-                build.building = False
-                build.duration_ms = int((time.time() - build.timestamp) * 1000)
-                logger.info("Build #%d simulated FAILURE", build.build_number)
-                await self._send_callback(build, success=False)
             else:
                 build.result = "SUCCESS"
-                build.building = False
-                build.duration_ms = int((time.time() - build.timestamp) * 1000)
-                logger.info("Build #%d simulated SUCCESS", build.build_number)
-                await self._send_callback(build, success=True)
+
+            build.building = False
+            build.duration_ms = int((time.time() - build.timestamp) * 1000)
+            logger.info("Build #%d completed: %s", build.build_number, build.result)
 
         except asyncio.CancelledError:
             build.result = "ABORTED"
@@ -108,52 +108,3 @@ class MockBuildManager:
             build.result = "FAILURE"
             build.building = False
             build.duration_ms = int((time.time() - build.timestamp) * 1000)
-
-    async def _send_callback(self, build: MockBuild, *, success: bool) -> None:
-        """POST the webhook callback to the bot, mimicking the Jenkinsfile."""
-        if not build.callback_url:
-            logger.info("No callback URL for build #%d, skipping", build.build_number)
-            return
-
-        commit_hash = uuid.uuid4().hex[:40]  # Simulate a 40-char git hash
-
-        metadata: dict[str, Any] = {
-            "request_id": build.request_id,
-            "job_id": build.job_id,
-            "status": "success" if success else "failure",
-            "commit_hash": commit_hash,
-        }
-
-        if not success:
-            metadata["logs"] = (
-                "FAILURE: Simulated build failure from mock-jenkins.\n"
-                "This is a test failure — no real compilation was attempted."
-            )
-
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                if success:
-                    # Multipart POST with artifact
-                    files = {
-                        "metadata": (None, json.dumps(metadata), "application/json"),
-                        "artifact": (
-                            "app-release.apk",
-                            io.BytesIO(DUMMY_APK),
-                            "application/octet-stream",
-                        ),
-                    }
-                    resp = await client.post(build.callback_url, files=files)  # type: ignore
-                else:
-                    # Multipart POST without artifact
-                    files = {
-                        "metadata": (None, json.dumps(metadata), "application/json"),
-                    }
-                    resp = await client.post(build.callback_url, files=files)  # type: ignore
-
-                logger.info(
-                    "Webhook callback sent to %s — status %d",
-                    build.callback_url,
-                    resp.status_code,
-                )
-        except Exception:
-            logger.exception("Failed to send webhook callback to %s", build.callback_url)

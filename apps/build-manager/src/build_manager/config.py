@@ -68,15 +68,6 @@ class BuildSettings(ServiceSettings):
             "json_key": "builds.file_manager_url",
         },
     )
-    self_url: str = Field(
-        title="Self URL",
-        description="Internal URL of this service (used for webhook callbacks)",
-        json_schema_extra={
-            "group": "Advanced",
-            "help_html": "Internal URL of this service (e.g., <code>http://build-manager:9010</code>). Normally provided by the deployment environment.",
-            "json_key": "builds.self_url",
-        },
-    )
     max_recent_builds: int = Field(
         3,
         title="Max Recent Builds",
@@ -93,6 +84,34 @@ class BuildSettings(ServiceSettings):
         json_schema_extra={
             "group": "Advanced",
             "json_key": "builds.build_timeout",
+        },
+    )
+    poll_interval: int = Field(
+        10,
+        title="Poll Interval (seconds)",
+        description="How often to check Jenkins for build completion",
+        json_schema_extra={
+            "group": "Advanced",
+            "help_html": (
+                "Seconds between Jenkins API checks while a build is "
+                "running. Lower values give faster notifications but "
+                "increase API traffic."
+            ),
+            "json_key": "builds.poll_interval",
+        },
+    )
+    artifact_pattern: str = Field(
+        "*.apk",
+        title="Artifact Pattern",
+        description="Glob pattern to match build artifacts in the Jenkins archive",
+        json_schema_extra={
+            "group": "Advanced",
+            "help_html": (
+                "Pattern to find the build artifact. Default "
+                "<code>*.apk</code> matches any APK. Change to "
+                "<code>*.aab</code> for app bundles."
+            ),
+            "json_key": "builds.artifact_pattern",
         },
     )
     build_data_path: Path = Field(

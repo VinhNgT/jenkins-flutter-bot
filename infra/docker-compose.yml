@@ -32,7 +32,6 @@ services:
       - path: env/build-manager.env
         required: false
     environment:
-      SELF_URL: http://build-manager:9010
       FILE_MANAGER_URL: http://file-manager:9092
       JENKINS_URL: http://jenkins:8080
     expose:

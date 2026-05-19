@@ -1,7 +1,15 @@
-"""Jenkins REST API client for triggering and querying builds."""
+"""Jenkins REST API client for triggering and querying builds.
+
+Provides methods for:
+  - Triggering parameterised builds
+  - Querying build history and results
+  - Downloading archived artifacts
+  - Cancelling queued or running builds
+"""
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -34,6 +42,20 @@ def _extract_params(build: dict[str, Any]) -> dict[str, str]:
         if params:
             return {p["name"]: p["value"] for p in params}
     return {}
+
+
+def _extract_commit_hash(build: dict[str, Any]) -> str:
+    """Extract commit hash from Jenkins Git plugin's ``lastBuiltRevision``.
+
+    The Git plugin stores the commit SHA inside the build's ``actions`` array
+    as ``{"lastBuiltRevision": {"SHA1": "<hex>"}}``.  Returns an empty string
+    if not present (e.g. build is still running, or Git plugin is absent).
+    """
+    for action in build.get("actions", []):
+        rev = action.get("lastBuiltRevision", {})
+        if "SHA1" in rev:
+            return rev["SHA1"]
+    return ""
 
 
 @dataclass(frozen=True)
@@ -76,7 +98,7 @@ class JenkinsClient:
         """
         tree = (
             "builds[number,result,building,timestamp,duration,"
-            f"actions[parameters[name,value]]]{{0,{count}}}"
+            f"actions[parameters[name,value],lastBuiltRevision[SHA1]]]{{0,{count}}}"
         )
         url = f"{self.job_url}/api/json?tree={tree}"
 
@@ -102,9 +124,9 @@ class JenkinsClient:
                         timestamp=raw.get("timestamp", 0) / 1000,  # ms → s
                         duration_ms=raw.get("duration", 0),
                         branch=params.get("BRANCH", ""),
-                        # commit_hash comes from webhook metadata, not Jenkins
-                        # build parameters — always empty when queried via API.
-                        commit_hash="",
+                        # commit_hash is populated from the Jenkins Git
+                        # plugin's lastBuiltRevision action when available.
+                        commit_hash=_extract_commit_hash(raw),
                         request_id=params.get("BOT_REQUEST_ID", ""),
                     )
                 )
@@ -117,9 +139,7 @@ class JenkinsClient:
     async def trigger_build(
         self,
         branch: str,
-        callback_url: str,
         request_id: str,
-        job_id: str,
     ) -> int:
         """Trigger a parameterised Jenkins build.
 
@@ -131,9 +151,7 @@ class JenkinsClient:
         url = f"{self.job_url}/buildWithParameters"
         params = {
             "BRANCH": branch,
-            "BOT_CALLBACK_URL": callback_url,
             "BOT_REQUEST_ID": request_id,
-            "BOT_JOB_ID": job_id,
         }
 
         try:
@@ -254,3 +272,37 @@ class JenkinsClient:
                 resp.status_code,
                 resp.text[:200],
             )
+
+    async def download_artifact(
+        self, build_number: int, pattern: str = "*.apk"
+    ) -> tuple[str, bytes] | None:
+        """Download the first archived artifact matching a glob pattern.
+
+        Lists artifacts via the Jenkins REST API, then downloads the first
+        file whose basename matches ``pattern`` (e.g. ``*.apk``).
+
+        Returns ``(filename, content_bytes)`` or ``None`` if no match found.
+        """
+        list_url = (
+            f"{self.job_url}/{build_number}/api/json"
+            f"?tree=artifacts[relativePath]"
+        )
+        resp = await self._client.get(list_url)
+        resp.raise_for_status()
+
+        artifacts = resp.json().get("artifacts", [])
+        match = None
+        for art in artifacts:
+            rel_path = art.get("relativePath", "")
+            if fnmatch.fnmatch(rel_path.split("/")[-1], pattern):
+                match = rel_path
+                break
+
+        if match is None:
+            return None
+
+        dl_url = f"{self.job_url}/{build_number}/artifact/{match}"
+        resp = await self._client.get(dl_url)
+        resp.raise_for_status()
+        filename = match.split("/")[-1]
+        return filename, resp.content

@@ -2,7 +2,8 @@
 
 Simulates the Jenkins REST API for local development.
 On trigger, spawns a background task that waits MOCK_BUILD_DELAY seconds,
-then POSTs a webhook callback to BOT_CALLBACK_URL with a dummy APK.
+then marks the build as complete.  Fully passive — makes no outbound
+HTTP requests.  Build-manager discovers completion by polling.
 """
 
 from __future__ import annotations

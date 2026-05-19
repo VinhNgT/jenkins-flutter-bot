@@ -1,22 +1,18 @@
 """Build API routes — /api/builds/*.
 
 Exposes the build lifecycle to frontends:
-  - POST /api/builds/trigger     — start a new build
-  - POST /api/builds/webhook     — receive build-complete callback
-  - GET  /api/builds/pending     — list in-flight builds
-  - GET  /api/builds/recent      — list completed builds
-  - POST /api/builds/{id}/cancel — cancel a pending build
+  - POST /api/builds/trigger           — start a new build
+  - GET  /api/builds/pending           — list in-flight builds
+  - GET  /api/builds/recent            — list completed builds
+  - POST /api/builds/{id}/cancel       — cancel a pending build
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import tempfile
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import APIRouter, HTTPException, Request
 
 from ..dependencies import CoordinatorDep
 from ..builds.jenkins_client import JenkinsTriggerError
@@ -46,47 +42,6 @@ async def trigger_build(coord: CoordinatorDep, request: Request) -> dict[str, An
         return result
     except JenkinsTriggerError as exc:
         raise HTTPException(status_code=502, detail=exc.user_message) from exc
-
-
-@router.post("/webhook")
-async def build_webhook(
-    coord: CoordinatorDep,
-    request: Request,
-    metadata: str | None = None,
-    artifact: UploadFile | None = None,
-) -> dict[str, str]:
-    """Receive a build-complete callback from the Jenkins agent.
-
-    Expects multipart form data with:
-      - ``metadata``: JSON string with build result info
-      - ``artifact``: optional uploaded APK file (on success)
-    """
-    # Parse metadata from form or body
-    if metadata:
-        meta = json.loads(metadata)
-    else:
-        # Fall back to reading the raw form
-        form = await request.form()
-        meta_field = form.get("metadata")
-        if meta_field is None:
-            return {"status": "ignored"}
-        meta = json.loads(str(meta_field))
-        artifact = form.get("artifact")  # type: ignore[assignment]
-
-    artifact_path: str | None = None
-
-    if artifact is not None and hasattr(artifact, "read"):
-        suffix = os.path.splitext(artifact.filename or "file")[1]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(await artifact.read())
-            artifact_path = tmp.name
-
-    try:
-        return await coord.handle_webhook(meta, artifact_path)
-    finally:
-        # Clean up temp file if upload failed or was handled
-        if artifact_path and os.path.exists(artifact_path):
-            os.unlink(artifact_path)
 
 
 @router.get("/pending")

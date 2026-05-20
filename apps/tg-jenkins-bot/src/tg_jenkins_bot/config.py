@@ -67,7 +67,7 @@ class BotSettings(ServiceSettings):
         json_schema_extra={"group": "Application", "json_key": "bot.branch_list"},
     )
     session_ttl: int = Field(
-        300,
+        60,
         title="Session TTL (seconds)",
         description="How long menu sessions stay active",
         json_schema_extra={"group": "Advanced", "json_key": "bot.session_ttl"},

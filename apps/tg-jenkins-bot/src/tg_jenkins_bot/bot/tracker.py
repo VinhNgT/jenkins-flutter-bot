@@ -15,6 +15,13 @@ States
 - ``building``          — build triggered, waiting for result callback
 - ``confirming_cancel`` — "Cancel" tapped, showing confirmation
 - ``done``              — terminal state (success, failure, cancelled)
+
+Expiry
+------
+The tracker is a **pure state store** — it does not enforce TTL or
+silently evict entries.  Picker expiration is handled exclusively by
+the active JobQueue timer (``BotContext.expire_picker``), which removes
+the entry and edits the Telegram message when the TTL elapses.
 """
 
 from __future__ import annotations
@@ -42,15 +49,16 @@ class InteractionTracker:
     Tracks every interactive Telegram message by ``(chat_id, message_id)``.
     Provides state queries, validated transitions, and chat-level locks.
 
-    TTL applies only to picker states (``picking``, ``awaiting_text``).
-    Build states (``building``, ``confirming_cancel``) are long-lived and
-    only removed explicitly via :meth:`remove` or :meth:`transition` to
-    ``done``.
+    This is a pure state store — it does **not** enforce TTL or silently
+    evict entries.  Picker expiration is handled by the active JobQueue
+    timer (see ``BotContext.expire_picker``).  The ``_picker_ttl`` value
+    is stored here as a configuration property, read by ``BotContext``
+    for scheduling the timer and formatting the expiry message.
     """
 
     _PICKER_STATES = frozenset({"picking", "awaiting_text"})
 
-    def __init__(self, picker_ttl: int = 300) -> None:
+    def __init__(self, picker_ttl: int = 60) -> None:
         self._messages: dict[tuple[int, int], TrackedMessage] = {}
         self._picker_ttl = picker_ttl
 
@@ -78,23 +86,8 @@ class InteractionTracker:
     # -- Queries --
 
     def get(self, chat_id: int, message_id: int) -> TrackedMessage | None:
-        """Get a tracked message, or None if expired/missing.
-
-        Picker-state messages are subject to TTL expiry.  Build-state
-        messages are never expired by TTL — they persist until explicitly
-        removed (via webhook callback or cancellation).
-        """
-        key = (chat_id, message_id)
-        msg = self._messages.get(key)
-        if msg is None:
-            return None
-        if (
-            msg.state in self._PICKER_STATES
-            and time.time() - msg.created_at > self._picker_ttl
-        ):
-            del self._messages[key]
-            return None
-        return msg
+        """Get a tracked message, or None if missing."""
+        return self._messages.get((chat_id, message_id))
 
     def find_by_state(
         self,
@@ -107,14 +100,7 @@ class InteractionTracker:
         and for finding the building message for a given branch.
         Returns the first match, or None.
         """
-        now = time.time()
-        for key, msg in list(self._messages.items()):
-            if (
-                msg.state in self._PICKER_STATES
-                and now - msg.created_at > self._picker_ttl
-            ):
-                del self._messages[key]
-                continue
+        for msg in self._messages.values():
             if msg.chat_id == chat_id and msg.state == state:
                 return msg
         return None
@@ -129,14 +115,7 @@ class InteractionTracker:
         Used for webhook callbacks where we only have request_id and
         need to find the corresponding building message across all chats.
         """
-        now = time.time()
-        for msg_key, msg in list(self._messages.items()):
-            if (
-                msg.state in self._PICKER_STATES
-                and now - msg.created_at > self._picker_ttl
-            ):
-                del self._messages[msg_key]
-                continue
+        for msg in self._messages.values():
             if msg.data.get(key_name) == value:
                 return msg
         return None
@@ -176,15 +155,4 @@ class InteractionTracker:
 
     def list_by_state(self, state: str) -> list[TrackedMessage]:
         """List all tracked messages in a given state (across all chats)."""
-        now = time.time()
-        result: list[TrackedMessage] = []
-        for key, msg in list(self._messages.items()):
-            if (
-                msg.state in self._PICKER_STATES
-                and now - msg.created_at > self._picker_ttl
-            ):
-                del self._messages[key]
-                continue
-            if msg.state == state:
-                result.append(msg)
-        return result
+        return [msg for msg in self._messages.values() if msg.state == state]

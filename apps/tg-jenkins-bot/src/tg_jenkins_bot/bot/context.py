@@ -141,6 +141,47 @@ class BotContext:
         return None
 
     # ------------------------------------------------------------------
+    # Picker expiration (called by JobQueue timer + passive fallback)
+    # ------------------------------------------------------------------
+
+    def _format_ttl_duration(self) -> str:
+        """Format the picker TTL as a human-readable duration string."""
+        ttl = self.tracker._picker_ttl
+        if ttl % 60 == 0:
+            mins = ttl // 60
+            return f"{mins} minute{'s' if mins > 1 else ''}"
+        return f"{ttl} seconds"
+
+    async def expire_picker(self, chat_id: int, message_id: int) -> bool:
+        """Expire a picker message if it's still in a picker state.
+
+        Removes the tracker entry and edits the Telegram message to show
+        an expiration notice. Returns True if the picker was expired,
+        False if it was already consumed/missing.
+
+        Called by:
+        - The active JobQueue timer (proactive expiry after TTL)
+        - The passive callback fallback (user taps a stale button)
+        """
+        tracked = self.tracker.get(chat_id, message_id)
+        if tracked is None:
+            return False
+        if tracked.state not in ("picking", "awaiting_text"):
+            return False
+
+        self.tracker.remove(chat_id, message_id)
+
+        duration = self._format_ttl_duration()
+        text = (
+            f"⏳ This build selection menu has expired after {duration}"
+            " of inactivity.\n\n"
+            "Please use the /build command to start a new selection."
+        )
+        await self._edit_build_message(tracked, text)
+
+        return True
+
+    # ------------------------------------------------------------------
     # Build result handlers (called by webhook callback route)
     # ------------------------------------------------------------------
 

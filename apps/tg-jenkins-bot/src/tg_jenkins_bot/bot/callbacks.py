@@ -67,7 +67,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if data.startswith("build:branch:"):
         if not tracked or tracked.state != "picking":
-            await _show_expired(query)
+            await ctx.expire_picker(chat_id, msg_id)
             return
         # Atomic transition: picking → consumed.  Only one tap wins.
         if not ctx.tracker.transition(chat_id, msg_id, "picking", "consumed"):
@@ -82,7 +82,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if data == "build:custom":
         if not tracked or tracked.state != "picking":
-            await _show_expired(query)
+            await ctx.expire_picker(chat_id, msg_id)
             return
         # Atomic transition: picking → awaiting_text
         if not ctx.tracker.transition(chat_id, msg_id, "picking", "awaiting_text"):
@@ -259,15 +259,6 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ---------------------------------------------------------------------------
 
 
-
-async def _show_expired(query: CallbackQuery) -> None:
-    """Edit a stale picker to 'expired'."""
-    try:
-        await query.edit_message_text(
-            "⏳ This picker has expired. Tap /build to start a new one."
-        )
-    except Exception:
-        pass
 
 
 async def _show_stale(query: CallbackQuery) -> None:

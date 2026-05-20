@@ -83,6 +83,25 @@ async def _ensure_authorized(
 
 
 # ---------------------------------------------------------------------------
+# JobQueue callbacks
+# ---------------------------------------------------------------------------
+
+
+async def _expire_picker_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """JobQueue callback — proactively expire an idle picker.
+
+    Delegates to :meth:`BotContext.expire_picker`, which is a no-op
+    if the picker was already consumed (branch selected / build triggered).
+    """
+    job = context.job
+    assert job is not None
+    assert isinstance(job.data, dict)
+    data: dict[str, int] = job.data
+    ctx: BotContext = context.bot_data["bot_context"]
+    await ctx.expire_picker(data["chat_id"], data["message_id"])
+
+
+# ---------------------------------------------------------------------------
 # /start and /help
 # ---------------------------------------------------------------------------
 
@@ -259,6 +278,17 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         state="picking",
         data={"user_name": user_name},
     )
+
+    # Schedule active expiry — proactively edit the picker to "expired"
+    # when the TTL elapses. If the picker was already consumed (branch
+    # selected, build triggered), expire_picker() is a safe no-op.
+    if context.job_queue:
+        context.job_queue.run_once(
+            _expire_picker_job,
+            when=ctx.tracker._picker_ttl,
+            data={"chat_id": chat_id, "message_id": msg.message_id},
+            name=f"expire_picker:{chat_id}:{msg.message_id}",
+        )
 
 
 # ---------------------------------------------------------------------------

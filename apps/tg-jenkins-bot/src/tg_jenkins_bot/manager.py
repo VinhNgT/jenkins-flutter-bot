@@ -121,7 +121,10 @@ class BotManager:
                 await application.start()
                 if not application.updater:
                     raise RuntimeError("Application.updater is None after start")
-                await application.updater.start_polling(drop_pending_updates=True)
+                await application.updater.start_polling(
+                    drop_pending_updates=True,
+                    allowed_updates=["message", "callback_query"],
+                )
 
                 # Register visible commands in the "/" picker
                 await application.bot.set_my_commands(

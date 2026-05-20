@@ -37,10 +37,10 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 | Telegram account  | —               | To create a bot via BotFather                |
 | Google account    | —               | For Drive API OAuth credentials              |
 
-> **First-time build warning:** The `flutter-agent` image downloads Flutter SDK, Android SDK, and pre-caches artifacts during build. Expect the **first `docker compose build`** to take **15–30 minutes** depending on your internet speed. Subsequent builds use Docker layer caching.
+> **First-time build warning:** The `agent-control` image (using `infra/Dockerfile.flutter-agent`) downloads Flutter SDK, Android SDK, and pre-caches artifacts during build. Expect the **first `docker compose build`** to take **15–30 minutes** depending on your internet speed. Subsequent builds use Docker layer caching.
 
 > [!WARNING]
-> **Apple Silicon (ARM64) users:** Flutter does not support building Android release APKs on Linux ARM64 hosts ([flutter#177936](https://github.com/flutter/flutter/issues/177936)). The `flutter-agent` service in `docker-compose.yml` is set to `platform: linux/amd64` to force x86_64 emulation. Builds will be slower under emulation — for production CI/CD, use a native x86_64 server.
+> **Apple Silicon (ARM64) users:** Flutter does not support building Android release APKs on Linux ARM64 hosts ([flutter#177936](https://github.com/flutter/flutter/issues/177936)). The `agent-control` service in `docker-compose.yml` is set to `platform: linux/amd64` to force x86_64 emulation. Builds will be slower under emulation — for production CI/CD, use a native x86_64 server.
 
 ---
 
@@ -78,8 +78,8 @@ This starts all seven services:
 | ---------------- | ---------------------- | ------------------------------------------------- |
 | `jenkins`        | http://localhost:8080   | Jenkins controller (web UI)                       |
 | `config-hub`     | http://localhost:9000   | Configuration dashboard and operational hub       |
-| `tg-bot`         | Internal (:9090)       | Telegram bot + webhook receiver                   |
-| `flutter-agent`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs           |
+| `tg-jenkins-bot` | Internal (:9090)       | Telegram bot + webhook receiver                   |
+| `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs + control API |
 | `file-manager`   | Internal (:9092)       | Google Drive OAuth and APK upload/download        |
 | `build-manager`  | Internal (:9010)       | Jenkins build trigger and job state tracking      |
 | `tg-admin-bot`   | Internal (polling)     | Headless admin bot (optional — needs `ADMIN_BOT_TOKEN`) |
@@ -134,7 +134,7 @@ Back in Jenkins (http://localhost:8080):
 
 1. Click your username (top-right) → **Configure**
 2. Under **API Token**, click **Add new Token**
-3. Give it a name (e.g., `tg-bot`) and click **Generate**
+3. Give it a name (e.g., `jenkins-flutter-bot` or `build-manager`) and click **Generate**
 4. **Copy the token immediately** — it won't be shown again
 
 ### 2e. Add Repository Credentials (Private Repos)
@@ -183,9 +183,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
    | Parameter Name    | Default Value | Description                                 |
    | ----------------- | ------------- | ------------------------------------------- |
    | `BRANCH`          | `main`        | Git branch or commit hash to build          |
-   | `BOT_CALLBACK_URL`| _(empty)_     | Webhook URL the bot provides                |
-   | `BOT_REQUEST_ID`  | _(empty)_     | Unique build tracking token                 |
-   | `BOT_JOB_ID`      | _(empty)_     | Job identifier for routing callbacks        |
+   | `BUILD_REQUEST_ID`| _(empty)_     | Correlation ID to match this build back to the Telegram request |
 
 5. Under **Pipeline**, paste a Jenkinsfile script.
 
@@ -200,10 +198,11 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
        agent { label 'flutter' }
 
        parameters {
+           // Branch to build — injected by the Telegram bot's /build command
            string(name: 'BRANCH', defaultValue: 'main')
-           string(name: 'BOT_CALLBACK_URL', defaultValue: '')
-           string(name: 'BOT_REQUEST_ID', defaultValue: '')
-           string(name: 'BOT_JOB_ID', defaultValue: '')
+
+           // Correlation ID — injected automatically by the build-manager. Do NOT set manually.
+           string(name: 'BUILD_REQUEST_ID', defaultValue: '')
        }
 
        stages {
@@ -229,55 +228,9 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
 
        post {
            success {
-               script {
-                   if (params.BOT_CALLBACK_URL) {
-                       def apkPath = 'build/app/outputs/flutter-apk/app-release.apk'
-                       def commitHash = ''
-                       try {
-                           commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
-                       } catch (e) {
-                           commitHash = ''
-                       }
-                       def metadata = groovy.json.JsonOutput.toJson([
-                           request_id : params.BOT_REQUEST_ID,
-                           job_id     : params.BOT_JOB_ID,
-                           status     : 'success',
-                           commit_hash: commitHash,
-                       ])
-
-                       sh """
-                           curl -X POST "${params.BOT_CALLBACK_URL}" \\
-                               -F 'metadata=${metadata}' \\
-                               -F "artifact=@${apkPath}"
-                       """
-                   }
-               }
-           }
-
-           failure {
-               script {
-                   if (params.BOT_CALLBACK_URL) {
-                       def commitHash = ''
-                       try {
-                           commitHash = sh(script: 'git rev-parse --verify HEAD', returnStdout: true).trim()
-                       } catch (e) {
-                           commitHash = ''
-                       }
-                       def logs = currentBuild.rawBuild.getLog(50).join('\n')
-                       def metadata = groovy.json.JsonOutput.toJson([
-                           request_id : params.BOT_REQUEST_ID,
-                           job_id     : params.BOT_JOB_ID,
-                           status     : 'failure',
-                           commit_hash: commitHash,
-                           logs       : logs,
-                       ])
-
-                       sh """
-                           curl -X POST "${params.BOT_CALLBACK_URL}" \\
-                               -F 'metadata=${metadata}'
-                       """
-                   }
-               }
+               // Archive the resulting APK inside Jenkins.
+               // Build-manager will poll for success, then download the archived file.
+               archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/*.apk'
            }
        }
    }
@@ -295,9 +248,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
    }
    ```
 
-   > **Adapt this pipeline** to your specific Flutter project. The key contract is the `post` block — it must POST a multipart form to `BOT_CALLBACK_URL` with a `metadata` JSON field (and an `artifact` file on success). Replace the `url` and `credentialsId` with your own values.
-   >
-   > `groovy.json.JsonOutput.toJson()` is used for metadata serialization — it correctly handles any special characters in commit hashes or log output. Do not use Groovy string interpolation to build JSON manually.
+   > **Adapt this pipeline** to your specific Flutter project. The key contract is the `archiveArtifacts` call in the success block. Build-manager's poll worker will detect completion and download the APK automatically. **The pipeline does not need to make any outbound HTTP calls.**
 
 6. Click **Save**
 
@@ -447,8 +398,8 @@ docker compose restart
 
 ```bash
 # Check logs for a specific service
-docker compose logs tg-bot
-docker compose logs flutter-agent
+docker compose logs tg-jenkins-bot
+docker compose logs agent-control
 docker compose logs config-hub
 docker compose logs build-manager
 docker compose logs file-manager
@@ -463,7 +414,7 @@ docker compose logs file-manager
 ### Agent shows as offline in Jenkins
 
 - Verify the agent secret is correct in the **Jenkins Agent** tab
-- Check the agent logs: `docker compose logs flutter-agent`
+- Check the agent logs: `docker compose logs agent-control`
 - Ensure the `JENKINS_AGENT_NAME` matches the node name in Jenkins (default: `flutter-agent`)
 
 ### Build triggers but Jenkins returns 403
@@ -481,9 +432,13 @@ docker compose logs file-manager
 
 ### Build succeeds but no Telegram notification
 
-- The `BOT_CALLBACK_URL` in the Jenkins pipeline must POST back to `http://tg-bot:9090/webhook/build-complete`
-- Check bot logs for webhook errors: `docker compose logs tg-bot`
-- Ensure the `request_id` and `job_id` are passed correctly in the pipeline's `post` block
+- Build-manager polls Jenkins REST API for build status. Ensure the Jenkins credentials and job name are configured correctly in the **Build Manager** tab.
+- The pipeline MUST archive the APK (via `archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/*.apk'`). Check that the archive pattern matches your APK output location.
+- Verify that `tg-jenkins-bot` and `build-manager` are successfully communicating. Check logs:
+  ```bash
+  docker compose logs build-manager
+  docker compose logs tg-jenkins-bot
+  ```
 
 ### OAuth popup says "redirect_uri_mismatch"
 

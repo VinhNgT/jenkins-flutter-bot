@@ -82,7 +82,7 @@ All function signatures should have parameter types and return types. Use `from 
 ### Data Classes vs Pydantic Models
 
 - **Config classes** inherit from `ServiceSettings` (Pydantic) — see `config-and-secrets.md` for the pattern.
-- **Value objects** like `PendingBuild` use frozen dataclasses — hashable and mutation-safe.
+- **Value objects and interactive states** use dataclasses (e.g. `TrackedMessage`) to cleanly encapsulate structured state. State transitions are managed atomically by dedicated tracker/manager classes (like `InteractionTracker`) to prevent race conditions.
 - Avoid global mutable state at module level; mutable state lives in manager classes attached to `app.state`.
 
 ### Logging

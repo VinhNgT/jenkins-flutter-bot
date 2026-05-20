@@ -12,7 +12,7 @@ Storage backend service for the Jenkins Flutter Bot. Manages Google Drive OAuth 
 ## How It Works
 
 1. On first use, config-hub initiates the OAuth flow — user signs in via a browser popup
-2. file-manager exchanges the auth code for tokens and stores them in `/app/data/storage.json`
+2. file-manager exchanges the auth code for tokens and stores them in `/app/data/oauth.json`
 3. On each successful build, the build-manager instructs file-manager to upload the APK
 4. file-manager creates a file-scoped shareable link and returns it to the caller
 

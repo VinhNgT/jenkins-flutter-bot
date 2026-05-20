@@ -17,10 +17,10 @@ The bot acts as a thin trigger layer. The full flow:
 2. Bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, `callback_url`, and a generated `request_id`
 3. Build-manager triggers Jenkins (`POST /buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build
 4. Build-manager spawns a **per-build poll worker** (`asyncio` task) that periodically queries the Jenkins REST API
-5. Bot stores a `PendingBuild` in memory (request_id → chat_id/message_id for inline editing)
-6. Jenkins pipeline runs on the flutter-agent and calls `archiveArtifacts` on success — **no outbound HTTP from the agent**
-7. Poll worker detects `building == False` for the matching `BUILD_REQUEST_ID`, downloads the artifact directly from Jenkins (`GET /job/{name}/{number}/artifact/{path}`), uploads it to file-manager, enforces `max_recent_builds` retention, and forwards the result to the bot's callback URL
-8. Bot matches `request_id` and sends the download link to the originating Telegram chat
+5. Bot registers the interactive message with the `InteractionTracker` as a `TrackedMessage` in `picking` state. Upon branch confirmation, the bot transitions the message to `building` state and stores `request_id` in the message's `data` dict (allowing callback correlation)
+6. Jenkins pipeline runs on the agent managed by `agent-control` and calls `archiveArtifacts` on success — **no outbound HTTP from the agent**
+7. Poll worker detects `building == False` for the matching `BUILD_REQUEST_ID`, downloads the artifact directly from Jenkins (`GET /job/{name}/{number}/artifact/{path}`), uploads it to `file-manager`, enforces `max_recent_builds` retention, and forwards the result to the bot's callback URL (`/callback/build-result`)
+8. Bot correlates the callback payload's `request_id` via `InteractionTracker.find_by_data()`, transitions the `TrackedMessage` to `done` state, and edits the message in-place to present the download link
 
 If the poll worker's elapsed time exceeds `build_timeout`, build-manager records a `timeout` completion and notifies the bot's callback URL.
 
@@ -55,14 +55,14 @@ If a service is down, its schema returns `null` and the config-hub frontend show
 
 ### Scope-to-Service Translation
 
-The config-hub exposes UI scopes that map directly to internal service names. The mapping lives exclusively in `config-hub/manager.py:_SCOPE_TO_SERVICE`:
+The config-hub exposes UI scopes that map directly to internal service URLs (which point to their Docker containers). The mapping lives exclusively in `config-hub/manager.py:_SCOPE_TO_SERVICE`:
 
-| UI Scope | Internal Service |
-|----------|-----------------|
-| `bot` | `bot` |
-| `agent` | `agent` |
-| `file_manager` | `file_manager` |
-| `builds` | `builds` |
+| UI Scope | Internal Service Client Name | Target Container / Service |
+|----------|-----------------------------|----------------------------|
+| `bot` | `bot` | `tg-jenkins-bot` |
+| `agent` | `agent` | `agent-control` |
+| `file_manager` | `file_manager` | `file-manager` |
+| `builds` | `builds` | `build-manager` |
 
 Unknown scopes are rejected with HTTP 404 — `save_scope()` raises `ValueError` for any scope not in the map.
 
@@ -115,7 +115,7 @@ Each uploaded APK is made individually accessible — the Drive **folder** stays
 Build state is split across two services:
 
 - **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links. Owns build completion detection (per-build poll worker `asyncio` tasks), artifact download, and retention enforcement (`max_recent_builds` eviction with Drive file cleanup). The poll worker queries Jenkins at configurable intervals and downloads the artifact directly from the Jenkins archive upon success.
-- **tg-bot** — maintains `PendingBuild` records (in-memory only) keyed by `request_id`. Each record maps a `request_id` to a Telegram `chat_id` and `message_id` for inline message editing. These are consumed on callback receipt.
+- **tg-jenkins-bot** — maintains `TrackedMessage` objects in-memory via `InteractionTracker` keyed by `(chat_id, message_id)`. The tracker handles picking and building states, providing atomic state transitions that prevent double-tap race conditions. Correlation with the callback's `request_id` is done by querying the `request_id` stored inside each message's `data` dictionary.
 
 Jenkins owns all raw build metadata (status, duration, branch, commit). The bot queries build-manager for summaries — it never queries Jenkins directly for build info.
 

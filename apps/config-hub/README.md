@@ -40,8 +40,8 @@ UI scope names map to their owning services:
 
 | Variable | Description |
 |----------|-------------|
-| `BOT_CONTROL_URL` | Base URL of the tg-bot control API (default: `http://tg-bot:9090`) |
-| `AGENT_CONTROL_URL` | Base URL of the agent-control API (default: `http://flutter-agent:9091`) |
+| `BOT_CONTROL_URL` | Base URL of the tg-jenkins-bot control API (default: `http://tg-jenkins-bot:9090`) |
+| `AGENT_CONTROL_URL` | Base URL of the agent-control API (default: `http://agent-control:9091`) |
 | `FILE_MANAGER_URL` | Base URL of the file-manager API (default: `http://file-manager:9092`) |
 | `BUILD_MANAGER_URL` | Base URL of the build-manager API (default: `http://build-manager:9010`) |
 

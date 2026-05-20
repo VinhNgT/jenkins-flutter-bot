@@ -24,10 +24,10 @@ graph TD
     end
 
     subgraph managed["Managed Services"]
-        BOT["tg-bot :9090"]
+        BOT["tg-jenkins-bot :9090"]
         BM["build-manager :9010"]
         FM["file-manager :9092"]
-        AGT["flutter-agent :9091"]
+        AGT["agent-control :9091"]
     end
 
     JNK["jenkins :8080 ★"]
@@ -41,7 +41,7 @@ graph TD
     BOT -- trigger --> BM
     BM -- trigger --> JNK
     JNK -- dispatches --> AGT
-    AGT -- webhook --> BM
+    BM -- polls --> JNK
     BM -- upload --> FM
     BM -- callback --> BOT
 ```
@@ -50,8 +50,8 @@ graph TD
 |---------|------|---------|------|
 | `config-hub` | 9000 | Yes | Central operational hub — config proxy, service control, web dashboard |
 | `jenkins` | 8080 | Yes | Jenkins controller (dev/testing — can be external) |
-| `tg-bot` | 9090 | No | Telegram bot — slash commands, notification rendering |
-| `flutter-agent` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs |
+| `tg-jenkins-bot` | 9090 | No | Telegram bot — slash commands, notification rendering |
+| `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 | `file-manager` | 9092 | No | Storage backend — Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job tracking |
 | `tg-admin-bot` | — | No | Headless Telegram admin bot (HTTP client to config-hub) |

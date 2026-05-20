@@ -23,7 +23,7 @@ Each schema-owning service declares a `ServiceSettings` subclass and exposes it 
 
 | Service | Config Class | Schema Endpoint |
 |---------|-------------|-----------------|
-| `tg-bot` | `BotSettings` | `GET /control/schema` |
+| `tg-jenkins-bot` | `BotSettings` | `GET /control/schema` |
 | `agent-control` | `AgentSettings` | `GET /control/schema` |
 | `file-manager` | `StorageSettings` | `GET /control/schema` |
 | `build-manager` | `BuildSettings` | `GET /control/schema` |
@@ -70,7 +70,7 @@ Each service stores its own config in a dedicated volume. Config paths are **har
 
 | File | Volume | Written By | Read By |
 |------|--------|------------|---------|
-| `/app/data/bot.json` | `bot-data` | config-hub (via PUT /control/config) | tg-bot |
+| `/app/data/bot.json` | `bot-data` | config-hub (via PUT /control/config) | `tg-jenkins-bot` |
 | `/app/data/agent.json` | `agent-data` | config-hub (via PUT /control/config) | agent-control |
 | `/app/data/storage.json` | `storage-data` | config-hub (via PUT /control/config) | file-manager |
 | `/app/data/builds.json` | `build-manager-data` | config-hub (via PUT /control/config) | build-manager |

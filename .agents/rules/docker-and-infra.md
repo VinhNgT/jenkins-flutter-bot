@@ -15,12 +15,12 @@ Triggered when editing Dockerfiles, docker-compose files, compose.sh, or env fil
 For the authoritative volume list, see `docker-compose.yml`. Key design decisions:
 
 - Each service has its own isolated data volume — no volumes are shared between services.
-- **`bot-data`** holds tg-bot runtime state (pending builds, build history) + bot JSON config.
-- **`agent-data`** holds the agent JSON config.
-- **`build-manager-data`** holds build registry state + build-manager JSON config.
-- **`storage-data`** holds Drive OAuth tokens + file-manager JSON config.
+- **`bot-data`** holds `tg-jenkins-bot` JSON config (interaction states are transient and held strictly in-memory).
+- **`agent-data`** holds the `agent-control` JSON config.
+- **`build-manager-data`** holds build registry state + `build-manager` JSON config.
+- **`storage-data`** holds Drive OAuth tokens + `file-manager` JSON config.
 - **`jenkins-data`** holds Jenkins home — decoupled from all other services.
-- **`mock-agent-data`** (mock mode only) holds the agent JSON config used by the mock agent-control server.
+- **`mock-agent-data`** (mock mode only) holds the agent JSON config used by the mock `agent-control` server.
 - Config crosses service boundaries via HTTP (`/control/config`), not via shared mounts.
 
 ---
@@ -32,9 +32,9 @@ All services share a single Docker bridge network. Only two ports are exposed to
 - **`jenkins:8080`** — Jenkins web UI
 - **`config-hub:9000`** — Config dashboard + Drive OAuth callback
 
-Bot (`9090`), flutter-agent (`9091`), file-manager (`9092`), and build-manager (`9010`) ports are internal only. `tg-admin-bot` has no HTTP server.
+Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), and build-manager (`9010`) ports are internal only. `tg-admin-bot` has no HTTP server.
 
-Do not expose bot, agent, file-manager, or build-manager ports to the host.
+Do not expose bot, agent-control, file-manager, or build-manager ports to the host.
 
 ---
 
@@ -57,7 +57,7 @@ Five compose modes via `compose.sh`:
 ./compose.sh prod [args]     # Prod — pulls pre-built images from GHCR
 ./compose.sh edge [args]     # Edge — pulls edge images from GHCR (main branch)
 ./compose.sh hybrid [args]   # Hybrid — builds locally except agent-control (pulled from GHCR)
-./compose.sh mock [args]     # Mock — replaces flutter-agent + jenkins with mock-jenkins
+./compose.sh mock [args]     # Mock — replaces agent-control + jenkins with mock-jenkins
 ```
 
 **Production mode** overlays `docker-compose.prod.yml`, which replaces `build:` with `image:` pointing to GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
@@ -66,7 +66,7 @@ Five compose modes via `compose.sh`:
 
 **Hybrid mode** overlays `docker-compose.hybrid.yml`, which disables the local build for `agent-control` and pulls it from GHCR instead, while building all other services locally.
 
-**Mock mode** overlays `docker-compose.mock.yml`, which replaces the real `flutter-agent` and `jenkins` with the `mock-jenkins` service. Used for local development and testing without a real Jenkins install.
+**Mock mode** overlays `docker-compose.mock.yml`, which replaces the real `agent-control` and `jenkins` with the `mock-jenkins` service. Used for local development and testing without a real Jenkins install.
 
 The `jenkins` service has **no** prod override — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the service.
 
@@ -76,7 +76,7 @@ The `jenkins` service has **no** prod override — it's a dev/testing convenienc
 
 Defined in `.github/workflows/build-images.yml`. Triggers on `v*.*.*` tags.
 
-All apps are built and pushed to GHCR with both the exact version tag and `latest`. The `flutter-agent` is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
+All apps are built and pushed to GHCR with both the exact version tag and `latest`. The `agent-control` (under `infra/Dockerfile.flutter-agent`) is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
 
 **To release:** `git tag v1.2.3 && git push origin v1.2.3`.
 
@@ -84,7 +84,7 @@ All apps are built and pushed to GHCR with both the exact version tag and `lates
 
 ## Docker Build Patterns
 
-### Standard Apps (tg-bot, config-hub, build-manager, file-manager, tg-admin-bot, agent-control)
+### Standard Apps (tg-jenkins-bot, config-hub, build-manager, file-manager, tg-admin-bot, agent-control)
 
 All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions:
 
@@ -93,9 +93,9 @@ All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions
 - The final image has no `uv`, no build caches, no dev deps
 - The `[project.scripts]` entry in each app's `pyproject.toml` is the Docker `CMD`
 
-### flutter-agent (Exception)
+### agent-control (Exception)
 
-Two-stage build with fundamentally different concerns: Stage 1 downloads multi-GB Android/Flutter SDKs; Stage 2 copies them into the runtime image.
+Two-stage build with fundamentally different concerns (using `infra/Dockerfile.flutter-agent` context): Stage 1 downloads multi-GB Android/Flutter SDKs; Stage 2 copies them into the runtime image.
 
 Key conventions and the *why*:
 
@@ -109,7 +109,7 @@ Key conventions and the *why*:
 A single container running two FastAPI servers:
 
 - **Port 8080** — mock Jenkins API (build trigger, status)
-- **Port 9091** — mock agent-control API (mirrors real `flutter-agent` `/control/*` endpoints)
+- **Port 9091** — mock agent-control API (mirrors real `agent-control` `/control/*` endpoints)
 
 The mock agent-control server uses the **real** `AgentSettings` schema from `agent-control` (not a hardcoded copy), so the schema served to config-hub is always in sync. Config is persisted to the `mock-agent-data` volume. Start/restart validate the config and fail if the agent secret is missing — matching real agent-control behaviour.
 

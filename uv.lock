@@ -23,7 +23,7 @@ members = [
 
 [[package]]
 name = "agent-control"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { editable = "apps/agent-control" }
 dependencies = [
     { name = "config-core" },
@@ -130,7 +130,7 @@ wheels = [
 
 [[package]]
 name = "build-manager"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { editable = "apps/build-manager" }
 dependencies = [
     { name = "config-core" },
@@ -320,7 +320,7 @@ wheels = [
 
 [[package]]
 name = "config-core"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { editable = "libs/config-core" }
 dependencies = [
     { name = "pydantic" },
@@ -337,7 +337,7 @@ requires-dist = [
 
 [[package]]
 name = "config-hub"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { editable = "apps/config-hub" }
 dependencies = [
     { name = "config-core" },
@@ -429,7 +429,7 @@ wheels = [
 
 [[package]]
 name = "file-manager"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { editable = "apps/file-manager" }
 dependencies = [
     { name = "config-core" },
@@ -595,7 +595,7 @@ wheels = [
 
 [[package]]
 name = "jenkins-flutter-bot"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -1131,7 +1131,7 @@ wheels = [
 
 [[package]]
 name = "tg-admin-bot"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { editable = "apps/tg-admin-bot" }
 dependencies = [
     { name = "config-core" },
@@ -1148,7 +1148,7 @@ requires-dist = [
 
 [[package]]
 name = "tg-jenkins-bot"
-version = "0.3.1.dev6"
+version = "0.3.2.dev1"
 source = { editable = "apps/tg-jenkins-bot" }
 dependencies = [
     { name = "config-core" },

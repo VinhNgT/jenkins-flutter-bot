@@ -37,8 +37,8 @@ async def handle_build_result(manager: ManagerDep, request: Request) -> dict[str
     request_id = body.get("request_id", "")
     result = body.get("result", "")
 
-    pending = ctx.consume_pending(request_id)
-    if pending is None:
+    building = ctx.consume_building(request_id)
+    if building is None:
         logger.info(
             "Build result for unknown request_id=%s — ignoring",
             request_id[:8],
@@ -46,10 +46,10 @@ async def handle_build_result(manager: ManagerDep, request: Request) -> dict[str
         return {"status": "ignored", "reason": "no pending build"}
 
     if result == "success":
-        await ctx.on_build_success(pending, body)
+        await ctx.on_build_success(building, body)
     elif result == "timeout":
-        await ctx.on_build_timeout(pending, body)
+        await ctx.on_build_timeout(building, body)
     else:
-        await ctx.on_build_failure(pending, body)
+        await ctx.on_build_failure(building, body)
 
     return {"status": "processed"}

@@ -1,8 +1,10 @@
 """Inline button callback router for Telegram bot.
 
-Dispatches ``CallbackQuery`` events based on ``callback_data`` prefix.
-All interactive states (branch picker, cancel confirm, rebuild confirm)
-are handled here via in-place message editing.
+Dispatches ``CallbackQuery`` events based on ``callback_data`` prefix
+**and** the tracked message's current state.  Every callback is validated
+against the interaction tracker before being processed.  Invalid
+transitions (double-taps, stale pickers, orphaned buttons) are rejected
+at the router level — individual handlers never see them.
 
 Entry points are /build and /recent slash commands (see handlers.py).
 """
@@ -12,7 +14,7 @@ from __future__ import annotations
 import html
 import logging
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from .context import BotContext, _format_elapsed
@@ -37,7 +39,12 @@ def _escape(text: str) -> str:
 
 
 async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Dispatch incoming callback queries by data prefix."""
+    """Dispatch incoming callback queries by data prefix + message state.
+
+    Every callback is looked up in the interaction tracker.  If the
+    message isn't tracked or is in the wrong state, the callback is
+    rejected with an appropriate user-facing message.
+    """
     query = update.callback_query
     if not query or not query.data:
         return
@@ -45,298 +52,230 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()  # Telegram requires this to dismiss the spinner
 
     data = query.data
+    ctx = _get_ctx(context)
+    chat_id = update.effective_chat.id if update.effective_chat else 0
+    msg_id = (
+        query.message.message_id
+        if query.message
+        else 0
+    )
+
+    # Look up the message in the tracker
+    tracked = ctx.tracker.get(chat_id, msg_id)
+
+    # -- Branch picker actions (require state=picking) --
 
     if data.startswith("build:branch:"):
-        await _on_branch_selected(update, context, data)
-    elif data == "build:custom":
-        await _on_custom_branch(update, context)
-    elif data.startswith("build:confirm_cancel_rebuild:"):
-        await _on_confirm_cancel_rebuild(update, context, data)
-    elif data.startswith("build:do_cancel_rebuild:"):
-        await _on_do_cancel_rebuild(update, context, data)
-    elif data.startswith("build:back_to_inprog:"):
-        await _on_back_to_inprog(update, context, data)
-    elif data.startswith("cancel:confirm:"):
-        await _on_confirm_cancel(update, context, data)
-    elif data.startswith("cancel:back:"):
-        await _on_back_to_building(update, context, data)
-    elif data.startswith("cancel:"):
-        await _on_cancel(update, context, data)
-    else:
-        logger.warning("Unknown callback_data: %s", data)
+        if not tracked or tracked.state != "picking":
+            await _show_expired(query)
+            return
+        # Atomic transition: picking → consumed.  Only one tap wins.
+        if not ctx.tracker.transition(chat_id, msg_id, "picking", "consumed"):
+            return  # another tap already won the race
+        branch = data.removeprefix("build:branch:")
+        await _trigger_build(update, context, branch, msg_id)
+        # Clean up the consumed tracker entry — _trigger_build registers
+        # a new "building" entry for this message_id if successful.
+        # If _trigger_build showed a duplicate warning instead, the
+        # consumed entry is just stale and will be ignored.
+        return
 
-
-# ---------------------------------------------------------------------------
-# Branch selection
-# ---------------------------------------------------------------------------
-
-
-async def _on_branch_selected(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """User tapped a branch button in the picker."""
-    assert update.callback_query is not None
-    ctx = _get_ctx(context)
-    chat_id = update.effective_chat.id if update.effective_chat else 0
-
-    branch = data.removeprefix("build:branch:")
-    ctx.clear_session(chat_id)
-
-    msg_id = (
-        update.callback_query.message.message_id
-        if update.callback_query.message
-        else None
-    )
-    await _trigger_build(update, context, branch, msg_id)
-
-
-async def _on_custom_branch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """User tapped '✏️ Type a name' — switch session to awaiting_text."""
-    assert update.callback_query is not None
-    ctx = _get_ctx(context)
-    chat_id = update.effective_chat.id if update.effective_chat else 0
-
-    session = ctx.get_session(chat_id)
-    if not session:
+    if data == "build:custom":
+        if not tracked or tracked.state != "picking":
+            await _show_expired(query)
+            return
+        # Atomic transition: picking → awaiting_text
+        if not ctx.tracker.transition(chat_id, msg_id, "picking", "awaiting_text"):
+            return
         try:
-            await update.callback_query.edit_message_text(
-                "⏳ Session expired. Tap 🔨 Build to try again."
+            await query.edit_message_text("✏️ Type the branch name:")
+        except Exception:
+            logger.exception("Failed to edit message for custom branch")
+        return
+
+    # -- Cancel build actions (require state=building) --
+
+    if data.startswith("cancel:") and not data.startswith("cancel:confirm:") and not data.startswith("cancel:back:"):
+        request_id = data.removeprefix("cancel:")
+        if not tracked or tracked.state != "building":
+            await _show_stale(query)
+            return
+        # Atomic transition: building → confirming_cancel
+        if not ctx.tracker.transition(chat_id, msg_id, "building", "confirming_cancel"):
+            return
+
+        ref = tracked.data.get("ref", "unknown")
+        buttons = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "✅ Yes, cancel it",
+                        callback_data=f"cancel:confirm:{request_id}",
+                    ),
+                    InlineKeyboardButton(
+                        "↩️ Go back",
+                        callback_data=f"cancel:back:{request_id}",
+                    ),
+                ],
+            ]
+        )
+        try:
+            await query.edit_message_text(
+                f"⚠️ Cancel the build on <code>{_escape(ref)}</code>?",
+                parse_mode="HTML",
+                reply_markup=buttons,
             )
         except Exception:
-            logger.exception("Failed to edit expired session message")
+            logger.exception("Failed to show cancel confirmation")
         return
 
-    session.state = "awaiting_text"
+    if data.startswith("cancel:confirm:"):
+        request_id = data.removeprefix("cancel:confirm:")
+        if not tracked or tracked.state != "confirming_cancel":
+            await _show_stale(query)
+            return
+        # Atomic transition: confirming_cancel → done
+        result = ctx.tracker.transition(chat_id, msg_id, "confirming_cancel", "done")
+        if not result:
+            return
 
-    try:
-        await update.callback_query.edit_message_text("✏️ Type the branch name:")
-    except Exception:
-        logger.exception("Failed to edit message for custom branch")
+        # Remove from tracker
+        ctx.tracker.remove(chat_id, msg_id)
 
-
-# ---------------------------------------------------------------------------
-# Cancel-and-rebuild confirmation
-# ---------------------------------------------------------------------------
-
-
-async def _on_confirm_cancel_rebuild(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Two-step: show confirmation for 'Cancel and rebuild'."""
-    assert update.callback_query is not None
-    ref = data.removeprefix("build:confirm_cancel_rebuild:")
-
-    buttons = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "✅ Yes, do it",
-                    callback_data=f"build:do_cancel_rebuild:{ref}",
-                ),
-                InlineKeyboardButton(
-                    "↩️ Go back",
-                    callback_data=f"build:back_to_inprog:{ref}",
-                ),
-            ],
-        ]
-    )
-
-    try:
-        await update.callback_query.edit_message_text(
-            f"⚠️ Cancel the current build on <code>{_escape(ref)}</code>"
-            " and start a new one?",
-            parse_mode="HTML",
-            reply_markup=buttons,
-        )
-    except Exception:
-        logger.exception("Failed to show cancel-rebuild confirmation")
-
-
-async def _on_do_cancel_rebuild(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Execute: cancel old build + trigger new one (force)."""
-    assert update.callback_query is not None
-    ref = data.removeprefix("build:do_cancel_rebuild:")
-    msg_id = (
-        update.callback_query.message.message_id
-        if update.callback_query.message
-        else None
-    )
-    await _trigger_build(update, context, ref, msg_id, force=True)
-
-
-async def _on_back_to_inprog(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Restore the in-progress message (go back from confirm)."""
-    assert update.callback_query is not None
-    ctx = _get_ctx(context)
-    ref = data.removeprefix("build:back_to_inprog:")
-
-    match = ctx.find_pending_for_branch(ref)
-    elapsed = ""
-    if match:
-        _, existing_pending = match
-        elapsed = f" (started {_format_elapsed(existing_pending.triggered_at)})"
-
-    buttons = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "🔄 Cancel and rebuild",
-                    callback_data=f"build:confirm_cancel_rebuild:{ref[:40]}",
-                )
-            ],
-        ]
-    )
-
-    try:
-        await update.callback_query.edit_message_text(
-            f"⚠️ A build is already running on <code>{_escape(ref)}</code>{elapsed}.",
-            parse_mode="HTML",
-            reply_markup=buttons,
-        )
-    except Exception:
-        logger.exception("Failed to restore in-progress message")
-
-
-# ---------------------------------------------------------------------------
-# Cancel build
-# ---------------------------------------------------------------------------
-
-
-async def _on_cancel(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Two-step: show confirmation for cancelling a build."""
-    assert update.callback_query is not None
-    # data format: "cancel:<request_id>"
-    request_id = data.removeprefix("cancel:")
-
-    # Avoid double-processing confirm/back sub-routes
-    if request_id.startswith("confirm:") or request_id.startswith("back:"):
-        return
-
-    ctx = _get_ctx(context)
-    try:
-        pending = ctx.get_pending(request_id)
-    except KeyError:
+        # Cancel via build-manager (best-effort)
         try:
-            await update.callback_query.edit_message_text(
-                "This build is no longer active."
+            await ctx.build_client.cancel_build(request_id)
+        except Exception:
+            logger.exception("Failed to cancel build via build-manager")
+
+        ref = tracked.data.get("ref", "unknown")
+        try:
+            await query.edit_message_text(
+                f"🚫 Build on <code>{_escape(ref)}</code> was cancelled.",
+                parse_mode="HTML",
             )
         except Exception:
-            logger.exception("Failed to edit stale cancel button")
+            logger.exception("Failed to edit message to cancelled state")
         return
 
-    buttons = InlineKeyboardMarkup(
-        [
+    if data.startswith("cancel:back:"):
+        request_id = data.removeprefix("cancel:back:")
+        if not tracked or tracked.state != "confirming_cancel":
+            await _show_stale(query)
+            return
+        # Atomic transition: confirming_cancel → building
+        if not ctx.tracker.transition(chat_id, msg_id, "confirming_cancel", "building"):
+            return
+
+        cancel_button = InlineKeyboardMarkup(
             [
-                InlineKeyboardButton(
-                    "✅ Yes, cancel it",
-                    callback_data=f"cancel:confirm:{request_id}",
-                ),
-                InlineKeyboardButton(
-                    "↩️ Go back",
-                    callback_data=f"cancel:back:{request_id}",
-                ),
-            ],
-        ]
-    )
-
-    try:
-        await update.callback_query.edit_message_text(
-            f"⚠️ Cancel the build on <code>{_escape(pending.ref)}</code>?",
-            parse_mode="HTML",
-            reply_markup=buttons,
+                [
+                    InlineKeyboardButton(
+                        "❌ Cancel",
+                        callback_data=f"cancel:{request_id}",
+                    )
+                ],
+            ]
         )
-    except Exception:
-        logger.exception("Failed to show cancel confirmation")
-
-
-async def _on_confirm_cancel(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Execute: cancel the build via build-manager."""
-    assert update.callback_query is not None
-    request_id = data.removeprefix("cancel:confirm:")
-    ctx = _get_ctx(context)
-
-    pending = ctx.consume_pending(request_id)
-    if not pending:
         try:
-            await update.callback_query.edit_message_text(
-                "This build is no longer active."
+            await query.edit_message_text(
+                ctx._msg_building(),
+                parse_mode="HTML",
+                reply_markup=cancel_button,
             )
         except Exception:
-            logger.exception("Failed to edit stale cancel confirm")
+            logger.exception("Failed to restore building message")
         return
 
-    # Cancel via build-manager (best-effort)
-    try:
-        await ctx.build_client.cancel_build(request_id)
-    except Exception:
-        logger.exception("Failed to cancel build via build-manager")
+    # -- Cancel-and-rebuild actions --
 
-    try:
-        await update.callback_query.edit_message_text(
-            f"🚫 Build on <code>{_escape(pending.ref)}</code> was cancelled.",
-            parse_mode="HTML",
+    if data.startswith("build:confirm_cancel_rebuild:"):
+        ref = data.removeprefix("build:confirm_cancel_rebuild:")
+        # This button appears on untracked "duplicate warning" messages.
+        # No state validation needed — the action is idempotent.
+        buttons = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "✅ Yes, do it",
+                        callback_data=f"build:do_cancel_rebuild:{ref}",
+                    ),
+                    InlineKeyboardButton(
+                        "↩️ Go back",
+                        callback_data=f"build:back_to_inprog:{ref}",
+                    ),
+                ],
+            ]
         )
-    except Exception:
-        logger.exception("Failed to edit message to cancelled state")
-
-
-async def _on_back_to_building(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    data: str,
-) -> None:
-    """Restore the building message (go back from cancel confirm)."""
-    assert update.callback_query is not None
-    request_id = data.removeprefix("cancel:back:")
-    ctx = _get_ctx(context)
-
-    try:
-        ctx.get_pending(request_id)
-    except KeyError:
         try:
-            await update.callback_query.edit_message_text(
-                "This build is no longer active."
+            await query.edit_message_text(
+                f"⚠️ Cancel the current build on <code>{_escape(ref)}</code>"
+                " and start a new one?",
+                parse_mode="HTML",
+                reply_markup=buttons,
             )
         except Exception:
-            logger.exception("Failed to edit stale cancel back")
+            logger.exception("Failed to show cancel-rebuild confirmation")
         return
 
-    cancel_button = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "❌ Cancel",
-                    callback_data=f"cancel:{request_id}",
-                )
-            ],
-        ]
-    )
+    if data.startswith("build:do_cancel_rebuild:"):
+        ref = data.removeprefix("build:do_cancel_rebuild:")
+        await _trigger_build(update, context, ref, msg_id, force=True)
+        return
 
+    if data.startswith("build:back_to_inprog:"):
+        ref = data.removeprefix("build:back_to_inprog:")
+        existing = ctx.find_building_for_branch(ref)
+        elapsed = ""
+        if existing:
+            triggered_at = existing.data.get("triggered_at", existing.created_at)
+            elapsed = f" (started {_format_elapsed(triggered_at)})"
+
+        buttons = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🔄 Cancel and rebuild",
+                        callback_data=f"build:confirm_cancel_rebuild:{ref[:40]}",
+                    )
+                ],
+            ]
+        )
+        try:
+            await query.edit_message_text(
+                f"⚠️ A build is already running on <code>{_escape(ref)}</code>{elapsed}.",
+                parse_mode="HTML",
+                reply_markup=buttons,
+            )
+        except Exception:
+            logger.exception("Failed to restore in-progress message")
+        return
+
+    logger.warning("Unknown callback_data: %s", data)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+
+async def _show_expired(query: CallbackQuery) -> None:
+    """Edit a stale picker to 'expired'."""
     try:
-        await update.callback_query.edit_message_text(
-            ctx._msg_building(),
-            parse_mode="HTML",
-            reply_markup=cancel_button,
+        await query.edit_message_text(
+            "⏳ This picker has expired. Tap /build to start a new one."
         )
     except Exception:
-        logger.exception("Failed to restore building message")
+        pass
+
+
+async def _show_stale(query: CallbackQuery) -> None:
+    """Edit a stale action button to 'no longer active'."""
+    try:
+        await query.edit_message_text(
+            "This build is no longer active."
+        )
+    except Exception:
+        pass
+

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 import logging
+import time
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from datetime import datetime, timezone
 
@@ -128,15 +129,15 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     # Current pending builds
-    pending = ctx.list_pending()
+    building = ctx.list_building()
 
     # Fetch build status from build-manager
     sm_status = await ctx.build_client.get_build_status()
 
     # Headline
     app_name = _escape(ctx.config.app_name)
-    if pending:
-        headline = f"🟡 <b>Building {app_name} ({len(pending)} active)</b>"
+    if building:
+        headline = f"🟡 <b>Building {app_name} ({len(building)} active)</b>"
     else:
         headline = f"🟢 <b>Ready to build {app_name}</b>"
 
@@ -148,23 +149,25 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lines.append(f"Completed builds: {completed}")
 
     # Pending builds
-    if pending:
+    if building:
         lines.append("")
         lines.append("In progress:")
-        for p in pending.values():
+        for b in building:
+            ref = b.data.get("ref", "unknown")
+            triggered_at = b.data.get("triggered_at", b.created_at)
             lines.append(
-                f"  • <code>{_escape(p.ref)}</code>"
-                f" (started {_format_elapsed(p.triggered_at)})"
+                f"  • <code>{_escape(ref)}</code>"
+                f" (started {_format_elapsed(triggered_at)})"
             )
 
     # Recent successful build
     recent = await ctx.build_client.get_recent_builds(count=1)
     successful = [b for b in recent if b.result == "success"]
     if successful:
-        b = successful[0]
-        short_hash = b.commit_hash[:7] if b.commit_hash else ""
-        date_str = _format_date(b.completed_at) if b.completed_at else ""
-        parts = [f"✅ {_escape(b.branch or 'unknown')}"]
+        last = successful[0]
+        short_hash = last.commit_hash[:7] if last.commit_hash else ""
+        date_str = _format_date(last.completed_at) if last.completed_at else ""
+        parts = [f"✅ {_escape(last.branch or 'unknown')}"]
         if short_hash:
             parts.append(f"<code>{_escape(short_hash)}</code>")
         if date_str:
@@ -173,7 +176,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lines.append(f"Last build: {' · '.join(parts)}")
 
     # Not-ready hint
-    if not pending and not completed:
+    if not building and not completed:
         lines.append("")
         lines.append(ctx._admin_hint())
 
@@ -214,13 +217,20 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await _trigger_build(update, context, ref)
             return
 
-    # Check session lock (group chats)
-    existing = ctx.get_session(chat_id)
-    if existing and user and existing.user_id != user.id:
-        await update.message.reply_text(
-            f"🔇 {_escape(existing.user_name)} is picking a branch right now.",
-            parse_mode="HTML",
-        )
+    # Check for active picker in this chat (one picker at a time)
+    existing = ctx.has_active_picker(chat_id)
+    if existing:
+        if user and existing.user_id != user.id:
+            picker_user = existing.data.get("user_name", "Someone")
+            await update.message.reply_text(
+                f"🔇 {_escape(picker_user)} is picking a branch right now.",
+                parse_mode="HTML",
+            )
+        else:
+            await update.message.reply_text(
+                "☝️ You already have a branch picker open. "
+                "Use it or wait for it to expire.",
+            )
         return
 
     # Build inline keyboard from configured branch list
@@ -239,10 +249,16 @@ async def build_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=InlineKeyboardMarkup(buttons),
     )
 
-    # Start session (TTL lock)
+    # Register picker with interaction tracker
     user_name = (user.first_name if user else "Someone") or "Someone"
     user_id = user.id if user else 0
-    ctx.start_session(chat_id, user_id, user_name, msg.message_id)
+    ctx.tracker.register(
+        chat_id,
+        msg.message_id,
+        user_id,
+        state="picking",
+        data={"user_name": user_name},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -307,24 +323,25 @@ async def text_branch_handler(
 
     ctx = _get_ctx(context)
     chat_id = update.effective_chat.id
-    session = ctx.get_session(chat_id)
 
-    # Ignore if no active session or not in text-input mode
-    if not session or session.state != "awaiting_text":
+    # Find the awaiting_text picker for this chat
+    picker = ctx.tracker.find_by_state(chat_id, "awaiting_text")
+    if not picker:
         return
 
     # Only the user who started the session can type a branch name
-    if update.effective_user.id != session.user_id:
+    if update.effective_user.id != picker.user_id:
         return
 
     branch = (update.message.text or "").strip()
     if not branch:
         return
 
-    ctx.clear_session(chat_id)
+    # Remove the picker (session consumed)
+    ctx.tracker.remove(chat_id, picker.message_id)
 
     # Trigger the build using the shared helper
-    await _trigger_build(update, context, branch, session.message_id)
+    await _trigger_build(update, context, branch, picker.message_id)
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +361,7 @@ async def _trigger_build(
 
     Delegates the actual build trigger to the build-manager service via
     :class:`BuildClient`.  The bot only manages local Telegram state
-    (pending tracking, message editing).
+    (interaction tracking, message editing).
     """
     assert update.effective_chat is not None
     ctx = _get_ctx(context)
@@ -352,10 +369,10 @@ async def _trigger_build(
 
     if not force:
         # Pending duplicate guard
-        match = ctx.find_pending_for_branch(ref)
-        if match:
-            _, existing_pending = match
-            elapsed = _format_elapsed(existing_pending.triggered_at)
+        existing = ctx.find_building_for_branch(ref)
+        if existing:
+            triggered_at = existing.data.get("triggered_at", existing.created_at)
+            elapsed = _format_elapsed(triggered_at)
             buttons = InlineKeyboardMarkup(
                 [
                     [
@@ -391,12 +408,14 @@ async def _trigger_build(
             return
     else:
         # Force: cancel any pending build for this branch first
-        match = ctx.find_pending_for_branch(ref)
-        if match:
-            old_rid, old_pending = match
-            await ctx.build_client.cancel_build(old_rid)
-            ctx.consume_pending(old_rid)
-            await ctx.on_build_cancelled(old_pending)
+        existing = ctx.find_building_for_branch(ref)
+        if existing:
+            old_rid = existing.data.get("request_id", "")
+            if old_rid:
+                await ctx.build_client.cancel_build(old_rid)
+            removed = ctx.tracker.remove(existing.chat_id, existing.message_id)
+            if removed:
+                await ctx.on_build_cancelled(removed)
 
     # Trigger build via build-manager
     try:
@@ -447,26 +466,33 @@ async def _trigger_build(
                 parse_mode="HTML",
                 reply_markup=cancel_button,
             )
-            ctx.add_pending(
-                request_id,
+            ctx.tracker.register(
                 chat_id,
-                ref,
-                message_id=picker_message_id,
+                picker_message_id,
+                user_id=0,
+                state="building",
+                data={
+                    "ref": ref,
+                    "request_id": request_id,
+                    "triggered_at": time.time(),
+                },
             )
         except Exception:
             logger.exception("Failed to edit picker to building state")
-            ctx.add_pending(request_id, chat_id, ref)
     elif update.message:
         msg = await update.message.reply_text(
             building_text,
             parse_mode="HTML",
             reply_markup=cancel_button,
         )
-        ctx.add_pending(
-            request_id,
+        ctx.tracker.register(
             chat_id,
-            ref,
-            message_id=msg.message_id,
+            msg.message_id,
+            user_id=0,
+            state="building",
+            data={
+                "ref": ref,
+                "request_id": request_id,
+                "triggered_at": time.time(),
+            },
         )
-    else:
-        ctx.add_pending(request_id, chat_id, ref)

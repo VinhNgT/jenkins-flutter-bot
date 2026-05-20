@@ -5,8 +5,7 @@ All build management (Jenkins, file storage, Git queries) is
 delegated to the build-manager service via :class:`BuildClient`.
 
 Owns:
-  - Pending build tracking (request_id → chat_id/message_id mapping)
-  - Build session management (interactive branch picker locking)
+  - Interaction tracking (via :class:`InteractionTracker`)
   - Telegram message formatting and editing
   - Build result notification rendering
 """
@@ -16,49 +15,18 @@ from __future__ import annotations
 import html
 import logging
 import time
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+
+from .tracker import InteractionTracker, TrackedMessage
 
 if TYPE_CHECKING:
     from ..config import BotSettings
     from ..build_client import BuildClient
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class BuildSession:
-    """Ephemeral session for the branch-picking phase.
-
-    Prevents two users from using the build flow simultaneously
-    in a group chat.  Not persisted — expires on restart.
-    """
-
-    chat_id: int
-    user_id: int
-    user_name: str
-    message_id: int
-    started_at: float
-    state: str  # "picking" | "awaiting_text"
-
-
-@dataclass(frozen=True)
-class PendingBuild:
-    """Tracks a build triggered via Telegram.
-
-    This is a Telegram-side record that maps ``request_id`` to the
-    originating chat and message for inline editing.  The canonical
-    build state lives in the build-manager service.
-    """
-
-    request_id: str
-    chat_id: int
-    ref: str
-    triggered_at: float
-    message_id: int | None = None  # for editing the build message inline
 
 
 def _escape(text: str) -> str:
@@ -95,8 +63,8 @@ class BotContext:
     """Shared context between Telegram handlers.
 
     Owns:
-    - Telegram-side pending build tracking (request_id → chat_id/message_id)
-    - Build session management (interactive lock for branch picking)
+    - Interaction tracking — every interactive message has an explicit
+      state managed by :class:`InteractionTracker`
     - Message formatting and editing helpers
     - Notification rendering for build results
 
@@ -113,8 +81,7 @@ class BotContext:
         self.config = config
         self.build_client = build_client
         self.bot = bot
-        self._pending: dict[str, PendingBuild] = {}
-        self._sessions: dict[int, BuildSession] = {}
+        self.tracker = InteractionTracker(picker_ttl=config.session_ttl)
 
     # ------------------------------------------------------------------
     # Admin contact helper
@@ -133,99 +100,53 @@ class BotContext:
         return f"🔨 <b>Building {app_name}...</b>\n\nI'll let you know when it's ready."
 
     # ------------------------------------------------------------------
-    # Build session (interactive lock for branch picking)
+    # Convenience: chat-level picker lock
     # ------------------------------------------------------------------
 
-    def start_session(
-        self,
-        chat_id: int,
-        user_id: int,
-        user_name: str,
-        message_id: int,
-    ) -> BuildSession:
-        """Start a new branch-picking session for a chat."""
-        session = BuildSession(
-            chat_id=chat_id,
-            user_id=user_id,
-            user_name=user_name,
-            message_id=message_id,
-            started_at=time.time(),
-            state="picking",
-        )
-        self._sessions[chat_id] = session
-        return session
+    def has_active_picker(self, chat_id: int) -> TrackedMessage | None:
+        """Check if there's an active picker in this chat.
 
-    def get_session(self, chat_id: int) -> BuildSession | None:
-        """Return the active session for a chat, or None if expired/missing."""
-        session = self._sessions.get(chat_id)
-        if session is None:
-            return None
-        if time.time() - session.started_at > self.config.session_ttl:
-            del self._sessions[chat_id]
-            return None
-        return session
-
-    def clear_session(self, chat_id: int) -> None:
-        """Remove the session for a chat."""
-        self._sessions.pop(chat_id, None)
-
-    # ------------------------------------------------------------------
-    # Pending build tracking (Telegram-side only)
-    # ------------------------------------------------------------------
-
-    @property
-    def pending_count(self) -> int:
-        """Number of pending builds currently tracked."""
-        return len(self._pending)
-
-    def add_pending(
-        self,
-        request_id: str,
-        chat_id: int,
-        ref: str,
-        *,
-        message_id: int | None = None,
-    ) -> None:
-        """Track a Telegram-triggered build."""
-        self._pending[request_id] = PendingBuild(
-            request_id=request_id,
-            chat_id=chat_id,
-            ref=ref,
-            triggered_at=time.time(),
-            message_id=message_id,
-        )
-
-    def get_pending(self, request_id: str) -> PendingBuild:
-        """Look up a pending build by request_id. Raises KeyError if not found."""
-        return self._pending[request_id]
-
-    def list_pending(self) -> dict[str, PendingBuild]:
-        """Return a snapshot of all pending builds."""
-        return dict(self._pending)
-
-    def consume_pending(self, request_id: str | None) -> PendingBuild | None:
-        """Look up and remove a pending build. Returns None if not found."""
-        if not request_id:
-            return None
-        return self._pending.pop(request_id, None)
-
-    def find_pending_for_branch(self, ref: str) -> tuple[str, PendingBuild] | None:
-        """Find a pending build for the given branch.
-
-        Returns ``(request_id, pending_build)`` or ``None``.
+        Returns the tracked picker message, or None.  Used by
+        ``/build`` to enforce one picker per chat at a time.
         """
-        for request_id, pending in self._pending.items():
-            if pending.ref == ref:
-                return request_id, pending
+        picking = self.tracker.find_by_state(chat_id, "picking")
+        if picking:
+            return picking
+        return self.tracker.find_by_state(chat_id, "awaiting_text")
+
+    # ------------------------------------------------------------------
+    # Convenience: build queries
+    # ------------------------------------------------------------------
+
+    def find_building_for_branch(self, ref: str) -> TrackedMessage | None:
+        """Find an active build for a branch (any chat)."""
+        for msg in self.tracker.list_by_state("building"):
+            if msg.data.get("ref") == ref:
+                return msg
+        return None
+
+    def list_building(self) -> list[TrackedMessage]:
+        """All currently building messages."""
+        return self.tracker.list_by_state("building")
+
+    def consume_building(self, request_id: str) -> TrackedMessage | None:
+        """Find and remove a building message by request_id.
+
+        Atomic — only one caller gets the message.  Used by the
+        webhook callback route to process build results.
+        """
+        msg = self.tracker.find_by_data("request_id", request_id)
+        if msg and msg.state == "building":
+            return self.tracker.remove(msg.chat_id, msg.message_id)
         return None
 
     # ------------------------------------------------------------------
-    # Build result handlers (called by callback route)
+    # Build result handlers (called by webhook callback route)
     # ------------------------------------------------------------------
 
     async def _edit_build_message(
         self,
-        pending: PendingBuild,
+        msg: TrackedMessage,
         text: str,
         reply_markup: InlineKeyboardMarkup | None = None,
     ) -> None:
@@ -233,22 +154,22 @@ class BotContext:
 
         Best-effort — failures are logged but never propagated.
         """
-        if not self.bot or not pending.message_id:
+        if not self.bot:
             return
         try:
             await self.bot.edit_message_text(
                 text,
-                chat_id=pending.chat_id,
-                message_id=pending.message_id,
+                chat_id=msg.chat_id,
+                message_id=msg.message_id,
                 parse_mode="HTML",
                 reply_markup=reply_markup,
             )
         except Exception:
-            logger.exception("Failed to edit build message %d", pending.message_id)
+            logger.exception("Failed to edit build message %d", msg.message_id)
 
     async def on_build_success(
         self,
-        pending: PendingBuild,
+        msg: TrackedMessage,
         result: dict,
     ) -> None:
         """Handle successful build — notify user with download link."""
@@ -256,15 +177,16 @@ class BotContext:
             logger.error("Cannot notify — bot instance is not available")
             return
 
-        now = time.time()
-        duration = _format_duration(pending.triggered_at, now)
+        triggered_at = msg.data.get("triggered_at", time.time())
+        duration = _format_duration(triggered_at, time.time())
         download_url = result.get("download_url", "")
+        ref = msg.data.get("ref", "unknown")
 
         app_name = _escape(self.config.app_name)
         text = (
             f"✅ <b>{app_name} is ready!</b>\n"
             f"\n"
-            f"Built from <code>{_escape(pending.ref)}</code> in {duration}."
+            f"Built from <code>{_escape(ref)}</code> in {duration}."
         )
 
         reply_markup = None
@@ -273,9 +195,9 @@ class BotContext:
                 [[InlineKeyboardButton("📲 Download APK", url=download_url)]]
             )
 
-        await self._edit_build_message(pending, text, reply_markup)
+        await self._edit_build_message(msg, text, reply_markup)
         await self.bot.send_message(
-            pending.chat_id,
+            msg.chat_id,
             text,
             parse_mode="HTML",
             reply_markup=reply_markup,
@@ -283,7 +205,7 @@ class BotContext:
 
     async def on_build_failure(
         self,
-        pending: PendingBuild,
+        msg: TrackedMessage,
         result: dict,
     ) -> None:
         """Handle failed build — notify user."""
@@ -291,24 +213,25 @@ class BotContext:
             logger.error("Cannot notify — bot instance is not available")
             return
 
+        ref = msg.data.get("ref", "unknown")
         app_name = _escape(self.config.app_name)
         text = (
             f"❌ <b>{app_name} build failed</b>\n"
             f"\n"
-            f"Something went wrong on <code>{_escape(pending.ref)}</code>.\n"
+            f"Something went wrong on <code>{_escape(ref)}</code>.\n"
             f"{self._admin_hint()}"
         )
 
-        await self._edit_build_message(pending, text)
+        await self._edit_build_message(msg, text)
         await self.bot.send_message(
-            pending.chat_id,
+            msg.chat_id,
             text,
             parse_mode="HTML",
         )
 
     async def on_build_timeout(
         self,
-        pending: PendingBuild,
+        msg: TrackedMessage,
         result: dict,
     ) -> None:
         """Handle timed-out build — notify user."""
@@ -316,35 +239,37 @@ class BotContext:
             logger.error("Cannot notify — bot instance is not available")
             return
 
+        ref = msg.data.get("ref", "unknown")
         app_name = _escape(self.config.app_name)
         text = (
             f"⏰ <b>{app_name} build timed out</b>\n"
             f"\n"
-            f"The build on <code>{_escape(pending.ref)}</code>"
+            f"The build on <code>{_escape(ref)}</code>"
             f" didn't complete in time.\n"
             f"{self._admin_hint()}"
         )
 
-        await self._edit_build_message(pending, text)
+        await self._edit_build_message(msg, text)
         await self.bot.send_message(
-            pending.chat_id,
+            msg.chat_id,
             text,
             parse_mode="HTML",
         )
 
     async def on_build_cancelled(
         self,
-        pending: PendingBuild,
+        msg: TrackedMessage,
     ) -> None:
         """Notify the build's chat that a build was cancelled."""
         if not self.bot:
             return
 
-        text = f"🚫 Build on <code>{_escape(pending.ref)}</code> was cancelled."
+        ref = msg.data.get("ref", "unknown")
+        text = f"🚫 Build on <code>{_escape(ref)}</code> was cancelled."
 
-        await self._edit_build_message(pending, text)
+        await self._edit_build_message(msg, text)
         await self.bot.send_message(
-            pending.chat_id,
+            msg.chat_id,
             text,
             parse_mode="HTML",
         )

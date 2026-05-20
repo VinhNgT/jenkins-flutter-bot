@@ -13,9 +13,9 @@ A self-hosted Telegram bot that acts as a thin trigger layer for Jenkins CI/CD. 
 ## How It Works
 
 1. User sends `/build` → bot presents branch selection via inline keyboard
-2. Bot requests a build from the build-manager, which triggers Jenkins with a unique `request_id`
-3. Jenkins pipeline runs on the flutter-agent, then POSTs results back to the build-manager's webhook
-4. Build-manager uploads APK to Drive via file-manager, enforces `max_recent_builds` retention, and forwards results to the bot's callback
+2. Bot requests a build from the build-manager, which triggers Jenkins with a unique `BUILD_REQUEST_ID`
+3. Jenkins pipeline runs on the flutter-agent and archives the resulting APK via `archiveArtifacts` — no outbound HTTP from the agent
+4. Build-manager's poll worker detects completion via the Jenkins API, downloads the APK, uploads to Drive via file-manager, enforces `max_recent_builds` retention, and forwards results to the bot's callback
 5. Bot matches `request_id` and sends the download link to Telegram
 
 The bot owns zero build logic — all cloning, compiling, and packaging is delegated to the Jenkins pipeline.
@@ -50,7 +50,7 @@ The config precedence chain is: `JSON (dashboard) > Environment Variable > .env 
 
 The bot triggers builds through the build-manager, which delegates to Jenkins. The web dashboard includes a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration — copy it into your Jenkins job.
 
-The pipeline contract: the `post` block must POST a multipart form to `BUILD_MANAGER_WEBHOOK_URL` with a `metadata` JSON field (containing `request_id`, `job_id`, `status`, `commit_hash`) and an `artifact` file on success.
+The pipeline contract: on success, call `archiveArtifacts` to persist the build artifact inside Jenkins. Build-manager's poll worker will detect completion and download the artifact automatically. **The pipeline does not need to make any outbound HTTP calls.**
 
 ## Setup
 

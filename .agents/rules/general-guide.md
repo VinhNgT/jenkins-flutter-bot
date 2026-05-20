@@ -89,7 +89,7 @@ graph TD
     BOT -- trigger --> BM
     BM -- trigger --> JNK
     JNK -- dispatches --> AGT
-    AGT -- webhook --> BM
+    BM -- polls --> JNK
     BM -- upload --> FM
     BM -- callback --> BOT
 ```
@@ -116,7 +116,7 @@ graph TD
 
 4. **FastAPI Everywhere** — All service APIs use FastAPI, structured per the official [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) pattern: `main.py` (app factory) → `dependencies.py` (`Depends` + `Annotated`) → `routers/` (`APIRouter` per domain). See `coding-conventions.md` for the module table. The `tg-admin-bot` is the only exception — it runs as a Telegram polling bot with no HTTP server.
 
-5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for webhook matching and inline message editing. No information about non-bot-triggered builds is ever exposed to Telegram.
+5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for callback matching and inline message editing. No information about non-bot-triggered builds is ever exposed to Telegram.
 
 6. **uv Workspace** — Single `pyproject.toml` + `uv.lock` at the root. All members share a unified lockfile. Shared code lives in `libs/`. Dev tools are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12).
 
@@ -139,7 +139,7 @@ These are architectural boundaries. Do not violate them.
 5. **Do NOT use synchronous blocking I/O** in async code paths without wrapping with `asyncio.to_thread()`.
 6. **Do NOT store secrets in code or Dockerfiles** — use env vars, `.env`, or service JSON config files.
 7. **Do NOT replace deep merge with full overwrite** in config save logic.
-8. **Do NOT leak non-bot build info to Telegram** — the bot strictly filters to its own triggered builds (matched by `BOT_REQUEST_ID`). No build counts, build numbers, or metadata from manual Jenkins triggers may appear in Telegram messages.
+8. **Do NOT leak non-bot build info to Telegram** — the bot strictly filters to its own triggered builds (matched by `BUILD_REQUEST_ID`). No build counts, build numbers, or metadata from manual Jenkins triggers may appear in Telegram messages.
 9. **Do NOT rename `file-manager` internals to `drive`** — the service is storage-backend agnostic. The `drive` name appears only in user-facing labels (UI text, help strings) — the config scope key is `file_manager`.
 
 ---

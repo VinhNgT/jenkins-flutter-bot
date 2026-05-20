@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: Build trigger flow, webhook protocol, OAuth implementations, config transfer, async patterns, and service lifecycle.
+description: Build trigger flow, polling-based completion detection, OAuth implementations, config transfer, async patterns, and service lifecycle.
 ---
 
 # Communication Flows
@@ -14,34 +14,19 @@ Loaded at model discretion when the task involves service-to-service communicati
 The bot acts as a thin trigger layer. The full flow:
 
 1. User sends `/build` (or `/build <ref>`) → bot shows branch picker or triggers directly
-2. Bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, callback URL, `request_id`, `job_id`
-3. Build-manager queues the job, triggers Jenkins (`POST /buildWithParameters`), and registers the `request_id`
-4. Build-manager starts a per-build timeout task (`asyncio.sleep`)
+2. Bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, `callback_url`, and a generated `request_id`
+3. Build-manager triggers Jenkins (`POST /buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build
+4. Build-manager spawns a **per-build poll worker** (`asyncio` task) that periodically queries the Jenkins REST API
 5. Bot stores a `PendingBuild` in memory (request_id → chat_id/message_id for inline editing)
-6. Jenkins pipeline runs on the flutter-agent, then POSTs results back to the build-manager webhook
-7. Build-manager cancels the timeout task, uploads APK to file-manager (`POST /api/files/upload`), records the `download_url`, enforces `max_recent_builds` retention (deletes old Drive files via `DELETE /api/files/{file_id}`), and forwards the result to the bot's callback URL
+6. Jenkins pipeline runs on the flutter-agent and calls `archiveArtifacts` on success — **no outbound HTTP from the agent**
+7. Poll worker detects `building == False` for the matching `BUILD_REQUEST_ID`, downloads the artifact directly from Jenkins (`GET /job/{name}/{number}/artifact/{path}`), uploads it to file-manager, enforces `max_recent_builds` retention, and forwards the result to the bot's callback URL
 8. Bot matches `request_id` and sends the download link to the originating Telegram chat
 
-If the timeout task fires before the webhook arrives, build-manager records a `timeout` completion and notifies the bot's callback URL with `result: "timeout"`.
-
----
-
-## Webhook Protocol
-
-Jenkins POSTs to the build-manager (and ultimately the bot) as multipart form data with two fields:
-
-- **`metadata`**: JSON string with `request_id`, `job_id`, `status`, `commit_hash`, and optionally `logs` (failure only)
-- **`artifact`** (optional): the built APK file (success only)
+If the poll worker's elapsed time exceeds `build_timeout`, build-manager records a `timeout` completion and notifies the bot's callback URL.
 
 ### Security Model
 
-The `request_id` is a 128-bit random token per build. It acts as webhook authentication — only callers who know the exact token can trigger a notification. Tokens are logged truncated, displayed truncated, and consumed on first use (one-time pop).
-
-### Key Design Decisions
-
-- **Validate before writing** — metadata is validated before any artifact is written to disk, preventing disk exhaustion from unauthenticated callers.
-- **`json.loads(strict=False)`** — Jenkins pipelines may embed literal control characters in the JSON. The `strict=False` flag is intentional.
-- **Failure logs** — the Jenkinsfile captures and forwards build logs. The bot only summarizes (extracts the first meaningful error line) — it never queries Jenkins for logs.
+The `BUILD_REQUEST_ID` is a 128-bit random token per build. It correlates the poll worker to the originating Telegram request. Tokens are logged truncated, displayed truncated, and consumed on first use (one-time pop).
 
 ---
 
@@ -129,7 +114,7 @@ Each uploaded APK is made individually accessible — the Drive **folder** stays
 
 Build state is split across two services:
 
-- **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links. Owns build timeout detection (per-build `asyncio` tasks) and retention enforcement (`max_recent_builds` eviction with Drive file cleanup).
+- **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links. Owns build completion detection (per-build poll worker `asyncio` tasks), artifact download, and retention enforcement (`max_recent_builds` eviction with Drive file cleanup). The poll worker queries Jenkins at configurable intervals and downloads the artifact directly from the Jenkins archive upon success.
 - **tg-bot** — maintains `PendingBuild` records (in-memory only) keyed by `request_id`. Each record maps a `request_id` to a Telegram `chat_id` and `message_id` for inline message editing. These are consumed on callback receipt.
 
 Jenkins owns all raw build metadata (status, duration, branch, commit). The bot queries build-manager for summaries — it never queries Jenkins directly for build info.

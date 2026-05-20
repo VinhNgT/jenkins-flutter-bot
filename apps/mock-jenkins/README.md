@@ -9,7 +9,7 @@ Runs **two** FastAPI servers inside a single container:
 
 | Port | Simulates | Key Endpoints |
 |------|-----------|---------------|
-| 8080 | Jenkins controller | `POST /job/{name}/buildWithParameters`, `GET /queue/item/{id}/api/json`, `GET /job/{name}/{build}/api/json` |
+| 8080 | Jenkins controller | `POST /job/{name}/buildWithParameters`, `GET /queue/item/{id}/api/json`, `GET /job/{name}/api/json`, `GET /job/{name}/{num}/api/json`, `GET /job/{name}/{num}/artifact/{path}`, `GET /crumbIssuer/api/json` |
 | 9091 | Agent-control API | `GET /control/status`, `GET /control/schema`, `POST /control/start`, `POST /control/stop`, `POST /control/restart`, `GET /control/config`, `PUT /control/config` |
 
 ## Usage
@@ -40,6 +40,6 @@ When triggered, the mock simulates a build lifecycle:
 
 1. Returns a queue item ID immediately
 2. Transitions to a build number after a short delay
-3. Fires a webhook back to the build-manager with a fake APK URL
+3. Marks the build as complete with a `SUCCESS` result and exposes a dummy APK via `GET /job/{name}/{num}/artifact/{path}`
 
-This allows testing the full build-trigger → webhook → Drive upload → callback flow locally.
+Build-manager's poll worker detects completion by querying `GET /job/{name}/api/json`, then downloads the artifact directly from the mock. No outbound webhook is fired — the polling model is fully self-contained.

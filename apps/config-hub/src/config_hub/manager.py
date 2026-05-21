@@ -45,16 +45,22 @@ class ConfigHubManager:
     Routes call methods on this class rather than wiring up raw dependencies.
     """
 
-    def __init__(self) -> None:
-        config = HubBootstrap.load()
-        self.file_manager_url: str | None = config.file_manager_url
-        self.services = ServiceClient(
-            bot_url=config.bot_control_url,
-            agent_url=config.agent_control_url,
-            file_manager_url=config.file_manager_url,
-            build_manager_url=config.build_manager_url,
+    def __init__(
+        self,
+        *,
+        config: HubBootstrap | None = None,
+        service_client: ServiceClient | None = None,
+        fm_client: httpx.AsyncClient | None = None,
+    ) -> None:
+        resolved = config or HubBootstrap.load()
+        self.file_manager_url: str | None = resolved.file_manager_url
+        self.services = service_client or ServiceClient(
+            bot_url=resolved.bot_control_url,
+            agent_url=resolved.agent_control_url,
+            file_manager_url=resolved.file_manager_url,
+            build_manager_url=resolved.build_manager_url,
         )
-        self.fm_client = httpx.AsyncClient(timeout=10.0)
+        self.fm_client = fm_client or httpx.AsyncClient(timeout=10.0)
 
     async def start(self) -> None:
         """No-op — config-hub has no daemon to start."""

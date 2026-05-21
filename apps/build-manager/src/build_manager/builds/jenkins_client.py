@@ -75,11 +75,19 @@ class JenkinsBuild:
 class JenkinsClient:
     """Triggers parameterised Jenkins builds and queries build history."""
 
-    def __init__(self, url: str, user: str, api_token: str, job_name: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        user: str,
+        api_token: str,
+        job_name: str,
+        *,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
         self.base_url = url.rstrip("/")
         self.job_name = job_name
         self._auth = httpx.BasicAuth(user, api_token)
-        self._client = httpx.AsyncClient(auth=self._auth)
+        self._client = client or httpx.AsyncClient(auth=self._auth)
 
     @property
     def job_url(self) -> str:

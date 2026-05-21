@@ -25,13 +25,20 @@ class GitRemoteClient:
     treats ``None`` as "unknown" and proceeds with the build.
     """
 
-    def __init__(self, base_url: str, project_id: str, token: str = "") -> None:
+    def __init__(
+        self,
+        base_url: str,
+        project_id: str,
+        token: str = "",
+        *,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         # URL-encode the project path (slashes → %2F).
         # Numeric IDs pass through unchanged.
         self._project_id = quote(project_id, safe="")
         self._token = token
-        self._client = httpx.AsyncClient(timeout=_TIMEOUT)
+        self._client = client or httpx.AsyncClient(timeout=_TIMEOUT)
 
     async def get_branch_head(self, branch: str) -> str | None:
         """Return the HEAD commit SHA of a remote branch, or None on failure.

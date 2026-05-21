@@ -27,6 +27,7 @@ the entry and edits the Telegram message when the TTL elapses.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -58,9 +59,12 @@ class InteractionTracker:
 
     _PICKER_STATES = frozenset({"picking", "awaiting_text"})
 
-    def __init__(self, picker_ttl: int = 60) -> None:
+    def __init__(
+        self, picker_ttl: int = 60, *, clock: Callable[[], float] = time.time,
+    ) -> None:
         self._messages: dict[tuple[int, int], TrackedMessage] = {}
         self._picker_ttl = picker_ttl
+        self._clock = clock
 
     # -- Registration --
 
@@ -78,6 +82,7 @@ class InteractionTracker:
             message_id=message_id,
             user_id=user_id,
             state=state,
+            created_at=self._clock(),
             data=data or {},
         )
         self._messages[(chat_id, message_id)] = msg

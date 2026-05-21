@@ -27,12 +27,14 @@ class ServiceClient:
         agent_url: str | None,
         file_manager_url: str | None = None,
         build_manager_url: str | None = None,
+        *,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
         self._bot_url = bot_url
         self._agent_url = agent_url
         self._file_manager_url = file_manager_url
         self._build_manager_url = build_manager_url
-        self._client = httpx.AsyncClient(timeout=5.0)
+        self._client = client or httpx.AsyncClient(timeout=5.0)
 
     async def close(self) -> None:
         """Shut down the underlying HTTP client."""

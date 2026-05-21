@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -48,20 +49,26 @@ class BuildCoordinator:
         self,
         *,
         data_dir: Path,
+        jenkins: JenkinsClient,
         file_manager_url: str,
         max_recent_builds: int = 3,
         build_timeout: int = 30,
         poll_interval: int = 10,
         artifact_pattern: str = "*.apk",
+        http_client: httpx.AsyncClient | None = None,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self._data_dir = data_dir
+        self._jenkins = jenkins
         self._file_manager_url = file_manager_url.rstrip("/")
         self._build_timeout = build_timeout
         self._poll_interval = poll_interval
         self._artifact_pattern = artifact_pattern
-        self._tracker = BuildTracker(data_dir, max_recent_builds=max_recent_builds)
-        self._jenkins: JenkinsClient | None = None
-        self._http = httpx.AsyncClient(timeout=30.0)
+        self._clock = clock
+        self._tracker = BuildTracker(
+            data_dir, max_recent_builds=max_recent_builds, clock=clock,
+        )
+        self._http = http_client or httpx.AsyncClient(timeout=30.0)
         self._poll_tasks: dict[str, asyncio.Task[None]] = {}
 
     @property
@@ -69,13 +76,8 @@ class BuildCoordinator:
         return self._tracker
 
     @property
-    def jenkins(self) -> JenkinsClient | None:
+    def jenkins(self) -> JenkinsClient:
         return self._jenkins
-
-    def init_jenkins(self, url: str, user: str, api_token: str, job_name: str) -> None:
-        """Initialise (or re-initialise) the Jenkins client."""
-        self._jenkins = JenkinsClient(url, user, api_token, job_name)
-        logger.info("Jenkins client initialised for %s", url)
 
     async def close(self) -> None:
         """Shut down HTTP clients and cancel pending poll tasks."""
@@ -107,12 +109,6 @@ class BuildCoordinator:
                     "The build queue is full. Please wait for an existing build "
                     "to finish or cancel one before starting a new build."
                 ),
-            )
-
-        if self._jenkins is None:
-            raise JenkinsTriggerError(
-                detail="Jenkins client not initialised",
-                user_message="Build server not configured. Contact your admin.",
             )
 
         request_id = BuildTracker.generate_request_id()
@@ -170,23 +166,19 @@ class BuildCoordinator:
         5. If Jenkins is unreachable → logs warning and retries next interval
         """
         timeout_seconds = self._build_timeout * 60
-        start_time = time.time()
+        start_time = self._clock()
 
         try:
             while True:
                 await asyncio.sleep(self._poll_interval)
 
-                elapsed = time.time() - start_time
+                elapsed = self._clock() - start_time
 
                 # Check timeout
                 if timeout_seconds > 0 and elapsed >= timeout_seconds:
                     self._poll_tasks.pop(request_id, None)
                     await self._handle_timeout(request_id)
                     return
-
-                # Query Jenkins
-                if self._jenkins is None:
-                    continue
 
                 try:
                     builds = await self._jenkins.get_builds(count=10)
@@ -223,14 +215,14 @@ class BuildCoordinator:
         if pending is None:
             return  # Already consumed by cancellation
 
-        now = time.time()
+        now = self._clock()
         download_url = ""
         file_id = ""
 
         # Jenkins uses uppercase (SUCCESS/FAILURE), we use lowercase
         build_status = "success" if jenkins_build.result == "SUCCESS" else "failure"
 
-        if build_status == "success" and jenkins_build.number and self._jenkins:
+        if build_status == "success" and jenkins_build.number:
             try:
                 artifact = await self._jenkins.download_artifact(
                     jenkins_build.number, self._artifact_pattern
@@ -293,7 +285,7 @@ class BuildCoordinator:
         if pending is None:
             return  # Already consumed by a webhook or cancellation
 
-        now = time.time()
+        now = self._clock()
         logger.warning(
             "Build timed out: request_id=%s branch=%s (%.0fs elapsed)",
             request_id,

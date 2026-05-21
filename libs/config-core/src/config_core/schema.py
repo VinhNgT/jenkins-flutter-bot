@@ -23,6 +23,27 @@ from pydantic_core import PydanticUndefinedType
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 
+def resolve_config_path(path: Path) -> Path:
+    """Apply ``JFB_DATA_DIR`` override to a config file path.
+
+    When the ``JFB_DATA_DIR`` environment variable is set, the parent
+    directory of *path* is replaced with its value while the filename is
+    preserved.  This allows tests to redirect **all** config I/O to a
+    temporary directory with a single env-var, requiring zero code
+    changes in any consumer.
+
+    Example::
+
+        # Original: Path("/app/data/bot.json")
+        # With JFB_DATA_DIR=/tmp/test123:
+        # Result:   Path("/tmp/test123/bot.json")
+    """
+    override = os.environ.get("JFB_DATA_DIR")
+    if override:
+        return Path(override) / path.name
+    return path
+
+
 class JsonConfigSettingsSource(PydanticBaseSettingsSource):
     """Custom settings source that loads JSON config.
 
@@ -63,7 +84,7 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
         if cls_path is None:
             return {}
 
-        path = Path(cls_path)
+        path = resolve_config_path(Path(cls_path))
         if not path.exists():
             return {}
 
@@ -295,10 +316,14 @@ def read_masked_config(
     Returns ``{"values": <dict>, "secret_lengths": <dict>}`` where
     secret values are replaced with ``None`` and their original lengths
     are tracked for the dashboard UI.
+
+    The *path* is subject to the ``JFB_DATA_DIR`` override so tests can
+    redirect config I/O transparently.
     """
+    resolved = resolve_config_path(path)
     data: dict[str, Any] = {}
-    if path.exists():
-        data = json.loads(path.read_text())
+    if resolved.exists():
+        data = json.loads(resolved.read_text())
 
     doc = ConfigDocument(data)
     secret_keys = get_secret_keys(config_cls)
@@ -401,7 +426,12 @@ def save_config_with_merge(
     String values are coerced to their native Python type (int, float, bool)
     before writing so the JSON file stays type-correct and Pydantic can
     validate it without errors on the next load.
+
+    The *path* is subject to the ``JFB_DATA_DIR`` override so tests can
+    redirect config I/O transparently.
     """
+    resolved = resolve_config_path(path)
+
     # Coerce form strings to native types before any other processing
     _coerce_payload_types(config_cls, payload)
 
@@ -425,14 +455,14 @@ def save_config_with_merge(
 
     # Deep merge with existing
     existing: dict[str, Any] = {}
-    if path.exists():
-        existing = json.loads(path.read_text())
+    if resolved.exists():
+        existing = json.loads(resolved.read_text())
 
     doc = ConfigDocument(existing)
     doc.merge(payload_doc.data)
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(doc.data, indent=2))
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(json.dumps(doc.data, indent=2))
 
 
 def format_validation_error(exc: Exception) -> str:

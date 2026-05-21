@@ -1,7 +1,8 @@
 """Telegram admin bot handlers — stack management via inline keyboard.
 
-All operational logic is delegated to the config-hub HTTP API.
-This module is purely Telegram UI formatting + httpx calls.
+All operational logic is delegated to the config-hub HTTP API via
+:class:`~tg_admin_bot.client.HubClient`.  This module is purely
+Telegram UI formatting + HubClient calls.
 """
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlencode
 
-import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -25,6 +25,7 @@ from telegram.ext import (
 )
 
 if TYPE_CHECKING:
+    from .client import HubClient
     from .config import AdminBotBootstrap
 
 logger = logging.getLogger(__name__)
@@ -38,9 +39,14 @@ def _admin_version() -> str:
         return "unknown"
 
 
-def _api(config: AdminBotBootstrap) -> str:
-    """Return the config-hub base URL."""
-    return config.config_hub_url
+def _hub(context: ContextTypes.DEFAULT_TYPE) -> HubClient:
+    """Retrieve the shared HubClient from bot_data."""
+    return context.bot_data["hub_client"]
+
+
+def _config(context: ContextTypes.DEFAULT_TYPE) -> AdminBotBootstrap:
+    """Retrieve the shared config from bot_data."""
+    return context.bot_data["config"]
 
 
 # ---------------------------------------------------------------------------
@@ -87,8 +93,8 @@ _ADMIN_KEYBOARD = InlineKeyboardMarkup(
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /admin command — show the admin control panel."""
-    config: AdminBotBootstrap = context.bot_data["config"]
-    if not _ensure_authorized(config, update):
+    cfg = _config(context)
+    if not _ensure_authorized(cfg, update):
         return
 
     await update.message.reply_text(  # type: ignore[union-attr]
@@ -109,12 +115,8 @@ async def _status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     assert query is not None
     await query.answer()
 
-    config: AdminBotBootstrap = context.bot_data["config"]
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{_api(config)}/api/services/status")
-            resp.raise_for_status()
-            data = resp.json()
+        data = await _hub(context).get_service_status()
     except Exception:
         logger.exception("Failed to fetch service status")
         data = {
@@ -188,14 +190,8 @@ async def _service_action_callback(
         return
     _, action, service = parts
 
-    config: AdminBotBootstrap = context.bot_data["config"]
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{_api(config)}/api/services/{service}/{action}"
-            )
-            resp.raise_for_status()
-            result = resp.json()
+        result = await _hub(context).service_action(service, action)
     except Exception:
         logger.exception("Failed to %s %s", action, service)
         result = {"running": "unknown", "available": False}
@@ -225,12 +221,8 @@ async def _export_env_callback(
     assert query is not None
     await query.answer("Generating config tarball…")
 
-    config: AdminBotBootstrap = context.bot_data["config"]
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(f"{_api(config)}/api/export/tarball")
-            resp.raise_for_status()
-            tarball_bytes = resp.content
+        tarball_bytes = await _hub(context).export_tarball()
     except Exception:
         logger.exception("Failed to export tarball from config-hub")
         await query.edit_message_text("❌ Failed to generate config tarball.")
@@ -268,8 +260,8 @@ async def _import_env_receive(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive and process the uploaded config tarball."""
-    config: AdminBotBootstrap = context.bot_data["config"]
-    if not _ensure_authorized(config, update):
+    cfg = _config(context)
+    if not _ensure_authorized(cfg, update):
         return ConversationHandler.END
 
     doc = update.message.document  # type: ignore[union-attr]
@@ -283,13 +275,7 @@ async def _import_env_receive(
     raw = await file.download_as_bytearray()
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"{_api(config)}/api/import/tarball",
-                files={"file": ("config.tar.gz", bytes(raw), "application/gzip")},
-            )
-            resp.raise_for_status()
-            result = resp.json()
+        result = await _hub(context).import_tarball(bytes(raw))
     except Exception:
         logger.exception("Failed to import tarball via config-hub")
         await update.message.reply_text(  # type: ignore[union-attr]
@@ -357,12 +343,8 @@ async def _jenkinsfile_callback(
     assert query is not None
     await query.answer("Generating Jenkinsfile…")
 
-    config: AdminBotBootstrap = context.bot_data["config"]
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{_api(config)}/api/jenkinsfile")
-            resp.raise_for_status()
-            data = resp.json()
+        data = await _hub(context).get_jenkinsfile()
     except Exception:
         logger.exception("Failed to generate Jenkinsfile via config-hub")
         await query.edit_message_text("❌ Failed to generate Jenkinsfile.")
@@ -389,12 +371,8 @@ async def _drive_setup_callback(
     assert query is not None
     await query.answer()
 
-    config: AdminBotBootstrap = context.bot_data["config"]
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{_api(config)}/api/drive/status")
-            resp.raise_for_status()
-            status = resp.json()
+        status = await _hub(context).get_drive_status()
     except Exception:
         logger.exception("Failed to check Drive status")
         status = {"connected": False, "configured": False}
@@ -424,8 +402,8 @@ async def _drive_receive_client_id(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive client_id, ask for client_secret."""
-    config: AdminBotBootstrap = context.bot_data["config"]
-    if not _ensure_authorized(config, update):
+    cfg = _config(context)
+    if not _ensure_authorized(cfg, update):
         return ConversationHandler.END
 
     client_id = update.message.text.strip()  # type: ignore[union-attr]
@@ -441,8 +419,8 @@ async def _drive_receive_client_secret(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive client_secret, generate consent URL via config-hub."""
-    config: AdminBotBootstrap = context.bot_data["config"]
-    if not _ensure_authorized(config, update):
+    cfg = _config(context)
+    if not _ensure_authorized(cfg, update):
         return ConversationHandler.END
 
     client_secret = update.message.text.strip()  # type: ignore[union-attr]
@@ -450,13 +428,7 @@ async def _drive_receive_client_secret(
 
     # Save credentials to drive config via config-hub
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            await client.put(
-                f"{_api(config)}/api/config/file_manager",
-                json={
-                    "drive": {"client_id": client_id, "client_secret": client_secret}
-                },
-            )
+        await _hub(context).save_drive_config(client_id, client_secret)
     except Exception:
         logger.exception("Failed to save Drive credentials")
 
@@ -490,8 +462,8 @@ async def _drive_receive_code(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """Receive OAuth code, exchange for tokens via config-hub API."""
-    config: AdminBotBootstrap = context.bot_data["config"]
-    if not _ensure_authorized(config, update):
+    cfg = _config(context)
+    if not _ensure_authorized(cfg, update):
         return ConversationHandler.END
 
     code = update.message.text.strip()  # type: ignore[union-attr]
@@ -499,16 +471,7 @@ async def _drive_receive_code(
     client_secret = context.user_data.get("drive_client_secret", "")  # type: ignore[union-attr]
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                f"{_api(config)}/api/drive/connect/exchange",
-                json={
-                    "code": code,
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                },
-            )
-            resp.raise_for_status()
+        await _hub(context).exchange_drive_code(code, client_id, client_secret)
     except Exception:
         logger.exception("Drive OAuth code exchange failed")
         await update.message.reply_text(  # type: ignore[union-attr]

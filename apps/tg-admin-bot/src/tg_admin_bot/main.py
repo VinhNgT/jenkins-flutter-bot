@@ -1,43 +1,63 @@
-"""Admin bot entry point — CLI + Application builder."""
+"""Tg-admin-bot — FastAPI app factory and CLI.
+
+Wraps the Telegram polling bot inside a FastAPI lifespan, matching
+the standard service pattern used by all other services in the stack.
+"""
 
 from __future__ import annotations
 
 import logging
-import sys
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
-from pydantic import ValidationError
-from telegram.ext import Application
+import uvicorn
+from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
 
-from .config import AdminBotBootstrap
-from .handlers import register_handlers
+from .manager import AdminBotManager, StartupError
+from .routers.control import router as control_router
 
 logger = logging.getLogger(__name__)
 
 
-def build_application(config: AdminBotBootstrap) -> Application:  # type: ignore[type-arg]
-    """Build and configure the Telegram Application."""
-    app = Application.builder().token(config.bot_token).build()
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage admin bot lifecycle on startup/shutdown."""
+    try:
+        await app.state.manager.start()
+    except StartupError:
+        logger.warning(
+            "Admin bot not auto-started: %s",
+            app.state.manager.status()["last_error"],
+        )
 
-    # Wire shared state into bot_data
-    app.bot_data["config"] = config
+    yield
 
-    register_handlers(app)
+    try:
+        await app.state.manager.stop()
+    except Exception:
+        logger.exception("Error during shutdown")
+
+
+def create_app() -> FastAPI:
+    """Create the FastAPI app hosting control routes."""
+    app = FastAPI(title="tg-admin-bot", lifespan=lifespan)
+    app.state.manager = AdminBotManager()
+
+    @app.exception_handler(StartupError)
+    async def handle_startup_error(
+        request: Request, exc: StartupError,
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    app.include_router(control_router)
     return app
 
 
 def cli() -> None:
-    """CLI entry point for the admin bot."""
+    """CLI entry point for the admin bot service."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
     )
-
-    try:
-        config = AdminBotBootstrap.load()
-    except ValidationError as e:
-        logger.critical("Missing required config:\n%s", e)
-        sys.exit(1)
-
-    logger.info("Starting admin bot (chat_id=%d)…", config.admin_chat_id)
-    app = build_application(config)
-    app.run_polling(drop_pending_updates=True)
+    uvicorn.run(create_app(), host="0.0.0.0", port=9093)

@@ -6,6 +6,7 @@ reporting status.  Attached to ``app.state.manager`` during lifespan.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import subprocess
@@ -50,13 +51,13 @@ class AgentManager:
     def running(self) -> bool:
         return self._process is not None and self._process.poll() is None
 
-    async def start(self) -> None:
+    async def start(self, config: AgentSettings | None = None) -> None:
         """Spawn the Jenkins inbound agent as a child process."""
         if self.running:
             return
 
         try:
-            config = AgentSettings.load()
+            config = config or AgentSettings.load()
         except (ValueError, ValidationError) as e:
             self._last_error = str(e)
             raise StartupError(str(e)) from e
@@ -99,10 +100,10 @@ class AgentManager:
         logger.info("Stopping Jenkins agent...")
         self._process.terminate()
         try:
-            self._process.wait(timeout=5)
+            await asyncio.to_thread(self._process.wait, timeout=5)
         except subprocess.TimeoutExpired:
             self._process.kill()
-            self._process.wait(timeout=5)
+            await asyncio.to_thread(self._process.wait, timeout=5)
         finally:
             self._process = None
             self._config = None

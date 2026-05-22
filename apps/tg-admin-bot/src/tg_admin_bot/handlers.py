@@ -34,7 +34,12 @@ logger = logging.getLogger(__name__)
 def _admin_version() -> str:
     """Return the installed tg-admin-bot package version, or 'unknown'."""
     try:
-        return _pkg_version("tg-admin-bot")
+        v = _pkg_version("tg-admin-bot")
+        # Python packaging normalizes version strings according to PEP 440
+        # (e.g. "0.3.2-dev.2" becomes "0.3.2.dev2"). We map PEP 440 pre-releases
+        # back to the exact human-authored format in pyproject.toml.
+        import re
+        return re.sub(r"^(\d+\.\d+\.\d+)\.(dev|rc)(\d+)$", r"\1-\2.\3", v)
     except PackageNotFoundError:
         return "unknown"
 

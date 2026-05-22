@@ -56,6 +56,45 @@ class TestGet:
 
 
 # ---------------------------------------------------------------------------
+# Constructor reference identity
+# ---------------------------------------------------------------------------
+
+
+class TestInit:
+    def test_empty_dict_preserves_reference(self):
+        """ConfigDocument({}) must use the SAME dict object, not create a new one.
+
+        Regression: `data or {}` treated {} as falsy and created a new dict,
+        severing the reference between the caller's dict and doc.data.
+        This broke _parse_env_content where modifications via doc.set()
+        were invisible to the caller.
+        """
+        d = {}
+        doc = ConfigDocument(d)
+        assert doc.data is d
+
+    def test_none_creates_new_dict(self):
+        doc = ConfigDocument(None)
+        assert doc.data == {}
+
+    def test_no_args_creates_new_dict(self):
+        doc = ConfigDocument()
+        assert doc.data == {}
+
+    def test_non_empty_dict_preserves_reference(self):
+        d = {"key": "val"}
+        doc = ConfigDocument(d)
+        assert doc.data is d
+
+    def test_set_on_empty_dict_visible_to_caller(self):
+        """Mutations via set() on an initially-empty dict are visible to the caller."""
+        d = {}
+        doc = ConfigDocument(d)
+        doc.set("a.b", 1)
+        assert d == {"a": {"b": 1}}
+
+
+# ---------------------------------------------------------------------------
 # set()
 # ---------------------------------------------------------------------------
 

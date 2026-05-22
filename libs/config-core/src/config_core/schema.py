@@ -249,7 +249,7 @@ class ConfigDocument:
     """Wrapper for manipulating nested configuration dictionaries."""
 
     def __init__(self, data: dict[str, Any] | None = None):
-        self.data = data or {}
+        self.data = data if data is not None else {}
 
     def get(self, dotted_key: str) -> Any:
         """Read a value from a nested dict using a dotted key path."""

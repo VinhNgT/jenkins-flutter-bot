@@ -136,29 +136,27 @@ class TestParseEnvContent:
         }
 
     def test_basic_parsing(self):
-        """Verify env content is correctly parsed and applied."""
+        """Verify env content is correctly parsed into the returned dict."""
         content = "BOT_TOKEN=abc123"
         bp, ap, fmp, applied, skipped, unrec, errors = _parse_env_content(
             content, self._lookup(), {}, {}
         )
+        assert "telegram" in bp
+        assert bp["telegram"]["bot_token"] == "abc123"
         assert len(applied) == 1
-        assert "BOT_TOKEN" in applied[0]
-        assert "abc123" in applied[0]
         assert errors == []
 
     def test_quoted_value(self):
         content = 'BOT_TOKEN="value with spaces"'
-        _, _, _, applied, *_ = _parse_env_content(
+        bp, _, _, applied, *_ = _parse_env_content(
             content, self._lookup(), {}, {}
         )
-        assert len(applied) == 1
-        assert "value with spaces" in applied[0]
+        assert bp["telegram"]["bot_token"] == "value with spaces"
 
     def test_comments_skipped(self):
         content = "# This is a comment\n\n# Another\nBOT_TOKEN=abc"
-        _, _, _, applied, *_ = _parse_env_content(content, self._lookup(), {}, {})
-        assert len(applied) == 1
-        assert "abc" in applied[0]
+        bp, *_ = _parse_env_content(content, self._lookup(), {}, {})
+        assert bp["telegram"]["bot_token"] == "abc"
 
     def test_invalid_syntax(self):
         content = "THIS IS NOT VALID"
@@ -182,9 +180,8 @@ class TestParseEnvContent:
 
     def test_export_prefix_handled(self):
         content = "export BOT_TOKEN=abc123"
-        _, _, _, applied, *_ = _parse_env_content(content, self._lookup(), {}, {})
-        assert len(applied) == 1
-        assert "abc123" in applied[0]
+        bp, *_ = _parse_env_content(content, self._lookup(), {}, {})
+        assert bp["telegram"]["bot_token"] == "abc123"
 
 
 # ---------------------------------------------------------------------------
@@ -218,14 +215,7 @@ class TestTarball:
             assert "env/oauth.json" not in tar.getnames()
 
     def test_tarball_roundtrip(self, tmp_path):
-        """Export → import → verifies applied log tracks the values.
-
-        NOTE: _parse_env_content has a known issue where returned patch
-        dicts are always empty due to ConfigDocument(data or {}) losing
-        the reference to empty dicts. The ``applied`` log correctly
-        records what was parsed, but the actual config files are not
-        written. This test documents the current behavior.
-        """
+        """Export → import → config files written with correct values."""
         bot_schema = _schema(
             _field_def("telegram.bot_token", "TELEGRAM_BOT_TOKEN"),
         )
@@ -252,11 +242,15 @@ class TestTarball:
             agent_config_path=agent_path,
         )
 
-        # The applied log correctly shows parsed values
         assert len(result.applied) == 2
         assert result.parse_errors == []
-        assert any("secret_token" in a for a in result.applied)
-        assert any("my-agent" in a for a in result.applied)
+
+        # Verify config files were actually written
+        bot_config = json.loads(bot_path.read_text())
+        assert bot_config["telegram"]["bot_token"] == "secret_token"
+
+        agent_config = json.loads(agent_path.read_text())
+        assert agent_config["agent"]["name"] == "my-agent"
 
     def test_import_invalid_tarball(self, tmp_path):
         result = import_tarball(

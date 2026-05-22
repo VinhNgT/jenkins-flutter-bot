@@ -29,6 +29,21 @@ class TestTriggerBuild:
         assert result["status"] == "queued"
         await client.close()
 
+    async def test_success_with_app_name(self):
+        import json
+        payload = {}
+        def handler(request: httpx.Request):
+            nonlocal payload
+            payload = json.loads(request.read())
+            return httpx.Response(200, json={"request_id": "abc123", "status": "queued"})
+
+        client = _build_client(handler)
+        result = await client.trigger_build("main", "http://bot/cb", app_name="My App")
+        assert result["request_id"] == "abc123"
+        assert result["status"] == "queued"
+        assert payload["app_name"] == "My App"
+        await client.close()
+
     async def test_connection_error(self):
         def handler(request: httpx.Request):
             raise httpx.ConnectError("Connection refused")

@@ -28,6 +28,7 @@ class PendingBuild:
     triggered_at: float
     queue_id: int | None = None
     frontend_callback_url: str = ""
+    app_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,7 @@ class BuildTracker:
                 "triggered_at": v.triggered_at,
                 "queue_id": v.queue_id,
                 "frontend_callback_url": v.frontend_callback_url,
+                "app_name": v.app_name,
             }
             for k, v in self._pending.items()
         }
@@ -145,6 +147,7 @@ class BuildTracker:
         *,
         queue_id: int | None = None,
         frontend_callback_url: str = "",
+        app_name: str | None = None,
     ) -> PendingBuild:
         """Register a new pending build."""
         pending = PendingBuild(
@@ -153,6 +156,7 @@ class BuildTracker:
             triggered_at=self._clock(),
             queue_id=queue_id,
             frontend_callback_url=frontend_callback_url,
+            app_name=app_name,
         )
         self._pending[request_id] = pending
         self._save_pending()

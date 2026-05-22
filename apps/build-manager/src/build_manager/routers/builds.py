@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/builds", tags=["builds"])
 async def trigger_build(coord: CoordinatorDep, request: Request) -> dict[str, Any]:
     """Trigger a new build.
 
-    Expects JSON: ``{branch: "main", callback_url: "http://..."}``
+    Expects JSON: ``{branch: "main", callback_url: "http://...", app_name: "..."}``
 
     Returns ``{request_id, status: "queued"}``.
     """
@@ -36,9 +36,12 @@ async def trigger_build(coord: CoordinatorDep, request: Request) -> dict[str, An
         raise HTTPException(status_code=400, detail="branch is required")
 
     callback_url = body.get("callback_url", "")
+    app_name = body.get("app_name", None)
 
     try:
-        result = await coord.trigger_build(branch, frontend_callback_url=callback_url)
+        result = await coord.trigger_build(
+            branch, frontend_callback_url=callback_url, app_name=app_name
+        )
         return result
     except JenkinsTriggerError as exc:
         raise HTTPException(status_code=502, detail=exc.user_message) from exc

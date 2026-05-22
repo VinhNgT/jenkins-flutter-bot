@@ -51,7 +51,9 @@ class BuildClient:
         """Close the underlying HTTP client."""
         await self._client.aclose()
 
-    async def trigger_build(self, branch: str, callback_url: str) -> dict[str, Any]:
+    async def trigger_build(
+        self, branch: str, callback_url: str, app_name: str | None = None
+    ) -> dict[str, Any]:
         """Trigger a build via the build manager.
 
         Returns ``{request_id, status}`` on success.
@@ -60,9 +62,12 @@ class BuildClient:
         """
         url = f"{self._base_url}/api/builds/trigger"
         try:
+            payload = {"branch": branch, "callback_url": callback_url}
+            if app_name:
+                payload["app_name"] = app_name
             resp = await self._client.post(
                 url,
-                json={"branch": branch, "callback_url": callback_url},
+                json=payload,
             )
         except Exception as exc:
             logger.exception("Failed to reach build-manager for trigger")

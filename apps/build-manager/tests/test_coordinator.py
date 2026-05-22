@@ -149,6 +149,42 @@ class TestCompleteBuild:
         assert recent[0].result == "success"
         await coordinator.close()
 
+    async def test_success_derives_filename_from_app_name(self, coordinator):
+        # Setup: add a pending build with app_name
+        coordinator._jenkins.trigger_build = AsyncMock(return_value=42)
+        result = await coordinator.trigger_build(
+            "main", frontend_callback_url="http://bot/cb", app_name="My Awesome App!"
+        )
+        request_id = result["request_id"]
+
+        # Mock artifact download
+        coordinator._jenkins.download_artifact = AsyncMock(
+            return_value=("app-release.apk", b"apk-data")
+        )
+
+        # Mock _upload_artifact to capture the filename
+        coordinator._upload_artifact = AsyncMock(
+            return_value={"download_url": "https://drive.google.com/file/123", "file_id": "drive_file_123"}
+        )
+
+        # Simulate build completion
+        jenkins_build = JenkinsBuild(
+            number=1, result="SUCCESS", building=False,
+            timestamp=1_700_000_000.0, duration_ms=60000,
+            branch="main", commit_hash="a" * 40, request_id=request_id,
+        )
+        await coordinator._complete_build(request_id, jenkins_build)
+
+        # Verify that _upload_artifact was called with a derived filename
+        assert coordinator._upload_artifact.called
+        called_args, called_kwargs = coordinator._upload_artifact.call_args
+        uploaded_filename = called_args[0]
+        
+        # Expected pattern: my-awesome-app-{YYYYMMDD}-{HHmmss}-{requestId8}.apk
+        assert uploaded_filename.startswith("my-awesome-app-")
+        assert uploaded_filename.endswith(f"-{request_id[:8]}.apk")
+        await coordinator.close()
+
     async def test_failure_no_upload(self, coordinator):
         result = await coordinator.trigger_build("main")
         request_id = result["request_id"]

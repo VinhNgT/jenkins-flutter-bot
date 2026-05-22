@@ -456,6 +456,7 @@ async def _trigger_build(
         result = await ctx.build_client.trigger_build(
             branch=ref,
             callback_url=ctx.config.bot_callback_url,
+            app_name=ctx.config.app_name,
         )
     except BuildClientError as exc:
         error_text = f"❌ {_escape(exc.user_message)}"

@@ -58,6 +58,22 @@ def test_trigger_success(client, mock_coordinator):
     assert resp.json()["status"] == "queued"
 
 
+def test_trigger_success_with_app_name(client, mock_coordinator):
+    mock_coordinator.trigger_build.return_value = {
+        "request_id": "abc123",
+        "status": "queued",
+    }
+    resp = client.post(
+        "/api/builds/trigger",
+        json={"branch": "main", "callback_url": "http://bot/cb", "app_name": "My App"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "queued"
+    mock_coordinator.trigger_build.assert_called_with(
+        "main", frontend_callback_url="http://bot/cb", app_name="My App"
+    )
+
+
 def test_trigger_queue_full_502(client, mock_coordinator):
     mock_coordinator.trigger_build.side_effect = JenkinsTriggerError(
         "Queue full", "Build queue is full"

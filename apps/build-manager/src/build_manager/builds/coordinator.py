@@ -94,7 +94,7 @@ class BuildCoordinator:
     # ------------------------------------------------------------------
 
     async def trigger_build(
-        self, branch: str, *, frontend_callback_url: str = ""
+        self, branch: str, *, frontend_callback_url: str = "", app_name: str | None = None
     ) -> dict[str, Any]:
         """Trigger a Jenkins build for the given branch.
 
@@ -123,6 +123,7 @@ class BuildCoordinator:
             branch,
             queue_id=queue_id,
             frontend_callback_url=frontend_callback_url,
+            app_name=app_name,
         )
 
         # Start per-build poll task
@@ -231,10 +232,19 @@ class BuildCoordinator:
                     original_name, content = artifact
                     # Build a descriptive filename:
                     # {jobName}-{YYYYMMDD}-{HHmmss}-{requestId8}.apk
+                    # If app_name is provided, use a sanitized version of it.
                     suffix = Path(original_name).suffix  # .apk
                     dt = datetime.fromtimestamp(now, tz=timezone.utc)
+                    if pending.app_name:
+                        import re
+                        cleaned = pending.app_name.replace(" ", "-")
+                        cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", cleaned).lower()
+                        base_name = cleaned or self._jenkins.job_name
+                    else:
+                        base_name = self._jenkins.job_name
+
                     upload_name = (
-                        f"{self._jenkins.job_name}"
+                        f"{base_name}"
                         f"-{dt.strftime('%Y%m%d')}"
                         f"-{dt.strftime('%H%M%S')}"
                         f"-{request_id[:8]}{suffix}"

@@ -32,9 +32,9 @@ All services share a single Docker bridge network. Only two ports are exposed to
 - **`jenkins:8080`** — Jenkins web UI
 - **`config-hub:9000`** — Config dashboard + Drive OAuth callback
 
-Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), and build-manager (`9010`) ports are internal only. `tg-admin-bot` has no HTTP server.
+Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), build-manager (`9010`), and admin bot (`tg-admin-bot` on `9093`) ports are internal only.
 
-Do not expose bot, agent-control, file-manager, or build-manager ports to the host.
+Do not expose bot, agent-control, file-manager, build-manager, or admin bot ports to the host.
 
 ---
 

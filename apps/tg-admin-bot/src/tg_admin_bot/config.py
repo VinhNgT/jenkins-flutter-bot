@@ -9,9 +9,9 @@ from config_core import BootstrapSettings
 class AdminBotBootstrap(BootstrapSettings):
     """Resolved admin bot bootstrap configuration.
 
-    tg-admin-bot has no JSON config file and no control API — it resolves
-    all fields from environment variables only.  Hard crash if required
-    fields (bot_token, admin_chat_id) are missing.
+    tg-admin-bot has no JSON config file — it resolves all fields from
+    environment variables only. Hard crash if required fields (bot_token,
+    admin_chat_id) are missing.
     """
 
     bot_token: str = Field(

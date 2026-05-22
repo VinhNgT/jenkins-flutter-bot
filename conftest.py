@@ -10,7 +10,6 @@ inline with overrides:  ``pending_build_factory(branch="dev")``.
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import httpx
@@ -242,7 +241,7 @@ def make_handler_context(bot_context: Any, *, bot: Any = None) -> Any:
     Wires *bot_context* into ``context.bot_data["bot_context"]``.
     Sets ``context.bot`` and ``context.job_queue`` as mocks.
     """
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import MagicMock
 
     ctx = MagicMock()
     ctx.bot_data = {"bot_context": bot_context}

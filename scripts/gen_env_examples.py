@@ -41,7 +41,7 @@ def _generate_example(cls: Type[BaseSettings], title: str) -> str:
         extra = field.json_schema_extra or {}
         if not isinstance(extra, dict):
             extra = {}
-        group = extra.get("group", "General")
+        group = str(extra.get("group", "General"))
         groups.setdefault(group, []).append((name, field))
 
     for group_name, group_fields in groups.items():
@@ -75,7 +75,7 @@ def main() -> None:
     env_dir = Path(__file__).resolve().parent.parent / "infra" / "env"
     env_dir.mkdir(parents=True, exist_ok=True)
 
-    examples = [
+    examples: list[tuple[Path, type[BaseSettings], str]] = [
         (env_dir / "tg-jenkins-bot.env.example", BotSettings, "Telegram Bot Config"),
         (env_dir / "agent-control.env.example", AgentSettings, "Agent Control Config"),
         (env_dir / "file-manager.env.example", StorageSettings, "File Manager Config"),

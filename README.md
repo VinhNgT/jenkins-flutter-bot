@@ -20,7 +20,7 @@ graph TD
 
     subgraph ops["Ops  (optional)"]
         CH["config-hub :9000 ★"]
-        TAB["tg-admin-bot"]
+        TAB["tg-admin-bot :9093"]
     end
 
     subgraph managed["Managed Services"]
@@ -54,7 +54,7 @@ graph TD
 | `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 | `file-manager` | 9092 | No | Storage backend — Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job tracking |
-| `tg-admin-bot` | — | No | Headless Telegram admin bot (HTTP client to config-hub) |
+| `tg-admin-bot` | 9093 | No | FastAPI Telegram admin bot (HTTP client to config-hub + control API) |
 
 ---
 

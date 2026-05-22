@@ -5,7 +5,6 @@ import httpx
 
 from build_manager.builds.jenkins_client import (
     JenkinsClient,
-    JenkinsBuild,
     JenkinsTriggerError,
     _extract_params,
     _extract_commit_hash,

@@ -13,7 +13,13 @@ A headless Telegram bot for stack management — provides a fallback interface w
 
 ## Architecture
 
-The admin bot runs as a Telegram polling bot with **no HTTP server**. It is a pure **HTTP API client** to the `config-hub` service — no config volume mounts, no direct library dependencies on operational logic. All config, service control, and OAuth flows are handled by `config-hub`; the bot formats results for the Telegram UI.
+The admin bot is built as a FastAPI application running on internal port `9093`. The Telegram polling updater is wrapped in a lifespan manager (`AdminBotManager`) that starts and stops the background polling process in coordination with the FastAPI application lifecycle.
+
+Key aspects of this architecture include:
+- **FastAPI Lifespan** — The application utilizes standard FastAPI startup/shutdown lifespans to cleanly initialize and stop the Telegram bot updater.
+- **Control endpoints** — Exposes `/control/*` endpoints (status, start, stop, restart) to align with the rest of the microservices in the stack.
+- **HTTP API Client** — It remains a pure client to `config-hub` for retrieving config, performing system operations, and completing Drive OAuth, avoiding any direct database or volume dependencies on operational logic.
+
 
 ## Environment Variables
 

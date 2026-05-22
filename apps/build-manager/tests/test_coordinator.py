@@ -1,7 +1,6 @@
 """Tests for BuildCoordinator — full lifecycle, timeout, eviction, cancellation."""
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest

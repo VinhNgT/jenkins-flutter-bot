@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 from telegram import Bot
 
 from tg_jenkins_bot.bot.context import BotContext
-from tg_jenkins_bot.bot.tracker import TrackedMessage
 
 
 def make_mock_bot() -> AsyncMock:

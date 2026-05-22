@@ -4,7 +4,6 @@ import os
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import ValidationError
 
 from file_manager.manager import StorageManager, StartupError
 from file_manager.backends.google_drive import GoogleDriveBackend
@@ -124,7 +123,6 @@ class TestStatus:
 
     def test_status_config_error(self, isolate_config):
         """When StorageSettings.load() fails, status shows config_error."""
-        import json
 
         # Create config that makes load() fail (e.g. invalid JSON)
         config_path = isolate_config / "storage.json"

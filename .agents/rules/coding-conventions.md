@@ -32,9 +32,9 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 
 ### Key Dependency Patterns
 
-- **All FastAPI services** share `fastapi` + `uvicorn`. The `tg-admin-bot` is the only exception — it uses only `python-telegram-bot[ext]` with no HTTP server.
+- **All FastAPI services** share `fastapi` + `uvicorn` (including `tg-jenkins-bot` and `tg-admin-bot`).
 - **All apps** depend on `config-core` (shared library) for `BootstrapSettings` / `ServiceSettings` and config I/O helpers.
-- **`tg-admin-bot`** is a pure HTTP client to `config-hub` — its primary dependencies are `httpx`, `python-telegram-bot`, and `config-core`.
+- **`tg-admin-bot`** is also a standard FastAPI service; its primary dependencies are `fastapi`, `uvicorn`, `httpx`, `python-telegram-bot`, and `config-core`.
 - **Blocking I/O libraries** (e.g., `google-api-python-client`) are wrapped with `asyncio.to_thread()`. See `communication-flows.md` for details.
 
 Check each app's `pyproject.toml` for the authoritative dependency list.
@@ -55,7 +55,7 @@ FastAPI service apps follow the official [Bigger Applications](https://fastapi.t
 | `dependencies.py` | Shared `Depends()` callables using `Annotated` type aliases |
 | `routers/` | Route modules, each defining an `APIRouter` — no business logic |
 
-This structure applies to all FastAPI services: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`, and `mock-jenkins`.
+This structure applies to all FastAPI services: `tg-jenkins-bot`, `tg-admin-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`, and `mock-jenkins`.
 
 `config-hub` and `tg-admin-bot` use `BootstrapSettings` (env-only, no JSON file) since they have no dashboard-editable config. `mock-jenkins` imports the real `AgentSettings` from `agent-control` for its mock agent-control server.
 
@@ -63,7 +63,7 @@ The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`, `git/`) for
 
 ### Admin Bot
 
-`tg-admin-bot` is a standalone Telegram polling bot — no FastAPI, no schema, no control API. It delegates all operations to the `config-hub` HTTP API via `httpx`, using `config.py` with an `AdminBotBootstrap(BootstrapSettings)` class for its env-only settings.
+`tg-admin-bot` is implemented as a standard FastAPI application hosting control endpoints on port `9093`. It uses `config.py` with an `AdminBotBootstrap(BootstrapSettings)` class for its env-only settings, and wraps the Telegram polling updater in the `AdminBotManager` controlled via FastAPI's lifespan hooks. All administrative and operational requests are proxied via `HubClient` to the `config-hub` API.
 
 ### Shared Library
 
@@ -129,4 +129,26 @@ Each service's `manager.py` defines a `StartupError` exception. The manager rais
 ### Terminal Catch Sites
 
 Bot Telegram API handlers, Drive OAuth flows, and Jenkins client calls are **terminal catch sites** — the operation failed, we log it, and continue. These correctly use `logger.exception()` because there is no caller to propagate to. Do not change these.
+
+---
+
+## Testing Conventions
+
+The repository uses **pytest** for both unit and integration tests across all workspace packages, configured globally in the root `pyproject.toml`.
+
+### Shared Testing Infrastructure (`conftest.py`)
+
+A centralized, root-level `conftest.py` provides shared testing utilities:
+
+1. **Domain Object Factories** — Plain helper functions (not fixtures) to quickly instantiate mock data with realistic defaults. Use them inline with overrides:
+   - `pending_build_factory(**overrides)` for build-manager builds
+   - `completed_build_factory(**overrides)` for completed builds
+   - `jenkins_build_factory(**overrides)` for Jenkins client responses
+   - `tracked_message_factory(**overrides)` for Telegram interaction tracking
+2. **HTTP Mocking** — The `mock_http_client` fixture registers custom transports to mock HTTP calls to external APIs without leaving the process boundary.
+3. **Telegram Test Helpers** — Full-stack mock fixtures to test Telegram polling dispatch loops safely:
+   - `make_mock_bot()` generates an `AsyncMock` pre-configured with the required attributes of `telegram.Bot` to satisfy PTB internals.
+   - `make_telegram_update(...)` and `make_callback_update(...)` construct realistic, bot-attributed `telegram.Update` payloads so command and button callbacks can be integration-tested natively.
+   - `make_handler_context(...)` mocks standard context objects to test standalone callback handlers in isolation.
+   - `make_test_application(...)` builds fully-wired `Application` instances bound to a mock bot to allow end-to-end integration testing via `await app.process_update()`.
 

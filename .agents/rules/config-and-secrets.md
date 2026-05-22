@@ -28,7 +28,7 @@ Each schema-owning service declares a `ServiceSettings` subclass and exposes it 
 | `file-manager` | `StorageSettings` | `GET /control/schema` |
 | `build-manager` | `BuildSettings` | `GET /control/schema` |
 
-`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend. `tg-admin-bot` uses `AdminBotBootstrap(BootstrapSettings)` — env-only, no schema, no control API.
+`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend. `tg-admin-bot` uses `AdminBotBootstrap(BootstrapSettings)` — env-only, no schema, but hosts a control API for lifecycle management.
 
 ### Adding a New Config Field
 

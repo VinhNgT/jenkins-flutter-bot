@@ -68,7 +68,7 @@ graph TD
 
     subgraph ops["Ops  (optional)"]
         CH["config-hub :9000 ★"]
-        TAB["tg-admin-bot"]
+        TAB["tg-admin-bot :9093"]
     end
 
     subgraph managed["Managed Services"]
@@ -104,7 +104,7 @@ graph TD
 | `flutter-agent` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 | `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
-| `tg-admin-bot` | — | No | Headless Telegram admin bot — pure HTTP client to config-hub |
+| `tg-admin-bot` | 9093 | No | FastAPI Telegram admin bot — HTTP client to config-hub + control API |
 
 ### Design Principles
 
@@ -114,13 +114,13 @@ graph TD
 
 3. **No Docker-out-of-Docker** — `docker.sock` is never mounted into any container. This is intentional for security and portability.
 
-4. **FastAPI Everywhere** — All service APIs use FastAPI, structured per the official [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) pattern: `main.py` (app factory) → `dependencies.py` (`Depends` + `Annotated`) → `routers/` (`APIRouter` per domain). See `coding-conventions.md` for the module table. The `tg-admin-bot` is the only exception — it runs as a Telegram polling bot with no HTTP server.
+4. **FastAPI Everywhere** — All service APIs use FastAPI, structured per the official [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) pattern: `main.py` (app factory) → `dependencies.py` (`Depends` + `Annotated`) → `routers/` (`APIRouter` per domain). See `coding-conventions.md` for the module table.
 
 5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for callback matching and inline message editing. No information about non-bot-triggered builds is ever exposed to Telegram.
 
 6. **uv Workspace** — Single `pyproject.toml` + `uv.lock` at the root. All members share a unified lockfile. Shared code lives in `libs/`. Dev tools are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12).
 
-7. **Hub-and-Spoke Management** — `config-hub` (web dashboard + API) is the central hub. `tg-admin-bot` (headless Telegram bot) is a lightweight spoke that proxies all operations through `config-hub`'s HTTP API. The admin bot has no config volume mounts and no library dependencies on operational logic.
+7. **Hub-and-Spoke Management** — `config-hub` (web dashboard + API) is the central hub. `tg-admin-bot` (FastAPI + Telegram bot) is a lightweight spoke that proxies all operations through `config-hub`'s HTTP API. The admin bot has no config volume mounts and no library dependencies on operational logic, but hosts control routes on port `9093` to manage the Telegram application lifespan.
 
 8. **Pydantic Configuration** — Two base classes from `config-core` partition the configuration by lifecycle: `BootstrapSettings` (env-only, hard crash at startup) for services with no dashboard-editable state (`config-hub`, `tg-admin-bot`), and `ServiceSettings` (JSON > env, soft fail) for services whose config is editable via the web UI. All `ServiceSettings` fields are visible in the dashboard. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
 

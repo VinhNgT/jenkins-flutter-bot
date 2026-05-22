@@ -70,16 +70,16 @@ class ConfigHubManager:
         await self.services.close()
         await self.fm_client.aclose()
 
-    async def restart(self) -> None:
+    async def restart(self, config: HubBootstrap | None = None) -> None:
         """Restart the manager — re-resolve config and rebuild clients."""
         await self.stop()
-        config = HubBootstrap.load()
-        self.file_manager_url = config.file_manager_url
+        resolved = config or HubBootstrap.load()
+        self.file_manager_url = resolved.file_manager_url
         self.services = ServiceClient(
-            bot_url=config.bot_control_url,
-            agent_url=config.agent_control_url,
-            file_manager_url=config.file_manager_url,
-            build_manager_url=config.build_manager_url,
+            bot_url=resolved.bot_control_url,
+            agent_url=resolved.agent_control_url,
+            file_manager_url=resolved.file_manager_url,
+            build_manager_url=resolved.build_manager_url,
         )
         self.fm_client = httpx.AsyncClient(timeout=10.0)
         logger.info("ConfigHubManager restarted")

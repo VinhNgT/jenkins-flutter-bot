@@ -17,7 +17,7 @@ import logging
 from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from .context import BotContext, _format_elapsed
+from .context import BotContext
 from .handlers import _trigger_build
 
 logger = logging.getLogger(__name__)
@@ -229,7 +229,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elapsed = ""
         if existing:
             triggered_at = existing.data.get("triggered_at", existing.created_at)
-            elapsed = f" (started {_format_elapsed(triggered_at)})"
+            elapsed = f" (started {ctx.format_elapsed(triggered_at)})"
 
         buttons = InlineKeyboardMarkup(
             [

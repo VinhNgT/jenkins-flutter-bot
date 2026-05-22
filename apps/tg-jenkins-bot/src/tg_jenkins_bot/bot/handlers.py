@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import html
 import logging
-import time
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from datetime import datetime, timezone
 
@@ -25,7 +24,7 @@ from telegram import (
 from telegram.ext import ContextTypes
 
 from ..build_client import BuildClientError
-from .context import BotContext, _format_duration, _format_elapsed
+from .context import BotContext, _format_duration
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +175,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             triggered_at = b.data.get("triggered_at", b.created_at)
             lines.append(
                 f"  • <code>{_escape(ref)}</code>"
-                f" (started {_format_elapsed(triggered_at)})"
+                f" (started {ctx.format_elapsed(triggered_at)})"
             )
 
     # Recent successful build
@@ -402,7 +401,7 @@ async def _trigger_build(
         existing = ctx.find_building_for_branch(ref)
         if existing:
             triggered_at = existing.data.get("triggered_at", existing.created_at)
-            elapsed = _format_elapsed(triggered_at)
+            elapsed = ctx.format_elapsed(triggered_at)
             buttons = InlineKeyboardMarkup(
                 [
                     [
@@ -504,7 +503,7 @@ async def _trigger_build(
                 data={
                     "ref": ref,
                     "request_id": request_id,
-                    "triggered_at": time.time(),
+                    "triggered_at": ctx._clock(),
                 },
             )
         except Exception:
@@ -523,6 +522,6 @@ async def _trigger_build(
             data={
                 "ref": ref,
                 "request_id": request_id,
-                "triggered_at": time.time(),
+                "triggered_at": ctx._clock(),
             },
         )

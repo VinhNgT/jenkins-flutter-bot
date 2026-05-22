@@ -11,6 +11,7 @@ import logging
 import os
 import subprocess
 import time
+from collections.abc import Callable
 from typing import Any
 
 from config_core import format_validation_error
@@ -41,11 +42,12 @@ class StartupError(Exception):
 class AgentManager:
     """Manage the Jenkins inbound agent subprocess."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, clock: Callable[[], float] = time.time) -> None:
         self._process: subprocess.Popen[str] | None = None
         self._last_error: str | None = None
         self._config: AgentSettings | None = None
         self._started_at: float | None = None
+        self._clock = clock
 
     @property
     def running(self) -> bool:
@@ -87,7 +89,7 @@ class AgentManager:
             self._process = subprocess.Popen(command, text=True, env=clean_env)
             self._config = config
             self._last_error = None
-            self._started_at = time.time()
+            self._started_at = self._clock()
         except Exception as exc:
             self._last_error = str(exc)
             raise StartupError(str(exc)) from exc

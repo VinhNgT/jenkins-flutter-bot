@@ -9,11 +9,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 from config_core import format_validation_error
 from pydantic import ValidationError
 
+from telegram import Bot
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -42,9 +44,25 @@ class StartupError(Exception):
     """Raised when the bot manager fails to start."""
 
 
-def _build_application(bot_context: BotContext) -> Application:
-    """Create a Telegram application wired with the handler architecture."""
-    application = ApplicationBuilder().token(bot_context.config.telegram_token).build()
+def _build_application(
+    config: BotSettings,
+    build_client: BuildClient,
+    bot: Bot,
+    *,
+    clock: Callable[[], float] = time.time,
+) -> tuple[Application, BotContext]:
+    """Create a Telegram Application wired with the handler architecture.
+
+    Uses ``ApplicationBuilder().bot()`` to accept any Bot-like object
+    (including ``AsyncMock`` for testing).  This eliminates the need for
+    a bootstrap ``BotContext(bot=None)`` — the ``BotContext`` is created
+    once with the real (or mock) bot.
+    """
+    application = ApplicationBuilder().bot(bot).build()
+
+    bot_context = BotContext(
+        config=config, build_client=build_client, bot=bot, clock=clock,
+    )
     application.bot_data["bot_context"] = bot_context
 
     # Slash commands
@@ -62,13 +80,13 @@ def _build_application(bot_context: BotContext) -> Application:
     # Inline button callbacks
     application.add_handler(CallbackQueryHandler(callback_router))
 
-    return application
+    return application, bot_context
 
 
 class BotManager:
     """Manage Telegram bot startup, shutdown, and status."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, clock: Callable[[], float] = time.time) -> None:
         self._lock = asyncio.Lock()
         self._application: Application | None = None
         self._bot_context: BotContext | None = None
@@ -76,6 +94,7 @@ class BotManager:
         self._build_client: BuildClient | None = None
         self._last_error: str | None = None
         self._started_at: float | None = None
+        self._clock = clock
 
     @property
     def bot_context(self) -> BotContext | None:
@@ -85,37 +104,24 @@ class BotManager:
     def running(self) -> bool:
         return self._application is not None and self._bot_context is not None
 
-    async def start(self) -> None:
+    async def start(self, config: BotSettings | None = None) -> None:
         """Build and start the Telegram polling application."""
         async with self._lock:
             if self.running:
                 return
 
             try:
-                config = BotSettings.load()
+                config = config or BotSettings.load()
             except (ValueError, ValidationError) as e:
                 self._last_error = str(e)
                 raise StartupError(str(e)) from e
 
             try:
                 build_client = BuildClient(config.build_manager_url)
-
-                # Two-step construction: application.bot is only available
-                # after _build_application() runs, so we build a bootstrap
-                # context with bot=None first, then replace it with the real
-                # context once the application object exists.
-                bootstrap_context = BotContext(
-                    config=config,
-                    build_client=build_client,
-                    bot=None,  # type: ignore[arg-type]
+                bot = Bot(config.telegram_token)
+                application, bot_context = _build_application(
+                    config, build_client, bot, clock=self._clock,
                 )
-                application = _build_application(bootstrap_context)
-                bot_context = BotContext(
-                    config=config,
-                    build_client=build_client,
-                    bot=application.bot,
-                )
-                application.bot_data["bot_context"] = bot_context
 
                 await application.initialize()
                 await application.start()
@@ -141,7 +147,7 @@ class BotManager:
                 self._config = config
                 self._build_client = build_client
                 self._last_error = None
-                self._started_at = time.time()
+                self._started_at = self._clock()
                 logger.info("Telegram bot started")
             except Exception as exc:
                 self._last_error = str(exc)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -27,12 +28,18 @@ class StartupError(Exception):
 class StorageManager:
     """Manages the storage backend lifecycle and configuration."""
 
-    def __init__(self, *, backend: GoogleDriveBackend | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        backend: GoogleDriveBackend | None = None,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
         self._config: StorageSettings | None = None
         self._backend: GoogleDriveBackend | None = backend
         self._injected_backend = backend is not None
         self._last_error: str | None = None
         self._started_at: float | None = None
+        self._clock = clock
 
     @property
     def config(self) -> StorageSettings | None:
@@ -60,7 +67,7 @@ class StorageManager:
         if not self._injected_backend:
             self._backend = GoogleDriveBackend(self._token_path())
         self._last_error = None
-        self._started_at = time.time()
+        self._started_at = self._clock()
         logger.info("StorageManager started")
 
     async def stop(self) -> None:

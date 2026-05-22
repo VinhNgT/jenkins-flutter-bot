@@ -15,11 +15,13 @@ from __future__ import annotations
 import html
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from .protocols import BotLike
 from .tracker import InteractionTracker, TrackedMessage
 
 if TYPE_CHECKING:
@@ -48,15 +50,6 @@ def _format_duration(start: float, end: float) -> str:
     return f"{minutes} min"
 
 
-def _format_elapsed(ts: float) -> str:
-    """Format elapsed time since a timestamp as a human-readable string."""
-    delta = int(time.time() - ts)
-    if delta < 60:
-        return "just now"
-    minutes = delta // 60
-    if minutes == 1:
-        return "1 min ago"
-    return f"{minutes} min ago"
 
 
 class BotContext:
@@ -76,12 +69,32 @@ class BotContext:
         self,
         config: BotSettings,
         build_client: BuildClient,
-        bot: Bot | None,
+        bot: BotLike | None,
+        *,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self.config = config
         self.build_client = build_client
         self.bot = bot
-        self.tracker = InteractionTracker(picker_ttl=config.session_ttl)
+        self._clock = clock
+        self.tracker = InteractionTracker(picker_ttl=config.session_ttl, clock=clock)
+
+    # ------------------------------------------------------------------
+    # Time formatting
+    # ------------------------------------------------------------------
+
+    def format_elapsed(self, ts: float) -> str:
+        """Format elapsed time since *ts* as a human-readable string.
+
+        Uses the injectable clock for deterministic testing.
+        """
+        delta = int(self._clock() - ts)
+        if delta < 60:
+            return "just now"
+        minutes = delta // 60
+        if minutes == 1:
+            return "1 min ago"
+        return f"{minutes} min ago"
 
     # ------------------------------------------------------------------
     # Admin contact helper
@@ -218,8 +231,8 @@ class BotContext:
             logger.error("Cannot notify — bot instance is not available")
             return
 
-        triggered_at = msg.data.get("triggered_at", time.time())
-        duration = _format_duration(triggered_at, time.time())
+        triggered_at = msg.data.get("triggered_at", self._clock())
+        duration = _format_duration(triggered_at, self._clock())
         download_url = result.get("download_url", "")
         ref = msg.data.get("ref", "unknown")
 

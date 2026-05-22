@@ -9,9 +9,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import ValidationError
+from telegram import Bot
 from telegram.ext import Application
 
 from .client import HubClient
@@ -28,32 +30,34 @@ class StartupError(Exception):
 class AdminBotManager:
     """Manage admin bot startup, shutdown, and status."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, clock: Callable[[], float] = time.time) -> None:
         self._lock = asyncio.Lock()
         self._application: Application | None = None  # type: ignore[type-arg]
         self._hub_client: HubClient | None = None
         self._last_error: str | None = None
         self._started_at: float | None = None
+        self._clock = clock
 
     @property
     def running(self) -> bool:
         return self._application is not None
 
-    async def start(self) -> None:
+    async def start(self, config: AdminBotBootstrap | None = None) -> None:
         """Resolve config, build Telegram Application, start polling."""
         async with self._lock:
             if self.running:
                 return
 
             try:
-                config = AdminBotBootstrap.load()
+                config = config or AdminBotBootstrap.load()
             except (ValueError, ValidationError) as e:
                 self._last_error = str(e)
                 raise StartupError(str(e)) from e
 
             try:
                 hub_client = HubClient(config.config_hub_url)
-                application = Application.builder().token(config.bot_token).build()
+                bot = Bot(config.bot_token)
+                application = Application.builder().bot(bot).build()
 
                 # Wire shared state into bot_data
                 application.bot_data["config"] = config
@@ -78,7 +82,7 @@ class AdminBotManager:
                 self._application = application
                 self._hub_client = hub_client
                 self._last_error = None
-                self._started_at = time.time()
+                self._started_at = self._clock()
                 logger.info(
                     "Admin bot started (chat_id=%d)", config.admin_chat_id
                 )

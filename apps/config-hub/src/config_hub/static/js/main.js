@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const createNotice = () => {
             const div = document.createElement('div');
             div.className = 'jf-placeholder-notice';
-            div.innerHTML = `<span class="notice-icon">ℹ️</span><span>Using placeholder <code>&lt;YOUR_REPO_URL&gt;</code>. Configure your Git URL in the <strong>Build Manager</strong> tab for a ready-to-copy script.</span>`;
+            div.innerHTML = `<span class="notice-icon">ℹ️</span><span>Using placeholder <code>&lt;YOUR_REPO_URL&gt;</code>. Configure your Git URL in the <strong>Repository Settings</strong> above for a ready-to-copy script.</span>`;
             return div;
           };
           jfPublicNotices.appendChild(createNotice());
@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Credentials warning ONLY applies to private repos
           const div = document.createElement('div');
           div.className = 'jf-placeholder-notice';
-          div.innerHTML = `<span class="notice-icon">ℹ️</span><span>Using placeholder <code>&lt;YOUR_CREDENTIALS_ID&gt;</code>. Configure your Credentials ID in the <strong>Build Manager</strong> tab or replace it in the script.</span>`;
+          div.innerHTML = `<span class="notice-icon">ℹ️</span><span>Using placeholder <code>&lt;YOUR_CREDENTIALS_ID&gt;</code>. Configure your Credentials ID in the <strong>Repository Settings</strong> above or replace it in the script.</span>`;
           jfPrivateNotices.appendChild(div);
         }
       });

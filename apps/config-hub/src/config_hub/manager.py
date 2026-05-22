@@ -259,14 +259,14 @@ class ConfigHubManager:
             repo_url = "<YOUR_REPO_URL>"
             warnings.append(
                 "Repository URL not configured — update it in"
-                " the Orchestrator config tab."
+                " the settings above."
             )
 
         effective_credentials_id = credentials_id or "<YOUR_CREDENTIALS_ID>"
         if not credentials_id:
             warnings.append(
                 "Repo Credentials ID not configured — the private script uses a "
-                "placeholder. Set it in the Orchestrator config tab or edit the Jenkinsfile."
+                "placeholder. Set it in the settings above or edit the Jenkinsfile."
             )
 
         script_public = generate_jenkinsfile(

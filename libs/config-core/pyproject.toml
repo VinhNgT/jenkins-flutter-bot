@@ -1,6 +1,6 @@
 [project]
 name = "config-core"
-version = "0.3.2-dev.1"
+version = "0.3.2-dev.2"
 description = "Configuration core framework for the Jenkins Flutter Bot stack based on Pydantic"
 requires-python = ">=3.12"
 dependencies = [

@@ -11,6 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
+      - run: uv sync --frozen --all-packages
       - run: uv run pytest --tb=short -q
       - run: uv run mypy apps/ libs/

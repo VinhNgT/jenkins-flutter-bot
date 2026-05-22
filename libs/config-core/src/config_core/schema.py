@@ -102,7 +102,7 @@ class JsonConfigSettingsSource(PydanticBaseSettingsSource):
             extra = field.json_schema_extra or {}
             if not isinstance(extra, dict):
                 extra = {}
-            json_key = extra.get("json_key", field_name)
+            json_key = str(extra.get("json_key", field_name))
             value = self._resolve_dotted(raw, json_key)
             if value is not _MISSING and value != "":
                 result[field_name] = value
@@ -388,7 +388,7 @@ def _coerce_payload_types(
         extra = field.json_schema_extra or {}
         if not isinstance(extra, dict):
             extra = {}
-        json_key = extra.get("json_key", field_name)
+        json_key = str(extra.get("json_key", field_name))
 
         value = payload_doc.get(json_key)
         if not isinstance(value, str):

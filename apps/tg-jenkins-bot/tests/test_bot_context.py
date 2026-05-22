@@ -183,8 +183,19 @@ class TestBuildResults:
         await ctx.on_build_success(msg, {
             "download_url": "https://drive.google.com/file/123",
         })
-        bot.edit_message_text.assert_awaited_once()
+        # Check that the original message was edited with a simple status text
+        bot.edit_message_text.assert_awaited_once_with(
+            "✅ Build on <code>main</code> completed successfully.",
+            chat_id=100,
+            message_id=1,
+            parse_mode="HTML",
+            reply_markup=None,
+        )
+        # Check that the rich notification message was sent to the bottom of the chat
         bot.send_message.assert_awaited_once()
+        sent_args = bot.send_message.call_args
+        assert "TestApp is ready!" in sent_args[0][1]
+        assert "Built from <code>main</code>" in sent_args[0][1]
 
     async def test_on_build_success_with_download_url(self, ctx, bot):
         msg = TrackedMessage(
@@ -213,8 +224,16 @@ class TestBuildResults:
             data={"ref": "main"},
         )
         await ctx.on_build_failure(msg, {})
-        bot.edit_message_text.assert_awaited_once()
+        bot.edit_message_text.assert_awaited_once_with(
+            "❌ Build on <code>main</code> failed.",
+            chat_id=100,
+            message_id=1,
+            parse_mode="HTML",
+            reply_markup=None,
+        )
         bot.send_message.assert_awaited_once()
+        sent_args = bot.send_message.call_args
+        assert "TestApp build failed" in sent_args[0][1]
 
     async def test_on_build_timeout_edits_and_sends(self, ctx, bot):
         msg = TrackedMessage(
@@ -222,17 +241,31 @@ class TestBuildResults:
             data={"ref": "main"},
         )
         await ctx.on_build_timeout(msg, {})
-        bot.edit_message_text.assert_awaited_once()
+        bot.edit_message_text.assert_awaited_once_with(
+            "⏰ Build on <code>main</code> timed out.",
+            chat_id=100,
+            message_id=1,
+            parse_mode="HTML",
+            reply_markup=None,
+        )
         bot.send_message.assert_awaited_once()
+        sent_args = bot.send_message.call_args
+        assert "TestApp build timed out" in sent_args[0][1]
 
-    async def test_on_build_cancelled_edits_and_sends(self, ctx, bot):
+    async def test_on_build_cancelled_edits_only(self, ctx, bot):
         msg = TrackedMessage(
             chat_id=100, message_id=1, user_id=42, state="building",
             data={"ref": "main"},
         )
         await ctx.on_build_cancelled(msg)
-        bot.edit_message_text.assert_awaited_once()
-        bot.send_message.assert_awaited_once()
+        bot.edit_message_text.assert_awaited_once_with(
+            "🚫 Build on <code>main</code> was cancelled.",
+            chat_id=100,
+            message_id=1,
+            parse_mode="HTML",
+            reply_markup=None,
+        )
+        bot.send_message.assert_not_called()
 
     async def test_no_bot_instance_logs_error(self):
         """bot=None → logs error, no crash."""

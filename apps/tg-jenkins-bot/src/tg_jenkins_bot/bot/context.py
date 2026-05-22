@@ -237,7 +237,13 @@ class BotContext:
         ref = msg.data.get("ref", "unknown")
 
         app_name = _escape(self.config.app_name)
-        text = (
+        
+        # 1. Update the original building message to a simple status text
+        status_text = f"✅ Build on <code>{_escape(ref)}</code> completed successfully."
+        await self._edit_build_message(msg, status_text)
+
+        # 2. Send the rich notification message with actions to the bottom
+        rich_text = (
             f"✅ <b>{app_name} is ready!</b>\n"
             f"\n"
             f"Built from <code>{_escape(ref)}</code> in {duration}."
@@ -249,10 +255,9 @@ class BotContext:
                 [[InlineKeyboardButton("📲 Download APK", url=download_url)]]
             )
 
-        await self._edit_build_message(msg, text, reply_markup)
         await self.bot.send_message(
             msg.chat_id,
-            text,
+            rich_text,
             parse_mode="HTML",
             reply_markup=reply_markup,
         )
@@ -269,17 +274,22 @@ class BotContext:
 
         ref = msg.data.get("ref", "unknown")
         app_name = _escape(self.config.app_name)
-        text = (
+
+        # 1. Update the original building message to a simple status text
+        status_text = f"❌ Build on <code>{_escape(ref)}</code> failed."
+        await self._edit_build_message(msg, status_text)
+
+        # 2. Send the rich notification message to the bottom
+        rich_text = (
             f"❌ <b>{app_name} build failed</b>\n"
             f"\n"
             f"Something went wrong on <code>{_escape(ref)}</code>.\n"
             f"{self._admin_hint()}"
         )
 
-        await self._edit_build_message(msg, text)
         await self.bot.send_message(
             msg.chat_id,
-            text,
+            rich_text,
             parse_mode="HTML",
         )
 
@@ -295,7 +305,13 @@ class BotContext:
 
         ref = msg.data.get("ref", "unknown")
         app_name = _escape(self.config.app_name)
-        text = (
+
+        # 1. Update the original building message to a simple status text
+        status_text = f"⏰ Build on <code>{_escape(ref)}</code> timed out."
+        await self._edit_build_message(msg, status_text)
+
+        # 2. Send the rich notification message to the bottom
+        rich_text = (
             f"⏰ <b>{app_name} build timed out</b>\n"
             f"\n"
             f"The build on <code>{_escape(ref)}</code>"
@@ -303,10 +319,9 @@ class BotContext:
             f"{self._admin_hint()}"
         )
 
-        await self._edit_build_message(msg, text)
         await self.bot.send_message(
             msg.chat_id,
-            text,
+            rich_text,
             parse_mode="HTML",
         )
 
@@ -314,7 +329,7 @@ class BotContext:
         self,
         msg: TrackedMessage,
     ) -> None:
-        """Notify the build's chat that a build was cancelled."""
+        """Cancel the build message in-place."""
         if not self.bot:
             return
 
@@ -322,8 +337,3 @@ class BotContext:
         text = f"🚫 Build on <code>{_escape(ref)}</code> was cancelled."
 
         await self._edit_build_message(msg, text)
-        await self.bot.send_message(
-            msg.chat_id,
-            text,
-            parse_mode="HTML",
-        )

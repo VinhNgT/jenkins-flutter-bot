@@ -20,7 +20,7 @@
 
 pipeline {
     agent { label 'flutter' }
-
+$properties
     parameters {
         // Branch to build — injected by the Telegram bot's /build command
         string(name: 'BRANCH', defaultValue: 'main')
@@ -44,6 +44,7 @@ $checkout
     }
 
     post {
+$post_actions
         success {
             archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/*.apk'
         }

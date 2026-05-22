@@ -18,6 +18,7 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
   - [2e. Add Repository Credentials (Private Repos)](#2e-add-repository-credentials-private-repos)
   - [2f. Create the Pipeline Job](#2f-create-the-pipeline-job)
   - [2g. Save Jenkins Settings in Config Hub](#2g-save-jenkins-settings-in-config-hub)
+  - [2h. Optimize Jenkins for Bot-Only Operation (Storage & Resources)](#2h-optimize-jenkins-for-bot-only-operation-storage--resources)
 - [Step 3 — Set Up the Telegram Bot](#step-3--set-up-the-telegram-bot)
 - [Step 4 — Set Up Google Drive](#step-4--set-up-google-drive)
   - [4a. Create Google Cloud Credentials](#4a-create-google-cloud-credentials)
@@ -270,6 +271,63 @@ Switch to **config-hub** at http://localhost:9000:
    > You can leave the other fields blank for now — we'll fill in Telegram and Drive in the next steps.
 
 3. Click **Save**
+
+### 2h. Optimize Jenkins for Bot-Only Operation (Storage & Resources)
+
+Because the project delegates build compilation to Jenkins but manages **build history, download delivery, and file hosting** entirely within its own internal services and Google Drive, you can configure Jenkins for highly optimized, low-footprint operations. This prevents your Jenkins server's disk space from filling up over time.
+
+Implement these optimizations in your Jenkins pipeline to run a lean, bot-only CI setup:
+
+#### 1. Discard Old Builds Automatically
+Since the bot immediately downloads the successful artifact and hosts it on Google Drive, and the build-manager tracks build logs/metadata locally, Jenkins does not need to store historical builds.
+* In your Pipeline Job settings (from [2f](#2f-create-the-pipeline-job)), check **Discard old builds**.
+* Under **Strategy**, select **Log Rotator**.
+* Set **Max # of builds to keep** to **`1` or `2`**.
+
+#### 2. Clean Workspaces Post-Build
+By default, Jenkins retains checked-out code and build caches on the agent's disk, which can grow to tens of gigabytes for Flutter/Android projects. Wipe this clean after every execution.
+* Ensure the **Workspace Cleanup Plugin** is installed in Jenkins (**Manage Jenkins → Plugins**).
+* Update your Pipeline script to call `cleanWs()` inside the `always` block of the `post` stage:
+  ```groovy
+  post {
+      always {
+          // Deletes the workspace directory on the agent after the run finishes
+          cleanWs()
+      }
+      success {
+          archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/*.apk'
+      }
+  }
+  ```
+
+#### 3. Enable Shallow Clones (Speed & Space Optimization)
+If your git history is large, downloading the entire repository history wastes time and disk space. Perform a shallow clone instead.
+* Update the pipeline's checkout stage to request a clone depth of `1` with no tags:
+  * **For private repositories using SCM extensions:**
+    ```groovy
+    checkout([$class: 'GitSCM',
+        branches: [[name: "*/${params.BRANCH}"]],
+        userRemoteConfigs: [[
+            url: 'https://gitlab.com/your-org/your-flutter-app.git',
+            credentialsId: 'gitlab-credentials'
+        ]],
+        extensions: [
+            [$class: 'CloneOption', depth: 1, noTags: true, shallow: true]
+        ]
+    ])
+    ```
+  * **For public repositories using the `git` helper:**
+    ```groovy
+    git branch: "${params.BRANCH}",
+        url: 'https://github.com/YOUR_USER/YOUR_FLUTTER_PROJECT.git',
+        depth: 1,
+        shallow: true
+    ```
+
+#### 4. Restrict Node Concurrency
+To ensure the `flutter-agent` build container isn't overwhelmed by multiple parallel builds (which can result in running out of memory/CPU thrashing):
+* In **Manage Jenkins → Nodes → flutter-agent → Configure**.
+* Set **Number of executors** to **`1`**.
 
 ---
 

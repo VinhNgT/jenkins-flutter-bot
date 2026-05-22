@@ -215,7 +215,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ─── Jenkinsfile generator ──────────────────────────────────────
-  const jenkinsfileWarnings = document.getElementById('jenkinsfile-warnings');
+  const jfPublicNotices     = document.getElementById('jf-public-notices');
+  const jfPrivateNotices    = document.getElementById('jf-private-notices');
   const jenkinsfileTabs     = document.getElementById('jenkinsfile-tabs');
   const jfPanelPublic       = document.getElementById('jf-panel-public');
   const jfPanelPrivate      = document.getElementById('jf-panel-private');
@@ -223,6 +224,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const jfOutputPrivate     = document.getElementById('jenkinsfile-output-private');
   const jfCopyPublic        = document.getElementById('jenkinsfile-copy-public');
   const jfCopyPrivate       = document.getElementById('jenkinsfile-copy-private');
+  const jfParamRepoUrl      = document.getElementById('jf-param-repo-url');
+  const jfParamCredentialsId = document.getElementById('jf-param-credentials-id');
+
+  // Load saved repository params from localStorage
+  if (jfParamRepoUrl) {
+    jfParamRepoUrl.value = localStorage.getItem('jf_repo_url') || '';
+    jfParamRepoUrl.addEventListener('input', () => {
+      localStorage.setItem('jf_repo_url', jfParamRepoUrl.value.trim());
+    });
+  }
+  if (jfParamCredentialsId) {
+    jfParamCredentialsId.value = localStorage.getItem('jf_credentials_id') || '';
+    jfParamCredentialsId.addEventListener('input', () => {
+      localStorage.setItem('jf_credentials_id', jfParamCredentialsId.value.trim());
+    });
+  }
 
   let activeJfTab = 'public';
 
@@ -246,7 +263,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     jfOutputPublic.value  = 'Generating…';
     jfOutputPrivate.value = 'Generating…';
 
-    const result = await API.getJenkinsfile();
+    const discard_builds = document.getElementById('opt-discard-builds').checked;
+    const clean_workspace = document.getElementById('opt-clean-workspace').checked;
+    const shallow_clone = document.getElementById('opt-shallow-clone').checked;
+    const repo_url = jfParamRepoUrl ? jfParamRepoUrl.value.trim() : '';
+    const credentials_id = jfParamCredentialsId ? jfParamCredentialsId.value.trim() : '';
+
+    const result = await API.getJenkinsfile({
+      discard_builds,
+      clean_workspace,
+      shallow_clone,
+      repo_url,
+      credentials_id,
+    });
     btn.disabled = false;
 
     if (!result) {
@@ -262,13 +291,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     jenkinsfileTabs.hidden = false;
     switchJfTab(activeJfTab);
 
+    // Clear previous notices
+    jfPublicNotices.innerHTML = '';
+    jfPrivateNotices.innerHTML = '';
+
     if (result.warnings?.length) {
-      jenkinsfileWarnings.innerHTML = result.warnings
-        .map(w => `<p>⚠️ ${w}</p>`)
-        .join('');
-      jenkinsfileWarnings.hidden = false;
-    } else {
-      jenkinsfileWarnings.hidden = true;
+      result.warnings.forEach(w => {
+        if (w.includes("Repository URL")) {
+          // Repo URL warning applies to both public and private repos
+          const createNotice = () => {
+            const div = document.createElement('div');
+            div.className = 'jf-placeholder-notice';
+            div.innerHTML = `<span class="notice-icon">ℹ️</span><span>Using placeholder <code>&lt;YOUR_REPO_URL&gt;</code>. Configure your Git URL in the <strong>Build Manager</strong> tab for a ready-to-copy script.</span>`;
+            return div;
+          };
+          jfPublicNotices.appendChild(createNotice());
+          jfPrivateNotices.appendChild(createNotice());
+        } else if (w.includes("Repo Credentials ID")) {
+          // Credentials warning ONLY applies to private repos
+          const div = document.createElement('div');
+          div.className = 'jf-placeholder-notice';
+          div.innerHTML = `<span class="notice-icon">ℹ️</span><span>Using placeholder <code>&lt;YOUR_CREDENTIALS_ID&gt;</code>. Configure your Credentials ID in the <strong>Build Manager</strong> tab or replace it in the script.</span>`;
+          jfPrivateNotices.appendChild(div);
+        }
+      });
     }
 
     Toast.show('Jenkinsfiles generated', 'success');

@@ -18,16 +18,26 @@ _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 
 @lru_cache(maxsize=1)
-def _load_templates() -> tuple[Template, Template, Template]:
-    """Load and cache Groovy templates on first use."""
-    return (
-        Template((_TEMPLATE_DIR / "pipeline.groovy").read_text()),
-        Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text()),
-        Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text()),
-    )
+def _load_templates() -> dict[str, Template | str]:
+    """Load and cache Groovy templates and snippet strings on first use."""
+    return {
+        "pipeline": Template((_TEMPLATE_DIR / "pipeline.groovy").read_text()),
+        "checkout_private": Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text()),
+        "checkout_public": Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text()),
+        "properties": (_TEMPLATE_DIR / "properties.groovy").read_text(),
+        "post_actions": (_TEMPLATE_DIR / "post_actions.groovy").read_text(),
+        "extensions": (_TEMPLATE_DIR / "extensions.groovy").read_text(),
+        "clone_opts": (_TEMPLATE_DIR / "clone_opts.groovy").read_text(),
+    }
 
 
-def generate_jenkinsfile(repo_url: str, credentials_id: str) -> str:
+def generate_jenkinsfile(
+    repo_url: str,
+    credentials_id: str,
+    discard_builds: bool = True,
+    clean_workspace: bool = False,
+    shallow_clone: bool = True,
+) -> str:
     """Generate a complete Jenkinsfile pipeline script.
 
     Parameters
@@ -37,15 +47,44 @@ def generate_jenkinsfile(repo_url: str, credentials_id: str) -> str:
     credentials_id:
         Jenkins credentials ID for private repos.  When empty, the
         public-repo checkout template is used instead.
+    discard_builds:
+        Whether to configure build discarding to save space.
+    clean_workspace:
+        Whether to wipe workspace caches after the build finishes.
+    shallow_clone:
+        Whether to enable shallow git cloning to reduce clone size.
     """
-    pipeline_tpl, private_tpl, public_tpl = _load_templates()
+    templates = _load_templates()
+    pipeline_tpl = templates["pipeline"]
+    private_tpl = templates["checkout_private"]
+    public_tpl = templates["checkout_public"]
+
+    # Build properties block
+    properties_val = ""
+    if discard_builds:
+        properties_val = templates["properties"]
+
+    # Build post actions block
+    post_actions_val = ""
+    if clean_workspace:
+        post_actions_val = templates["post_actions"]
+
+    # Build SCM options
+    extensions_val = ""
+    clone_opts_val = ""
+    if shallow_clone:
+        extensions_val = templates["extensions"]
+        clone_opts_val = templates["clone_opts"]
 
     if credentials_id:
         checkout = private_tpl.safe_substitute(
-            repo_url=repo_url, credentials_id=credentials_id
+            repo_url=repo_url, credentials_id=credentials_id, extensions=extensions_val
         )
     else:
-        checkout = public_tpl.safe_substitute(repo_url=repo_url)
+        checkout = public_tpl.safe_substitute(repo_url=repo_url, clone_opts=clone_opts_val)
 
-    return pipeline_tpl.safe_substitute(checkout=checkout)
+    return pipeline_tpl.safe_substitute(
+        properties=properties_val, checkout=checkout, post_actions=post_actions_val
+    )
+
 

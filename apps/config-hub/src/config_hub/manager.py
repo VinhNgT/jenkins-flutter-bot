@@ -234,16 +234,25 @@ class ConfigHubManager:
     # Jenkinsfile (UI quality-of-life feature)
     # ------------------------------------------------------------------
 
-    async def get_jenkinsfile(self) -> dict[str, Any]:
-        """Generate Jenkinsfile variants from current build manager config."""
-        orch_config = await self.services.get_config("builds")
-        values = orch_config.get("values", {}) if orch_config else {}
-
-        # Extract git repo URL and credentials from build manager config
-        git_section = values.get("git", {})
-        jenkins_section = values.get("jenkins", {})
-        repo_url = git_section.get("repo_url", "")
-        credentials_id = jenkins_section.get("credentials_id", "")
+    async def get_jenkinsfile(
+        self,
+        discard_builds: bool = True,
+        clean_workspace: bool = False,
+        shallow_clone: bool = True,
+        repo_url: str | None = None,
+        credentials_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Generate Jenkinsfile variants from current parameters or config."""
+        # Fall back to builds config if parameters are not provided explicitly
+        if not repo_url or not credentials_id:
+            orch_config = await self.services.get_config("builds")
+            values = orch_config.get("values", {}) if orch_config else {}
+            git_section = values.get("git", {})
+            jenkins_section = values.get("jenkins", {})
+            if not repo_url:
+                repo_url = git_section.get("repo_url", "")
+            if not credentials_id:
+                credentials_id = jenkins_section.get("credentials_id", "")
 
         warnings: list[str] = []
         if not repo_url:
@@ -260,8 +269,20 @@ class ConfigHubManager:
                 "placeholder. Set it in the Orchestrator config tab or edit the Jenkinsfile."
             )
 
-        script_public = generate_jenkinsfile(repo_url, credentials_id="")
-        script_private = generate_jenkinsfile(repo_url, effective_credentials_id)
+        script_public = generate_jenkinsfile(
+            repo_url,
+            credentials_id="",
+            discard_builds=discard_builds,
+            clean_workspace=clean_workspace,
+            shallow_clone=shallow_clone,
+        )
+        script_private = generate_jenkinsfile(
+            repo_url,
+            effective_credentials_id,
+            discard_builds=discard_builds,
+            clean_workspace=clean_workspace,
+            shallow_clone=shallow_clone,
+        )
         return {
             "script_public": script_public,
             "script_private": script_private,

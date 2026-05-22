@@ -2,6 +2,6 @@
         stage('Clone') {
             steps {
                 git branch: "${params.BRANCH}",
-                    url: '$repo_url'
+                    url: '$repo_url'$clone_opts
             }
         }

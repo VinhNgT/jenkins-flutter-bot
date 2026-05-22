@@ -118,10 +118,15 @@ export const API = {
     }
   },
 
-  /** @returns {Promise<{script: string, warnings: string[]}|null>} */
-  async getJenkinsfile() {
+  /**
+   * @param {Object} [opts={}]
+   * @returns {Promise<{script_public: string, script_private: string, warnings: string[]}|null>}
+   */
+  async getJenkinsfile(opts = {}) {
     try {
-      const res = await fetch('/api/jenkinsfile');
+      const params = new URLSearchParams(opts).toString();
+      const url = params ? `/api/jenkinsfile?${params}` : '/api/jenkinsfile';
+      const res = await fetch(url);
       const result = await res.json();
       if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
       return result;

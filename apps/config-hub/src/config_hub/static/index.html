@@ -105,13 +105,41 @@
             Generate a ready-to-use <code>Jenkinsfile</code> based on your current bot configuration.
             Paste the output into your Jenkins pipeline job definition.
           </p>
+          <div class="jenkinsfile-opts">
+            <h3>Repository Settings</h3>
+            <div class="jf-input-group">
+              <label for="jf-param-repo-url">Git Repository URL</label>
+              <input type="text" id="jf-param-repo-url" placeholder="e.g. https://github.com/username/repo.git" />
+              <div class="help-text">Optional. Public Git clone URL. If blank, uses placeholder <code>&lt;YOUR_REPO_URL&gt;</code>.</div>
+            </div>
+            <div class="jf-input-group" style="margin-bottom: 0;">
+              <label for="jf-param-credentials-id">Jenkins Credentials ID</label>
+              <input type="text" id="jf-param-credentials-id" placeholder="e.g. github-pat-credentials" />
+              <div class="help-text">Optional. Jenkins Credentials ID for private checkouts. If blank, uses placeholder <code>&lt;YOUR_CREDENTIALS_ID&gt;</code>.</div>
+            </div>
+          </div>
+
+          <div class="jenkinsfile-opts">
+            <h3>Pipeline Storage &amp; Space Optimizations</h3>
+            <label>
+              <input type="checkbox" id="opt-discard-builds" checked />
+              Discard Old Builds Automatically (limits Jenkins run history to keep Master disk clean)
+            </label>
+            <label>
+              <input type="checkbox" id="opt-clean-workspace" />
+              Clean Workspace Post-Build (always runs workspace cleanup on agent node)
+            </label>
+            <label>
+              <input type="checkbox" id="opt-shallow-clone" checked />
+              Enable Shallow Clones (clones depth 1 with no tags to speed up and reduce agent space)
+            </label>
+          </div>
           <div class="jenkinsfile-actions">
             <button class="btn btn-accent" id="jenkinsfile-generate" type="button">
               <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 003 3.5v13A1.5 1.5 0 004.5 18h11a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 0011.378 2H4.5zm2.25 8.5a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5zm0 3a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5z" clip-rule="evenodd" /></svg>
               Generate Scripts
             </button>
           </div>
-          <div id="jenkinsfile-warnings" class="jenkinsfile-warnings" hidden></div>
 
           <!-- Version tabs -->
           <div class="export-tabs" id="jenkinsfile-tabs" hidden>
@@ -125,6 +153,7 @@
               For <strong>public repositories</strong> — no authentication required.
               Uses the plain <code>git</code> step.
             </p>
+            <div id="jf-public-notices"></div>
             <div class="jenkinsfile-actions" style="margin-bottom:0.5rem">
               <button class="btn btn-secondary" id="jenkinsfile-copy-public" type="button" disabled>
                 <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" /><path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.44A1.5 1.5 0 008.378 6H4.5z" /></svg>
@@ -142,6 +171,7 @@
               The <code>credentialsId</code> must match a credential stored in
               <strong>Jenkins → Manage Jenkins → Credentials</strong>.
             </p>
+            <div id="jf-private-notices"></div>
             <div class="jenkinsfile-actions" style="margin-bottom:0.5rem">
               <button class="btn btn-secondary" id="jenkinsfile-copy-private" type="button" disabled>
                 <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" /><path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.44A1.5 1.5 0 008.378 6H4.5z" /></svg>
@@ -149,6 +179,41 @@
               </button>
             </div>
             <textarea id="jenkinsfile-output-private" class="jenkinsfile-output" readonly placeholder="Click 'Generate Scripts' to create your Jenkinsfile…"></textarea>
+          </div>
+
+          <!-- Jenkins tips & tricks section -->
+          <div class="card jenkins-tips-card">
+            <h3>💡 Jenkins Tips &amp; Tricks for Bot-Only Setup</h3>
+            <div class="tips-grid">
+              <div class="tip-item">
+                <span class="tip-icon">🔒</span>
+                <div>
+                  <strong>Credentials &amp; PAT Rotation</strong>
+                  <p>Remember that Personal Access Tokens (PATs) expire! Set a calendar reminder to rotate credentials under <strong>Manage Jenkins &rarr; Credentials</strong> to keep your SCM checkouts healthy.</p>
+                </div>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">⚡</span>
+                <div>
+                  <strong>Shallow Git Clones</strong>
+                  <p>Enabling shallow cloning limits history checkout to <code>depth: 1</code>. This saves substantial agent disk space and speeds up the checkout stage significantly.</p>
+                </div>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">🧹</span>
+                <div>
+                  <strong>Workspace Cleanups</strong>
+                  <p>Ensure the <strong>Workspace Cleanup Plugin</strong> is installed in Jenkins. Wiping the workspace after runs prevents accumulating tens of gigabytes of Flutter build caches on agent disks.</p>
+                </div>
+              </div>
+              <div class="tip-item">
+                <span class="tip-icon">🚦</span>
+                <div>
+                  <strong>Restrict Agent Concurrency</strong>
+                  <p>Set the agent's <strong>Number of executors</strong> to <code>1</code> (under <strong>Nodes &rarr; flutter-agent &rarr; Configure</strong>) to prevent parallel Gradle runs from choking agent RAM and CPU resources.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

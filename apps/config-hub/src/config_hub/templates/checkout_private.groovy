@@ -8,7 +8,7 @@
                     userRemoteConfigs: [[
                         url: '$repo_url',
                         credentialsId: '$credentials_id'
-                    ]]
+                    ]]$extensions
                 ])
             }
         }

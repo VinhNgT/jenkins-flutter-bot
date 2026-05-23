@@ -1,34 +1,33 @@
 # 🤖 Telegram Jenkins Build Bot
 
-A self-hosted Telegram bot that acts as a thin trigger layer for Jenkins CI/CD. It lets users trigger Flutter builds via slash commands, tracks only the builds started through Telegram, and delivers shareable download links for resulting APKs.
+A self-hosted Telegram Web App and passive notification bot that acts as a thin trigger layer for Jenkins CI/CD. It lets users trigger Flutter builds via a Telegram Mini App, tracks only the builds started through Telegram, and delivers shareable download links for resulting APKs.
 
 ## Features
 
-- **Jenkins Integration** — Triggers builds on the build-manager service via REST and receives webhook callbacks on completion.
-- **Telegram Slash Commands** — `/build`, `/recent`, `/status`, `/help`, `/about` — native Telegram command interface.
-- **Build Notifications** — Receives callbacks from the build-manager and returns shareable per-file download links to the user.
-- **Chat Whitelist** — Restricts bot access to specific authorized Telegram chat IDs.
+- **Mini App Build Trigger** — Taps a dedicated `🚀 Build` MenuButtonWebApp to launch a premium glassmorphic target branch selector Web App.
+- **Passive Notification Channel** — The bot operates as a send-only passive announcer. No interactive messages, pickers, or message edits are performed.
+- **HMAC Authentication** — Validates Telegram Web App data signatures to ensure only authorized Telegram sessions can interact with the APIs.
+- **Chat Whitelist** — Restricts bot and Web App access to specific whitelisted Telegram chat IDs.
 - **Bot-Scoped Tracking** — Only builds triggered by the bot are correlated back to Telegram users. No Jenkins metadata from manual triggers is ever exposed.
 
 ## How It Works
 
-1. User sends `/build` → bot presents branch selection via inline keyboard
-2. Bot requests a build from the build-manager, which triggers Jenkins with a unique `BUILD_REQUEST_ID`
-3. Jenkins pipeline runs on the flutter-agent and archives the resulting APK via `archiveArtifacts` — no outbound HTTP from the agent
-4. Build-manager's poll worker detects completion via the Jenkins API, downloads the APK, uploads to Drive via file-manager, enforces `max_recent_builds` retention, and forwards results to the bot's callback
-5. Bot matches `request_id` and sends the download link to Telegram
-
-The bot owns zero build logic — all cloning, compiling, and packaging is delegated to the Jenkins pipeline.
+1. **User Opens Web App** — Taps `🚀 Build` inside the Telegram chat to launch the webview.
+2. **API Verification** — The Web App requests configuration from `GET /api/webapp/config`. The bot validates the HMAC-SHA256 signature using its token, checks `allowed_chat_ids`, and returns branch configurations and active builds.
+3. **Trigger Build** — User selects a branch and clicks Build. Web App calls `POST /api/webapp/trigger` to instruct the bot to request a build from the build-manager.
+4. **Active Build Registration** — The bot posts a `"🔨 User started a Target build"` confirmation to the chat, registers the active build in `ActiveBuildStore`, and returns success to the Web App (which closes).
+5. **Poll and Deliver** — The build-manager polls Jenkins for the build (tracked by `BUILD_REQUEST_ID`), uploads the compiled APK to Google Drive via file-manager, and forwards the results to the bot's webhook.
+6. **immutable Success Notification** — The bot consumes the `ActiveBuild` from `ActiveBuildStore` and delivers a clean notification message containing the direct APK download link.
 
 ## Telegram Interface
 
 | Command | Action |
 |---------|--------|
-| `/build [ref]` | Trigger a build — presents branch picker, or builds `ref` directly if supplied |
 | `/recent` | Show recent builds with download links |
 | `/status` | Show service health and active builds |
 | `/help` | Show usage instructions |
-| `/about` | Show version and system info |
+
+> **🚀 Build Button**: Dynamically registered next to the message input box on bot startup if `webapp_url` is configured.
 
 ## Configuration
 
@@ -43,18 +42,18 @@ The config precedence chain is: `JSON (dashboard) > Environment Variable > .env 
 | Telegram Bot Token | [@BotFather](https://t.me/BotFather) |
 | Allowed Chat IDs | Telegram chat metadata |
 | App Name | Free text — shown in bot messages |
+| Web App URL | Public HTTPS URL mapping to the bot's `/webapp` static server |
 
-> Drive and Jenkins settings are managed in the **Google Drive** and **Build Manager** tabs of the config-hub dashboard respectively.
+## API & Static Server Layout
 
-## Jenkins Pipeline
+The bot FastAPI service mounts a static directory at `/webapp` serving `index.html` (the Mini App UI) and exposes these Web App endpoints under `/api/webapp`:
 
-The bot triggers builds through the build-manager, which delegates to Jenkins. The web dashboard includes a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration — copy it into your Jenkins job.
+- `GET /api/webapp/config` — Returns target branches and active builds list.
+- `POST /api/webapp/trigger` — Triggers a new build.
+- `POST /api/webapp/cancel` — Cancels an active build.
 
-The pipeline contract: on success, call `archiveArtifacts` to persist the build artifact inside Jenkins. Build-manager's poll worker will detect completion and download the artifact automatically. **The pipeline does not need to make any outbound HTTP calls.**
-
-## Setup
-
-📖 **See [docs/setup-guide.md](../../docs/setup-guide.md) for the complete walkthrough** — Jenkins setup, bot creation, Google Drive OAuth, and configuration.
+### Preview Mode
+When opened directly in a browser (where `window.Telegram.WebApp` is unavailable), the Web App operates in "Preview Mode" with simulated data to enable easy local development and validation.
 
 ## License
 

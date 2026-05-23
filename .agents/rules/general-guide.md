@@ -116,7 +116,7 @@ graph TD
 
 4. **FastAPI Everywhere** — All service APIs use FastAPI, structured per the official [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) pattern: `main.py` (app factory) → `dependencies.py` (`Depends` + `Annotated`) → `routers/` (`APIRouter` per domain). See `coding-conventions.md` for the module table.
 
-5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for callback matching and inline message editing. No information about non-bot-triggered builds is ever exposed to Telegram.
+5. **Jenkins-Synced, Bot-Scoped** — The bot tracks only builds it triggered. Build state is maintained in the build-manager; the bot's local state is limited to what it needs for callback matching. No information about non-bot-triggered builds is ever exposed to Telegram.
 
 6. **uv Workspace** — Single `pyproject.toml` + `uv.lock` at the root. All members share a unified lockfile. Shared code lives in `libs/`. Dev tools are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12).
 
@@ -125,6 +125,11 @@ graph TD
 8. **Pydantic Configuration** — Two base classes from `config-core` partition the configuration by lifecycle: `BootstrapSettings` (env-only, hard crash at startup) for services with no dashboard-editable state (`config-hub`, `tg-admin-bot`), and `ServiceSettings` (JSON > env, soft fail) for services whose config is editable via the web UI. All `ServiceSettings` fields are visible in the dashboard. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
 
 9. **Scope = Service Name** — `config-hub` exposes UI scope names (`bot`, `agent`, `file_manager`, `builds`) that map directly to their `ServiceClient` service names. This mapping lives in `config-hub/manager.py:_SCOPE_TO_SERVICE` as a seam for future divergence. Unknown scopes are rejected with HTTP 404.
+
+10. **No-Workaround Policy & Root Cause Resolution** — Workarounds or temporary band-aids that only mask symptoms instead of resolving core architectural problems are strictly forbidden. You must always address the *root cause* of bugs and mismatches. 
+    If you are adding new features or fixing a bug and find that the current design or architecture is no longer a good fit, you have **explicit, unrestricted permission to rewrite the architecture** to ensure the code and system are as perfect and structural as possible.
+
+11. **Refactor Notification Requirement** — While the user is open-minded and encourages structural rewrites to make the product perfect, you must notify the user, explain why the current architecture is a bad fit, and align on the rewrite plan before executing large-scale refactors.
 
 ---
 
@@ -141,6 +146,7 @@ These are architectural boundaries. Do not violate them.
 7. **Do NOT replace deep merge with full overwrite** in config save logic.
 8. **Do NOT leak non-bot build info to Telegram** — the bot strictly filters to its own triggered builds (matched by `BUILD_REQUEST_ID`). No build counts, build numbers, or metadata from manual Jenkins triggers may appear in Telegram messages.
 9. **Do NOT rename `file-manager` internals to `drive`** — the service is storage-backend agnostic. The `drive` name appears only in user-facing labels (UI text, help strings) — the config scope key is `file_manager`.
+10. **Do NOT use quick workarounds or temporary patches** — always fix structural root causes and rewrite components if necessary to maintain code perfection.
 
 ---
 

@@ -59,7 +59,7 @@ This structure applies to all FastAPI services: `tg-jenkins-bot`, `tg-admin-bot`
 
 `config-hub` and `tg-admin-bot` use `BootstrapSettings` (env-only, no JSON file) since they have no dashboard-editable config. `mock-jenkins` imports the real `AgentSettings` from `agent-control` for its mock agent-control server.
 
-The bot additionally has sub-packages (`bot/`, `jenkins/`, `drive/`, `git/`) for domain-specific logic.
+The bot additionally has a sub-package (`bot/`) and a static (`webapp/`) directory for the Telegram Web App assets.
 
 ### Admin Bot
 
@@ -82,7 +82,7 @@ All function signatures should have parameter types and return types. Use `from 
 ### Data Classes vs Pydantic Models
 
 - **Config classes** inherit from `ServiceSettings` (Pydantic) — see `config-and-secrets.md` for the pattern.
-- **Value objects and interactive states** use dataclasses (e.g. `TrackedMessage`) to cleanly encapsulate structured state. State transitions are managed atomically by dedicated tracker/manager classes (like `InteractionTracker`) to prevent race conditions.
+- **Value objects and interactive states** use dataclasses (e.g. `ActiveBuild`) to cleanly encapsulate structured state.
 - Avoid global mutable state at module level; mutable state lives in manager classes attached to `app.state`.
 
 ### Logging
@@ -144,11 +144,9 @@ A centralized, root-level `conftest.py` provides shared testing utilities:
    - `pending_build_factory(**overrides)` for build-manager builds
    - `completed_build_factory(**overrides)` for completed builds
    - `jenkins_build_factory(**overrides)` for Jenkins client responses
-   - `tracked_message_factory(**overrides)` for Telegram interaction tracking
 2. **HTTP Mocking** — The `mock_http_client` fixture registers custom transports to mock HTTP calls to external APIs without leaving the process boundary.
 3. **Telegram Test Helpers** — Full-stack mock fixtures to test Telegram polling dispatch loops safely:
    - `make_mock_bot()` generates an `AsyncMock` pre-configured with the required attributes of `telegram.Bot` to satisfy PTB internals.
    - `make_telegram_update(...)` and `make_callback_update(...)` construct realistic, bot-attributed `telegram.Update` payloads so command and button callbacks can be integration-tested natively.
    - `make_handler_context(...)` mocks standard context objects to test standalone callback handlers in isolation.
    - `make_test_application(...)` builds fully-wired `Application` instances bound to a mock bot to allow end-to-end integration testing via `await app.process_update()`.
-

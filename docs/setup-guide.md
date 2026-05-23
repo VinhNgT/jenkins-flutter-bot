@@ -188,7 +188,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
 
 5. Under **Pipeline**, paste a Jenkinsfile script.
 
-   > **💡 Tip:** After completing the next sub-step ([2g](#2g-save-jenkins-settings-in-config-hub)), the config-hub dashboard has a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration. You can copy it directly into Jenkins.
+   > **💡 Tip:** After completing the next sub-step ([2g](#2g-save-jenkins-settings-in-config-hub)), the config-hub dashboard has a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration. You can select features like discarding old builds, cleaning workspaces, and shallow cloning, then copy the generated Groovy script directly into Jenkins.
 
    Alternatively, use this reference template:
 
@@ -199,7 +199,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
        agent { label 'flutter' }
 
        parameters {
-           // Branch to build — injected by the Telegram bot's /build command
+           // Branch to build — injected by the Telegram Web App
            string(name: 'BRANCH', defaultValue: 'main')
 
            // Correlation ID — injected automatically by the build-manager. Do NOT set manually.
@@ -276,57 +276,23 @@ Switch to **config-hub** at http://localhost:9000:
 
 Because the project delegates build compilation to Jenkins but manages **build history, download delivery, and file hosting** entirely within its own internal services and Google Drive, you can configure Jenkins for highly optimized, low-footprint operations. This prevents your Jenkins server's disk space from filling up over time.
 
-Implement these optimizations in your Jenkins pipeline to run a lean, bot-only CI setup:
+Implement these optimizations in your Jenkins pipeline using the **integrated checkboxes in config-hub's "Jenkins Pipeline" tab**:
 
 #### 1. Discard Old Builds Automatically
 Since the bot immediately downloads the successful artifact and hosts it on Google Drive, and the build-manager tracks build logs/metadata locally, Jenkins does not need to store historical builds.
-* In your Pipeline Job settings (from [2f](#2f-create-the-pipeline-job)), check **Discard old builds**.
-* Under **Strategy**, select **Log Rotator**.
-* Set **Max # of builds to keep** to **`1` or `2`**.
+* Switch on the **Discard Old Builds** option in config-hub to limit the build history to **`1`** build.
 
 #### 2. Clean Workspaces Post-Build
 By default, Jenkins retains checked-out code and build caches on the agent's disk, which can grow to tens of gigabytes for Flutter/Android projects. Wipe this clean after every execution.
-* Ensure the **Workspace Cleanup Plugin** is installed in Jenkins (**Manage Jenkins → Plugins**).
-* Update your Pipeline script to call `cleanWs()` inside the `always` block of the `post` stage:
-  ```groovy
-  post {
-      always {
-          // Deletes the workspace directory on the agent after the run finishes
-          cleanWs()
-      }
-      success {
-          archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/*.apk'
-      }
-  }
-  ```
+* Switch on the **Clean Workspace Post-Build** option in config-hub to clean workspace files after completion.
 
 #### 3. Enable Shallow Clones (Speed & Space Optimization)
 If your git history is large, downloading the entire repository history wastes time and disk space. Perform a shallow clone instead.
-* Update the pipeline's checkout stage to request a clone depth of `1` with no tags:
-  * **For private repositories using SCM extensions:**
-    ```groovy
-    checkout([$class: 'GitSCM',
-        branches: [[name: "*/${params.BRANCH}"]],
-        userRemoteConfigs: [[
-            url: 'https://gitlab.com/your-org/your-flutter-app.git',
-            credentialsId: 'gitlab-credentials'
-        ]],
-        extensions: [
-            [$class: 'CloneOption', depth: 1, noTags: true, shallow: true]
-        ]
-    ])
-    ```
-  * **For public repositories using the `git` helper:**
-    ```groovy
-    git branch: "${params.BRANCH}",
-        url: 'https://github.com/YOUR_USER/YOUR_FLUTTER_PROJECT.git',
-        depth: 1,
-        shallow: true
-    ```
+* Switch on the **Shallow Git Clone** option in config-hub to enable `--depth=1` shallow cloning.
 
 #### 4. Restrict Node Concurrency
-To ensure the `flutter-agent` build container isn't overwhelmed by multiple parallel builds (which can result in running out of memory/CPU thrashing):
-* In **Manage Jenkins → Nodes → flutter-agent → Configure**.
+To ensure the `flutter-agent` build container isn't overwhelmed by multiple parallel builds:
+* Go to **Manage Jenkins → Nodes → flutter-agent → Configure**.
 * Set **Number of executors** to **`1`**.
 
 ---
@@ -350,11 +316,9 @@ To ensure the `flutter-agent` build container isn't overwhelmed by multiple para
    - Send `/setcommands` to @BotFather
    - Select your bot, then paste:
      ```
-     build - Trigger a Flutter build
      recent - Show recent builds with download links
      status - Current build status and service health
      help - Show usage instructions
-     about - Show version and system info
      ```
 
 Now enter these values in config-hub:
@@ -366,14 +330,18 @@ Now enter these values in config-hub:
    | ------------------ | --------------------------------------- |
    | Telegram Bot Token | The token from BotFather                |
    | Allowed Chat IDs   | Your chat ID(s), comma-separated        |
+   | Web App URL        | The public HTTPS URL where your bot service is accessible (e.g., `https://your-domain/webapp/`) |
 
-   You can also set these optional fields now:
+   You can also set these optional fields:
 
    | Field              | Value                                   |
    | ------------------ | --------------------------------------- |
    | App Name           | Your app's display name (e.g., `Tendoo Mall`) — shown in bot messages |
+   | Build Options      | JSON mapping of display label to git branch (e.g., `{"Stable Release": "main", "Testing Version": "develop"}`) |
 
 8. Click **Save Bot Config**
+
+> **💡 Web App Menu Button Setup:** The bot dynamically registers the native `🚀 Build` MenuButtonWebApp on startup using the configured `webapp_url`. You do not need to configure this manually in BotFather.
 
 ---
 
@@ -439,14 +407,14 @@ docker compose restart
 ### Run Your First Build
 
 1. Open your Telegram chat with the bot
-2. Send `/build` — the bot presents a branch selection inline keyboard
-3. Select a branch (or send `/build main` to trigger directly)
-4. The bot replies with a "Building..." confirmation
-5. Wait for Jenkins to complete the build (watch progress at http://localhost:8080)
-6. On success, the bot uploads the APK to Google Drive and sends a download link
-7. Send `/recent` to see your build history
+2. Tap the **🚀 Build** button at the bottom left to open the Telegram Mini App.
+3. Select an option (e.g., *Stable Release*) or type a custom branch name, then tap **Trigger Build**.
+4. The Web App will close, and the bot will post `🔨 Alice started a Stable Release build` to the chat.
+5. Watch the build progress on Jenkins (http://localhost:8080)
+6. Upon successful completion, the bot will post a completely new `✅ MyApp Stable Release is ready!` message containing the direct Google Drive **📥 Download APK** link.
+7. Send `/recent` to see your past builds.
 
-🎉 **Setup complete!** You now have a fully functional CI/CD pipeline triggered from Telegram.
+🎉 **Setup complete!** You now have a fully functional CI/CD pipeline triggered via Telegram Web Apps.
 
 ---
 

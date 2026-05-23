@@ -11,22 +11,23 @@ Loaded at model discretion when the task involves service-to-service communicati
 
 ## Build Trigger Flow
 
-The bot acts as a thin trigger layer. The full flow:
+The bot acts as a passive frontend and notification layer. All interactive build selections are handled in the Telegram Web App:
 
-1. User sends `/build` (or `/build <ref>`) → bot shows branch picker or triggers directly
-2. Bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, `callback_url`, and a generated `request_id`
-3. Build-manager triggers Jenkins (`POST /buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build
-4. Build-manager spawns a **per-build poll worker** (`asyncio` task) that periodically queries the Jenkins REST API
-5. Bot registers the interactive message with the `InteractionTracker` as a `TrackedMessage` in `picking` state. Upon branch confirmation, the bot transitions the message to `building` state and stores `request_id` in the message's `data` dict (allowing callback correlation)
-6. Jenkins pipeline runs on the agent managed by `agent-control` and calls `archiveArtifacts` on success — **no outbound HTTP from the agent**
-7. Poll worker detects `building == False` for the matching `BUILD_REQUEST_ID`, downloads the artifact directly from Jenkins (`GET /job/{name}/{number}/artifact/{path}`), uploads it to `file-manager`, enforces `max_recent_builds` retention, and forwards the result to the bot's callback URL (`/callback/build-result`)
-8. Bot correlates the callback payload's `request_id` via `InteractionTracker.find_by_data()`, transitions the `TrackedMessage` to `done` state, and edits the message in-place to present the download link
-
-If the poll worker's elapsed time exceeds `build_timeout`, build-manager records a `timeout` completion and notifies the bot's callback URL.
+1. **User launches Web App** — Taps the `🚀 Build` MenuButtonWebApp to open the Telegram Mini App (served at `/webapp`).
+2. **Retrieve Config** — Web App calls `GET /api/webapp/config` with `X-Telegram-Init-Data`. The bot's API validates the signature and authorizes the chat.
+3. **Trigger Build** — User selects a branch option and clicks build. Web App calls `POST /api/webapp/trigger`.
+4. **Trigger Build-Manager** — The bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, `callback_url`, and a generated `request_id`.
+5. **Register Active Build** — The bot sends a `"🔨 User started a Target build"` confirmation message to the Telegram chat, registers the active build in `ActiveBuildStore`, and returns success to the Web App (which closes).
+6. **Trigger Jenkins** — Build-manager triggers Jenkins (`POST /job/{name}/buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build.
+7. **Jenkins Run** — Jenkins pipeline runs on the agent managed by `agent-control` and archives the resulting APK on success — **no outbound HTTP from the agent**.
+8. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, uploads to Drive via `file-manager`, and forwards the result to the bot's webhook (`POST /callback/build-result`).
+9. **Notify Chat** — Bot consumes the `ActiveBuild` from `ActiveBuildStore` and delivers a completely new success/failure/timeout notification message to the chat. Messages are **immutable** (send-only, fire-and-forget). The bot **never** edits or deletes messages.
 
 ### Security Model
 
-The `BUILD_REQUEST_ID` is a 128-bit random token per build. It correlates the poll worker to the originating Telegram request. Tokens are logged truncated, displayed truncated, and consumed on first use (one-time pop).
+- **HMAC-SHA256 Validation** — The bot validates the `X-Telegram-Init-Data` header signature using the bot's token (HMAC-SHA256) on every Web App API call to prevent unauthorized trigger requests.
+- **Allowed Chat Filtering** — The bot extracts `chat.id` (or `user.id` for private 1-on-1 chats) from the verified `initData` and enforces access control using the whitelisted `allowed_chat_ids`.
+- **Correlation Token** — `BUILD_REQUEST_ID` is a 128-bit random token per build correlating the webhook callback back to the correct chat and active build.
 
 ---
 
@@ -47,9 +48,9 @@ The `/control/status` response carries four fields:
 |-------|------|---------|
 | `configured` | `bool` | Whether `Settings.load()` succeeds (all required fields present) |
 | `running` | `bool` | Whether the managed subprocess/resource is active |
-| `last_error` | `str \| null` | Last runtime error from a `start()` attempt |
-| `config_error` | `str \| null` | Current config validation error (`null` when configured) |
-| `started_at` | `float \| null` | UNIX epoch timestamp of the last successful `start()` (for uptime display) |
+| `last_error` | `str | null` | Last runtime error from a `start()` attempt |
+| `config_error` | `str | null` | Current config validation error (`null` when configured) |
+| `started_at` | `float | null` | UNIX epoch timestamp of the last successful `start()` (for uptime display) |
 
 If a service is down, its schema returns `null` and the config-hub frontend shows "Loading..." for that tab.
 
@@ -115,7 +116,7 @@ Each uploaded APK is made individually accessible — the Drive **folder** stays
 Build state is split across two services:
 
 - **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links. Owns build completion detection (per-build poll worker `asyncio` tasks), artifact download, and retention enforcement (`max_recent_builds` eviction with Drive file cleanup). The poll worker queries Jenkins at configurable intervals and downloads the artifact directly from the Jenkins archive upon success.
-- **tg-jenkins-bot** — maintains `TrackedMessage` objects in-memory via `InteractionTracker` keyed by `(chat_id, message_id)`. The tracker handles picking and building states, providing atomic state transitions that prevent double-tap race conditions. Correlation with the callback's `request_id` is done by querying the `request_id` stored inside each message's `data` dictionary.
+- **tg-jenkins-bot** — maintains active builds in-memory via `ActiveBuildStore` mapping `request_id -> ActiveBuild`. Used strictly to correlate webhook callback results back to the Telegram chat.
 
 Jenkins owns all raw build metadata (status, duration, branch, commit). The bot queries build-manager for summaries — it never queries Jenkins directly for build info.
 

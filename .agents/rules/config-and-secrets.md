@@ -14,7 +14,7 @@ Triggered when editing config-related files. Covers the Pydantic configuration s
 
 Two base classes from `config-core` partition configuration by lifecycle:
 
-- **`BootstrapSettings`** — env-only, resolved once at process start. Hard crash if invalid. Used by services with no dashboard-editable state (`config-hub`, `tg-admin-bot`).
+- **`BootstrapSettings`** — env-only, resolved once at process start. Hard crash if invalid. Used by services with no dashboard-editable state (`config-hub`).
 - **`ServiceSettings`** — JSON > env, loaded on demand by managers. Soft fail → pending state. All fields are visible in the dashboard. Used by services that expose `/control/schema`.
 
 ### Schema Ownership
@@ -28,7 +28,7 @@ Each schema-owning service declares a `ServiceSettings` subclass and exposes it 
 | `file-manager` | `StorageSettings` | `GET /control/schema` |
 | `build-manager` | `BuildSettings` | `GET /control/schema` |
 
-`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend. `tg-admin-bot` uses `AdminBotBootstrap(BootstrapSettings)` — env-only, no schema, but hosts a control API for lifecycle management.
+`config-hub` owns zero schemas — it fetches all schemas from the owning services via HTTP and proxies them to the frontend.
 
 ### Adding a New Config Field
 
@@ -75,7 +75,7 @@ Each service stores its own config in a dedicated volume. Config paths are **har
 | `/app/data/storage.json` | `storage-data` | config-hub (via PUT /control/config) | file-manager |
 | `/app/data/builds.json` | `build-manager-data` | config-hub (via PUT /control/config) | build-manager |
 
-No service mounts another service's volume. All config I/O crosses service boundaries via HTTP (`/control/config`). `tg-admin-bot` mounts no volumes — it proxies all operations through the config-hub API.
+No service mounts another service's volume. All config I/O crosses service boundaries via HTTP (`/control/config`).
 
 OAuth tokens are stored separately by file-manager in its own data volume and are **not** part of config exports.
 

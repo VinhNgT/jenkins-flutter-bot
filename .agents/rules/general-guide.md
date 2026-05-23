@@ -11,7 +11,7 @@ This is the core architectural reference for the **jenkins-flutter-bot** monorep
 
 ## What This Project Is
 
-A self-hosted microservice CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins and delivers APKs through Google Drive. Seven containerized microservices coordinate over an internal Docker network.
+A self-hosted microservice CI/CD ecosystem: a Telegram bot triggers Flutter builds on Jenkins and delivers APKs through Google Drive. Six containerized microservices coordinate over an internal Docker network.
 
 **It is NOT a build system.** It is a thin orchestration layer around Jenkins. All cloning, compiling, and artifact packaging is delegated to a Jenkins pipeline running on a Flutter-capable agent.
 
@@ -21,7 +21,7 @@ A self-hosted microservice CI/CD ecosystem: a Telegram bot triggers Flutter buil
 
 The monorepo uses a **uv workspace** to manage its microservices, with two top-level directories for code:
 
-- **`apps/`** — Seven deployable Python applications, each with a Dockerfile, `pyproject.toml`, and `src/<package>/` layout.
+- **`apps/`** — Six deployable Python applications, each with a Dockerfile, `pyproject.toml`, and `src/<package>/` layout.
 - **`libs/`** — One shared workspace library consumed by the apps.
 - **`infra/`** — Docker Compose files, Dockerfiles, and per-service environment file templates.
 - **`scripts/`** — Developer utilities (env example generation, version tagging).
@@ -34,7 +34,6 @@ The monorepo uses a **uv workspace** to manage its microservices, with two top-l
 | `config-hub` | `config_hub` | Central operational hub — config proxy, service control, web dashboard |
 | `build-manager` | `build_manager` | Build orchestration — Jenkins trigger, job/state tracking |
 | `file-manager` | `file_manager` | Storage backend — Google Drive OAuth, APK upload/download |
-| `tg-admin-bot` | `tg_admin_bot` | Headless Telegram admin bot — HTTP client to config-hub |
 | `agent-control` | `agent_control` | HTTP control wrapper for the Jenkins agent subprocess |
 | `mock-jenkins` | `mock_jenkins` | Dev/test mock — simulates Jenkins + agent-control APIs |
 
@@ -56,34 +55,38 @@ The monorepo uses a **uv workspace** to manage its microservices, with two top-l
 
 ### Service Topology
 
-Seven services on a shared Docker bridge network. Only Jenkins and config-hub are exposed to the host:
+Six backend services (and two utility infra containers) on a shared Docker bridge network. Only Jenkins and config-hub are directly exposed to the host, while public Web App traffic is securely routed via the Caddy Ingress Gateway and Cloudflare Tunnel:
 
 ```mermaid
 graph TD
     subgraph users["Users"]
         TU["Telegram User"]
         BA["Browser Admin"]
-        TA["Telegram Admin"]
     end
 
-    subgraph ops["Ops  (optional)"]
+    subgraph public["Public Boundary"]
+        CF["cloudflared (Tunnel)"]
+        GW["gateway (Caddy Ingress) :80"]
+    end
+
+    subgraph ops["Ops"]
         CH["config-hub :9000 ★"]
-        TAB["tg-admin-bot :9093"]
     end
 
     subgraph managed["Managed Services"]
-        BOT["tg-bot :9090"]
+        BOT["tg-jenkins-bot :9090"]
         BM["build-manager :9010"]
         FM["file-manager :9092"]
-        AGT["flutter-agent :9091"]
+        AGT["agent-control :9091"]
     end
 
     JNK["jenkins :8080 ★"]
 
-    TU -- polling --> BOT
+    TU -- Web App / HTTPS --> CF
+    CF --> GW
+    GW -- Proxy (/webapp) --> BOT
+    BOT -- polling --> TU
     BA --> CH
-    TA -- polling --> TAB
-    TAB -. "HTTP API" .-> CH
     CH -. "configures & controls" .-> managed
 
     BOT -- trigger --> BM
@@ -100,17 +103,18 @@ graph TD
 |---------|------|---------|------|
 | `config-hub` | 9000 | Yes | Central operational hub — config proxy, service control, web dashboard |
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
-| `tg-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
-| `flutter-agent` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
+| `tg-jenkins-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
+| `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 | `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
-| `tg-admin-bot` | 9093 | No | FastAPI Telegram admin bot — HTTP client to config-hub + control API |
+| `gateway` | 80 (internal) | No | Caddy Ingress Gateway — secure routing perimeter for public Web App endpoints |
+| `cloudflared` | — | No | Cloudflare Tunnel — secure HTTPS tunnel connecting local gateway to Cloudflare |
 
 ### Design Principles
 
 1. **Thin Trigger Layer** — The bot owns zero build logic. It delegates build requests to the build-manager, which triggers Jenkins via REST. All cloning, compiling, and packaging happens in the Jenkins pipeline.
 
-2. **Centralized Operations** — `config-hub` is the single entry point for all configuration, service control, and Drive OAuth. It proxies `/control/*` calls to each owning service. Other consumers (`tg-admin-bot`) interact via its HTTP API — no direct library dependencies or volume mounts needed.
+2. **Centralized Operations** — `config-hub` is the single entry point for all configuration, service control, and Drive OAuth. It proxies `/control/*` calls to each owning service. Other API consumers interact via its HTTP API — no direct library dependencies or volume mounts needed.
 
 3. **No Docker-out-of-Docker** — `docker.sock` is never mounted into any container. This is intentional for security and portability.
 
@@ -120,9 +124,9 @@ graph TD
 
 6. **uv Workspace** — Single `pyproject.toml` + `uv.lock` at the root. All members share a unified lockfile. Shared code lives in `libs/`. Dev tools are declared once at the workspace root. The flutter-agent Dockerfile keeps uv in runtime (exception — the base image lacks Python 3.12).
 
-7. **Hub-and-Spoke Management** — `config-hub` (web dashboard + API) is the central hub. `tg-admin-bot` (FastAPI + Telegram bot) is a lightweight spoke that proxies all operations through `config-hub`'s HTTP API. The admin bot has no config volume mounts and no library dependencies on operational logic, but hosts control routes on port `9093` to manage the Telegram application lifespan.
+7. **Centralized Operational Hub** — `config-hub` (web dashboard + API) serves as the singular hub for editing configurations, initiating Google Drive OAuth connections, and monitoring individual container lifespans, eliminating secondary admin interfaces.
 
-8. **Pydantic Configuration** — Two base classes from `config-core` partition the configuration by lifecycle: `BootstrapSettings` (env-only, hard crash at startup) for services with no dashboard-editable state (`config-hub`, `tg-admin-bot`), and `ServiceSettings` (JSON > env, soft fail) for services whose config is editable via the web UI. All `ServiceSettings` fields are visible in the dashboard. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
+8. **Pydantic Configuration** — Two base classes from `config-core` partition the configuration by lifecycle: `BootstrapSettings` (env-only, hard crash at startup) for services with no dashboard-editable state (`config-hub`), and `ServiceSettings` (JSON > env, soft fail) for services whose config is editable via the web UI. All `ServiceSettings` fields are visible in the dashboard. Config is hardcoded to `/app/data/<service>.json` in each module — no path configuration needed.
 
 9. **Scope = Service Name** — `config-hub` exposes UI scope names (`bot`, `agent`, `file_manager`, `builds`) that map directly to their `ServiceClient` service names. This mapping lives in `config-hub/manager.py:_SCOPE_TO_SERVICE` as a seam for future divergence. Unknown scopes are rejected with HTTP 404.
 

@@ -32,9 +32,11 @@ All services share a single Docker bridge network. Only two ports are exposed to
 - **`jenkins:8080`** — Jenkins web UI
 - **`config-hub:9000`** — Config dashboard + Drive OAuth callback
 
-Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), build-manager (`9010`), and admin bot (`tg-admin-bot` on `9093`) ports are internal only.
+Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), and build-manager (`9010`) ports are internal only.
 
-Do not expose bot, agent-control, file-manager, build-manager, or admin bot ports to the host.
+Additionally, a **Caddy Ingress Gateway** (`gateway` service on internal port `80`) acts as a secure routing perimeter, proxying public Telegram Web App paths (`/webapp*` and `/api/webapp*`) to `tg-jenkins-bot:9090` while blocking all other traffic. A **Cloudflare Tunnel** (`cloudflared` service) interfaces directly with `gateway:80` to safely expose the Web App endpoints over HTTPS.
+
+Do not expose bot, agent-control, file-manager, or build-manager ports to the host.
 
 ---
 
@@ -44,29 +46,29 @@ Services consume optional per-service `.env` files via Compose `env_file:` with 
 
 Template files (`*.env.example`) are auto-generated from schemas via `scripts/gen_env_examples.py`. Regenerate after schema changes.
 
-The `tg-admin-bot` uses `ADMIN_BOT_TOKEN` and `ADMIN_CHAT_ID` via `${VAR:-}` interpolation in `docker-compose.yml`, sourced from `infra/.env`.
-
 ---
 
 ## Dev vs Production Compose
 
-Five compose modes via `compose.sh`:
+All Docker Compose overlay configurations are organized under `infra/compose/` and managed using the `infra/compose.sh` script, which automates multi-file overlays.
+
+Five compose modes are supported:
 
 ```bash
-./compose.sh [args]          # Dev — builds images locally from source
-./compose.sh prod [args]     # Prod — pulls pre-built images from GHCR
-./compose.sh edge [args]     # Edge — pulls edge images from GHCR (main branch)
-./compose.sh hybrid [args]   # Hybrid — builds locally except agent-control (pulled from GHCR)
-./compose.sh mock [args]     # Mock — replaces agent-control + jenkins with mock-jenkins
+./compose.sh [args]          # Dev — builds images locally from source using compose/docker-compose.yml
+./compose.sh prod [args]     # Prod — overlays compose/docker-compose.prod.yml (pulls images from GHCR)
+./compose.sh edge [args]     # Edge — overlays compose/docker-compose.edge.yml (pulls edge images from GHCR)
+./compose.sh hybrid [args]   # Hybrid — overlays compose/docker-compose.hybrid.yml (builds locally, pulls agent)
+./compose.sh mock [args]     # Mock — overlays compose/docker-compose.mock.yml (replaces agent/jenkins with mock)
 ```
 
-**Production mode** overlays `docker-compose.prod.yml`, which replaces `build:` with `image:` pointing to GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
+**Production mode** overlays `compose/docker-compose.prod.yml`, which replaces local `build:` context with `image:` pointing to GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
 
-**Edge mode** overlays `docker-compose.edge.yml`, pulling `edge` tagged images representing the latest development snapshot.
+**Edge mode** overlays `compose/docker-compose.edge.yml`, pulling `edge` tagged images representing the latest development snapshot.
 
-**Hybrid mode** overlays `docker-compose.hybrid.yml`, which disables the local build for `agent-control` and pulls it from GHCR instead, while building all other services locally.
+**Hybrid mode** overlays `compose/docker-compose.hybrid.yml`, which disables the local build for `agent-control` and pulls it from GHCR instead, while building all other services locally from their respective `Dockerfile` definitions.
 
-**Mock mode** overlays `docker-compose.mock.yml`, which replaces the real `agent-control` and `jenkins` with the `mock-jenkins` service. Used for local development and testing without a real Jenkins install.
+**Mock mode** overlays `compose/docker-compose.mock.yml`, which replaces the real `agent-control` and `jenkins` with the `mock-jenkins` service. Used for local development and testing without a real Jenkins install.
 
 The `jenkins` service has **no** prod override — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the service.
 
@@ -76,7 +78,7 @@ The `jenkins` service has **no** prod override — it's a dev/testing convenienc
 
 Defined in `.github/workflows/build-images.yml`. Triggers on `v*.*.*` tags.
 
-All apps are built and pushed to GHCR with both the exact version tag and `latest`. The `agent-control` (under `infra/Dockerfile.flutter-agent`) is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
+All apps are built and pushed to GHCR with both the exact version tag and `latest`. The `agent-control` (under `infra/docker/Dockerfile.flutter-agent`) is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
 
 **To release:** `git tag v1.2.3 && git push origin v1.2.3`.
 
@@ -84,7 +86,7 @@ All apps are built and pushed to GHCR with both the exact version tag and `lates
 
 ## Docker Build Patterns
 
-### Standard Apps (tg-jenkins-bot, config-hub, build-manager, file-manager, tg-admin-bot, agent-control)
+### Standard Apps (tg-jenkins-bot, config-hub, build-manager, file-manager, agent-control)
 
 All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions:
 
@@ -95,7 +97,7 @@ All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions
 
 ### agent-control (Exception)
 
-Two-stage build with fundamentally different concerns (using `infra/Dockerfile.flutter-agent` context): Stage 1 downloads multi-GB Android/Flutter SDKs; Stage 2 copies them into the runtime image.
+Two-stage build with fundamentally different concerns (using `infra/docker/Dockerfile.flutter-agent` context): Stage 1 downloads multi-GB Android/Flutter SDKs; Stage 2 copies them into the runtime image.
 
 Key conventions and the *why*:
 

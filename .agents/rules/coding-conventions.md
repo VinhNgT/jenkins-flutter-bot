@@ -33,9 +33,8 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 
 ### Key Dependency Patterns
 
-- **All FastAPI services** share `fastapi` + `uvicorn` (including `tg-jenkins-bot` and `tg-admin-bot`).
+- **All FastAPI services** share `fastapi` + `uvicorn` (including `tg-jenkins-bot`).
 - **All apps** depend on `config-core` (shared library) for `BootstrapSettings` / `ServiceSettings` and config I/O helpers.
-- **`tg-admin-bot`** is also a standard FastAPI service; its primary dependencies are `fastapi`, `uvicorn`, `httpx`, `python-telegram-bot`, and `config-core`.
 - **Blocking I/O libraries** (e.g., `google-api-python-client`) are wrapped with `asyncio.to_thread()`. See `communication-flows.md` for details.
 
 Check each app's `pyproject.toml` for the authoritative dependency list.
@@ -56,15 +55,11 @@ FastAPI service apps follow the official [Bigger Applications](https://fastapi.t
 | `dependencies.py` | Shared `Depends()` callables using `Annotated` type aliases |
 | `routers/` | Route modules, each defining an `APIRouter` — no business logic |
 
-This structure applies to all FastAPI services: `tg-jenkins-bot`, `tg-admin-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`, and `mock-jenkins`.
+This structure applies to all FastAPI services: `tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`, and `mock-jenkins`.
 
-`config-hub` and `tg-admin-bot` use `BootstrapSettings` (env-only, no JSON file) since they have no dashboard-editable config. `mock-jenkins` imports the real `AgentSettings` from `agent-control` for its mock agent-control server.
+`config-hub` uses `BootstrapSettings` (env-only, no JSON file) since it has no dashboard-editable config. `mock-jenkins` imports the real `AgentSettings` from `agent-control` for its mock agent-control server.
 
 The bot additionally has a sub-package (`bot/`) and a static (`webapp/`) directory for the Telegram Web App assets.
-
-### Admin Bot
-
-`tg-admin-bot` is implemented as a standard FastAPI application hosting control endpoints on port `9093`. It uses `config.py` with an `AdminBotBootstrap(BootstrapSettings)` class for its env-only settings, and wraps the Telegram polling updater in the `AdminBotManager` controlled via FastAPI's lifespan hooks. All administrative and operational requests are proxied via `HubClient` to the `config-hub` API.
 
 ### Shared Library
 

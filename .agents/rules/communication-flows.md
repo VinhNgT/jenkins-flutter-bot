@@ -33,7 +33,7 @@ The bot acts as a passive frontend and notification layer. All interactive build
 
 ## Service Control
 
-`config-hub` and `tg-admin-bot` control services via `ServiceClient` in `config-hub`:
+`config-hub` controls services via `ServiceClient`:
 
 ```
 Client → POST /control/{start|stop|restart} → target service
@@ -76,7 +76,7 @@ Do not move or duplicate this mapping. Do not rename `file-manager` internals to
 OAuth is handled by `file-manager` (`/api/auth/*`) via two mechanisms, both proxied through config-hub (`/api/drive/*`):
 
 1. **Browser-redirect flow** — used by the web dashboard (popup callback at `http://<host>:9000/api/drive/oauth/callback`)
-2. **Headless code-paste flow** — used by `tg-admin-bot` (no browser available)
+2. **Headless code-paste flow** — exchange manually-pasted auth code for tokens (manual fallback option)
 
 Both flows produce the same stored token in file-manager's data volume. The bot never initiates OAuth — it only uploads files after a successful build.
 
@@ -90,7 +90,7 @@ Both flows produce the same stored token in file-manager's data volume. The bot 
 
 ## Config Transfer
 
-Both `config-hub` and `tg-admin-bot` support symmetric config transfer:
+`config-hub` supports symmetric config transfer:
 
 - **Export**: packages all JSON configs + generated `.env` files into a `.tar.gz`
 - **Import**: extracts a `.tar.gz`, applies configs to each owning service via `PUT /control/config`, triggers service restarts
@@ -122,10 +122,10 @@ Jenkins owns all raw build metadata (status, duration, branch, commit). The bot 
 
 ---
 
-## Bot/Admin Bot Manager Lifecycle
+## Bot Manager Lifecycle
 
-- **BotManager** (in `tg-jenkins-bot`) and **AdminBotManager** (in `tg-admin-bot`) are defined in their respective `manager.py` files and injected into control routers via `ManagerDep`.
-- Both managers utilize an `asyncio.Lock` for thread-safe concurrent `start()`, `stop()`, and `restart()` control operations.
+- **BotManager** (in `tg-jenkins-bot`) is defined in `manager.py` and injected into control routers via `ManagerDep`.
+- The manager utilizes an `asyncio.Lock` for thread-safe concurrent `start()`, `stop()`, and `restart()` control operations.
 - On startup failure (e.g. invalid bot tokens), the FastAPI wrapper stays running, meaning the control API remains available for retries and troubleshooting.
 - Shared context (e.g., config, clients) is bound directly into `Application.bot_data` for accessibility within handler callbacks.
 

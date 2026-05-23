@@ -25,7 +25,6 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
   - [4b. Save & Connect in Config Hub](#4b-save--connect-in-config-hub)
 - [Step 5 — Start Services & Test](#step-5--start-services--test)
 - [Troubleshooting](#troubleshooting)
-- [Admin Bot Setup (Optional)](#admin-bot-setup-optional)
 
 ---
 

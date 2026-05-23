@@ -141,6 +141,16 @@ services:
     networks:
       - jenkins
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: on-failure
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    command: tunnel --no-autoupdate run
+    networks:
+      - jenkins
+
 volumes:
   jenkins-data:
   bot-data:

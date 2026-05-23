@@ -68,7 +68,6 @@ class BotSettings(ServiceSettings):
         json_schema_extra={"group": "Application", "json_key": "bot.branches"},
     )
     webapp_url: str = Field(
-        "",
         title="Web App URL",
         description="Public HTTPS URL for the Telegram Web App (e.g. https://your-host/webapp/)",
         json_schema_extra={"group": "Application", "json_key": "bot.webapp_url"},

@@ -343,6 +343,50 @@ Now enter these values in config-hub:
 
 > **💡 Web App Menu Button Setup:** The bot dynamically registers the native `🚀 Build` MenuButtonWebApp on startup using the configured `webapp_url`. You do not need to configure this manually in BotFather.
 
+### 3b. Exposing the Web App via Cloudflare Tunnel (HTTPS)
+
+Telegram Web Apps require a public **HTTPS** URL. An exceptionally secure, fast, and free way to obtain one without opening router ports or managing SSL certificates is **Cloudflare Tunnel** (`cloudflared`).
+
+#### Method A — Running Cloudflared via Docker Compose (Recommended)
+
+
+The `cloudflared` service is already pre-configured in `infra/docker-compose.yml` and leverages the internal `jenkins` bridge network to connect directly to the bot securely.
+
+1. Open your Cloudflare Zero Trust Dashboard and go to **Networks → Tunnels**.
+2. Click **Create a Tunnel**, choose **Cloudflared**, name it (e.g., `jenkins-flutter-bot`), and click **Save**.
+3. Under **Install and run a connector**, select **Docker** and copy the **token** from the provided command (the long hash after `--token`).
+4. Simply create or edit your **`infra/.env`** file and add your token:
+   ```env
+   CLOUDFLARE_TUNNEL_TOKEN=YOUR_CLOUDFLARE_TUNNEL_TOKEN
+   ```
+5. On the Cloudflare Tunnel page, click **Next** to go to **Route Traffic**.
+6. Set up your public hostname:
+   - **Public Hostname:** `bot.yourdomain.com` (or any subdomain of a domain managed by Cloudflare)
+   - **Service Type:** `HTTP`
+   - **URL:** `tg-jenkins-bot:9090` (uses the internal Docker container hostname and port)
+7. Save the tunnel settings.
+
+When you run your services, Docker Compose will automatically spin up the tunnel connector and link it securely.
+
+
+#### Method B — Running Cloudflared on the Host
+
+If you prefer to run the connector natively on your host machine:
+
+1. Download and install `cloudflared` on your system.
+2. Run the connector with your tunnel token:
+   ```bash
+   cloudflared tunnel --no-autoupdate run --token YOUR_CLOUDFLARE_TUNNEL_TOKEN
+   ```
+3. In the Cloudflare Tunnel configuration, route your public hostname to:
+   - **Service Type:** `HTTP`
+   - **URL:** `http://localhost:9090`
+
+#### Finalizing the Setup
+Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http://localhost:9000):
+- Set **Web App URL** to `https://bot.yourdomain.com/webapp/` (make sure it ends with `/webapp/` and uses `https`).
+- Click **Save Bot Config** and restart the bot service. The bot will automatically register the `🚀 Build` MenuButtonWebApp pointing to your new Cloudflare domain!
+
 ---
 
 ## Step 4 — Set Up Google Drive

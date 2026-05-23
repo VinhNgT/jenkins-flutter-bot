@@ -66,6 +66,7 @@ def app_with_mocks(mock_build_client, mock_bot):
         branches={"Stable Release": "main", "Testing Version": "develop"},
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
+        webapp_url="https://example.com/webapp",
     )
 
     ctx = BotContext(

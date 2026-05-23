@@ -121,25 +121,6 @@ services:
     networks:
       - jenkins
 
-  tg-admin-bot:
-    profiles:
-      - disabled
-    build:
-      context: ../..
-      dockerfile: apps/tg-admin-bot/Dockerfile
-    container_name: tg-admin-bot
-    restart: on-failure
-    env_file:
-      - path: ../env/tg-admin-bot.env
-        required: false
-    environment:
-      ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN:-}
-      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID:-}
-      CONFIG_HUB_URL: http://config-hub:9000
-    depends_on:
-      - config-hub
-    networks:
-      - jenkins
 
   gateway:
     image: caddy:alpine

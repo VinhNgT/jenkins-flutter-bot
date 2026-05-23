@@ -56,10 +56,7 @@ async def start_drive_connect(manager: ManagerDep, request: Request) -> dict[str
 
 @router.post("/connect/exchange")
 async def exchange_drive_code(manager: ManagerDep, request: Request) -> dict[str, Any]:
-    """Exchange a manually-pasted auth code for tokens (headless flow).
-
-    Used by tg-admin-bot via the config-hub API.
-    """
+    """Exchange a manually-pasted auth code for tokens (headless flow)."""
     body = await request.json()
 
     try:

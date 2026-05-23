@@ -23,6 +23,4 @@ services:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/file-manager:${IMAGE_TAG:-edge}
 
-  tg-admin-bot:
-    build: !reset null
-    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-admin-bot:${IMAGE_TAG:-edge}
+

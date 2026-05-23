@@ -32,7 +32,6 @@ testpaths = [
     "apps/file-manager/tests",
     "apps/mock-jenkins/tests",
     "apps/tg-jenkins-bot/tests",
-    "apps/tg-admin-bot/tests",
     "libs/config-core/tests",
 ]
 asyncio_mode = "auto"

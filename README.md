@@ -15,12 +15,10 @@ graph TD
     subgraph users["Users"]
         TU["Telegram User"]
         BA["Browser Admin"]
-        TA["Telegram Admin"]
     end
 
-    subgraph ops["Ops  (optional)"]
+    subgraph ops["Ops"]
         CH["config-hub :9000 ★"]
-        TAB["tg-admin-bot :9093"]
     end
 
     subgraph managed["Managed Services"]
@@ -34,8 +32,6 @@ graph TD
 
     TU -- polling --> BOT
     BA --> CH
-    TA -- polling --> TAB
-    TAB -. "HTTP API" .-> CH
     CH -. "configures & controls" .-> managed
 
     BOT -- trigger --> BM
@@ -54,7 +50,6 @@ graph TD
 | `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 | `file-manager` | 9092 | No | Storage backend — Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job tracking |
-| `tg-admin-bot` | 9093 | No | FastAPI Telegram admin bot (HTTP client to config-hub + control API) |
 
 ---
 
@@ -80,7 +75,6 @@ Open **http://localhost:9000** and follow the **[Setup Guide](docs/setup-guide.m
 | [config-hub](apps/config-hub/) | Central operational hub — config proxy, service control, web dashboard | [README](apps/config-hub/README.md) |
 | [build-manager](apps/build-manager/) | Build orchestration — Jenkins trigger, job/state tracking | [README](apps/build-manager/README.md) |
 | [file-manager](apps/file-manager/) | Storage backend — Google Drive OAuth, APK upload/download links | [README](apps/file-manager/README.md) |
-| [tg-admin-bot](apps/tg-admin-bot/) | Headless Telegram admin bot — proxies to config-hub API | [README](apps/tg-admin-bot/README.md) |
 | [agent-control](apps/agent-control/) | HTTP control wrapper for the Jenkins agent subprocess | [README](apps/agent-control/README.md) |
 | [mock-jenkins](apps/mock-jenkins/) | Dev/test mock — simulates Jenkins + agent-control APIs | [README](apps/mock-jenkins/README.md) |
 

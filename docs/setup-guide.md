@@ -73,7 +73,7 @@ git push origin v1.2.3
 
 </details>
 
-This starts all seven services:
+This starts all six services:
 
 | Service          | URL                    | Purpose                                           |
 | ---------------- | ---------------------- | ------------------------------------------------- |
@@ -83,7 +83,6 @@ This starts all seven services:
 | `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs + control API |
 | `file-manager`   | Internal (:9092)       | Google Drive OAuth and APK upload/download        |
 | `build-manager`  | Internal (:9010)       | Jenkins build trigger and job state tracking      |
-| `tg-admin-bot`   | Internal (:9093)       | FastAPI admin bot (optional — needs `ADMIN_BOT_TOKEN`) |
 
 > [!NOTE]
 > The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so config-hub can manage them.
@@ -523,24 +522,6 @@ cd infra
 docker compose down -v    # ⚠️ This deletes all volumes (config, data, Jenkins home)
 docker compose up -d --build
 ```
-
----
-
-## Admin Bot Setup (Optional)
-
-The `tg-admin-bot` provides a Telegram-based fallback for stack management when the config-hub dashboard is unavailable. 
-
-Like other services in the stack, the admin bot is implemented as a standard FastAPI application hosting control routes (`/control/start`, `/control/stop`, `/control/restart`, `/control/status`) on internal port `9093`. It utilizes the `AdminBotManager` to control the Telegram polling engine inside a service lifespan context.
-
-1. Create a **separate** bot via @BotFather (not the same as the build bot)
-2. Add both values to `infra/.env`:
-   ```env
-   ADMIN_BOT_TOKEN=your-admin-bot-token
-   ADMIN_CHAT_ID=your-chat-id
-   ```
-3. Restart the stack: `cd infra && ./compose.sh up -d`
-
-The admin bot supports: config view/edit, service control, headless Drive OAuth (code-paste flow), and config transfer (tarball export/import).
 
 ---
 

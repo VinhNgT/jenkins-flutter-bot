@@ -19,7 +19,6 @@ from agent_control.config import AgentSettings
 from build_manager.config import BuildSettings
 from config_hub.config import HubBootstrap
 from file_manager.config import StorageSettings
-from tg_admin_bot.config import AdminBotBootstrap
 from tg_jenkins_bot.config import BotSettings
 
 
@@ -81,7 +80,6 @@ def main() -> None:
         (env_dir / "file-manager.env.example", StorageSettings, "File Manager Config"),
         (env_dir / "build-manager.env.example", BuildSettings, "Build Manager Config"),
         (env_dir / "config-hub.env.example", HubBootstrap, "Config Hub Infra"),
-        (env_dir / "tg-admin-bot.env.example", AdminBotBootstrap, "Admin Bot Infra"),
     ]
 
     for path, cls, title in examples:

@@ -51,7 +51,6 @@ PYPROJECT_FILES: list[Path] = [
     REPO_ROOT / "apps" / "config-hub"           / "pyproject.toml",
     REPO_ROOT / "apps" / "file-manager"         / "pyproject.toml",
     REPO_ROOT / "apps" / "agent-control"        / "pyproject.toml",
-    REPO_ROOT / "apps" / "tg-admin-bot"         / "pyproject.toml",
     REPO_ROOT / "libs" / "config-core"          / "pyproject.toml",
 ]
 

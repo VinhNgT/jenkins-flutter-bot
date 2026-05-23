@@ -24,7 +24,7 @@ The Drive folder itself stays private — links grant access only to the specifi
 |----------|--------|-------------|
 | `/api/auth/status` | GET | OAuth connection status |
 | `/api/auth/connect/start` | POST | Start browser-redirect OAuth flow (returns auth URL) |
-| `/api/auth/connect/exchange` | POST | Headless code exchange (admin bot flow) |
+| `/api/auth/connect/exchange` | POST | Headless code exchange (manual paste flow) |
 | `/api/auth/callback` | GET | OAuth redirect callback |
 | `/api/auth/disconnect` | DELETE | Revoke and delete stored token |
 | `/api/files/upload` | POST | Upload a file and return a download link |

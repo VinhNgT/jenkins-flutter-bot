@@ -11,8 +11,8 @@ services:
     image: jfb-jenkins-local
     pull_policy: build
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.jenkins
     container_name: jenkins
     restart: on-failure
     ports:
@@ -24,12 +24,12 @@ services:
 
   build-manager:
     build:
-      context: ..
+      context: ../..
       dockerfile: apps/build-manager/Dockerfile
     container_name: build-manager
     restart: on-failure
     env_file:
-      - path: env/build-manager.env
+      - path: ../env/build-manager.env
         required: false
     environment:
       FILE_MANAGER_URL: http://file-manager:9092
@@ -45,12 +45,12 @@ services:
 
   config-hub:
     build:
-      context: ..
+      context: ../..
       dockerfile: apps/config-hub/Dockerfile
     container_name: config-hub
     restart: on-failure
     env_file:
-      - path: env/config-hub.env
+      - path: ../env/config-hub.env
         required: false
     ports:
       - "9000:9000"
@@ -69,12 +69,12 @@ services:
 
   tg-jenkins-bot:
     build:
-      context: ..
+      context: ../..
       dockerfile: apps/tg-jenkins-bot/Dockerfile
     container_name: tg-jenkins-bot
     restart: on-failure
     env_file:
-      - path: env/tg-jenkins-bot.env
+      - path: ../env/tg-jenkins-bot.env
         required: false
     environment:
       BOT_SERVICE_URL: "http://tg-jenkins-bot:9090"
@@ -89,12 +89,12 @@ services:
   agent-control:
     platform: linux/amd64
     build:
-      context: ..
-      dockerfile: infra/Dockerfile.flutter-agent
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.flutter-agent
     container_name: agent-control
     restart: on-failure
     env_file:
-      - path: env/agent-control.env
+      - path: ../env/agent-control.env
         required: false
     environment:
       JENKINS_URL: http://jenkins:8080
@@ -107,12 +107,12 @@ services:
 
   file-manager:
     build:
-      context: ..
+      context: ../..
       dockerfile: apps/file-manager/Dockerfile
     container_name: file-manager
     restart: on-failure
     env_file:
-      - path: env/file-manager.env
+      - path: ../env/file-manager.env
         required: false
     expose:
       - "9092"
@@ -125,12 +125,12 @@ services:
     profiles:
       - disabled
     build:
-      context: ..
+      context: ../..
       dockerfile: apps/tg-admin-bot/Dockerfile
     container_name: tg-admin-bot
     restart: on-failure
     env_file:
-      - path: env/tg-admin-bot.env
+      - path: ../env/tg-admin-bot.env
         required: false
     environment:
       ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN:-}
@@ -146,7 +146,7 @@ services:
     container_name: gateway
     restart: on-failure
     volumes:
-      - ./gateway/Caddyfile:/etc/caddy/Caddyfile
+      - ../gateway/Caddyfile:/etc/caddy/Caddyfile
     expose:
       - "80"
     networks:

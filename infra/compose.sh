@@ -24,27 +24,27 @@ cd "$(dirname "$0")"
 if [[ "${1:-}" == "prod" ]]; then
   shift
   exec docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.prod.yml \
+    -f compose/docker-compose.yml \
+    -f compose/docker-compose.prod.yml \
     "$@"
 elif [[ "${1:-}" == "edge" ]]; then
   shift
   exec docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.edge.yml \
+    -f compose/docker-compose.yml \
+    -f compose/docker-compose.edge.yml \
     "$@"
 elif [[ "${1:-}" == "hybrid" ]]; then
   shift
   exec docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.hybrid.yml \
+    -f compose/docker-compose.yml \
+    -f compose/docker-compose.hybrid.yml \
     "$@"
 elif [[ "${1:-}" == "mock" ]]; then
   shift
   exec docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.mock.yml \
+    -f compose/docker-compose.yml \
+    -f compose/docker-compose.mock.yml \
     "$@"
 else
-  exec docker compose "$@"
+  exec docker compose -f compose/docker-compose.yml "$@"
 fi

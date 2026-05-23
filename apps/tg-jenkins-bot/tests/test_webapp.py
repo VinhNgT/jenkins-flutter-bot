@@ -32,7 +32,7 @@ def _generate_valid_init_data(token: str, chat_id: int | None = None) -> str:
     sorted_params = sorted(init_params.items())
     check_string = "\n".join(f"{k}={v}" for k, v in sorted_params)
 
-    secret_key = hmac.new(b"Webapps", token.encode("utf-8"), hashlib.sha256).digest()
+    secret_key = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
     sig = hmac.new(secret_key, check_string.encode("utf-8"), hashlib.sha256).hexdigest()
 
     init_params["hash"] = sig

@@ -72,6 +72,17 @@ class BotSettings(ServiceSettings):
         description="Public HTTPS URL for the Telegram Web App (e.g. https://your-host/webapp/)",
         json_schema_extra={"group": "Application", "json_key": "bot.webapp_url"},
     )
+    webapp_short_name: str = Field(
+        "",
+        title="Mini App Short Name",
+        description=(
+            "Short name of the Mini App registered with @BotFather via /newapp "
+            "(e.g. 'builds'). When set, command buttons launch the app as a native "
+            "Telegram Mini App panel in group chats via t.me/bot/shortname. "
+            "Leave blank to fall back to a standard in-app browser button."
+        ),
+        json_schema_extra={"group": "Application", "json_key": "bot.webapp_short_name"},
+    )
 
     @field_validator("webapp_url", mode="before")
     @classmethod

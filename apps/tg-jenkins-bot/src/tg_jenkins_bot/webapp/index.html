@@ -54,21 +54,7 @@
             transition: background-color 0.3s ease;
         }
 
-        /* Preview banner */
-        .preview-banner {
-            display: none;
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            color: white;
-            text-align: center;
-            padding: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
+
 
         /* Container */
         .container {
@@ -410,10 +396,7 @@
 </head>
 <body>
 
-    <!-- Preview Mode Indicator -->
-    <div id="previewBanner" class="preview-banner">
-        Preview Mode (Local Browser)
-    </div>
+
 
     <!-- MAIN SCREEN -->
     <div id="mainScreen" class="container">
@@ -498,7 +481,7 @@
         const mainScreen = document.getElementById('mainScreen');
         const errorScreen = document.getElementById('errorScreen');
         const loadingScreen = document.getElementById('loadingScreen');
-        const previewBanner = document.getElementById('previewBanner');
+
         const alertBox = document.getElementById('alertBox');
         const alertMsg = document.getElementById('alertMsg');
         const branchesContainer = document.getElementById('branchesContainer');
@@ -520,7 +503,11 @@
             // Hide standard button container in TG
             document.getElementById('triggerButtonContainer').style.display = 'none';
         } else {
-            previewBanner.style.display = 'block';
+            // Disable plain HTTPS access in regular browsers entirely to limit access to Telegram clients only
+            document.addEventListener('DOMContentLoaded', () => {
+                showError("Telegram Required", "This application can only be accessed within the Telegram client.");
+            });
+            throw new Error("Telegram Required: Direct browser access disabled.");
         }
 
         // Init

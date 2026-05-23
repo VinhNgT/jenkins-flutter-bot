@@ -60,8 +60,8 @@ def _verify_telegram_init_data(init_data: str, token: str) -> dict:
     sorted_params = sorted(params_dict.items())
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted_params)
 
-    # Calculate secret key: HMAC-SHA256 of token with constant key "Webapps"
-    secret_key = hmac.new(b"Webapps", token.encode("utf-8"), hashlib.sha256).digest()
+    # Calculate secret key: HMAC-SHA256 of token with constant key "WebAppData"
+    secret_key = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
 
     # Calculate HMAC-SHA256 of data_check_string using secret_key
     computed_hash = hmac.new(

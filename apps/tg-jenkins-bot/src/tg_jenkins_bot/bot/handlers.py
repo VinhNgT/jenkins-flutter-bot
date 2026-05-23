@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from telegram import (
     Update,
     LinkPreviewOptions,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
 )
 from telegram.ext import ContextTypes
 
@@ -41,6 +43,36 @@ def _get_ctx(context: ContextTypes.DEFAULT_TYPE) -> BotContext:
 def _escape(text: str) -> str:
     """Escape user-supplied text for safe inclusion in HTML messages."""
     return html.escape(text, quote=False)
+
+
+def _get_webapp_keyboard(
+    context: ContextTypes.DEFAULT_TYPE,
+) -> InlineKeyboardMarkup | None:
+    """Build a 🚀 Build inline keyboard button that opens the Telegram native Mini App.
+
+    If ``webapp_short_name`` is configured in BotSettings **and** the bot's
+    username is available, the button URL is a native Telegram Mini App deep
+    link (``https://t.me/<bot>/<shortname>``). Telegram clients intercept
+    this link and open the Mini App as a native slide-up panel/modal, even in group
+    chats.
+
+    Returns ``None`` when webapp_short_name is missing or the bot username is not resolved.
+    """
+    ctx = _get_ctx(context)
+    if not ctx.config.webapp_url:
+        return None
+
+    short_name = ctx.config.webapp_short_name.strip()
+    bot_username = getattr(context.bot, "username", None)
+    if short_name and bot_username:
+        # Native Mini App deep link — works in group chats.
+        url = f"https://t.me/{bot_username}/{short_name}"
+        return InlineKeyboardMarkup(
+            [[InlineKeyboardButton(text="🚀 Build", url=url)]]
+        )
+
+    # Return None to hide the button when the native Mini App is not configured.
+    return None
 
 
 def _format_date(ts: float) -> str:
@@ -99,6 +131,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "\n"
         f"{footer}",
         parse_mode="HTML",
+        reply_markup=_get_webapp_keyboard(context),
         link_preview_options=LinkPreviewOptions(is_disabled=True),
     )
 
@@ -170,6 +203,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",
+        reply_markup=_get_webapp_keyboard(context),
     )
 
 
@@ -218,4 +252,5 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",
+        reply_markup=_get_webapp_keyboard(context),
     )

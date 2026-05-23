@@ -78,6 +78,8 @@ def _make_config(**overrides):
     config.branches = overrides.get("branches", {"Stable Release": "main"})
     config.bot_callback_url = overrides.get("bot_callback_url", "http://bot/cb")
     config.github_url = ""
+    config.webapp_url = overrides.get("webapp_url", "https://example.com/webapp/")
+    config.webapp_short_name = overrides.get("webapp_short_name", "")
     return config
 
 
@@ -119,6 +121,7 @@ def _make_context(ctx, bot):
     context = MagicMock()
     context.bot_data = {"bot_context": ctx}
     context.bot = bot
+    context.bot.username = "test_bot"
     context.job_queue = MagicMock()
     context.args = []
     return context
@@ -134,8 +137,46 @@ class TestCommandHandlers:
 
         update.message.reply_text.assert_called_once()
         text = update.message.reply_text.call_args[0][0]
-        assert "Tap the 🚀 Build button below to get started" in text
+        assert "Tap the 🚀 Build button" in text
         assert "TestApp" in text
+
+    async def test_start_handler_no_button_when_no_short_name(self, ctx, bot) -> None:
+        """Without webapp_short_name, no keyboard button is attached."""
+        update = make_message_update("/start", chat_id=12345)
+        context = _make_context(ctx, bot)
+        # Ensure no short name is set (default config)
+        ctx.config.webapp_short_name = ""
+
+        await start_handler(update, context)
+
+        kwargs = update.message.reply_text.call_args[1]
+        assert kwargs.get("reply_markup") is None
+
+    async def test_start_handler_shows_native_deeplink_button(self, ctx, bot) -> None:
+        """With webapp_short_name set, button uses t.me native Mini App deep link."""
+        ctx.config.webapp_short_name = "builds"
+        update = make_message_update("/start", chat_id=12345)
+        context = _make_context(ctx, bot)
+
+        await start_handler(update, context)
+
+        kwargs = update.message.reply_text.call_args[1]
+        keyboard = kwargs["reply_markup"]
+        assert keyboard is not None
+        button = keyboard.inline_keyboard[0][0]
+        assert button.url == "https://t.me/test_bot/builds"
+        assert button.web_app is None
+
+    async def test_start_handler_no_button_when_no_webapp_url(self, ctx, bot) -> None:
+        """Without webapp_url configured, no keyboard is attached."""
+        ctx.config.webapp_url = ""
+        update = make_message_update("/start", chat_id=12345)
+        context = _make_context(ctx, bot)
+
+        await start_handler(update, context)
+
+        kwargs = update.message.reply_text.call_args[1]
+        assert kwargs.get("reply_markup") is None
 
     async def test_recent_handler_authorized(self, ctx, bot) -> None:
         """Verify recent handler returns recent successful builds."""

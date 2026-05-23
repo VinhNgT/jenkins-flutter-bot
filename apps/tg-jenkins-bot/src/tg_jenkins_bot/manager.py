@@ -15,7 +15,7 @@ from typing import Any
 from config_core import format_validation_error
 from pydantic import ValidationError
 
-from telegram import Bot, MenuButtonWebApp, WebAppInfo
+from telegram import Bot, MenuButtonDefault
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -120,14 +120,10 @@ class BotManager:
                     ]
                 )
 
-                # Set Web App menu button if webapp_url is configured
-                if config.webapp_url:
-                    await application.bot.set_chat_menu_button(
-                        menu_button=MenuButtonWebApp(
-                            text="🚀 Build",
-                            web_app=WebAppInfo(url=config.webapp_url),
-                        )
-                    )
+                # Ensure the chat menu button is set to default (consistent experience across all chats)
+                await application.bot.set_chat_menu_button(
+                    menu_button=MenuButtonDefault()
+                )
 
                 self._application = application
                 self._bot_context = bot_context

@@ -15,20 +15,10 @@ from typing import Any, Protocol, runtime_checkable
 class BotLike(Protocol):
     """Minimal bot interface used by BotContext for messaging.
 
-    Only the two Telegram Bot methods that BotContext actually calls
-    are declared here.  Any object implementing these two methods
+    Only the Telegram Bot methods that BotContext actually calls
+    are declared here.  Any object implementing these methods
     (including ``AsyncMock``) is a valid substitute.
     """
-
-    async def edit_message_text(
-        self,
-        text: str,
-        chat_id: int | None = ...,
-        message_id: int | None = ...,
-        *,
-        parse_mode: str | None = ...,
-        reply_markup: Any = ...,
-    ) -> Any: ...
 
     async def send_message(
         self,

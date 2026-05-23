@@ -5,14 +5,17 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from starlette.responses import JSONResponse
 
 from .manager import BotManager, StartupError
 from .routers.callbacks import router as callbacks_router
 from .routers.control import router as control_router
+from .routers.webapp import router as webapp_router
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
-    """Create the FastAPI app hosting callback and control routes."""
+    """Create the FastAPI app hosting callback, control, and Web App routes."""
     app = FastAPI(title="tg-jenkins-bot", lifespan=lifespan)
     app.state.manager = BotManager()
 
@@ -44,8 +47,14 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
+    # Mount static Web App files
+    static_dir = Path(__file__).parent / "webapp"
+    app.mount("/webapp", StaticFiles(directory=str(static_dir), html=True), name="webapp")
+
+    # API routers
     app.include_router(control_router)
     app.include_router(callbacks_router)
+    app.include_router(webapp_router)
     return app
 
 

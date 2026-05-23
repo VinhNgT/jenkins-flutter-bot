@@ -60,17 +60,17 @@ class BotSettings(ServiceSettings):
         description="Name of the app being built (used in messages)",
         json_schema_extra={"group": "Application", "json_key": "bot.app_name"},
     )
-    branch_list: list[str] = Field(
-        default=["main", "develop"],
-        title="Git Branches",
-        description="Comma-separated list of branches to show in the build menu",
-        json_schema_extra={"group": "Application", "json_key": "bot.branch_list"},
+    branches: dict[str, str] = Field(
+        default={"Stable Release": "main", "Testing Version": "develop"},
+        title="Build Options",
+        description="Mapping of display label → git branch (e.g. 'Stable Release' → 'main')",
+        json_schema_extra={"group": "Application", "json_key": "bot.branches"},
     )
-    session_ttl: int = Field(
-        60,
-        title="Session TTL (seconds)",
-        description="How long menu sessions stay active",
-        json_schema_extra={"group": "Advanced", "json_key": "bot.session_ttl"},
+    webapp_url: str = Field(
+        "",
+        title="Web App URL",
+        description="Public HTTPS URL for the Telegram Web App (e.g. https://your-host/webapp/)",
+        json_schema_extra={"group": "Application", "json_key": "bot.webapp_url"},
     )
 
     # Project
@@ -104,11 +104,29 @@ class BotSettings(ServiceSettings):
         },
     )
 
-    @field_validator("branch_list", mode="before")
+    @field_validator("branches", mode="before")
     @classmethod
-    def parse_branch_list(cls, v: Any) -> list[str]:
+    def parse_branches(cls, v: Any) -> dict[str, str]:
+        if isinstance(v, dict):
+            return {str(k): str(val) for k, val in v.items()}
         if isinstance(v, str):
-            return [b.strip() for b in v.split(",") if b.strip()]
+            v = v.strip()
+            if not v:
+                return {}
+            # Try to parse as JSON dict
+            if v.startswith("{"):
+                try:
+                    import json
+                    parsed = json.loads(v)
+                    if isinstance(parsed, dict):
+                        return {str(k): str(val) for k, val in parsed.items()}
+                except Exception:
+                    pass
+            # Comma-separated list fallback
+            items = [b.strip() for b in v.split(",") if b.strip()]
+            return {b: b for b in items}
+        if isinstance(v, list):
+            return {str(b): str(b) for b in v if b}
         return v
 
     @field_validator("allowed_chat_ids", mode="before")

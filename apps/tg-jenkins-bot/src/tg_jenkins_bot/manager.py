@@ -15,24 +15,18 @@ from typing import Any
 from config_core import format_validation_error
 from pydantic import ValidationError
 
-from telegram import Bot
+from telegram import Bot, MenuButtonWebApp, WebAppInfo
 from telegram.ext import (
     Application,
     ApplicationBuilder,
-    CallbackQueryHandler,
     CommandHandler,
-    MessageHandler,
-    filters,
 )
 
-from .bot.callbacks import callback_router
 from .bot.context import BotContext
 from .bot.handlers import (
-    build_handler,
     recent_handler,
     start_handler,
     status_handler,
-    text_branch_handler,
 )
 from .build_client import BuildClient
 from .config import BotSettings
@@ -51,13 +45,7 @@ def _build_application(
     *,
     clock: Callable[[], float] = time.time,
 ) -> tuple[Application, BotContext]:
-    """Create a Telegram Application wired with the handler architecture.
-
-    Uses ``ApplicationBuilder().bot()`` to accept any Bot-like object
-    (including ``AsyncMock`` for testing).  This eliminates the need for
-    a bootstrap ``BotContext(bot=None)`` — the ``BotContext`` is created
-    once with the real (or mock) bot.
-    """
+    """Create a Telegram Application wired with the passive handler architecture."""
     application = ApplicationBuilder().bot(bot).build()
 
     bot_context = BotContext(
@@ -69,16 +57,7 @@ def _build_application(
     application.add_handler(CommandHandler("start", start_handler))
     application.add_handler(CommandHandler("help", start_handler))
     application.add_handler(CommandHandler("status", status_handler))
-    application.add_handler(CommandHandler("build", build_handler))
     application.add_handler(CommandHandler("recent", recent_handler))
-
-    # Free-text branch name (for the "✏️ Type a name" path)
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, text_branch_handler)
-    )
-
-    # Inline button callbacks
-    application.add_handler(CallbackQueryHandler(callback_router))
 
     return application, bot_context
 
@@ -129,18 +108,26 @@ class BotManager:
                     raise RuntimeError("Application.updater is None after start")
                 await application.updater.start_polling(
                     drop_pending_updates=True,
-                    allowed_updates=["message", "callback_query"],
+                    allowed_updates=["message"],
                 )
 
                 # Register visible commands in the "/" picker
                 await application.bot.set_my_commands(
                     [
-                        ("build", "Trigger a new build"),
                         ("recent", "Show recent builds"),
                         ("status", "Check build system health"),
                         ("help", "How to use this bot"),
                     ]
                 )
+
+                # Set Web App menu button if webapp_url is configured
+                if config.webapp_url:
+                    await application.bot.set_chat_menu_button(
+                        menu_button=MenuButtonWebApp(
+                            text="🚀 Build",
+                            web_app=WebAppInfo(url=config.webapp_url),
+                        )
+                    )
 
                 self._application = application
                 self._bot_context = bot_context
@@ -148,7 +135,7 @@ class BotManager:
                 self._build_client = build_client
                 self._last_error = None
                 self._started_at = self._clock()
-                logger.info("Telegram bot started")
+                logger.info("Telegram bot started (Web App mode)")
             except Exception as exc:
                 self._last_error = str(exc)
                 raise StartupError(str(exc)) from exc

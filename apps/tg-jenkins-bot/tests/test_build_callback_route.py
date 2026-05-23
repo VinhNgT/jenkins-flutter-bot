@@ -1,5 +1,7 @@
 """Tests for POST /callback/build-result — webhook processing."""
 
+from __future__ import annotations
+
 import os
 from unittest.mock import AsyncMock, MagicMock
 
@@ -38,9 +40,8 @@ def _make_config():
     config = MagicMock()
     config.app_name = "TestApp"
     config.admin_contact = "@admin"
-    config.session_ttl = 60
     config.allowed_chat_ids = [12345]
-    config.branch_list = ["main"]
+    config.branches = {"Stable Release": "main"}
     config.bot_callback_url = "http://bot/cb"
     config.github_url = ""
     return config
@@ -76,7 +77,13 @@ def client_with_ctx():
 
 def test_build_result_success_dispatches(client_with_ctx):
     client, ctx = client_with_ctx
-    ctx.tracker.register(100, 1, 42, "building", data={"request_id": "abc123"})
+    ctx.store.register(
+        request_id="abc123",
+        chat_id=100,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
     ctx.on_build_success = AsyncMock()
 
     resp = client.post("/callback/build-result", json={
@@ -93,7 +100,13 @@ def test_build_result_success_dispatches(client_with_ctx):
 
 def test_build_result_failure_dispatches(client_with_ctx):
     client, ctx = client_with_ctx
-    ctx.tracker.register(100, 1, 42, "building", data={"request_id": "abc123"})
+    ctx.store.register(
+        request_id="abc123",
+        chat_id=100,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
     ctx.on_build_failure = AsyncMock()
 
     resp = client.post("/callback/build-result", json={
@@ -106,7 +119,13 @@ def test_build_result_failure_dispatches(client_with_ctx):
 
 def test_build_result_timeout_dispatches(client_with_ctx):
     client, ctx = client_with_ctx
-    ctx.tracker.register(100, 1, 42, "building", data={"request_id": "abc123"})
+    ctx.store.register(
+        request_id="abc123",
+        chat_id=100,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
     ctx.on_build_timeout = AsyncMock()
 
     resp = client.post("/callback/build-result", json={
@@ -131,7 +150,13 @@ def test_build_result_unknown_request_id_ignored(client_with_ctx):
 def test_build_result_duplicate_callback_ignored(client_with_ctx):
     """Same request_id twice → second is ignored (consume_building returns None)."""
     client, ctx = client_with_ctx
-    ctx.tracker.register(100, 1, 42, "building", data={"request_id": "abc123"})
+    ctx.store.register(
+        request_id="abc123",
+        chat_id=100,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
     ctx.on_build_success = AsyncMock()
 
     # First callback

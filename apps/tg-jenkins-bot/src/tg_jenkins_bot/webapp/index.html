@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Build Manager</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* CSS Variables - Modern harmonious palette with glassmorphism */
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --danger-color: #ef4444;
+            --danger-hover: #dc2626;
+            --warning-color: #f59e0b;
+            --success-color: #10b981;
+            --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Telegram Theme Adaptation */
+        body.tg {
+            --bg-color: var(--tg-theme-bg-color, #0f172a);
+            --text-color: var(--tg-theme-text-color, #f8fafc);
+            --text-secondary: var(--tg-theme-hint-color, #94a3b8);
+            --accent-color: var(--tg-theme-button-color, #3b82f6);
+            --accent-hover: var(--tg-theme-button-color, #2563eb);
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --card-border: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.5;
+            padding: 16px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Preview banner */
+        .preview-banner {
+            display: none;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Container */
+        .container {
+            max-width: 500px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-grow: 1;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 4px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(to right, #3b82f6, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* Cards/Sections */
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 18px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--accent-color);
+        }
+
+        /* Option Grid */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .option-btn {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1.5px solid var(--card-border);
+            color: var(--text-color);
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .option-btn:hover {
+            border-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.05);
+            transform: translateY(-1px);
+        }
+
+        .option-btn.selected {
+            border-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .option-btn-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-family: monospace;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Custom Input */
+        .custom-input-container {
+            margin-top: 12px;
+            position: relative;
+        }
+
+        .custom-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1.5px solid var(--card-border);
+            color: var(--text-color);
+            padding: 12px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .custom-input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        /* Active Builds List */
+        .builds-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .build-item {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: slideIn 0.3s ease;
+        }
+
+        .build-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .build-item-label {
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .build-item-label .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--warning-color);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--warning-color);
+            animation: pulse 1.5s infinite;
+        }
+
+        .build-item-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .cancel-btn {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: var(--danger-color);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .cancel-btn:hover {
+            background: var(--danger-color);
+            color: white;
+            border-color: var(--danger-color);
+        }
+
+        .cancel-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .empty-state svg {
+            width: 32px;
+            height: 32px;
+            color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Alerts & Errors */
+        .alert {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            color: #fde047;
+        }
+
+        /* Main trigger button (when not using native SDK MainButton) */
+        .trigger-build-btn {
+            background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+            transition: all 0.2s ease;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .trigger-build-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .trigger-build-btn:disabled {
+            background: #334155;
+            color: #64748b;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 2.5px solid rgba(255, 255, 255, 0.2);
+            border-top: 2.5px solid currentColor;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Screens */
+        .screen {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+            text-align: center;
+            padding: 24px;
+            gap: 16px;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        .screen-icon {
+            width: 64px;
+            height: 64px;
+            color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+
+        .screen-icon.error {
+            color: var(--danger-color);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Animations */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(8px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Preview Mode Indicator -->
+    <div id="previewBanner" class="preview-banner">
+        Preview Mode (Local Browser)
+    </div>
+
+    <!-- MAIN SCREEN -->
+    <div id="mainScreen" class="container">
+        <header>
+            <div>
+                <h1 id="appName">Build Manager</h1>
+                <p class="subtitle">Select a target branch to deploy</p>
+            </div>
+        </header>
+
+        <!-- Error Alert Panel -->
+        <div id="alertBox" class="alert" style="display: none;">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+            <span id="alertMsg">An error occurred.</span>
+        </div>
+
+        <!-- Branches Selection -->
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+                Target Option
+            </div>
+            <div id="branchesContainer" class="options-grid">
+                <!-- Branches will load here -->
+            </div>
+
+            <div class="custom-input-container">
+                <input type="text" id="customBranchInput" class="custom-input" placeholder="Or enter custom branch name...">
+            </div>
+        </div>
+
+        <!-- Active Builds Panel -->
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                </svg>
+                Active Builds
+            </div>
+            <div id="buildsList" class="builds-list">
+                <!-- Builds will load here -->
+            </div>
+        </div>
+
+        <!-- Fallback Trigger Button when WebApp.MainButton is not supported -->
+        <div id="triggerButtonContainer" style="margin-top: auto; padding-top: 16px;">
+            <button id="triggerBtn" class="trigger-build-btn" disabled>
+                <span>Trigger Build</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ERROR SCREEN (403 or Service Down) -->
+    <div id="errorScreen" class="screen">
+        <div class="screen-icon error">
+            <svg width="32" height="32" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M13.477 3.03a.75.75 0 01.32.787l-.82 6.25h4.29a.75.75 0 01.636 1.155l-8.5 13.5a.75.75 0 01-1.282-.782l.83-6.425H4.66a.75.75 0 01-.637-1.155l8.5-13.5a.75.75 0 01.953-.33z" clip-rule="evenodd" />
+            </svg>
+        </div>
+        <h2 id="errorTitle">Access Denied</h2>
+        <p id="errorDescription" class="subtitle">This chat is not authorized to trigger builds.</p>
+    </div>
+
+    <!-- LOADING SCREEN -->
+    <div id="loadingScreen" class="screen active">
+        <div class="spinner" style="width: 32px; height: 32px; color: var(--accent-color)"></div>
+        <p class="subtitle">Connecting to build system...</p>
+    </div>
+
+    <script>
+        // State
+        let config = null;
+        let selectedBranch = null;
+        let isTelegram = false;
+        let initData = 'preview';
+
+        // Elements
+        const mainScreen = document.getElementById('mainScreen');
+        const errorScreen = document.getElementById('errorScreen');
+        const loadingScreen = document.getElementById('loadingScreen');
+        const previewBanner = document.getElementById('previewBanner');
+        const alertBox = document.getElementById('alertBox');
+        const alertMsg = document.getElementById('alertMsg');
+        const branchesContainer = document.getElementById('branchesContainer');
+        const customBranchInput = document.getElementById('customBranchInput');
+        const buildsList = document.getElementById('buildsList');
+        const appNameEl = document.getElementById('appName');
+        const triggerBtn = document.getElementById('triggerBtn');
+
+        // Check environment
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+            isTelegram = true;
+            initData = window.Telegram.WebApp.initData;
+            document.body.classList.add('tg');
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+            // Configure native MainButton
+            window.Telegram.WebApp.MainButton.setText("TRIGGER BUILD");
+            window.Telegram.WebApp.MainButton.onClick(handleTriggerClick);
+            // Hide standard button container in TG
+            document.getElementById('triggerButtonContainer').style.display = 'none';
+        } else {
+            previewBanner.style.display = 'block';
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', fetchConfig);
+
+        async function fetchConfig() {
+            try {
+                const response = await fetch('/api/webapp/config', {
+                    headers: {
+                        'X-Telegram-Init-Data': initData
+                    }
+                });
+
+                if (response.status === 403 || response.status === 401) {
+                    const data = await response.json();
+                    showError("Access Denied", data.detail || "This chat is not authorized to trigger builds.");
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error("Server responded with " + response.status);
+                }
+
+                config = await response.json();
+                renderUI();
+            } catch (err) {
+                console.error(err);
+                showError("Service Unavailable", "The build server is currently offline or unreachable. Please try again in a minute.");
+            }
+        }
+
+        function showError(title, desc) {
+            document.getElementById('errorTitle').innerText = title;
+            document.getElementById('errorDescription').innerText = desc;
+            loadingScreen.classList.remove('active');
+            mainScreen.style.display = 'none';
+            errorScreen.classList.add('active');
+        }
+
+        function renderUI() {
+            appNameEl.innerText = config.app_name;
+
+            // Render branches
+            branchesContainer.innerHTML = '';
+            config.branches.forEach(branch => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerHTML = `
+                    <span>${branch.label}</span>
+                    <span class="option-btn-meta">${branch.ref}</span>
+                `;
+                btn.addEventListener('click', () => selectBranch(branch.ref, btn));
+                branchesContainer.appendChild(btn);
+            });
+
+            // Render active builds
+            buildsList.innerHTML = '';
+            if (config.active_builds.length === 0) {
+                buildsList.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        <span>No builds running right now.</span>
+                    </div>
+                `;
+            } else {
+                config.active_builds.forEach(build => {
+                    const elapsed = formatElapsed(build.triggered_at);
+                    const item = document.createElement('div');
+                    item.className = 'build-item';
+                    item.innerHTML = `
+                        <div class="build-item-info">
+                            <div class="build-item-label">
+                                <div class="dot"></div>
+                                <span>${build.label}</span>
+                            </div>
+                            <div class="build-item-meta">
+                                By ${build.triggered_by} · ${elapsed}
+                            </div>
+                        </div>
+                        <button class="cancel-btn" onclick="handleCancelClick('${build.request_id}', this)">
+                            <span>🚫 Cancel</span>
+                        </button>
+                    `;
+                    buildsList.appendChild(item);
+                });
+            }
+
+            // Sync custom inputs
+            customBranchInput.addEventListener('input', (e) => {
+                if (e.target.value.trim() !== '') {
+                    // Deselect options
+                    document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
+                    selectedBranch = e.target.value.trim();
+                    updateTriggerButtonState(true);
+                } else {
+                    selectedBranch = null;
+                    updateTriggerButtonState(false);
+                }
+            });
+
+            loadingScreen.classList.remove('active');
+            mainScreen.style.display = 'flex';
+        }
+
+        function selectBranch(branchRef, btnElement) {
+            customBranchInput.value = '';
+            document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
+            btnElement.classList.add('selected');
+            selectedBranch = branchRef;
+            updateTriggerButtonState(true);
+        }
+
+        function updateTriggerButtonState(enabled) {
+            // Check duplicates
+            const isDuplicate = config.active_builds.some(b => b.ref === selectedBranch);
+
+            if (isDuplicate) {
+                showAlert(`A build on '${selectedBranch}' is already running. Please cancel it first.`);
+                enabled = false;
+            } else {
+                hideAlert();
+            }
+
+            if (isTelegram) {
+                if (enabled) {
+                    window.Telegram.WebApp.MainButton.show();
+                    window.Telegram.WebApp.MainButton.enable();
+                } else {
+                    window.Telegram.WebApp.MainButton.hide();
+                }
+            } else {
+                triggerBtn.disabled = !enabled;
+            }
+        }
+
+        function showAlert(msg) {
+            alertMsg.innerText = msg;
+            alertBox.style.display = 'flex';
+        }
+
+        function hideAlert() {
+            alertBox.style.display = 'none';
+        }
+
+        async function handleTriggerClick() {
+            if (!selectedBranch) return;
+
+            setTriggeringState(true);
+
+            try {
+                const response = await fetch('/api/webapp/trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': initData
+                    },
+                    body: JSON.stringify({ branch: selectedBranch })
+                });
+
+                const resData = await response.json();
+                if (!response.ok) {
+                    throw new Error(resData.detail || "Trigger failed");
+                }
+
+                if (isTelegram) {
+                    window.Telegram.WebApp.close();
+                } else {
+                    // Reset and refresh config
+                    selectedBranch = null;
+                    customBranchInput.value = '';
+                    document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
+                    showAlert("Build successfully triggered!");
+                    alertBox.className = "alert alert-warning";
+                    fetchConfig();
+                }
+            } catch (err) {
+                console.error(err);
+                showAlert(err.message || "Failed to trigger build. Please try again.");
+                setTriggeringState(false);
+            }
+        }
+
+        function setTriggeringState(isLoading) {
+            if (isTelegram) {
+                if (isLoading) {
+                    window.Telegram.WebApp.MainButton.showProgress();
+                } else {
+                    window.Telegram.WebApp.MainButton.hideProgress();
+                }
+            } else {
+                triggerBtn.disabled = isLoading;
+                triggerBtn.innerHTML = isLoading ? '<div class="spinner"></div>' : 'Trigger Build';
+            }
+        }
+
+        async function handleCancelClick(requestId, buttonEl) {
+            if (!confirm("Are you sure you want to cancel this build?")) return;
+
+            buttonEl.disabled = true;
+            buttonEl.innerHTML = '<div class="spinner" style="width:12px; height:12px; border-width:1.5px;"></div>';
+
+            try {
+                const response = await fetch('/api/webapp/cancel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': initData
+                    },
+                    body: JSON.stringify({ request_id: requestId })
+                });
+
+                const resData = await response.json();
+                if (!response.ok) {
+                    throw new Error(resData.detail || "Cancellation failed");
+                }
+
+                // Refresh
+                fetchConfig();
+            } catch (err) {
+                console.error(err);
+                alert("Failed to cancel build: " + err.message);
+                buttonEl.disabled = false;
+                buttonEl.innerHTML = '🚫 Cancel';
+            }
+        }
+
+        function formatElapsed(timestamp) {
+            const diffSec = Math.floor(Date.now() / 1000 - timestamp);
+            if (diffSec < 60) return "just now";
+            const diffMin = Math.floor(diffSec / 60);
+            return `${diffMin}m ago`;
+        }
+
+        // Setup fallback button click handler
+        triggerBtn.addEventListener('click', handleTriggerClick);
+    </script>
+</body>
+</html>

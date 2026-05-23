@@ -1,6 +1,10 @@
-# Edge override — pulls edge images from GHCR (usually built from main branch).
+# Edge environment — pulls edge images from GHCR (usually built from main branch).
 # Usage: ./compose.sh edge [args]
-#
+
+name: jfb
+
+include:
+  - ../dev/docker-compose.yml
 
 services:
   build-manager:
@@ -22,5 +26,3 @@ services:
   file-manager:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/file-manager:${IMAGE_TAG:-edge}
-
-

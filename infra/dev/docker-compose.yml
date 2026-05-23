@@ -14,7 +14,7 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile.jenkins
     container_name: jenkins
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
@@ -27,7 +27,7 @@ services:
       context: ../..
       dockerfile: apps/build-manager/Dockerfile
     container_name: build-manager
-    restart: on-failure
+    restart: unless-stopped
     env_file:
       - path: ../env/build-manager.env
         required: false
@@ -48,7 +48,7 @@ services:
       context: ../..
       dockerfile: apps/config-hub/Dockerfile
     container_name: config-hub
-    restart: on-failure
+    restart: unless-stopped
     env_file:
       - path: ../env/config-hub.env
         required: false
@@ -72,7 +72,7 @@ services:
       context: ../..
       dockerfile: apps/tg-jenkins-bot/Dockerfile
     container_name: tg-jenkins-bot
-    restart: on-failure
+    restart: unless-stopped
     env_file:
       - path: ../env/tg-jenkins-bot.env
         required: false
@@ -92,7 +92,7 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile.flutter-agent
     container_name: agent-control
-    restart: on-failure
+    restart: unless-stopped
     env_file:
       - path: ../env/agent-control.env
         required: false
@@ -110,7 +110,7 @@ services:
       context: ../..
       dockerfile: apps/file-manager/Dockerfile
     container_name: file-manager
-    restart: on-failure
+    restart: unless-stopped
     env_file:
       - path: ../env/file-manager.env
         required: false
@@ -125,7 +125,7 @@ services:
   gateway:
     image: caddy:alpine
     container_name: gateway
-    restart: on-failure
+    restart: unless-stopped
     volumes:
       - ../gateway/Caddyfile:/etc/caddy/Caddyfile
     expose:
@@ -136,7 +136,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
-    restart: on-failure
+    restart: unless-stopped
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     command: tunnel --no-autoupdate run

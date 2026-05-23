@@ -605,6 +605,15 @@ wheels = [
 name = "jenkins-flutter-bot"
 version = "0.4.0.dev1"
 source = { virtual = "." }
+dependencies = [
+    { name = "agent-control" },
+    { name = "build-manager" },
+    { name = "config-core" },
+    { name = "config-hub" },
+    { name = "file-manager" },
+    { name = "mock-jenkins" },
+    { name = "tg-jenkins-bot" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -618,6 +627,15 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "agent-control", editable = "apps/agent-control" },
+    { name = "build-manager", editable = "apps/build-manager" },
+    { name = "config-core", editable = "libs/config-core" },
+    { name = "config-hub", editable = "apps/config-hub" },
+    { name = "file-manager", editable = "apps/file-manager" },
+    { name = "mock-jenkins", editable = "apps/mock-jenkins" },
+    { name = "tg-jenkins-bot", editable = "apps/tg-jenkins-bot" },
+]
 
 [package.metadata.requires-dev]
 dev = [

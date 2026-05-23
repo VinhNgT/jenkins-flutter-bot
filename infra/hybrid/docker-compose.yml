@@ -1,6 +1,10 @@
-# Hybrid override — builds all services locally except agent-control, which is pulled from GHCR.
+# Hybrid environment — builds all services locally except agent-control, which is pulled from GHCR.
 # Usage: ./compose.sh hybrid [args]
-#
+
+name: jfb
+
+include:
+  - ../dev/docker-compose.yml
 
 services:
   agent-control:

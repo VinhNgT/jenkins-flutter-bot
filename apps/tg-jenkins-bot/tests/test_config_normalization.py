@@ -1,0 +1,58 @@
+"""Unit tests for BotSettings configuration normalization."""
+
+from __future__ import annotations
+
+import pytest
+from tg_jenkins_bot.config import BotSettings
+
+
+def test_webapp_url_normalization() -> None:
+    # 1. Bare domain name
+    config1 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        webapp_url="tendoo-tg-bot.vinhngt.dev",
+    )
+    assert config1.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
+
+    # 2. Domain with slash
+    config2 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        webapp_url="tendoo-tg-bot.vinhngt.dev/",
+    )
+    assert config2.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
+
+    # 3. Domain with partial webapp path
+    config3 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        webapp_url="tendoo-tg-bot.vinhngt.dev/webapp",
+    )
+    assert config3.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
+
+    # 4. Domain with full HTTPS and webapp path
+    config4 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        webapp_url="https://tendoo-tg-bot.vinhngt.dev/webapp/",
+    )
+    assert config4.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
+
+    # 5. Localhost HTTP url
+    config5 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        webapp_url="http://localhost:9090",
+    )
+    assert config5.webapp_url == "http://localhost:9090/webapp/"

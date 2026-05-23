@@ -1,7 +1,10 @@
-# Production override — pulls pre-built images from GHCR instead of building locally.
-# Usage: ./compose.sh prod [args]
-#
-# Pin a specific release:  IMAGE_TAG=v1.2.3 ./compose.sh prod up -d
+# Production environment — pulls pre-built images from GHCR instead of building locally.
+# Pin a specific release: IMAGE_TAG=v1.2.3 ./compose.sh prod up -d
+
+name: jfb
+
+include:
+  - ../dev/docker-compose.yml
 
 services:
   build-manager:
@@ -23,5 +26,3 @@ services:
   file-manager:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/file-manager:${IMAGE_TAG:-latest}
-
-

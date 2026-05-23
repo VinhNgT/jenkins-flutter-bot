@@ -73,6 +73,26 @@ class BotSettings(ServiceSettings):
         json_schema_extra={"group": "Application", "json_key": "bot.webapp_url"},
     )
 
+    @field_validator("webapp_url", mode="before")
+    @classmethod
+    def normalize_webapp_url(cls, v: Any) -> str:
+        if not isinstance(v, str):
+            return v
+        v = v.strip()
+        if not v:
+            return v
+        
+        # 1. Normalize schema prefix (default to https:// if none exists)
+        if not (v.startswith("http://") or v.startswith("https://")):
+            v = f"https://{v}"
+            
+        # 2. Ensure it ends with /webapp/
+        v = v.rstrip("/")
+        if not v.endswith("/webapp"):
+            v = f"{v}/webapp"
+            
+        return f"{v}/"
+
     # Project
     github_url: str = Field(
         "",

@@ -1,15 +1,14 @@
+name: jfb
+
 # Mock override — replaces jenkins + flutter-agent with lightweight mocks.
 # Usage: ./compose.sh mock [args]
-#
-# The mock-jenkins service uses container_name "jenkins" so the bot's
-# JENKINS_URL (http://jenkins:8080) resolves without any config changes.
-#
-# The agent-control is replaced with the mock agent-control API so
-# config-hub sees the agent as configured and running.
 #
 # Configurable environment:
 #   MOCK_BUILD_DELAY  — simulated build time in seconds (default: 10)
 #   MOCK_FAILURE_RATE — probability of failure, 0.0–1.0 (default: 0)
+
+include:
+  - ../dev/docker-compose.yml
 
 services:
   # Replace real Jenkins with mock
@@ -21,7 +20,7 @@ services:
       context: ../..
       dockerfile: apps/mock-jenkins/Dockerfile
     container_name: jenkins
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
@@ -39,7 +38,7 @@ services:
       context: ../..
       dockerfile: apps/mock-jenkins/Dockerfile
     container_name: agent-control
-    restart: on-failure
+    restart: unless-stopped
     command: ["mock-agent"]
     environment:
       JENKINS_URL: http://jenkins:8080

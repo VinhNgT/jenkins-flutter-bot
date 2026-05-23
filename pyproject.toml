@@ -3,6 +3,16 @@ name = "jenkins-flutter-bot"
 version = "0.4.0-dev.1"
 description = "CI/CD ecosystem: Telegram bot + Jenkins + Google Drive"
 requires-python = ">=3.12"
+dependencies = [
+    "tg-jenkins-bot",
+    "config-hub",
+    "file-manager",
+    "build-manager",
+    "agent-control",
+    "mock-jenkins",
+    "config-core",
+]
+
 
 [tool.uv]
 package = false
@@ -12,6 +22,15 @@ members = [
     "apps/*",
     "libs/*",
 ]
+
+[tool.uv.sources]
+tg-jenkins-bot = { workspace = true }
+config-hub = { workspace = true }
+file-manager = { workspace = true }
+build-manager = { workspace = true }
+agent-control = { workspace = true }
+mock-jenkins = { workspace = true }
+config-core = { workspace = true }
 
 [dependency-groups]
 dev = [

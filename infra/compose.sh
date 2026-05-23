@@ -21,30 +21,16 @@ set -euo pipefail
 # Always run from the directory where the script is located
 cd "$(dirname "$0")"
 
-if [[ "${1:-}" == "prod" ]]; then
-  shift
-  exec docker compose \
-    -f compose/docker-compose.yml \
-    -f compose/docker-compose.prod.yml \
-    "$@"
-elif [[ "${1:-}" == "edge" ]]; then
-  shift
-  exec docker compose \
-    -f compose/docker-compose.yml \
-    -f compose/docker-compose.edge.yml \
-    "$@"
-elif [[ "${1:-}" == "hybrid" ]]; then
-  shift
-  exec docker compose \
-    -f compose/docker-compose.yml \
-    -f compose/docker-compose.hybrid.yml \
-    "$@"
-elif [[ "${1:-}" == "mock" ]]; then
-  shift
-  exec docker compose \
-    -f compose/docker-compose.yml \
-    -f compose/docker-compose.mock.yml \
-    "$@"
-else
-  exec docker compose -f compose/docker-compose.yml "$@"
+ENV_ARGS=()
+if [[ -f .env ]]; then
+  ENV_ARGS+=(--env-file .env)
 fi
+
+# Determine target environment directory
+ENV_NAME="dev"
+if [[ "${1:-}" =~ ^(prod|edge|hybrid|mock)$ ]]; then
+  ENV_NAME="$1"
+  shift
+fi
+
+exec docker compose "${ENV_ARGS[@]}" -f "$ENV_NAME/docker-compose.yml" "$@"

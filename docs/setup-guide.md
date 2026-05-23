@@ -350,7 +350,7 @@ Telegram Web Apps require a public **HTTPS** URL. An exceptionally secure, fast,
 #### Method A — Running Cloudflared via Docker Compose (Recommended)
 
 
-The `cloudflared` service is already pre-configured in `infra/docker-compose.yml` and leverages the internal `jenkins` bridge network to connect directly to the bot securely.
+The `cloudflared` tunnel and a pre-configured **Caddy Ingress Gateway** are already integrated into `infra/docker-compose.yml`. The Ingress Gateway acts as a secure routing perimeter, exposing **only** the public Web App (`/webapp`) and its APIs (`/api/webapp`), while keeping all administrative and webhook paths completely isolated and closed to the public.
 
 1. Open your Cloudflare Zero Trust Dashboard and go to **Networks → Tunnels**.
 2. Click **Create a Tunnel**, choose **Cloudflared**, name it (e.g., `jenkins-flutter-bot`), and click **Save**.
@@ -363,10 +363,11 @@ The `cloudflared` service is already pre-configured in `infra/docker-compose.yml
 6. Set up your public hostname:
    - **Public Hostname:** `bot.yourdomain.com` (or any subdomain of a domain managed by Cloudflare)
    - **Service Type:** `HTTP`
-   - **URL:** `tg-jenkins-bot:9090` (uses the internal Docker container hostname and port)
+   - **URL:** `gateway:80` (routes directly through our secure Caddy Ingress Gateway)
 7. Save the tunnel settings.
 
-When you run your services, Docker Compose will automatically spin up the tunnel connector and link it securely.
+When you run your services, Docker Compose will automatically spin up the Caddy Ingress Gateway and the tunnel connector, linking them securely on the internal network.
+
 
 
 #### Method B — Running Cloudflared on the Host

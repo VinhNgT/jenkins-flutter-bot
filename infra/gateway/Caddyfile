@@ -1,0 +1,14 @@
+:80 {
+    # Match only the Web App frontend and dynamic APIs
+    @public_bot_paths {
+        path /webapp* /api/webapp*
+    }
+    handle @public_bot_paths {
+        reverse_proxy tg-jenkins-bot:9090
+    }
+
+    # Catch-all: reject everything else (including private /control, /callbacks, and other containers)
+    handle {
+        respond "Not Found" 404
+    }
+}

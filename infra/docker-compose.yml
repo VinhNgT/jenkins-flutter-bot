@@ -4,9 +4,9 @@ services:
   # Development/testing convenience — in production, point JENKINS_URL to an
   # external Jenkins instance and remove this service entirely.
   jenkins:
-    # Workaround: Explicitly set image name to avoid cache collision with the 
+    # Workaround: Explicitly set image name to avoid cache collision with the
     # mock-jenkins service (which shares the 'jenkins' service name).
-    # pull_policy: build prevents 'docker compose pull' from attempting to 
+    # pull_policy: build prevents 'docker compose pull' from attempting to
     # fetch this local-only image from Docker Hub.
     image: jfb-jenkins-local
     pull_policy: build
@@ -141,6 +141,17 @@ services:
     networks:
       - jenkins
 
+  gateway:
+    image: caddy:alpine
+    container_name: gateway
+    restart: on-failure
+    volumes:
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile
+    expose:
+      - "80"
+    networks:
+      - jenkins
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
@@ -148,6 +159,8 @@ services:
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     command: tunnel --no-autoupdate run
+    depends_on:
+      - gateway
     networks:
       - jenkins
 

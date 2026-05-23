@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import urllib.parse
 from typing import Annotated
 
@@ -95,8 +96,17 @@ async def validate_webapp_request(
             detail="Bot service is not running",
         )
 
-    # Allow preview mode bypass
+    # Allow preview mode bypass only in development / testing environments
     if x_telegram_init_data == "preview":
+        is_dev = (
+            os.environ.get("JFB_DEV_MODE") == "true"
+            or ctx.config.telegram_token in ("123456:test-token", "fake:token", "")
+        )
+        if not is_dev:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Preview mode is not allowed in production",
+            )
         if not ctx.config.allowed_chat_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

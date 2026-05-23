@@ -14,6 +14,7 @@ Triggered when editing Python files. Covers the Python stack, coding style, and 
 
 - **Python 3.12+** — all apps declare `requires-python = ">=3.12"`.
 - **`from __future__ import annotations`** at the top of every module for deferred type evaluation.
+- **Top-Level Imports** — All imports must be declared strictly at the top of the file. Avoid inline/lazy imports inside functions or methods unless strictly required to resolve circular dependencies (in which case, prefer `TYPE_CHECKING` guards where possible).
 
 ### Package Manager
 

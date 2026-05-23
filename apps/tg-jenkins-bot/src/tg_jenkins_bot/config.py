@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -116,7 +117,6 @@ class BotSettings(ServiceSettings):
             # Try to parse as JSON dict
             if v.startswith("{"):
                 try:
-                    import json
                     parsed = json.loads(v)
                     if isinstance(parsed, dict):
                         return {str(k): str(val) for k, val in parsed.items()}

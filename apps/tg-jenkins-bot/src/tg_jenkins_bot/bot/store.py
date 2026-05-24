@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -30,6 +31,20 @@ class ActiveBuildStore:
     def __init__(self, *, clock: Callable[[], float] = time.time) -> None:
         self._builds: dict[str, ActiveBuild] = {}
         self._clock = clock
+        self._listeners: set[asyncio.Event] = set()
+
+    def add_listener(self, event: asyncio.Event) -> None:
+        """Register an asyncio.Event listener to be notified on store mutations."""
+        self._listeners.add(event)
+
+    def remove_listener(self, event: asyncio.Event) -> None:
+        """Remove an asyncio.Event listener."""
+        self._listeners.discard(event)
+
+    def _notify_listeners(self) -> None:
+        """Set all registered event listeners to trigger immediate wakeup."""
+        for event in list(self._listeners):
+            event.set()
 
     def register(
         self,
@@ -51,6 +66,7 @@ class ActiveBuildStore:
             triggered_by_id=triggered_by_id,
         )
         self._builds[request_id] = build
+        self._notify_listeners()
         return build
 
     def get(self, request_id: str) -> ActiveBuild | None:
@@ -59,7 +75,10 @@ class ActiveBuildStore:
 
     def consume(self, request_id: str) -> ActiveBuild | None:
         """Consume and return an active build by its request ID."""
-        return self._builds.pop(request_id, None)
+        build = self._builds.pop(request_id, None)
+        if build is not None:
+            self._notify_listeners()
+        return build
 
     def find_by_branch(self, ref: str) -> ActiveBuild | None:
         """Find an active build by its branch reference."""
@@ -71,3 +90,4 @@ class ActiveBuildStore:
     def list_active(self) -> list[ActiveBuild]:
         """List all currently active builds."""
         return list(self._builds.values())
+

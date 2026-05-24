@@ -309,10 +309,10 @@ async def test_webapp_stream_integration(app_with_mocks) -> None:
 
     httpx.ASGITransport buffers the entire ASGI response before returning,
     so an infinite SSE generator would block forever.  To make the generator
-    finite, we patch ``asyncio.sleep`` to be a no-op and
-    ``Request.is_disconnected`` to return ``True`` on the second call.
-    The generator yields one event, loops, sees "disconnected", and exits
-    cleanly — giving ASGITransport a complete response to flush.
+    finite, we schedule a background task to mutate the store (waking up
+    the event-driven stream loop instantly) and patch ``Request.is_disconnected`` 
+    to return ``True`` on the second call. The generator yields the first event, 
+    wakes up on store mutation, loops, sees "disconnected", and exits cleanly.
     """
     import httpx
     from unittest.mock import patch
@@ -336,10 +336,16 @@ async def test_webapp_stream_integration(app_with_mocks) -> None:
         call_count += 1
         return call_count > 1
 
+    # Mutate the store in the background after starting the request to wake up SSE instantly.
+    async def trigger_event_later():
+        await asyncio.sleep(0.01)
+        ctx.store.consume("req-integration")
+
+    asyncio.create_task(trigger_event_later())
+
     transport = httpx.ASGITransport(app=app_with_mocks)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         with (
-            patch("tg_jenkins_bot.routers.webapp.asyncio.sleep", new_callable=AsyncMock),
             patch("starlette.requests.Request.is_disconnected", fake_is_disconnected),
         ):
             resp = await client.get(

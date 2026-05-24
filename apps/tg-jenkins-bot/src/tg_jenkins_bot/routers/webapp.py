@@ -273,6 +273,11 @@ async def stream_active_builds(
     headers, and proxy-buffering prevention — all handled automatically.
     """
     ctx = manager.bot_context
+    if ctx is None:
+        return
+
+    event = asyncio.Event()
+    ctx.store.add_listener(event)
     last_sent_hash = None
 
     try:
@@ -282,18 +287,17 @@ async def stream_active_builds(
                 break
 
             active_builds = []
-            if ctx:
-                for build in ctx.list_building():
-                    active_builds.append(
-                        {
-                            "request_id": build.request_id,
-                            "label": build.label,
-                            "ref": build.ref,
-                            "triggered_at": build.triggered_at,
-                            "triggered_by": build.triggered_by,
-                            "triggered_by_id": build.triggered_by_id,
-                        }
-                    )
+            for build in ctx.list_building():
+                active_builds.append(
+                    {
+                        "request_id": build.request_id,
+                        "label": build.label,
+                        "ref": build.ref,
+                        "triggered_at": build.triggered_at,
+                        "triggered_by": build.triggered_by,
+                        "triggered_by_id": build.triggered_by_id,
+                    }
+                )
 
             # Only stream updates down the wire when the builds state actually mutates.
             # Hash the canonical JSON for deduplication, but pass the raw list to
@@ -305,10 +309,19 @@ async def stream_active_builds(
                 last_sent_hash = current_hash
                 yield ServerSentEvent(data=active_builds, event="builds")
 
-            await asyncio.sleep(3)
+            # Wait until store mutation sets the event, or timeout (15s) for a keep-alive window.
+            try:
+                await asyncio.wait_for(event.wait(), timeout=15.0)
+            except asyncio.TimeoutError:
+                pass
+
+            event.clear()
     except asyncio.CancelledError:
         logger.info("SSE streaming cancelled")
         raise
+    finally:
+        ctx.store.remove_listener(event)
+
 
 
 @router.post("/trigger")

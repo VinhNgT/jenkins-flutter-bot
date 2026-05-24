@@ -54,6 +54,8 @@ class ConfigHubManager:
     ) -> None:
         resolved = config or HubBootstrap.load()
         self.file_manager_url: str | None = resolved.file_manager_url
+        self.auth_username: str | None = resolved.auth_username
+        self.auth_password: str | None = resolved.auth_password
         self.services = service_client or ServiceClient(
             bot_url=resolved.bot_control_url,
             agent_url=resolved.agent_control_url,
@@ -75,6 +77,8 @@ class ConfigHubManager:
         await self.stop()
         resolved = config or HubBootstrap.load()
         self.file_manager_url = resolved.file_manager_url
+        self.auth_username = resolved.auth_username
+        self.auth_password = resolved.auth_password
         self.services = ServiceClient(
             bot_url=resolved.bot_control_url,
             agent_url=resolved.agent_control_url,

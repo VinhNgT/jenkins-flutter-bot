@@ -17,3 +17,11 @@ class HubBootstrap(BootstrapSettings):
     agent_control_url: str | None = Field(None)
     file_manager_url: str | None = Field(None)
     build_manager_url: str | None = Field(None)
+    auth_username: str | None = Field(
+        None,
+        description="Username for Web UI Basic Authentication",
+    )
+    auth_password: str | None = Field(
+        None,
+        description="Password for Web UI Basic Authentication",
+    )

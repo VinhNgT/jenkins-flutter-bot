@@ -8,10 +8,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .dependencies import verify_basic_auth
 from .manager import ConfigHubManager
 from .routers import config, drive, export, jenkinsfile, pages, services, version
 
@@ -45,16 +46,17 @@ def create_app() -> FastAPI:
     app.state.templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
     # --- API routers ---
-    app.include_router(config.router)
-    app.include_router(services.router)
-    app.include_router(export.router)
-    app.include_router(drive.router)
-    app.include_router(jenkinsfile.router)
-    app.include_router(version.router)
+    auth_deps = [Depends(verify_basic_auth)]
+    app.include_router(config.router, dependencies=auth_deps)
+    app.include_router(services.router, dependencies=auth_deps)
+    app.include_router(export.router, dependencies=auth_deps)
+    app.include_router(drive.router, dependencies=auth_deps)
+    app.include_router(jenkinsfile.router, dependencies=auth_deps)
+    app.include_router(version.router, dependencies=auth_deps)
 
     # --- Static files & SPA shell (must be after API routers) ---
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-    app.include_router(pages.router)
+    app.include_router(pages.router, dependencies=auth_deps)
 
     return app
 

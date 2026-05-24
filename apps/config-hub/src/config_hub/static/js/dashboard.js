@@ -253,8 +253,10 @@ export async function refreshDriveCard() {
   }
 }
 
-export async function refreshDashboard() {
-  const status = await API.getServiceStatus();
+export async function refreshDashboard(status) {
+  if (!status) {
+    status = await API.getServiceStatus();
+  }
 
   if (status) {
     // Update summary bar
@@ -310,43 +312,63 @@ export async function controlService(service, action) {
   }
 }
 
-/* Polling manager */
+/* SSE Stream manager */
 export const Poller = {
-  _interval: null,
+  _eventSource: null,
   _fn: null,
 
   start(fn) {
     this.stop();
     this._fn = fn;
-    fn(); // immediate first call
-    this._interval = setInterval(fn, 5000);
+    
+    // Snappy initial load via HTTP fetch before the stream connects
+    fn();
 
-    // Pause polling when browser tab is hidden
+    this._connect();
+
+    // Reconnect/disconnect when browser tab visibility changes
     document.addEventListener('visibilitychange', this._onVisibility);
   },
 
   stop() {
-    if (this._interval) {
-      clearInterval(this._interval);
-      this._interval = null;
-    }
+    this._disconnect();
     document.removeEventListener('visibilitychange', this._onVisibility);
     this._fn = null;
   },
 
+  _connect() {
+    if (this._eventSource) return;
+
+    this._eventSource = new EventSource('/api/services/stream');
+
+    this._eventSource.addEventListener('status', (event) => {
+      try {
+        const status = JSON.parse(event.data);
+        if (this._fn) {
+          this._fn(status);
+        }
+      } catch (err) {
+        console.error('Failed to parse service status SSE payload:', err);
+      }
+    });
+
+    this._eventSource.onerror = (err) => {
+      console.error('Service status SSE connection error/closed. Retrying...', err);
+    };
+  },
+
+  _disconnect() {
+    if (this._eventSource) {
+      this._eventSource.close();
+      this._eventSource = null;
+    }
+  },
+
   _onVisibility() {
-    // `this` is the Poller object when called as method, but as event listener
-    // it's the document. Use Poller directly.
     if (document.hidden) {
-      if (Poller._interval) {
-        clearInterval(Poller._interval);
-        Poller._interval = null;
-      }
+      Poller._disconnect();
     } else {
-      if (Poller._fn && !Poller._interval) {
-        Poller._fn(); // immediate refresh
-        Poller._interval = setInterval(Poller._fn, 5000);
-      }
+      Poller._connect();
     }
   },
 };

@@ -1,6 +1,6 @@
 /* Tab navigation — show/hide panels, start/stop polling. */
 
-import { Poller, refreshDashboard, refreshDriveCard } from './dashboard.js';
+import { refreshDriveCard } from './dashboard.js';
 
 export function initTabs() {
   document.querySelectorAll('[data-tab]').forEach((btn) => {
@@ -47,10 +47,6 @@ export function switchTab(tabId) {
     panel.hidden = !isActive;
   });
 
-  Poller.stop();
-  if (tabId === 'dashboard') {
-    Poller.start(refreshDashboard);
-  }
   if (tabId === 'file_manager') {
     refreshDriveCard();
   }

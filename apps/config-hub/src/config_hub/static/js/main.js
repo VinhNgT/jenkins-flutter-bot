@@ -5,7 +5,7 @@ import { API } from './api.js';
 import { renderSchemaForm } from './schema-renderer.js';
 import { collectScope, populateScope, validateScope, initSecretFields } from './config.js';
 import { initHelpPopovers } from './help.js';
-import { refreshDashboard, refreshDriveCard, controlService, handleStop } from './dashboard.js';
+import { Poller, refreshDashboard, refreshDriveCard, controlService, handleStop } from './dashboard.js';
 import { initTabs, switchTab } from './tabs.js';
 import { Icons } from './icons.js';
 
@@ -498,6 +498,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     importFile.value = '';
     importFilename.textContent = '';
   });
+
+  // Start the global service status real-time stream
+  Poller.start(refreshDashboard);
 
   // Initialize tabs last (starts polling if on dashboard)
   initTabs();

@@ -249,6 +249,7 @@ async def get_webapp_config(
                 "ref": build.ref,
                 "triggered_at": build.triggered_at,
                 "triggered_by": build.triggered_by,
+                "triggered_by_id": build.triggered_by_id,
             }
         )
 
@@ -291,6 +292,7 @@ async def stream_active_builds(
                             "ref": build.ref,
                             "triggered_at": build.triggered_at,
                             "triggered_by": build.triggered_by,
+                            "triggered_by_id": build.triggered_by_id,
                         }
                     )
 

@@ -126,6 +126,68 @@ def test_webapp_config_preview_bypass(test_client) -> None:
     assert len(data["active_builds"]) == 0
 
 
+def test_webapp_preview_bypass_with_dev_mode_env(app_with_mocks) -> None:
+    """Test that JFB_DEV_MODE='true' allows preview bypass even with a production-like token."""
+    import os
+    from unittest.mock import patch
+    
+    # Temporarily set token to something non-test, but set JFB_DEV_MODE to true
+    app_with_mocks.state.manager.bot_context.config.telegram_token = "production_token_1234"
+    
+    with patch.dict(os.environ, {"JFB_DEV_MODE": "true"}):
+        client = TestClient(app_with_mocks)
+        response = client.get(
+            "/api/webapp/config",
+            headers={"X-Telegram-Init-Data": "preview"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["app_name"] == "TestApp"
+
+
+def test_webapp_preview_bypass_rejected_in_prod(app_with_mocks) -> None:
+    """Test that preview bypass is rejected in production (non-test token, no JFB_DEV_MODE)."""
+    import os
+    from unittest.mock import patch
+    
+    app_with_mocks.state.manager.bot_context.config.telegram_token = "production_token_1234"
+    
+    with patch.dict(os.environ, {}):
+        if "JFB_DEV_MODE" in os.environ:
+            del os.environ["JFB_DEV_MODE"]
+        client = TestClient(app_with_mocks)
+        response = client.get(
+            "/api/webapp/config",
+            headers={"X-Telegram-Init-Data": "preview"},
+        )
+        assert response.status_code == 401
+        assert "Preview mode is not allowed in production" in response.json()["detail"]
+
+
+def test_webapp_config_includes_triggered_by_id(app_with_mocks) -> None:
+    """Verify that triggered_by_id is serialized in the config response."""
+    ctx = app_with_mocks.state.manager.bot_context
+    ctx.store.register(
+        request_id="req-999",
+        chat_id=-12345,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+        triggered_by_id=67890,
+    )
+    
+    client = TestClient(app_with_mocks)
+    response = client.get(
+        "/api/webapp/config",
+        headers={"X-Telegram-Init-Data": "preview"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["active_builds"]) == 1
+    assert data["active_builds"][0]["triggered_by_id"] == 67890
+
+
+
 def test_webapp_config_real_hmac(test_client) -> None:
     """Test config access using valid HMAC signature."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)

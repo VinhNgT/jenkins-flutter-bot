@@ -1,0 +1,738 @@
+/* Telegram Native Design System & Visual Engine */
+
+/* Unified design variables with modern iOS/Android client theme fallbacks */
+:root {
+    /* Telegram SDK auto-injects --tg-theme-* CSS variables (lines 467-486
+       of telegram-web-app.js). Use them as primary source with hardcoded
+       fallbacks for non-Telegram environments (browser preview). */
+    --tg-color-bg: var(--tg-theme-bg-color, #ffffff);
+    --tg-color-secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f7);
+    --tg-color-text: var(--tg-theme-text-color, #000000);
+    --tg-color-hint: var(--tg-theme-hint-color, #8e8e93);
+    --tg-color-link: var(--tg-theme-link-color, #007ee5);
+    --tg-color-button: var(--tg-theme-button-color, #2481cc);
+    --tg-color-button-text: var(--tg-theme-button-text-color, #ffffff);
+    --tg-color-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
+
+    /* API 7.0+ section-level theme params */
+    --tg-color-section-bg: var(--tg-theme-section-bg-color, var(--tg-color-bg));
+    --tg-color-section-header: var(--tg-theme-section-header-text-color, var(--tg-color-hint));
+    --tg-color-subtitle: var(--tg-theme-subtitle-text-color, var(--tg-color-hint));
+    --tg-color-header-bg: var(--tg-theme-header-bg-color, var(--tg-color-secondary-bg));
+
+    /* API 7.6: section_separator_color for list dividers */
+    --tg-color-separator: var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.08));
+    --tg-color-divider: var(--tg-color-separator);
+
+    /* API 7.10: bottom bar behind MainButton */
+    --tg-color-bottom-bar: var(--tg-theme-bottom-bar-bg-color, var(--tg-color-secondary-bg));
+
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    --transition-speed: 0.22s;
+    --border-radius-card: 12px;
+}
+
+/* Fallback Dark Theme detection (handles previews outside Telegram beautifully) */
+@media (prefers-color-scheme: dark) {
+    :root:not(.tg-theme-loaded) {
+        --tg-color-bg: #1c242c;
+        --tg-color-secondary-bg: #0f171e;
+        --tg-color-text: #ffffff;
+        --tg-color-hint: #708499;
+        --tg-color-link: #5288c1;
+        --tg-color-button: #5288c1;
+        --tg-color-button-text: #ffffff;
+        --tg-color-destructive: #ff3b30;
+        --tg-color-separator: rgba(255, 255, 255, 0.08);
+        --tg-color-divider: var(--tg-color-separator);
+
+        --tg-color-section-bg: var(--tg-color-bg);
+        --tg-color-section-header: var(--tg-color-hint);
+        --tg-color-subtitle: var(--tg-color-hint);
+        --tg-color-header-bg: var(--tg-color-secondary-bg);
+    }
+}
+
+/* Telegram client specific class adjustments */
+body.tg-dark {
+    --tg-color-separator: rgba(255, 255, 255, 0.08);
+    --tg-color-divider: var(--tg-color-separator);
+}
+body.tg-light {
+    --tg-color-separator: rgba(0, 0, 0, 0.08);
+    --tg-color-divider: var(--tg-color-separator);
+}
+
+/* Core resets and frame styling */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--tg-color-secondary-bg);
+    color: var(--tg-color-text);
+    line-height: 1.45;
+    /* TGUI List iOS: padding 10px 18px + Telegram SDK safe area insets.
+       The SDK injects --tg-safe-area-inset-* vars; env() is fallback
+       for browser preview outside Telegram. */
+    padding: calc(10px + var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px)))
+             calc(18px + var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px)))
+             calc(40px + var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+             calc(18px + var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px)));
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+.container {
+    max-width: 540px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-grow: 1;
+    animation: fadeIn var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Native Header layout */
+header {
+    padding: 8px 6px 12px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--tg-color-text);
+    letter-spacing: -0.2px;
+}
+
+.header-subtitle {
+    font-size: 13px;
+    color: var(--tg-color-subtitle);
+    margin-top: 2px;
+    font-weight: 400;
+}
+
+/* Telegram standard grouped sections */
+.tg-section {
+    display: flex;
+    flex-direction: column;
+    /* No margin-bottom: container gap: 12px handles inter-section spacing */
+}
+
+.tg-section-header {
+    /* TGUI SectionHeader: padding: 20px 24px 4px 22px (left 22px for slight
+       indent vs Cell's 24px — matches native iOS Settings header pattern) */
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--tg-color-section-header);
+    padding: 20px 24px 4px 22px;
+    margin: 0;
+    letter-spacing: 0.3px;
+}
+
+.tg-section-footer {
+    /* TGUI SectionFooter iOS: padding: 8px 16px 0 */
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    padding: 8px 16px 0;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Grouped List Box */
+.tg-list {
+    background-color: var(--tg-color-section-bg);
+    border-radius: var(--border-radius-card);
+    overflow: hidden;
+    transition: background-color var(--transition-speed) ease;
+}
+
+/* List Items (Rows) */
+.tg-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: relative;
+    cursor: pointer;
+    min-height: 48px;
+    background: transparent;
+    transition: background-color 0.15s ease;
+}
+
+/* Native tapped ink ripple fallback */
+.tg-list-item:active {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+body.tg-dark .tg-list-item:active {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Bottom separator line */
+.tg-list-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 0;
+    height: 0.5px;
+    background-color: var(--tg-color-divider);
+    transition: background-color var(--transition-speed) ease;
+}
+
+.tg-list-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-grow: 1;
+    padding: 16px 8px 16px 0;
+}
+
+.tg-list-item-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--tg-color-text);
+}
+
+.tg-list-item-subtitle {
+    font-size: 13px;
+    color: var(--tg-color-subtitle);
+}
+
+.tg-list-item-meta {
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    font-family: monospace;
+    background-color: rgba(0, 0, 0, 0.04);
+    padding: 1px 6px;
+    border-radius: 4px;
+    max-width: fit-content;
+}
+body.tg-dark .tg-list-item-meta {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Radio checkmark styling */
+.tg-radio-icon {
+    width: 20px;
+    height: 20px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tg-color-link);
+    opacity: 0;
+    transform: scale(0.7);
+    transition: transform var(--transition-speed) cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity var(--transition-speed) ease;
+}
+
+.tg-list-item.selected .tg-radio-icon {
+    opacity: 1;
+    transform: scale(1.0);
+}
+
+/* Native-style inputs inside grouped rows */
+.tg-input-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 48px;
+    position: relative;
+}
+
+.tg-input-field {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--tg-color-text);
+    font-family: var(--font-family);
+    font-size: 16px;
+    font-weight: 400;
+    padding: 12px 0;
+}
+
+.tg-input-field::placeholder {
+    color: var(--tg-color-hint);
+    opacity: 0.8;
+}
+
+/* Clear icon */
+.tg-input-clear {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.06);
+    color: var(--tg-color-hint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    margin-right: 8px;
+}
+body.tg-dark .tg-input-clear {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.tg-input-row.populated .tg-input-clear {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Destructive cancel row item */
+.tg-cancel-action {
+    color: var(--tg-color-destructive);
+    font-weight: 500;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: background-color 0.15s ease;
+}
+
+.tg-cancel-action:hover {
+    background-color: rgba(255, 59, 48, 0.08);
+}
+
+.tg-cancel-action:active {
+    background-color: rgba(255, 59, 48, 0.14);
+}
+
+.tg-cancel-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Empty state list items */
+.tg-empty-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 24px;
+    text-align: center;
+    color: var(--tg-color-hint);
+}
+
+.tg-empty-row svg {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 8px;
+    opacity: 0.35;
+    color: var(--tg-color-text);
+}
+
+.tg-empty-row span {
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* Premium Toast Notification Banner */
+.tg-toast {
+    position: fixed;
+    top: -64px;
+    left: 16px;
+    right: 16px;
+    z-index: 9999;
+    background-color: #31b545; /* Native green success toast */
+    color: #ffffff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+}
+
+.tg-toast.active {
+    transform: translateY(80px);
+}
+
+.tg-toast.toast-error {
+    background-color: var(--tg-color-destructive);
+}
+
+.tg-toast-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* Screen States (Loading, Error, Main) */
+.screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    padding: 24px;
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.screen.active {
+    display: flex;
+}
+
+.screen-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background-color: rgba(36, 129, 204, 0.1);
+    color: var(--tg-color-link);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+.screen-icon.error {
+    background-color: rgba(255, 59, 48, 0.1);
+    color: var(--tg-color-destructive);
+}
+
+.screen-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--tg-color-text);
+    margin-bottom: 8px;
+}
+
+.screen-description {
+    font-size: 14px;
+    color: var(--tg-color-hint);
+    max-width: 280px;
+    line-height: 1.45;
+}
+
+/* Custom interactive controls for Authorized UI inputs in Denied view */
+.tg-action-card {
+    width: 100%;
+    max-width: 320px;
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Browser fallback buttons */
+.tg-primary-button {
+    background-color: var(--tg-color-button);
+    color: var(--tg-color-button-text);
+    border: none;
+    outline: none;
+    width: 100%;
+    min-height: 46px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.tg-primary-button:active {
+    transform: scale(0.98);
+}
+
+.tg-primary-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.tg-copy-container {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.tg-copy-field {
+    flex-grow: 1;
+    background-color: var(--tg-color-section-bg);
+    border: 1px solid var(--tg-color-divider);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--tg-color-text);
+    outline: none;
+}
+
+.tg-copy-button {
+    background-color: var(--tg-color-section-bg);
+    border: 1px solid var(--tg-color-divider);
+    color: var(--tg-color-link);
+    border-radius: 8px;
+    width: 44px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.tg-copy-button:active {
+    background-color: var(--tg-color-divider);
+}
+
+/* Animated Loading Spinner */
+.spinner-ios {
+    width: 24px;
+    height: 24px;
+    animation: rotateSpinner 0.8s linear infinite;
+    color: var(--tg-color-link);
+}
+
+/* Pulsing build active dot */
+.pulsing-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #f59e0b; /* Amber */
+    box-shadow: 0 0 8px #f59e0b;
+    animation: pulse 1.6s ease-in-out infinite;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+/* Clean Animations */
+@keyframes rotateSpinner {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.85); opacity: 0.45; }
+    50% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(0.85); opacity: 0.45; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleUp {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* Skeleton Loading Shimmer — Progressive content reveal (Telegram native pattern) */
+.tg-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--tg-color-section-bg) 25%,
+        var(--tg-color-secondary-bg) 50%,
+        var(--tg-color-section-bg) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite ease-in-out;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════
+   Telegram SDK Emulator — Browser Development Styles
+   Only rendered when tg-emulator.js injects DOM elements.
+   ═══════════════════════════════════════════════════ */
+
+/* Emulator identification badge */
+.emu-badge {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 10000;
+    background: rgba(36, 129, 204, 0.9);
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: var(--font-family);
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* Emulated MainButton (BottomButton) — Fixed to viewport bottom */
+.emu-main-button {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9000;
+    min-height: 50px;
+    border: none;
+    outline: none;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: var(--font-family);
+    transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.emu-main-button:active {
+    filter: brightness(0.9);
+}
+
+.emu-main-button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.emu-main-button-spinner {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Emulated BackButton — Fixed top-left circle */
+.emu-back-button {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 10000;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--tg-color-header-bg);
+    color: var(--tg-color-link);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.15s ease, transform 0.1s ease;
+    font-family: var(--font-family);
+}
+
+.emu-back-button:hover {
+    background: var(--tg-color-divider);
+}
+
+.emu-back-button:active {
+    transform: scale(0.92);
+}
+
+/* Popup overlay backdrop */
+.emu-popup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 11000;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.15s ease;
+    font-family: var(--font-family);
+}
+
+/* Popup card */
+.emu-popup-card {
+    background: var(--tg-color-section-bg);
+    border-radius: 14px;
+    padding: 20px 24px 12px;
+    max-width: 300px;
+    width: 85%;
+    text-align: center;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+    animation: scaleUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+.emu-popup-card h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--tg-color-text);
+    margin-bottom: 6px;
+}
+
+.emu-popup-card p {
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    line-height: 1.45;
+    margin-bottom: 16px;
+}
+
+.emu-popup-buttons {
+    display: flex;
+    flex-direction: column;
+    border-top: 0.5px solid var(--tg-color-divider);
+}
+
+.emu-popup-btn {
+    padding: 12px;
+    border: none;
+    background: transparent;
+    font-size: 17px;
+    font-weight: 400;
+    cursor: pointer;
+    color: var(--tg-color-link);
+    font-family: var(--font-family);
+    border-top: 0.5px solid var(--tg-color-divider);
+}
+
+.emu-popup-btn:first-child {
+    border-top: none;
+}
+
+.emu-popup-btn:active {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.emu-popup-btn.emu-popup-destructive {
+    color: var(--tg-color-destructive);
+}
+
+.emu-popup-btn.emu-popup-cancel {
+    font-weight: 600;
+}
+

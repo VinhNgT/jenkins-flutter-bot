@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import JSONResponse
 
@@ -50,10 +52,41 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
-    # Mount static Web App files
+    # ── Version-based cache-busting for Telegram WebView ──────────
+    # Read package version once at startup. This version is set by
+    # scripts/release.py and baked into the installed package metadata
+    # at Docker build time (uv sync --no-editable).
+    try:
+        _app_version = pkg_version("tg-jenkins-bot")
+    except Exception:
+        # Fallback for development if package is not installed as editable/normal
+        _app_version = "0.0.0-dev"
+
     static_dir = Path(__file__).parent / "webapp"
+    _index_template = (static_dir / "index.html").read_text()
+
+    @app.get("/webapp", response_class=HTMLResponse)
+    @app.get("/webapp/", response_class=HTMLResponse)
+    async def serve_index() -> HTMLResponse:
+        """Serve index.html with cache-busting version query strings.
+
+        Two-tier caching strategy:
+        1. This HTML response uses Cache-Control: no-cache — the WebView
+           always revalidates it (cheap 304 for a small file).
+        2. Sub-resources (CSS/JS) use ?v=<version> in their URLs — cached
+           aggressively, invalidated automatically on version bumps.
+        """
+        return HTMLResponse(
+            content=_index_template.replace("{{APP_VERSION}}", _app_version),
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    # Mount remaining static files (CSS, JS, assets/) — served as-is.
+    # html=True is removed: index.html is now served by the explicit
+    # route above. FastAPI evaluates routes before mounts, so GET
+    # /webapp/ hits serve_index() first.
     app.mount(
-        "/webapp", StaticFiles(directory=str(static_dir), html=True), name="webapp"
+        "/webapp", StaticFiles(directory=str(static_dir)), name="webapp"
     )
 
     # API routers

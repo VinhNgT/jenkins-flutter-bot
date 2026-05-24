@@ -488,9 +488,6 @@ async function handleTriggerClick() {
         // Trigger Success feedback
         hapticNotification('success');
         showToast("Build successfully triggered!");
-        
-        // Soft refresh configuration
-        await fetchConfig();
     } catch (err) {
         console.error(err);
         hapticNotification('error');
@@ -555,9 +552,6 @@ async function cancelBuild(requestId, buttonEl) {
         
         hapticNotification('success');
         showToast("Build successfully cancelled.");
-        
-        // Soft refresh configuration
-        await fetchConfig();
     } catch (err) {
         console.error(err);
         hapticNotification('error');
@@ -608,10 +602,18 @@ function startSSEStream() {
             
             // Compare structure changes to prevent redundant render operations
             if (JSON.stringify(config.active_builds) !== JSON.stringify(activeBuilds)) {
+                const oldBuilds = config.active_builds || [];
                 config.active_builds = activeBuilds;
                 renderActiveBuilds();
-                fetchRecentBuilds();
                 validateTriggerState();
+                
+                // Only fetch recent builds if a previously active build has completed/cancelled/disappeared
+                const hasCompletedBuild = oldBuilds.some(
+                    oldBuild => !activeBuilds.some(newBuild => newBuild.request_id === oldBuild.request_id)
+                );
+                if (hasCompletedBuild) {
+                    fetchRecentBuilds();
+                }
             }
         } catch (err) {
             console.error("Failed parsing SSE payload:", err);

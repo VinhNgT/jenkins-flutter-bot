@@ -52,8 +52,8 @@ services:
     env_file:
       - path: ../env/config-hub.env
         required: false
-    ports:
-      - "9000:9000"
+    expose:
+      - "9000"
     environment:
       BOT_CONTROL_URL: http://tg-jenkins-bot:9090
       AGENT_CONTROL_URL: http://agent-control:9091
@@ -126,6 +126,8 @@ services:
     image: caddy:alpine
     container_name: gateway
     restart: unless-stopped
+    ports:
+      - "9000:9000"
     volumes:
       - ../gateway/Caddyfile:/etc/caddy/Caddyfile
     expose:

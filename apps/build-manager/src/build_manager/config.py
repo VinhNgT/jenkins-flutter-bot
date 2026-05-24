@@ -69,7 +69,7 @@ class BuildSettings(ServiceSettings):
         },
     )
     max_recent_builds: int = Field(
-        3,
+        5,
         title="Max Recent Builds",
         description="Maximum number of completed builds to keep. Older builds and their Drive files are automatically deleted.",
         json_schema_extra={

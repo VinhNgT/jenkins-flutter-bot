@@ -241,3 +241,11 @@ class TestMisc:
         tracker = BuildTracker(tmp_path, clock=clock)
         pending = tracker.add_pending("req1", "main")
         assert pending.triggered_at == 999.0
+
+    def test_default_max_recent_builds(self, tmp_path):
+        """Verify that max_recent_builds defaults to 5 in tracker and settings."""
+        tracker = BuildTracker(tmp_path)
+        assert tracker._max_recent_builds == 5
+
+        from build_manager.config import BuildSettings
+        assert BuildSettings.model_fields["max_recent_builds"].default == 5

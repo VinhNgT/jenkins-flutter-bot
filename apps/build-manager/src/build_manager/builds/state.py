@@ -55,7 +55,7 @@ class BuildTracker:
         self,
         data_dir: Path,
         *,
-        max_recent_builds: int = 3,
+        max_recent_builds: int = 5,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._data_dir = data_dir

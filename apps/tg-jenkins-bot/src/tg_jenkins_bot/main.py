@@ -100,7 +100,6 @@ def create_app() -> FastAPI:
         ).replace("{{ASSET_HASH}}", _asset_hash)
         return HTMLResponse(
             content=html,
-            headers={"Cache-Control": "no-cache"},
         )
 
     # Mount remaining static files (CSS, JS, assets/) — served as-is.

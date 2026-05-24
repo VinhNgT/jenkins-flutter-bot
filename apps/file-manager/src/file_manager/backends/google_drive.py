@@ -39,6 +39,7 @@ class GoogleDriveBackend:
         self._token_path = token_path
         self._pending_flow: Flow | None = None
         self._folder_id_cache: dict[str, str] = {}
+        self._cached_creds: Credentials | None = None
 
     @property
     def token_path(self) -> Path:
@@ -85,6 +86,7 @@ class GoogleDriveBackend:
         return flow
 
     def _save_credentials(self, creds: Credentials) -> None:
+        self._cached_creds = creds
         self._token_path.parent.mkdir(parents=True, exist_ok=True)
         self._token_path.write_text(
             json.dumps(
@@ -214,12 +216,18 @@ class GoogleDriveBackend:
 
         Offloads blocking disk I/O and Google token refresh to a thread.
         """
-        return await asyncio.to_thread(
+        if self._cached_creds and self._cached_creds.valid:
+            return self._cached_creds
+
+        creds = await asyncio.to_thread(
             self._load_tokens_sync, client_id, client_secret
         )
+        self._cached_creds = creds
+        return creds
 
     def delete_tokens(self) -> bool:
         """Remove the saved OAuth token file."""
+        self._cached_creds = None
         if self._token_path.exists():
             self._token_path.unlink()
             logger.info("Deleted Drive OAuth tokens at %s", self._token_path)

@@ -1,14 +1,56 @@
+# ── tg-jenkins-bot (public, via Cloudflare tunnel) ────────────────
 :80 {
-    # Match only the Web App frontend and dynamic APIs
-    @public_bot_paths {
+    @bot_static {
+        path /webapp/*.css /webapp/*.js
+    }
+    @bot_html {
+        path /webapp /webapp/
+    }
+    @bot_api {
+        path /api/webapp/*
+    }
+    @bot_routes {
         path /webapp* /api/webapp*
     }
-    handle @public_bot_paths {
+
+    handle @bot_routes {
+        # Tier 2: Versioned static assets — cache forever (?v=hash invalidates)
+        header @bot_static Cache-Control "public, max-age=31536000, immutable"
+
+        # Tier 1: HTML entry point — always revalidate to pick up new ?v= hashes
+        header @bot_html Cache-Control "no-cache"
+
+        # Tier 3: API responses — never cache operational data
+        header @bot_api Cache-Control "no-store"
+
         reverse_proxy tg-jenkins-bot:9090
     }
 
-    # Catch-all: reject everything else (including private /control, /callbacks, and other containers)
     handle {
         respond "Not Found" 404
     }
+}
+
+# ── config-hub (admin dashboard, host-local only) ─────────────────
+:9000 {
+    @hub_static {
+        path /static/*
+    }
+    @hub_html {
+        path / /index.html
+    }
+    @hub_api {
+        path /api/*
+    }
+
+    # Unversioned static assets — always revalidate (ETag/304)
+    header @hub_static Cache-Control "no-cache"
+
+    # HTML entry point — always revalidate to pick up changes
+    header @hub_html Cache-Control "no-cache"
+
+    # API responses — never cache config values, secrets, Drive status
+    header @hub_api Cache-Control "no-store"
+
+    reverse_proxy config-hub:9000
 }

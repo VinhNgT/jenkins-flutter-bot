@@ -587,3 +587,10 @@ def test_webapp_index_replaces_version_and_hash(test_client) -> None:
     assert len(hash_matches) >= 3, "Expected at least 3 ?v=<hash> occurrences (CSS + 2 JS)"
     # All query strings should use the same hash
     assert len(set(hash_matches)) == 1, "All asset hashes should be identical"
+
+
+def test_webapp_index_has_no_application_cache_control_headers(test_client) -> None:
+    """Test that the index response has no application-level Cache-Control headers."""
+    response = test_client.get("/webapp")
+    assert response.status_code == 200
+    assert "cache-control" not in response.headers

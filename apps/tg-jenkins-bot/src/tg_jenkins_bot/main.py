@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -40,6 +41,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.exception("Error during shutdown")
 
 
+def _compute_asset_hash(static_dir: Path) -> str:
+    """Compute a short SHA-256 digest of the cacheable static assets.
+
+    The hash covers the actual file contents of CSS/JS sub-resources
+    referenced from index.html.  It changes if and only if any asset
+    file changes — server restarts with identical code produce the same
+    hash, so no unnecessary cache invalidation occurs.  This replaces
+    the previous APP_VERSION-based cache-busting which was broken in
+    development (always ``0.0.0-dev``).
+    """
+    h = hashlib.sha256()
+    for name in ("style.css", "app.js", "tg-emulator.js"):
+        h.update((static_dir / name).read_bytes())
+    return h.hexdigest()[:8]
+
+
 def create_app() -> FastAPI:
     """Create the FastAPI app hosting callback, control, and Web App routes."""
     app = FastAPI(title="tg-jenkins-bot", lifespan=lifespan)
@@ -52,32 +69,37 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
-    # ── Version-based cache-busting for Telegram WebView ──────────
-    # Read package version once at startup. This version is set by
-    # scripts/release.py and baked into the installed package metadata
-    # at Docker build time (uv sync --no-editable).
+    # ── Cache-busting for Telegram WebView ────────────────────────
+    # APP_VERSION: package version for display only (UI fingerprint).
     try:
         _app_version = pkg_version("tg-jenkins-bot")
     except Exception:
-        # Fallback for development if package is not installed as editable/normal
         _app_version = "0.0.0-dev"
 
+    # ASSET_HASH: content-based hash for ?v= query strings.
+    # Changes only when actual CSS/JS file contents change — stable
+    # across server restarts with identical code.
     static_dir = Path(__file__).parent / "webapp"
+    _asset_hash = _compute_asset_hash(static_dir)
     _index_template = (static_dir / "index.html").read_text()
 
     @app.get("/webapp", response_class=HTMLResponse)
     @app.get("/webapp/", response_class=HTMLResponse)
     async def serve_index() -> HTMLResponse:
-        """Serve index.html with cache-busting version query strings.
+        """Serve index.html with content-hash cache-busting.
 
         Two-tier caching strategy:
         1. This HTML response uses Cache-Control: no-cache — the WebView
            always revalidates it (cheap 304 for a small file).
-        2. Sub-resources (CSS/JS) use ?v=<version> in their URLs — cached
-           aggressively, invalidated automatically on version bumps.
+        2. Sub-resources (CSS/JS) use ?v=<asset_hash> in their URLs —
+           cached aggressively, invalidated only when file content
+           actually changes.
         """
+        html = _index_template.replace(
+            "{{APP_VERSION}}", _app_version
+        ).replace("{{ASSET_HASH}}", _asset_hash)
         return HTMLResponse(
-            content=_index_template.replace("{{APP_VERSION}}", _app_version),
+            content=html,
             headers={"Cache-Control": "no-cache"},
         )
 

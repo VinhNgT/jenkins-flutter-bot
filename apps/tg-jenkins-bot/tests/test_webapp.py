@@ -562,3 +562,22 @@ def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) ->
 
     # Verify build is NOT consumed from store
     assert len(ctx.store.list_active()) == 1
+
+
+def test_webapp_index_replaces_version_and_hash(test_client) -> None:
+    """Test that served HTML has APP_VERSION and ASSET_HASH replaced."""
+    response = test_client.get("/webapp")
+    assert response.status_code == 200
+
+    html = response.text
+    # Placeholders must be fully replaced — no raw template markers
+    assert "{{APP_VERSION}}" not in html
+    assert "{{ASSET_HASH}}" not in html
+
+    # Cache-busting query strings should use the 8-char hex asset hash
+    import re
+
+    hash_matches = re.findall(r'\?v=([0-9a-f]{8})', html)
+    assert len(hash_matches) >= 3, "Expected at least 3 ?v=<hash> occurrences (CSS + 2 JS)"
+    # All query strings should use the same hash
+    assert len(set(hash_matches)) == 1, "All asset hashes should be identical"

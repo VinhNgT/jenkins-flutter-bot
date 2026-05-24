@@ -586,6 +586,13 @@ body.tg-dark .tg-input-clear {
 .tg-result-badge.timeout { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
 .tg-result-badge.cancelled { background: rgba(142, 142, 147, 0.12); color: var(--tg-color-hint); }
 
+/* Diagnostic build fingerprint — de-emphasized footer hint */
+.build-fingerprint {
+    text-align: center;
+    padding-top: 24px;
+    opacity: 0.6;
+}
+
 /* Download link in recent builds */
 .tg-download-link {
     color: var(--tg-color-link);

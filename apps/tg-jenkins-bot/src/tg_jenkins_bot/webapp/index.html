@@ -9,7 +9,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <!-- Native Layout Stylesheet -->
-    <link rel="stylesheet" href="style.css?v={{APP_VERSION}}">
+    <link rel="stylesheet" href="style.css?v={{ASSET_HASH}}">
     
     <!--
         Telegram SDK Emulator — Local Development Only
@@ -17,10 +17,10 @@
         on localhost. Does nothing in production or inside Telegram client.
         Must load synchronously before app.js to populate window.Telegram.
     -->
-    <script src="tg-emulator.js?v={{APP_VERSION}}"></script>
+    <script src="tg-emulator.js?v={{ASSET_HASH}}"></script>
     
     <!-- Dynamic State Controller Script -->
-    <script defer src="app.js?v={{APP_VERSION}}"></script>
+    <script defer src="app.js?v={{ASSET_HASH}}"></script>
 </head>
 <body>
 
@@ -86,6 +86,10 @@
             </div>
             <div class="tg-section-footer">Shows the last completed builds with download links.</div>
         </div>
+
+        <!-- Diagnostic fingerprint — shows version + asset content hash
+             so stale-cache issues are visible at a glance -->
+        <div class="tg-section-footer build-fingerprint">v{{APP_VERSION}} · {{ASSET_HASH}}</div>
 
         <!-- Browser Fallback Primary Actions (Only shown outside Telegram) -->
         <div id="fallbackBtnContainer" style="margin-top: auto; padding-top: 16px; width: 100%;">

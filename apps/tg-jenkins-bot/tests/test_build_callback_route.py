@@ -174,6 +174,44 @@ def test_build_result_duplicate_callback_ignored(client_with_ctx):
     assert ctx.on_build_success.await_count == 1
 
 
+def test_build_result_cancelled_dispatches(client_with_ctx):
+    client, ctx = client_with_ctx
+    ctx.store.register(
+        request_id="abc123",
+        chat_id=100,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
+    ctx.on_build_cancelled = AsyncMock()
+
+    resp = client.post("/callback/build-result", json={
+        "request_id": "abc123",
+        "result": "cancelled",
+    })
+    assert resp.status_code == 200
+    ctx.on_build_cancelled.assert_awaited_once()
+
+
+def test_build_result_aborted_dispatches(client_with_ctx):
+    client, ctx = client_with_ctx
+    ctx.store.register(
+        request_id="abc123",
+        chat_id=100,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
+    ctx.on_build_cancelled = AsyncMock()
+
+    resp = client.post("/callback/build-result", json={
+        "request_id": "abc123",
+        "result": "aborted",
+    })
+    assert resp.status_code == 200
+    ctx.on_build_cancelled.assert_awaited_once()
+
+
 def test_build_result_bot_not_running(isolate_config):
     """No bot context → ignored."""
     from tg_jenkins_bot.main import create_app

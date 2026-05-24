@@ -165,6 +165,18 @@ class BotContext:
         )
         await self.bot.send_message(build.chat_id, text, parse_mode="HTML")
 
-    async def on_build_cancelled(self, build: ActiveBuild) -> None:
-        """Cancel build. Passive — no message posted since user cancelled via web app."""
-        pass
+    async def on_build_cancelled(
+        self, build: ActiveBuild, cancelled_by: str | None = None
+    ) -> None:
+        """Handle cancelled build — notify user."""
+        if not self.bot:
+            return
+        app_name = _escape(self.config.app_name)
+        label = _escape(build.label)
+
+        if cancelled_by:
+            text = f"🛑 <b>{_escape(cancelled_by)} cancelled the {app_name} {label} build</b>"
+        else:
+            text = f"🛑 <b>{app_name} {label} build was cancelled</b>"
+
+        await self.bot.send_message(build.chat_id, text, parse_mode="HTML")

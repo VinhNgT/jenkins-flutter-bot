@@ -292,6 +292,7 @@ async def trigger_webapp_build(
         ref=req.branch,
         label=label,
         triggered_by=triggered_by,
+        triggered_by_id=user.user_id,
     )
 
     return {"ok": True, "request_id": request_id}
@@ -309,12 +310,22 @@ async def cancel_webapp_build(
         raise HTTPException(status_code=503, detail="Bot not initialized")
 
     # 1. Verify it exists
-    build = ctx.store.consume(req.request_id)
+    build = ctx.store.get(req.request_id)
     if not build:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Build not found or already completed",
         )
+
+    # Enforce: Only the user who triggered the build can cancel it
+    if build.triggered_by_id != user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the user who triggered the build can cancel it.",
+        )
+
+    # Consume/remove from active store since the user is authorized to cancel it
+    ctx.store.consume(req.request_id)
 
     # 2. Call build-manager to cancel
     try:
@@ -328,10 +339,17 @@ async def cancel_webapp_build(
             ref=build.ref,
             label=build.label,
             triggered_by=build.triggered_by,
+            triggered_by_id=build.triggered_by_id,
         )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Build cancellation failed: {e}",
         )
+
+    # 3. Send Telegram notification to the group chat showing who cancelled it
+    try:
+        await ctx.on_build_cancelled(build, user.first_name)
+    except Exception:
+        logger.exception("Failed to send cancellation message to Telegram")
 
     return {"ok": True}

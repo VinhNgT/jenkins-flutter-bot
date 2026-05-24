@@ -218,7 +218,7 @@ class TestBuildResults:
         assert "TestApp Stable Release build timed out" in text
         assert "main" in text
 
-    async def test_on_build_cancelled_passive(self, ctx, bot):
+    async def test_on_build_cancelled_without_user(self, ctx, bot):
         build = ActiveBuild(
             chat_id=100,
             ref="main",
@@ -228,7 +228,23 @@ class TestBuildResults:
             triggered_by="Alice",
         )
         await ctx.on_build_cancelled(build)
-        bot.send_message.assert_not_called()
+        bot.send_message.assert_called_once()
+        text = bot.send_message.call_args[0][1]
+        assert "TestApp Stable Release build was cancelled" in text
+
+    async def test_on_build_cancelled_with_user(self, ctx, bot):
+        build = ActiveBuild(
+            chat_id=100,
+            ref="main",
+            label="Stable Release",
+            request_id="req-123",
+            triggered_at=1_700_000_000.0,
+            triggered_by="Alice",
+        )
+        await ctx.on_build_cancelled(build, cancelled_by="Bob")
+        bot.send_message.assert_called_once()
+        text = bot.send_message.call_args[0][1]
+        assert "Bob cancelled the TestApp Stable Release build" in text
 
     async def test_no_bot_instance_no_crash(self):
         """bot=None → no crash."""

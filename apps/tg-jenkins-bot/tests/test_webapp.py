@@ -215,13 +215,14 @@ def test_webapp_cancel_build_happy_path(test_client, mock_build_client, app_with
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
     ctx = app_with_mocks.state.manager.bot_context
 
-    # Register an active build
+    # Register an active build triggered by Alice (user_id 67890)
     ctx.store.register(
         request_id="req-999",
         chat_id=-12345,
         ref="main",
         label="Stable Release",
         triggered_by="Alice",
+        triggered_by_id=67890,
     )
 
     response = test_client.post(
@@ -288,3 +289,32 @@ def test_webapp_private_chat_rejected_via_fallback(test_client) -> None:
 
     assert response.status_code == 403
     assert "Private chats are disabled" in response.json()["detail"]
+
+
+def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) -> None:
+    """Test that cancelling a build triggered by someone else is blocked with HTTP 403."""
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
+    ctx = app_with_mocks.state.manager.bot_context
+
+    # Register an active build triggered by Bob (user_id 99999)
+    ctx.store.register(
+        request_id="req-999",
+        chat_id=-12345,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Bob",
+        triggered_by_id=99999,
+    )
+
+    # Alice (user_id 67890 in init_data) tries to cancel Bob's build
+    response = test_client.post(
+        "/api/webapp/cancel",
+        headers={"X-Telegram-Init-Data": init_data},
+        json={"request_id": "req-999"},
+    )
+
+    assert response.status_code == 403
+    assert "Only the user who triggered the build can cancel it" in response.json()["detail"]
+
+    # Verify build is NOT consumed from store
+    assert len(ctx.store.list_active()) == 1

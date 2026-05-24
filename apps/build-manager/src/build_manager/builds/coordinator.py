@@ -220,8 +220,13 @@ class BuildCoordinator:
         download_url = ""
         file_id = ""
 
-        # Jenkins uses uppercase (SUCCESS/FAILURE), we use lowercase
-        build_status = "success" if jenkins_build.result == "SUCCESS" else "failure"
+        # Jenkins uses uppercase (SUCCESS/FAILURE/ABORTED), we use lowercase
+        if jenkins_build.result == "SUCCESS":
+            build_status = "success"
+        elif jenkins_build.result == "ABORTED":
+            build_status = "cancelled"
+        else:
+            build_status = "failure"
 
         if build_status == "success" and jenkins_build.number:
             try:

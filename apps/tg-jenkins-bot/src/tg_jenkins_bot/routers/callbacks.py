@@ -49,6 +49,8 @@ async def handle_build_result(manager: ManagerDep, request: Request) -> dict[str
         await ctx.on_build_success(building, body)
     elif result == "timeout":
         await ctx.on_build_timeout(building, body)
+    elif result in ("aborted", "cancelled"):
+        await ctx.on_build_cancelled(building)
     else:
         await ctx.on_build_failure(building, body)
 

@@ -17,6 +17,7 @@ class ActiveBuild:
     request_id: str
     triggered_at: float
     triggered_by: str  # user display name
+    triggered_by_id: int = 0  # user Telegram ID
 
 
 class ActiveBuildStore:
@@ -37,6 +38,7 @@ class ActiveBuildStore:
         ref: str,
         label: str,
         triggered_by: str,
+        triggered_by_id: int = 0,
     ) -> ActiveBuild:
         """Register a new active build."""
         build = ActiveBuild(
@@ -46,9 +48,14 @@ class ActiveBuildStore:
             request_id=request_id,
             triggered_at=self._clock(),
             triggered_by=triggered_by,
+            triggered_by_id=triggered_by_id,
         )
         self._builds[request_id] = build
         return build
+
+    def get(self, request_id: str) -> ActiveBuild | None:
+        """Retrieve an active build by its request ID without removing it."""
+        return self._builds.get(request_id)
 
     def consume(self, request_id: str) -> ActiveBuild | None:
         """Consume and return an active build by its request ID."""

@@ -94,10 +94,20 @@ async def _ensure_authorized(
 
     chat = update.effective_chat
     if chat.type == "private":
+        reply_markup = None
+        bot_username = getattr(context.bot, "username", None)
+        if bot_username:
+            url = f"https://t.me/{bot_username}?startgroup=auth"
+            reply_markup = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("➕ Add Bot to Group", url=url)]]
+            )
         await msg.reply_text(
             "❌ Private chats are disabled.\n"
-            "This bot can only be used in authorized group chats.",
+            "This bot can only be used in <b>authorized</b> group chats.\n"
+            "\n"
+            "If your group is already authorized, tap the button below to add the bot. Otherwise, adding the bot to a new group will show its Chat ID so you can request access from your admin.",
             parse_mode="HTML",
+            reply_markup=reply_markup,
         )
         return False
 

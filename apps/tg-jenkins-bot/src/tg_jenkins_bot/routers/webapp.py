@@ -143,12 +143,17 @@ async def validate_webapp_request(
     chat_id = None
     chat_data = data.get("chat")
     start_param = data.get("start_param")
+    bot_username = ctx.bot.username if ctx.bot else None
 
     if chat_data and "id" in chat_data:
         if chat_data.get("type") == "private":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Private chats are disabled. Please use an authorized group.",
+                detail={
+                    "error": "private_chat_disabled",
+                    "message": "Private chats are disabled. Please use an authorized group.",
+                    "bot_username": bot_username,
+                },
             )
         chat_id = chat_data["id"]
     elif start_param:
@@ -161,13 +166,21 @@ async def validate_webapp_request(
     if chat_id is not None and chat_id > 0:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Private chats are disabled. Please use an authorized group.",
+            detail={
+                "error": "private_chat_disabled",
+                "message": "Private chats are disabled. Please use an authorized group.",
+                "bot_username": bot_username,
+            },
         )
 
     if chat_id is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Private chats are disabled. Please use an authorized group.",
+            detail={
+                "error": "private_chat_disabled",
+                "message": "Private chats are disabled. Please use an authorized group.",
+                "bot_username": bot_username,
+            },
         )
 
     # Verify authorization
@@ -179,7 +192,12 @@ async def validate_webapp_request(
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Chat ID {chat_id} is not authorized",
+            detail={
+                "error": "group_not_authorized",
+                "message": f"Chat ID {chat_id} is not authorized",
+                "chat_id": chat_id,
+                "bot_username": bot_username,
+            },
         )
 
     return WebAppUser(

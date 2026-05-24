@@ -462,6 +462,7 @@
         </div>
         <h2 id="errorTitle">Access Denied</h2>
         <p id="errorDescription" class="subtitle">This chat is not authorized to trigger builds.</p>
+        <div id="errorActionContainer" style="margin-top: 20px; width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center;"></div>
     </div>
 
     <!-- LOADING SCREEN -->
@@ -523,7 +524,17 @@
 
                 if (response.status === 403 || response.status === 401) {
                     const data = await response.json();
-                    showError("Access Denied", data.detail || "This chat is not authorized to trigger builds.");
+                    let desc = "This chat is not authorized to trigger builds.";
+                    let detail = null;
+                    if (data.detail) {
+                        if (typeof data.detail === 'object') {
+                            desc = data.detail.message || desc;
+                            detail = data.detail;
+                        } else {
+                            desc = data.detail;
+                        }
+                    }
+                    showError("Access Denied", desc, detail);
                     return;
                 }
 
@@ -539,9 +550,55 @@
             }
         }
 
-        function showError(title, desc) {
+        function showError(title, desc, detail = null) {
             document.getElementById('errorTitle').innerText = title;
             document.getElementById('errorDescription').innerText = desc;
+            
+            const actionContainer = document.getElementById('errorActionContainer');
+            actionContainer.innerHTML = '';
+            
+            if (detail && detail.error === 'private_chat_disabled' && detail.bot_username) {
+                // Add the premium "➕ Add Bot to Group" button
+                const btn = document.createElement('button');
+                btn.className = 'trigger-build-btn';
+                btn.innerHTML = '➕ Add Bot to Group';
+                btn.onclick = () => {
+                    window.Telegram.WebApp.openTelegramLink(`https://t.me/${detail.bot_username}?startgroup=auth`);
+                };
+                actionContainer.appendChild(btn);
+            } else if (detail && detail.error === 'group_not_authorized' && detail.chat_id) {
+                // Display the Chat ID clearly and provide a "Copy" input field
+                const chatInfo = document.createElement('div');
+                chatInfo.style.width = '100%';
+                chatInfo.style.maxWidth = '300px';
+                chatInfo.style.display = 'flex';
+                chatInfo.style.flexDirection = 'column';
+                chatInfo.style.gap = '8px';
+                chatInfo.style.alignItems = 'center';
+                chatInfo.innerHTML = `
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight: 700; width: 100%; text-align: left; padding-left: 2px;">YOUR CHAT ID:</div>
+                    <div style="display: flex; gap: 8px; width: 100%;">
+                        <input type="text" readonly value="${detail.chat_id}" class="custom-input" style="text-align: center; font-family: monospace; font-size: 14px; font-weight: 700; flex-grow: 1;" onclick="this.select();">
+                        <button class="option-btn" style="padding: 12px; font-size: 16px;" id="copyIdBtn">📋</button>
+                    </div>
+                    <p class="subtitle" style="font-size: 11px; text-align: center; margin-top: 4px; line-height: 1.4;">Send this Chat ID to your admin to request authorization.</p>
+                `;
+                actionContainer.appendChild(chatInfo);
+                
+                // Add clipboard copy listener
+                const copyBtn = document.getElementById('copyIdBtn');
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(String(detail.chat_id))
+                        .then(() => {
+                            copyBtn.innerText = '✅';
+                            setTimeout(() => { copyBtn.innerText = '📋'; }, 2000);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy ID: ', err);
+                        });
+                };
+            }
+
             loadingScreen.classList.remove('active');
             mainScreen.style.display = 'none';
             errorScreen.classList.add('active');

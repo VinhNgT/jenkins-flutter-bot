@@ -70,6 +70,7 @@ def mock_build_client():
 @pytest.fixture
 def mock_bot():
     bot = AsyncMock()
+    bot.username = "test_bot"
     bot.send_message = AsyncMock()
     return bot
 
@@ -155,7 +156,11 @@ def test_webapp_config_unauthorized_chat(test_client) -> None:
         headers={"X-Telegram-Init-Data": init_data},
     )
     assert response.status_code == 403
-    assert "is not authorized" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["error"] == "group_not_authorized"
+    assert "is not authorized" in detail["message"]
+    assert detail["chat_id"] == -99999
+    assert detail["bot_username"] == "test_bot"
 
 
 def test_webapp_trigger_build_happy_path(test_client, mock_build_client, mock_bot) -> None:
@@ -273,7 +278,10 @@ def test_webapp_private_chat_rejected_via_start_param(test_client) -> None:
     )
 
     assert response.status_code == 403
-    assert "Private chats are disabled" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["error"] == "private_chat_disabled"
+    assert "Private chats are disabled" in detail["message"]
+    assert detail["bot_username"] == "test_bot"
 
 
 def test_webapp_private_chat_rejected_via_fallback(test_client) -> None:
@@ -288,7 +296,10 @@ def test_webapp_private_chat_rejected_via_fallback(test_client) -> None:
     )
 
     assert response.status_code == 403
-    assert "Private chats are disabled" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["error"] == "private_chat_disabled"
+    assert "Private chats are disabled" in detail["message"]
+    assert detail["bot_username"] == "test_bot"
 
 
 def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) -> None:

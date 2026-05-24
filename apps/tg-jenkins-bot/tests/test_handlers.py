@@ -236,12 +236,21 @@ class TestCommandHandlers:
         assert "develop" in text
 
     async def test_start_handler_private_chat_rejected(self, ctx, bot) -> None:
-        """Verify that private chats are rejected and receive an error message."""
+        """Verify that private chats are rejected and receive an error message with a group redirect button."""
         update = make_message_update("/start", chat_id=12345, chat_type="private")
         context = _make_context(ctx, bot)
 
         await start_handler(update, context)
 
         update.message.reply_text.assert_called_once()
-        text = update.message.reply_text.call_args[0][0]
+        args, kwargs = update.message.reply_text.call_args
+        text = args[0]
         assert "Private chats are disabled" in text
+        assert "authorized" in text
+        assert "request access from your admin" in text
+
+        reply_markup = kwargs.get("reply_markup")
+        assert reply_markup is not None
+        button = reply_markup.inline_keyboard[0][0]
+        assert button.text == "➕ Add Bot to Group"
+        assert button.url == "https://t.me/test_bot?startgroup=auth"

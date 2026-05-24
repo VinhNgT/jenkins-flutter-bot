@@ -43,7 +43,9 @@ class BuildClientError(Exception):
 class BuildClient:
     """Async HTTP client for the build-manager API."""
 
-    def __init__(self, base_url: str, *, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, base_url: str, *, client: httpx.AsyncClient | None = None
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._client = client or httpx.AsyncClient(timeout=30.0)
 

@@ -150,9 +150,12 @@ class TestBuildResults:
             triggered_by="Alice",
         )
         ctx._clock_ref[0] = 1_700_000_120.0  # 2 minutes later
-        await ctx.on_build_success(build, {
-            "download_url": "https://drive.google.com/file/123",
-        })
+        await ctx.on_build_success(
+            build,
+            {
+                "download_url": "https://drive.google.com/file/123",
+            },
+        )
 
         # Verify bot.send_message was called to deliver APK link
         bot.send_message.assert_awaited_once()
@@ -161,7 +164,7 @@ class TestBuildResults:
         text = call_args[0][1]
         assert "TestApp Stable Release is ready!" in text
         assert "2 min" in text
-        
+
         # Verify reply markup download button
         reply_markup = call_args.kwargs.get("reply_markup")
         assert reply_markup is not None

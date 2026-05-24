@@ -119,10 +119,7 @@ class BotContext:
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
 
-        text = (
-            f"✅ <b>{app_name} {label} is ready!</b>\n"
-            f"⏱ {duration}\n"
-        )
+        text = f"✅ <b>{app_name} {label} is ready!</b>\n⏱ {duration}\n"
         reply_markup = None
         if download_url:
             reply_markup = InlineKeyboardMarkup(

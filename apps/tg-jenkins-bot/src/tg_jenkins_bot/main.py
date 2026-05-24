@@ -26,7 +26,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         await app.state.manager.start()
     except StartupError:
-        logger.warning("Bot not auto-started: %s", app.state.manager.status()["last_error"])
+        logger.warning(
+            "Bot not auto-started: %s", app.state.manager.status()["last_error"]
+        )
 
     yield
 
@@ -43,13 +45,16 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(StartupError)
     async def handle_startup_error(
-        request: Request, exc: StartupError,
+        request: Request,
+        exc: StartupError,
     ) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     # Mount static Web App files
     static_dir = Path(__file__).parent / "webapp"
-    app.mount("/webapp", StaticFiles(directory=str(static_dir), html=True), name="webapp")
+    app.mount(
+        "/webapp", StaticFiles(directory=str(static_dir), html=True), name="webapp"
+    )
 
     # API routers
     app.include_router(control_router)

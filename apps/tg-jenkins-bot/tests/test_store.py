@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from tg_jenkins_bot.bot.store import ActiveBuildStore
 
 

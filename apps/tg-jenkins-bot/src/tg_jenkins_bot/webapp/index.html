@@ -296,6 +296,13 @@
             color: #fde047;
         }
 
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #a7f3d0;
+        }
+
+
         /* Main trigger button (when not using native SDK MainButton) */
         .trigger-build-btn {
             background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
@@ -477,6 +484,8 @@
         let selectedBranch = null;
         let isTelegram = false;
         let initData = 'preview';
+        let eventSource = null;
+
 
         // Elements
         const mainScreen = document.getElementById('mainScreen');
@@ -514,6 +523,37 @@
         // Init
         document.addEventListener('DOMContentLoaded', fetchConfig);
 
+        function startStreaming() {
+            if (eventSource) eventSource.close();
+            
+            const sseUrl = `/api/webapp/stream?init_data=${encodeURIComponent(initData)}`;
+            eventSource = new EventSource(sseUrl);
+            
+            eventSource.addEventListener('builds', (event) => {
+                try {
+                    const activeBuilds = JSON.parse(event.data);
+                    if (JSON.stringify(config.active_builds) !== JSON.stringify(activeBuilds)) {
+                        config.active_builds = activeBuilds;
+                        renderActiveBuilds();
+                        updateTriggerButtonState(selectedBranch !== null);
+                    }
+                } catch (e) {
+                    console.error("Failed to parse SSE payload:", e);
+                }
+            });
+            
+            eventSource.onerror = (err) => {
+                console.error("SSE stream disconnected. Automatic retry is handled by EventSource.", err);
+            };
+        }
+
+        function stopStreaming() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+
         async function fetchConfig() {
             try {
                 const response = await fetch('/api/webapp/config', {
@@ -544,6 +584,7 @@
 
                 config = await response.json();
                 renderUI();
+                startStreaming();
             } catch (err) {
                 console.error(err);
                 showError("Service Unavailable", "The build server is currently offline or unreachable. Please try again in a minute.");
@@ -551,8 +592,10 @@
         }
 
         function showError(title, desc, detail = null) {
+            stopStreaming();
             document.getElementById('errorTitle').innerText = title;
             document.getElementById('errorDescription').innerText = desc;
+
             
             const actionContainer = document.getElementById('errorActionContainer');
             actionContainer.innerHTML = '';
@@ -604,23 +647,7 @@
             errorScreen.classList.add('active');
         }
 
-        function renderUI() {
-            appNameEl.innerText = config.app_name;
-
-            // Render branches
-            branchesContainer.innerHTML = '';
-            config.branches.forEach(branch => {
-                const btn = document.createElement('button');
-                btn.className = 'option-btn';
-                btn.innerHTML = `
-                    <span>${branch.label}</span>
-                    <span class="option-btn-meta">${branch.ref}</span>
-                `;
-                btn.addEventListener('click', () => selectBranch(branch.ref, btn));
-                branchesContainer.appendChild(btn);
-            });
-
-            // Render active builds
+        function renderActiveBuilds() {
             buildsList.innerHTML = '';
             if (config.active_builds.length === 0) {
                 buildsList.innerHTML = `
@@ -653,23 +680,30 @@
                     buildsList.appendChild(item);
                 });
             }
+        }
 
-            // Sync custom inputs
-            customBranchInput.addEventListener('input', (e) => {
-                if (e.target.value.trim() !== '') {
-                    // Deselect options
-                    document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
-                    selectedBranch = e.target.value.trim();
-                    updateTriggerButtonState(true);
-                } else {
-                    selectedBranch = null;
-                    updateTriggerButtonState(false);
-                }
+        function renderUI() {
+            appNameEl.innerText = config.app_name;
+
+            // Render branches
+            branchesContainer.innerHTML = '';
+            config.branches.forEach(branch => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerHTML = `
+                    <span>${branch.label}</span>
+                    <span class="option-btn-meta">${branch.ref}</span>
+                `;
+                btn.addEventListener('click', () => selectBranch(branch.ref, btn));
+                branchesContainer.appendChild(btn);
             });
+
+            renderActiveBuilds();
 
             loadingScreen.classList.remove('active');
             mainScreen.style.display = 'flex';
         }
+
 
         function selectBranch(branchRef, btnElement) {
             customBranchInput.value = '';
@@ -731,23 +765,33 @@
                     throw new Error(resData.detail || "Trigger failed");
                 }
 
-                if (isTelegram) {
-                    window.Telegram.WebApp.close();
-                } else {
-                    // Reset and refresh config
-                    selectedBranch = null;
-                    customBranchInput.value = '';
-                    document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
-                    showAlert("Build successfully triggered!");
-                    alertBox.className = "alert alert-warning";
-                    fetchConfig();
-                }
+                // Reset and refresh config
+                selectedBranch = null;
+                customBranchInput.value = '';
+                document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
+                
+                // Show premium green success toast
+                showAlert("Build successfully triggered!");
+                alertBox.className = "alert alert-success";
+                
+                setTimeout(() => {
+                    hideAlert();
+                    alertBox.className = "alert";
+                }, 5000);
+
+                // Immediately refresh active builds list
+                await fetchConfig();
+                
+                setTriggeringState(false);
+                updateTriggerButtonState(false);
             } catch (err) {
                 console.error(err);
                 showAlert(err.message || "Failed to trigger build. Please try again.");
+                alertBox.className = "alert";
                 setTriggeringState(false);
             }
         }
+
 
         function setTriggeringState(isLoading) {
             if (isTelegram) {
@@ -784,7 +828,7 @@
                 }
 
                 // Refresh
-                fetchConfig();
+                await fetchConfig();
             } catch (err) {
                 console.error(err);
                 alert("Failed to cancel build: " + err.message);
@@ -800,8 +844,22 @@
             return `${diffMin}m ago`;
         }
 
+        // Setup custom branch input listener once
+        customBranchInput.addEventListener('input', (e) => {
+            if (e.target.value.trim() !== '') {
+                // Deselect options
+                document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
+                selectedBranch = e.target.value.trim();
+                updateTriggerButtonState(true);
+            } else {
+                selectedBranch = null;
+                updateTriggerButtonState(false);
+            }
+        });
+
         // Setup fallback button click handler
         triggerBtn.addEventListener('click', handleTriggerClick);
+
     </script>
 </body>
 </html>

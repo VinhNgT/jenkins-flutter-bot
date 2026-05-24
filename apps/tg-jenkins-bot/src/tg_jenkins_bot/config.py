@@ -92,16 +92,16 @@ class BotSettings(ServiceSettings):
         v = v.strip()
         if not v:
             return v
-        
+
         # 1. Normalize schema prefix (default to https:// if none exists)
         if not (v.startswith("http://") or v.startswith("https://")):
             v = f"https://{v}"
-            
+
         # 2. Ensure it ends with /webapp/
         v = v.rstrip("/")
         if not v.endswith("/webapp"):
             v = f"{v}/webapp"
-            
+
         return f"{v}/"
 
     # Project

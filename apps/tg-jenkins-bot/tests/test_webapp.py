@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
 import urllib.parse
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tg_jenkins_bot.bot.context import BotContext
-from tg_jenkins_bot.bot.store import ActiveBuildStore
 from tg_jenkins_bot.config import BotSettings
 from tg_jenkins_bot.main import create_app
 
@@ -62,7 +61,9 @@ def _generate_valid_init_data_with_start_param(token: str, start_param: str) -> 
 @pytest.fixture
 def mock_build_client():
     client = AsyncMock()
-    client.trigger_build = AsyncMock(return_value={"request_id": "req-999", "status": "queued"})
+    client.trigger_build = AsyncMock(
+        return_value={"request_id": "req-999", "status": "queued"}
+    )
     client.cancel_build = AsyncMock(return_value={"status": "cancelled"})
     return client
 
@@ -163,7 +164,166 @@ def test_webapp_config_unauthorized_chat(test_client) -> None:
     assert detail["bot_username"] == "test_bot"
 
 
-def test_webapp_trigger_build_happy_path(test_client, mock_build_client, mock_bot) -> None:
+def test_webapp_config_real_hmac_query_param(test_client) -> None:
+    """Test config access using valid HMAC signature via query parameter."""
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
+    response = test_client.get(
+        f"/api/webapp/config?init_data={urllib.parse.quote(init_data)}",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["app_name"] == "TestApp"
+
+
+def test_webapp_config_invalid_hmac_query_param(test_client) -> None:
+    """Test config access fails with invalid HMAC signature via query param."""
+    init_data = _generate_valid_init_data(token="WRONG-TOKEN", chat_id=-12345)
+    response = test_client.get(
+        f"/api/webapp/config?init_data={urllib.parse.quote(init_data)}",
+    )
+    assert response.status_code == 401
+    assert "Authentication failed" in response.json()["detail"]
+
+
+def test_webapp_config_unauthorized_chat_query_param(test_client) -> None:
+    """Test config access fails for unauthorized chat via query param."""
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-99999)
+    response = test_client.get(
+        f"/api/webapp/config?init_data={urllib.parse.quote(init_data)}",
+    )
+    assert response.status_code == 403
+    detail = response.json()["detail"]
+    assert detail["error"] == "group_not_authorized"
+
+
+@pytest.mark.asyncio
+async def test_webapp_stream_direct(app_with_mocks) -> None:
+    """Test the SSE stream endpoint event generator directly."""
+    ctx = app_with_mocks.state.manager.bot_context
+    ctx.store.register(
+        request_id="req-stream-test",
+        chat_id=-12345,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
+
+    from fastapi import Request
+    from unittest.mock import MagicMock
+
+    mock_request = MagicMock(spec=Request)
+    mock_request.is_disconnected = AsyncMock(return_value=False)
+
+    from tg_jenkins_bot.routers.webapp import stream_active_builds, WebAppUser
+
+    user = WebAppUser(
+        chat_id=-12345,
+        user_id=12345,
+        first_name="Alice",
+        username="alice_tg",
+    )
+
+    # The endpoint is now an async generator that yields ServerSentEvent directly
+    gen = stream_active_builds(
+        request=mock_request,
+        manager=app_with_mocks.state.manager,
+        user=user,
+    )
+
+    first_event = await gen.__anext__()
+
+    assert first_event.event == "builds"
+    assert isinstance(first_event.data, list)
+    assert any(b["request_id"] == "req-stream-test" for b in first_event.data)
+
+
+@pytest.mark.asyncio
+async def test_webapp_stream_integration(app_with_mocks) -> None:
+    """Full HTTP integration test for the SSE /stream endpoint.
+
+    Uses httpx.AsyncClient with ASGITransport to exercise the complete
+    request pipeline (route wiring, Depends auth, response headers, SSE
+    wire format).
+
+    httpx.ASGITransport buffers the entire ASGI response before returning,
+    so an infinite SSE generator would block forever.  To make the generator
+    finite, we patch ``asyncio.sleep`` to be a no-op and
+    ``Request.is_disconnected`` to return ``True`` on the second call.
+    The generator yields one event, loops, sees "disconnected", and exits
+    cleanly — giving ASGITransport a complete response to flush.
+    """
+    import httpx
+    from unittest.mock import patch
+
+    ctx = app_with_mocks.state.manager.bot_context
+    ctx.store.register(
+        request_id="req-integration",
+        chat_id=-12345,
+        ref="main",
+        label="Stable Release",
+        triggered_by="Alice",
+    )
+
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
+
+    # Track call count so is_disconnected returns False first, True second.
+    call_count = 0
+
+    async def fake_is_disconnected(self):
+        nonlocal call_count
+        call_count += 1
+        return call_count > 1
+
+    transport = httpx.ASGITransport(app=app_with_mocks)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        with (
+            patch("tg_jenkins_bot.routers.webapp.asyncio.sleep", new_callable=AsyncMock),
+            patch("starlette.requests.Request.is_disconnected", fake_is_disconnected),
+        ):
+            resp = await client.get(
+                f"/api/webapp/stream?init_data={urllib.parse.quote(init_data)}",
+            )
+
+    assert resp.status_code == 200
+
+    # Verify SSE response headers
+    assert resp.headers["content-type"].startswith("text/event-stream")
+    assert resp.headers["cache-control"] == "no-cache"
+
+    # Parse SSE wire format from the response body
+    body = resp.text
+    data_lines = [
+        line[len("data:") :].strip()
+        for line in body.splitlines()
+        if line.startswith("data:")
+    ]
+    assert len(data_lines) > 0, f"No SSE data frames in response body:\n{body}"
+    payload = json.loads(data_lines[0])
+    assert isinstance(payload, list)
+    assert any(b["request_id"] == "req-integration" for b in payload)
+
+
+@pytest.mark.asyncio
+async def test_webapp_stream_rejects_invalid_auth(app_with_mocks) -> None:
+    """Verify the SSE /stream endpoint rejects invalid authentication."""
+    import httpx
+
+    bad_init_data = _generate_valid_init_data(token="WRONG-TOKEN", chat_id=-12345)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_with_mocks),
+        base_url="http://test",
+    ) as client:
+        resp = await client.get(
+            f"/api/webapp/stream?init_data={urllib.parse.quote(bad_init_data)}",
+        )
+        assert resp.status_code == 401
+        assert "Authentication failed" in resp.json()["detail"]
+
+
+def test_webapp_trigger_build_happy_path(
+    test_client, mock_build_client, mock_bot
+) -> None:
     """Test successful build trigger from Web App."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
 
@@ -190,7 +350,9 @@ def test_webapp_trigger_build_happy_path(test_client, mock_build_client, mock_bo
     )
 
 
-def test_webapp_trigger_duplicate_blocked(test_client, mock_build_client, app_with_mocks) -> None:
+def test_webapp_trigger_duplicate_blocked(
+    test_client, mock_build_client, app_with_mocks
+) -> None:
     """Test that starting a build on a branch already building is blocked."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
     ctx = app_with_mocks.state.manager.bot_context
@@ -215,7 +377,9 @@ def test_webapp_trigger_duplicate_blocked(test_client, mock_build_client, app_wi
     assert not mock_build_client.trigger_build.called
 
 
-def test_webapp_cancel_build_happy_path(test_client, mock_build_client, app_with_mocks) -> None:
+def test_webapp_cancel_build_happy_path(
+    test_client, mock_build_client, app_with_mocks
+) -> None:
     """Test successful build cancellation from Web App."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
     ctx = app_with_mocks.state.manager.bot_context
@@ -248,7 +412,9 @@ def test_webapp_cancel_build_happy_path(test_client, mock_build_client, app_with
 
 def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) -> None:
     """Test that chat_id is correctly extracted from start_param (deep link)."""
-    init_data = _generate_valid_init_data_with_start_param(token="123456:test-token", start_param="-12345")
+    init_data = _generate_valid_init_data_with_start_param(
+        token="123456:test-token", start_param="-12345"
+    )
 
     response = test_client.post(
         "/api/webapp/trigger",
@@ -269,7 +435,9 @@ def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) ->
 
 def test_webapp_private_chat_rejected_via_start_param(test_client) -> None:
     """Test that Web App triggers in private chats (positive chat IDs) are rejected."""
-    init_data = _generate_valid_init_data_with_start_param(token="123456:test-token", start_param="67890")
+    init_data = _generate_valid_init_data_with_start_param(
+        token="123456:test-token", start_param="67890"
+    )
 
     response = test_client.post(
         "/api/webapp/trigger",
@@ -325,7 +493,10 @@ def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) ->
     )
 
     assert response.status_code == 403
-    assert "Only the user who triggered the build can cancel it" in response.json()["detail"]
+    assert (
+        "Only the user who triggered the build can cancel it"
+        in response.json()["detail"]
+    )
 
     # Verify build is NOT consumed from store
     assert len(ctx.store.list_active()) == 1

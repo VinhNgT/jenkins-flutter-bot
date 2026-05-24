@@ -49,7 +49,10 @@ def _build_application(
     application = ApplicationBuilder().bot(bot).build()
 
     bot_context = BotContext(
-        config=config, build_client=build_client, bot=bot, clock=clock,
+        config=config,
+        build_client=build_client,
+        bot=bot,
+        clock=clock,
     )
     application.bot_data["bot_context"] = bot_context
 
@@ -99,7 +102,10 @@ class BotManager:
                 build_client = BuildClient(config.build_manager_url)
                 bot = Bot(config.telegram_token)
                 application, bot_context = _build_application(
-                    config, build_client, bot, clock=self._clock,
+                    config,
+                    build_client,
+                    bot,
+                    clock=self._clock,
                 )
 
                 await application.initialize()

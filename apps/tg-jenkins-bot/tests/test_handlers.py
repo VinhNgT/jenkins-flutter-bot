@@ -58,7 +58,7 @@ def make_message_update(
     reply_msg.chat = chat
     reply_msg.from_user = user
     reply_msg.set_bot(bot)
-    
+
     message.reply_text = AsyncMock(return_value=reply_msg)
 
     # Mock the overall Update
@@ -86,10 +86,12 @@ def _make_config(**overrides):
 
 def _make_build_client():
     client = AsyncMock()
-    client.trigger_build = AsyncMock(return_value={"request_id": "new_req", "status": "queued"})
+    client.trigger_build = AsyncMock(
+        return_value={"request_id": "new_req", "status": "queued"}
+    )
     client.cancel_build = AsyncMock(return_value={"status": "cancelled"})
     client.get_build_status = AsyncMock(return_value={"completed_count": 5})
-    
+
     # Mock recent builds
     b1 = MagicMock()
     b1.branch = "main"

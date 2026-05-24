@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -10,11 +11,11 @@ import os
 import urllib.parse
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
 
 from ..dependencies import ManagerDep
-from ..bot.store import ActiveBuild
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,8 @@ def _verify_telegram_init_data(init_data: str, token: str) -> dict:
 
 async def validate_webapp_request(
     manager: ManagerDep,
-    x_telegram_init_data: str = Header(...),
+    x_telegram_init_data: str | None = Header(None),
+    init_data: str | None = Query(None),
 ) -> WebAppUser:
     """Validate initData and check chat authorization."""
     ctx = manager.bot_context
@@ -96,11 +98,22 @@ async def validate_webapp_request(
             detail="Bot service is not running",
         )
 
+    # Fall back to query param if header is missing
+    init_data_str = x_telegram_init_data or init_data
+    if not init_data_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Telegram authentication credentials",
+        )
+
     # Allow preview mode bypass only in development / testing environments
-    if x_telegram_init_data == "preview":
-        is_dev = (
-            os.environ.get("JFB_DEV_MODE") == "true"
-            or ctx.config.telegram_token in ("123456:test-token", "fake:token", "")
+    if init_data_str == "preview":
+        is_dev = os.environ.get(
+            "JFB_DEV_MODE"
+        ) == "true" or ctx.config.telegram_token in (
+            "123456:test-token",
+            "fake:token",
+            "",
         )
         if not is_dev:
             raise HTTPException(
@@ -121,7 +134,7 @@ async def validate_webapp_request(
         )
 
     try:
-        data = _verify_telegram_init_data(x_telegram_init_data, ctx.config.telegram_token)
+        data = _verify_telegram_init_data(init_data_str, ctx.config.telegram_token)
     except ValueError as e:
         logger.warning("Invalid webapp initData: %s", e)
         raise HTTPException(
@@ -229,19 +242,72 @@ async def get_webapp_config(
     # Get active builds formatted for frontend
     active_builds = []
     for build in ctx.list_building():
-        active_builds.append({
-            "request_id": build.request_id,
-            "label": build.label,
-            "ref": build.ref,
-            "triggered_at": build.triggered_at,
-            "triggered_by": build.triggered_by,
-        })
+        active_builds.append(
+            {
+                "request_id": build.request_id,
+                "label": build.label,
+                "ref": build.ref,
+                "triggered_at": build.triggered_at,
+                "triggered_by": build.triggered_by,
+            }
+        )
 
     return {
         "app_name": ctx.config.app_name,
         "branches": branches_list,
         "active_builds": active_builds,
     }
+
+
+@router.get("/stream", response_class=EventSourceResponse)
+async def stream_active_builds(
+    request: Request,
+    manager: ManagerDep,
+    user: ValidatedUser,
+):
+    """Stream active builds using Server-Sent Events (SSE).
+
+    This is an async generator endpoint.  FastAPI's ``response_class =
+    EventSourceResponse`` wraps the yielded ``ServerSentEvent`` objects into a
+    proper ``text/event-stream`` response with keep-alive pings, no-cache
+    headers, and proxy-buffering prevention — all handled automatically.
+    """
+    ctx = manager.bot_context
+    last_sent_hash = None
+
+    try:
+        while True:
+            if await request.is_disconnected():
+                logger.info("SSE client disconnected")
+                break
+
+            active_builds = []
+            if ctx:
+                for build in ctx.list_building():
+                    active_builds.append(
+                        {
+                            "request_id": build.request_id,
+                            "label": build.label,
+                            "ref": build.ref,
+                            "triggered_at": build.triggered_at,
+                            "triggered_by": build.triggered_by,
+                        }
+                    )
+
+            # Only stream updates down the wire when the builds state actually mutates.
+            # Hash the canonical JSON for deduplication, but pass the raw list to
+            # ServerSentEvent — FastAPI serializes `data` automatically.
+            current_str = json.dumps(active_builds, sort_keys=True)
+            current_hash = hashlib.md5(current_str.encode()).hexdigest()
+
+            if last_sent_hash is None or current_hash != last_sent_hash:
+                last_sent_hash = current_hash
+                yield ServerSentEvent(data=active_builds, event="builds")
+
+            await asyncio.sleep(3)
+    except asyncio.CancelledError:
+        logger.info("SSE streaming cancelled")
+        raise
 
 
 @router.post("/trigger")

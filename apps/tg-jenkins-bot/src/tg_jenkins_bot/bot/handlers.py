@@ -25,6 +25,7 @@ def _bot_version() -> str:
     try:
         v = _pkg_version("tg-jenkins-bot")
         import re
+
         return re.sub(r"^(\d+\.\d+\.\d+)\.(dev|rc)(\d+)$", r"\1-\2.\3", v)
     except PackageNotFoundError:
         return "unknown"
@@ -70,9 +71,7 @@ def _get_webapp_keyboard(
         url = f"https://t.me/{bot_username}/{short_name}"
         if chat_id is not None:
             url += f"?startapp={chat_id}"
-        return InlineKeyboardMarkup(
-            [[InlineKeyboardButton(text="🚀 Build", url=url)]]
-        )
+        return InlineKeyboardMarkup([[InlineKeyboardButton(text="🚀 Build", url=url)]])
 
     # Return None to hide the button when the native Mini App is not configured.
     return None

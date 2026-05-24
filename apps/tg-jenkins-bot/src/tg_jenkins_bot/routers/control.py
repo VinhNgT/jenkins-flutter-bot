@@ -50,7 +50,7 @@ async def get_schema() -> dict[str, Any]:
             "Configures the Telegram bot interface. You need a Bot Token from"
             " @BotFather. You must also specify which chat IDs are allowed to"
             " use the bot to prevent unauthorized access."
-        )
+        ),
     )
 
 

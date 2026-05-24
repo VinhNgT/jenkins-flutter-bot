@@ -21,7 +21,9 @@ def _build_client(handler) -> BuildClient:
 class TestTriggerBuild:
     async def test_success(self):
         def handler(request: httpx.Request):
-            return httpx.Response(200, json={"request_id": "abc123", "status": "queued"})
+            return httpx.Response(
+                200, json={"request_id": "abc123", "status": "queued"}
+            )
 
         client = _build_client(handler)
         result = await client.trigger_build("main", "http://bot/cb")
@@ -31,11 +33,15 @@ class TestTriggerBuild:
 
     async def test_success_with_app_name(self):
         import json
+
         payload = {}
+
         def handler(request: httpx.Request):
             nonlocal payload
             payload = json.loads(request.read())
-            return httpx.Response(200, json={"request_id": "abc123", "status": "queued"})
+            return httpx.Response(
+                200, json={"request_id": "abc123", "status": "queued"}
+            )
 
         client = _build_client(handler)
         result = await client.trigger_build("main", "http://bot/cb", app_name="My App")
@@ -98,19 +104,22 @@ class TestCancelBuild:
 class TestGetRecentBuilds:
     async def test_parses_response(self):
         def handler(request: httpx.Request):
-            return httpx.Response(200, json={
-                "builds": [
-                    {
-                        "request_id": "req1",
-                        "branch": "main",
-                        "commit_hash": "a" * 40,
-                        "result": "success",
-                        "triggered_at": 1.0,
-                        "completed_at": 2.0,
-                        "download_url": "https://example.com/file.apk",
-                    }
-                ]
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "builds": [
+                        {
+                            "request_id": "req1",
+                            "branch": "main",
+                            "commit_hash": "a" * 40,
+                            "result": "success",
+                            "triggered_at": 1.0,
+                            "completed_at": 2.0,
+                            "download_url": "https://example.com/file.apk",
+                        }
+                    ]
+                },
+            )
 
         client = _build_client(handler)
         builds = await client.get_recent_builds(count=5)

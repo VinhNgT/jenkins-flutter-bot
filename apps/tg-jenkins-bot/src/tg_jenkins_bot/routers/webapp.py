@@ -125,9 +125,8 @@ async def validate_webapp_request(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No allowed chats configured",
             )
-        chat_id = ctx.config.allowed_chat_ids[0]
         return WebAppUser(
-            chat_id=chat_id,
+            chat_id=ctx.config.allowed_chat_ids[0],
             user_id=12345,
             first_name="Preview",
             username="preview_user",
@@ -153,10 +152,10 @@ async def validate_webapp_request(
     # Determine chat ID
     # In groups/channels, chat.id is present. In private, it's user.id.
     # If launched via deep link, chat.id is missing but we pass the chat ID as start_param.
-    chat_id = None
+    chat_id: int | None = None
     chat_data = data.get("chat")
     start_param = data.get("start_param")
-    bot_username = ctx.bot.username if ctx.bot else None
+    bot_username = getattr(ctx.bot, "username", None) if ctx.bot else None
 
     if chat_data and "id" in chat_data:
         if chat_data.get("type") == "private":

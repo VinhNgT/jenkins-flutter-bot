@@ -18,17 +18,21 @@ _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 
 @lru_cache(maxsize=1)
-def _load_templates() -> dict[str, Template | str]:
+def _load_templates() -> tuple[dict[str, Template], dict[str, str]]:
     """Load and cache Groovy templates and snippet strings on first use."""
-    return {
-        "pipeline": Template((_TEMPLATE_DIR / "pipeline.groovy").read_text()),
-        "checkout_private": Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text()),
-        "checkout_public": Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text()),
-        "properties": (_TEMPLATE_DIR / "properties.groovy").read_text(),
-        "post_actions": (_TEMPLATE_DIR / "post_actions.groovy").read_text(),
-        "extensions": (_TEMPLATE_DIR / "extensions.groovy").read_text(),
-        "clone_opts": (_TEMPLATE_DIR / "clone_opts.groovy").read_text(),
-    }
+    return (
+        {
+            "pipeline": Template((_TEMPLATE_DIR / "pipeline.groovy").read_text()),
+            "checkout_private": Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text()),
+            "checkout_public": Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text()),
+        },
+        {
+            "properties": (_TEMPLATE_DIR / "properties.groovy").read_text(),
+            "post_actions": (_TEMPLATE_DIR / "post_actions.groovy").read_text(),
+            "extensions": (_TEMPLATE_DIR / "extensions.groovy").read_text(),
+            "clone_opts": (_TEMPLATE_DIR / "clone_opts.groovy").read_text(),
+        },
+    )
 
 
 def generate_jenkinsfile(
@@ -54,27 +58,27 @@ def generate_jenkinsfile(
     shallow_clone:
         Whether to enable shallow git cloning to reduce clone size.
     """
-    templates = _load_templates()
-    pipeline_tpl = templates["pipeline"]
-    private_tpl = templates["checkout_private"]
-    public_tpl = templates["checkout_public"]
+    tpls, snippets = _load_templates()
+    pipeline_tpl = tpls["pipeline"]
+    private_tpl = tpls["checkout_private"]
+    public_tpl = tpls["checkout_public"]
 
     # Build properties block
     properties_val = ""
     if discard_builds:
-        properties_val = templates["properties"]
+        properties_val = snippets["properties"]
 
     # Build post actions block
     post_actions_val = ""
     if clean_workspace:
-        post_actions_val = templates["post_actions"]
+        post_actions_val = snippets["post_actions"]
 
     # Build SCM options
     extensions_val = ""
     clone_opts_val = ""
     if shallow_clone:
-        extensions_val = templates["extensions"]
-        clone_opts_val = templates["clone_opts"]
+        extensions_val = snippets["extensions"]
+        clone_opts_val = snippets["clone_opts"]
 
     if credentials_id:
         checkout = private_tpl.safe_substitute(

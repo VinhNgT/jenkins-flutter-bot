@@ -13,20 +13,23 @@ Loaded at model discretion when the task involves service-to-service communicati
 
 The bot acts as a passive frontend and notification layer. All interactive build selections are handled in the Telegram Web App:
 
-1. **User launches Web App** — Taps the `🚀 Build` MenuButtonWebApp to open the Telegram Mini App (served at `/webapp`).
-2. **Retrieve Config** — Web App calls `GET /api/webapp/config` with `X-Telegram-Init-Data`. The bot's API validates the signature and authorizes the chat.
-3. **Trigger Build** — User selects a branch option and clicks build. Web App calls `POST /api/webapp/trigger`.
-4. **Trigger Build-Manager** — The bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, `callback_url`, and a generated `request_id`.
-5. **Register Active Build** — The bot sends a `"🔨 User started a Target build"` confirmation message to the Telegram chat, registers the active build in `ActiveBuildStore`, and returns success to the Web App (which closes).
-6. **Trigger Jenkins** — Build-manager triggers Jenkins (`POST /job/{name}/buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build.
-7. **Jenkins Run** — Jenkins pipeline runs on the agent managed by `agent-control` and archives the resulting APK on success — **no outbound HTTP from the agent**.
-8. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, uploads to Drive via `file-manager`, and forwards the result to the bot's webhook (`POST /callback/build-result`).
-9. **Notify Chat** — Bot consumes the `ActiveBuild` from `ActiveBuildStore` and delivers a completely new success/failure/timeout notification message to the chat. Messages are **immutable** (send-only, fire-and-forget). The bot **never** edits or deletes messages.
+1. **User launches Web App** — Taps the `🚀 Build` MenuButtonWebApp to open the Telegram Mini App (served at `/webapp`). Private chats are disabled; the Web App must be launched from an authorized group chat.
+2. **Retrieve Config** — Web App calls `GET /api/webapp/config` with `X-Telegram-Init-Data`. The bot's API validates the signature, verifies that it is not a private chat, and authorizes the chat ID against the whitelisted `allowed_chat_ids`.
+3. **Establish Real-Time Active Build Stream** — The Web App establishes a Server-Sent Events (SSE) connection to `/api/webapp/stream` to receive real-time active build states. The backend only pushes down the wire when the store mutates, utilizing a 15-second keep-alive.
+4. **Trigger Build** — User selects a branch option and clicks build. Web App calls `POST /api/webapp/trigger`.
+5. **Trigger Build-Manager** — The bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, `callback_url`, and a generated `request_id`.
+6. **Register Active Build** — The bot sends a `"🔨 User started a Target build"` confirmation message to the Telegram group chat, registers the active build in `ActiveBuildStore`, and returns success to the Web App.
+7. **Trigger Jenkins** — Build-manager triggers Jenkins (`POST /job/{name}/buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build.
+8. **Jenkins Run** — Jenkins pipeline runs on the agent managed by `agent-control` and archives the resulting APK on success — **no outbound HTTP from the agent**.
+9. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, uploads to Drive via `file-manager`, and forwards the result to the bot's webhook (`POST /callback/build-result`).
+10. **Notify Chat** — Bot consumes the `ActiveBuild` from `ActiveBuildStore` (which automatically updates the SSE stream) and delivers a completely new success/failure/timeout notification message containing a direct Google Drive download link to the group chat. Messages are **immutable** (send-only, fire-and-forget). The bot **never** edits or deletes messages.
+11. **Retrieve History** — Users can browse past successful builds on demand inside the Web App interface, which calls the `GET /api/webapp/recent` endpoint to query the 5 most recent completed builds directly from build-manager (the Telegram chat remains clean of historical spam).
 
-### Security Model
+### Security & Access Model
 
-- **HMAC-SHA256 Validation** — The bot validates the `X-Telegram-Init-Data` header signature using the bot's token (HMAC-SHA256) on every Web App API call to prevent unauthorized trigger requests.
-- **Allowed Chat Filtering** — The bot extracts `chat.id` (or `user.id` for private 1-on-1 chats) from the verified `initData` and enforces access control using the whitelisted `allowed_chat_ids`.
+- **HMAC-SHA256 Validation** — The bot validates the `X-Telegram-Init-Data` header signature using the bot's token (HMAC-SHA256) on every Web App API call to prevent unauthorized requests.
+- **Allowed Group Filtering** — The bot extracts `chat.id` from the verified `initData` and enforces access control using the whitelisted `allowed_chat_ids`. Web App access from private chats (positive chat IDs) is strictly prohibited.
+- **Creator-Only Cancellation** — When a cancel request is made via `POST /api/webapp/cancel`, the backend verifies that the Telegram user ID (`user.id`) matches the `triggered_by_id` stored for that active build, preventing unauthorized cancellation of builds triggered by other group members.
 - **Correlation Token** — `BUILD_REQUEST_ID` is a 128-bit random token per build correlating the webhook callback back to the correct chat and active build.
 
 ---
@@ -37,12 +40,15 @@ The bot acts as a passive frontend and notification layer. All interactive build
 
 ```
 Client → POST /control/{start|stop|restart} → target service
-Client → GET /control/status → target service
+Client → GET /control/status → target service (polling status check)
+Client → GET /control/stream → target service (SSE real-time status stream)
 Client → GET /control/schema → target service
 Client → GET/PUT /control/config → target service (read/write config)
 ```
 
-The `/control/status` response carries four fields:
+The real-time status of all services is streamed to the config-hub frontend via a Server-Sent Events (SSE) stream at `/api/services/stream`. The backend polls all managed service clients, serializes the aggregated status as a canonical JSON string, and hashes it using MD5. It only yields a new `ServerSentEvent` to the client if the resulting hash differs from the previously sent update, preventing redundant rendering and saving network bandwidth.
+
+The `/control/status` response carries five fields:
 
 | Field | Type | Meaning |
 |-------|------|---------|
@@ -79,6 +85,9 @@ OAuth is handled by `file-manager` (`/api/auth/*`) via two mechanisms, both prox
 2. **Headless code-paste flow** — exchange manually-pasted auth code for tokens (manual fallback option)
 
 Both flows produce the same stored token in file-manager's data volume. The bot never initiates OAuth — it only uploads files after a successful build.
+
+### Basic Auth Exemption for OAuth Callback
+To support browser-redirect flow under optional Config Hub Basic Authentication, the Google Drive OAuth callback endpoint (`/api/drive/oauth/callback`) is explicitly exempted from credentials check. This is required because modern browsers strip cached Basic Auth headers on cross-origin redirects (i.e. when accounts.google.com redirects the user back to the config-hub). This exemption is completely safe as the endpoint only serves a static HTML shell that triggers parent window callback events, and carries out no administrative or write operations.
 
 ### Key Design Decisions
 

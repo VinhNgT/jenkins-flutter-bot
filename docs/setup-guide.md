@@ -77,8 +77,9 @@ This starts all six services:
 | Service          | URL                    | Purpose                                           |
 | ---------------- | ---------------------- | ------------------------------------------------- |
 | `jenkins`        | http://localhost:8080   | Jenkins controller (web UI)                       |
-| `config-hub`     | http://localhost:9000   | Configuration dashboard and operational hub       |
-| `tg-jenkins-bot` | Internal (:9090)       | Telegram bot + webhook receiver                   |
+| `gateway`        | http://localhost:9000   | Ingress Gateway (proxies to config-hub)           |
+| `config-hub`     | Internal (:9000)       | Configuration dashboard and operational hub       |
+| `tg-jenkins-bot` | Internal (:9090)       | Telegram bot + webhook receiver (publicly proxied to gateway:80) |
 | `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs + control API |
 | `file-manager`   | Internal (:9092)       | Google Drive OAuth and APK upload/download        |
 | `build-manager`  | Internal (:9010)       | Jenkins build trigger and job state tracking      |
@@ -86,7 +87,26 @@ This starts all six services:
 > [!NOTE]
 > The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so config-hub can manage them.
 
-Open **http://localhost:9000** — you'll use this dashboard throughout the remaining steps.
+Open **http://localhost:9000** (proxied securely via the gateway) — you'll use this dashboard throughout the remaining steps.
+
+### 1b. Config Hub Security (Basic Authentication)
+
+By default, Config Hub operates with no authentication in development for rapid setup. To secure your configuration dashboard (especially when hosting publicly or in production):
+
+1. Create or edit **`infra/env/config-hub.env`** and add your credentials:
+   ```env
+   CONFIG_HUB_AUTH_USERNAME=your_username
+   CONFIG_HUB_AUTH_PASSWORD=your_secure_password
+   ```
+2. Restart the Config Hub container:
+   ```bash
+   ./compose.sh restart config-hub
+   ```
+
+Once configured, the web UI and APIs will prompt for standard HTTP Basic Authentication credentials.
+
+> [!NOTE]
+> The Google Drive OAuth callback endpoint (`/api/drive/oauth/callback`) is automatically exempted from Basic Auth. This prevents modern browsers from stripping authentication credentials on the redirect back from Google Accounts.
 
 ---
 
@@ -449,13 +469,16 @@ docker compose restart
 
 ### Run Your First Build
 
-1. Open your Telegram chat with the bot
-2. Tap the **🚀 Build** button at the bottom left to open the Telegram Mini App.
-3. Select an option (e.g., *Stable Release*) or type a custom branch name, then tap **Trigger Build**.
-4. The Web App will close, and the bot will post `🔨 Alice started a Stable Release build` to the chat.
-5. Watch the build progress on Jenkins (http://localhost:8080)
-6. Upon successful completion, the bot will post a completely new `✅ MyApp Stable Release is ready!` message containing the direct Google Drive **📥 Download APK** link.
-7. Send `/recent` to see your past builds.
+1. **Group Chat Only Requirement:** The Telegram Mini App is strictly prohibited in private 1-on-1 chats for collaborative security. Ensure your bot is added to an authorized group chat (one of the whitelisted IDs in `allowed_chat_ids`).
+2. Tap the **🚀 Build** menu button in the authorized group chat to launch the Telegram Mini App. (Launching from a private chat will display a `private_chat_disabled` error page).
+3. Select a configured branch or type a custom branch name, then tap **Trigger Build**.
+4. The Mini App provides a **Real-Time Active Builds** dashboard using Server-Sent Events (SSE). You can monitor your build's status directly in the Mini App as it progresses:
+   - Tapping **Cancel** stops the build in Jenkins and cleans up state immediately.
+   - **Creator-Only Cancellation:** Only the user who originally triggered a specific build is authorized to cancel it. Other users will receive a `403 Forbidden` if they try.
+5. The bot will also post a status message `🔨 Alice started a Stable Release build` to the group chat.
+6. Watch the build progress on Jenkins (http://localhost:8080)
+7. Upon successful completion, the bot posts a completely new `✅ MyApp Stable Release is ready!` message to the group chat containing the direct Google Drive **📥 Download APK** link.
+8. **Recent Builds History:** Instead of spamming the chat with historical lists, you can view the 5 most recent completed builds and their download links natively inside the **Recent Builds** section at the bottom of the Mini App.
 
 🎉 **Setup complete!** You now have a fully functional CI/CD pipeline triggered via Telegram Web Apps.
 

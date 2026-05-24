@@ -17,13 +17,13 @@ graph TD
         BA["Browser Admin"]
     end
 
-    subgraph public["Public Boundary"]
+    subgraph public["Gateway Ingress Boundary"]
         CF["cloudflared (Tunnel)"]
-        GW["gateway (Caddy Ingress) :80"]
+        GW["gateway (Caddy Ingress)"]
     end
 
     subgraph ops["Ops"]
-        CH["config-hub :9000 ★"]
+        CH["config-hub :9000"]
     end
 
     subgraph managed["Managed Services"]
@@ -37,9 +37,10 @@ graph TD
 
     TU -- Web App / HTTPS --> CF
     CF --> GW
-    GW -- Proxy (/webapp) --> BOT
+    GW -- Proxy :80 (/webapp) --> BOT
     BOT -- polling --> TU
-    BA --> CH
+    BA -- Host Access :9000 --> GW
+    GW -- Proxy :9000 --> CH
     CH -. "configures & controls" .-> managed
 
     BOT -- trigger --> BM
@@ -52,13 +53,13 @@ graph TD
 
 | Service | Port | Exposed | Role |
 |---------|------|---------|------|
-| `config-hub` | 9000 | Yes | Central operational hub — config proxy, service control, web dashboard |
+| `config-hub` | 9000 | No | Central operational hub — config proxy, service control, web dashboard (accessed via gateway) |
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
 | `tg-jenkins-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
 | `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
 | `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
-| `gateway` | 80 (internal) | No | Caddy Ingress Gateway — secure routing perimeter for public Web App endpoints |
+| `gateway` | 80, 9000 | Yes | Caddy Ingress Gateway — secure routing perimeter for public Web App (:80) and admin UI (:9000) |
 | `cloudflared` | — | No | Cloudflare Tunnel — secure HTTPS tunnel connecting local gateway to Cloudflare |
 
 ---

@@ -29,12 +29,12 @@ For the authoritative volume list, see `docker-compose.yml`. Key design decision
 
 All services share a single Docker bridge network. Only two ports are exposed to the host:
 
-- **`jenkins:8080`** — Jenkins web UI
-- **`config-hub:9000`** — Config dashboard + Drive OAuth callback
+- **`jenkins:8080`** — Jenkins web UI (for local development)
+- **`gateway:9000`** — Caddy Ingress Gateway's local proxy port, which routes traffic securely to `config-hub:9000`
 
-Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), and build-manager (`9010`) ports are internal only.
+Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), build-manager (`9010`), and config-hub (`9000`) ports are internal only. Config-hub is never exposed to the host directly.
 
-Additionally, a **Caddy Ingress Gateway** (`gateway` service on internal port `80`) acts as a secure routing perimeter, proxying public Telegram Web App paths (`/webapp*` and `/api/webapp*`) to `tg-jenkins-bot:9090` while blocking all other traffic. A **Cloudflare Tunnel** (`cloudflared` service) interfaces directly with `gateway:80` to safely expose the Web App endpoints over HTTPS.
+Additionally, the **Caddy Ingress Gateway** (`gateway` service) acts as the secure routing perimeter for **both** local administrative traffic (via `:9000` on the host) and public Web App traffic (via internal port `:80`). It proxies public Telegram Web App paths (`/webapp*` and `/api/webapp*`) to `tg-jenkins-bot:9090` while blocking all other public traffic. A **Cloudflare Tunnel** (`cloudflared` service) interfaces directly with `gateway:80` to safely expose the Web App endpoints over HTTPS.
 
 Do not expose bot, agent-control, file-manager, or build-manager ports to the host.
 
@@ -50,27 +50,27 @@ Template files (`*.env.example`) are auto-generated from schemas via `scripts/ge
 
 ## Dev vs Production Compose
 
-All Docker Compose overlay configurations are organized under `infra/compose/` and managed using the `infra/compose.sh` script, which automates multi-file overlays.
+All Docker Compose configurations are organized into individual directories under `infra/` representing their respective environments. The `infra/compose.sh` script acts as a runner, automatically forwarding commands to the correct subdirectory using the `-f` flag (and optionally passing an `.env` file if it exists at `infra/.env`).
 
-Five compose modes are supported:
+Five compose modes/directories are supported:
 
 ```bash
-./compose.sh [args]          # Dev — builds images locally from source using compose/docker-compose.yml
-./compose.sh prod [args]     # Prod — overlays compose/docker-compose.prod.yml (pulls images from GHCR)
-./compose.sh edge [args]     # Edge — overlays compose/docker-compose.edge.yml (pulls edge images from GHCR)
-./compose.sh hybrid [args]   # Hybrid — overlays compose/docker-compose.hybrid.yml (builds locally, pulls agent)
-./compose.sh mock [args]     # Mock — overlays compose/docker-compose.mock.yml (replaces agent/jenkins with mock)
+./compose.sh [args]          # Dev — runs from infra/dev/docker-compose.yml (builds images locally from source)
+./compose.sh prod [args]     # Prod — runs from infra/prod/docker-compose.yml (pulls stable images from GHCR)
+./compose.sh edge [args]     # Edge — runs from infra/edge/docker-compose.yml (pulls latest development edge images from GHCR)
+./compose.sh hybrid [args]   # Hybrid — runs from infra/hybrid/docker-compose.yml (builds apps locally, pulls agent-control from GHCR)
+./compose.sh mock [args]     # Mock — runs from infra/mock/docker-compose.yml (replaces agent-control & jenkins with mock-jenkins)
 ```
 
-**Production mode** overlays `compose/docker-compose.prod.yml`, which replaces local `build:` context with `image:` pointing to GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
+**Production mode** runs `infra/prod/docker-compose.yml`, which pulls images from GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
 
-**Edge mode** overlays `compose/docker-compose.edge.yml`, pulling `edge` tagged images representing the latest development snapshot.
+**Edge mode** runs `infra/edge/docker-compose.yml`, pulling `edge` tagged snapshots from GHCR.
 
-**Hybrid mode** overlays `compose/docker-compose.hybrid.yml`, which disables the local build for `agent-control` and pulls it from GHCR instead, while building all other services locally from their respective `Dockerfile` definitions.
+**Hybrid mode** runs `infra/hybrid/docker-compose.yml`, building all five Python applications locally while pulling the heavy `agent-control` image from GHCR to save compile time.
 
-**Mock mode** overlays `compose/docker-compose.mock.yml`, which replaces the real `agent-control` and `jenkins` with the `mock-jenkins` service. Used for local development and testing without a real Jenkins install.
+**Mock mode** runs `infra/mock/docker-compose.yml`, replacing Jenkins and Agent Control with the lightweight `mock-jenkins` service for offline development and testing.
 
-The `jenkins` service has **no** prod override — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the service.
+The `jenkins` service has **no** prod configuration — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the local container.
 
 ---
 

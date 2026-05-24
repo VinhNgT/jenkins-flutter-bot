@@ -119,7 +119,15 @@ class BotContext:
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
 
-        text = f"✅ <b>{app_name} {label} is ready!</b>\n⏱ {duration}\n"
+        lines = [f"✅ <b>{app_name} {label} is ready!</b>", ""]
+        lines.append(f"📦 Branch: <code>{_escape(build.ref)}</code>")
+        commit = result.get("commit_hash", "")
+        if commit:
+            lines.append(f"🔖 Commit: <code>{_escape(commit[:7])}</code>")
+        lines.append(f"⏱ Duration: {duration}")
+        lines.append(f"👤 Triggered by: {_escape(build.triggered_by)}")
+        text = "\n".join(lines) + "\n"
+
         reply_markup = None
         if download_url:
             reply_markup = InlineKeyboardMarkup(
@@ -140,12 +148,17 @@ class BotContext:
         label = _escape(build.label)
         duration = _format_duration(build.triggered_at, self._clock())
 
-        text = (
-            f"❌ <b>{app_name} {label} build failed</b>\n"
-            f"⏱ {duration}\n"
-            f"\n"
-            f"<i>Branch: {_escape(build.ref)} · {self._admin_hint()}</i>"
-        )
+        lines = [f"❌ <b>{app_name} {label} build failed</b>", ""]
+        lines.append(f"📦 Branch: <code>{_escape(build.ref)}</code>")
+        commit = result.get("commit_hash", "")
+        if commit:
+            lines.append(f"🔖 Commit: <code>{_escape(commit[:7])}</code>")
+        lines.append(f"⏱ Duration: {duration}")
+        lines.append(f"👤 Triggered by: {_escape(build.triggered_by)}")
+        lines.append("")
+        lines.append(f"<i>{self._admin_hint()} for build logs.</i>")
+        text = "\n".join(lines)
+
         await self.bot.send_message(build.chat_id, text, parse_mode="HTML")
 
     async def on_build_timeout(self, build: ActiveBuild, result: dict) -> None:
@@ -155,11 +168,15 @@ class BotContext:
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
 
-        text = (
-            f"⏰ <b>{app_name} {label} build timed out</b>\n"
-            f"\n"
-            f"<i>Branch: {_escape(build.ref)} · {self._admin_hint()}</i>"
-        )
+        duration = _format_duration(build.triggered_at, self._clock())
+        lines = [f"⏰ <b>{app_name} {label} build timed out</b>", ""]
+        lines.append(f"📦 Branch: <code>{_escape(build.ref)}</code>")
+        lines.append(f"⏱ Waited: {duration}")
+        lines.append(f"👤 Triggered by: {_escape(build.triggered_by)}")
+        lines.append("")
+        lines.append(f"<i>The build exceeded its time limit. {self._admin_hint()}</i>")
+        text = "\n".join(lines)
+
         await self.bot.send_message(build.chat_id, text, parse_mode="HTML")
 
     async def on_build_cancelled(
@@ -171,9 +188,10 @@ class BotContext:
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
 
+        lines = [f"🛑 <b>{app_name} {label} build cancelled</b>", ""]
+        lines.append(f"📦 Branch: <code>{_escape(build.ref)}</code>")
         if cancelled_by:
-            text = f"🛑 <b>{_escape(cancelled_by)} cancelled the {app_name} {label} build</b>"
-        else:
-            text = f"🛑 <b>{app_name} {label} build was cancelled</b>"
+            lines.append(f"👤 Cancelled by: {_escape(cancelled_by)}")
+        text = "\n".join(lines)
 
         await self.bot.send_message(build.chat_id, text, parse_mode="HTML")

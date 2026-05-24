@@ -15,7 +15,7 @@ from typing import Any
 from config_core import format_validation_error
 from pydantic import ValidationError
 
-from telegram import Bot, MenuButtonDefault
+from telegram import Bot, BotCommandScopeAllGroupChats, BotCommandScopeDefault
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -24,7 +24,7 @@ from telegram.ext import (
 
 from .bot.context import BotContext
 from .bot.handlers import (
-    recent_handler,
+    help_handler,
     start_handler,
     status_handler,
 )
@@ -58,9 +58,8 @@ def _build_application(
 
     # Slash commands
     application.add_handler(CommandHandler("start", start_handler))
-    application.add_handler(CommandHandler("help", start_handler))
+    application.add_handler(CommandHandler("help", help_handler))
     application.add_handler(CommandHandler("status", status_handler))
-    application.add_handler(CommandHandler("recent", recent_handler))
 
     return application, bot_context
 
@@ -118,17 +117,16 @@ class BotManager:
                 )
 
                 # Register visible commands in the "/" picker
+                # Empty command list for group chats — hides the "/" menu button
+                await application.bot.set_my_commands([], scope=BotCommandScopeAllGroupChats())
+
+                # Register commands with default scope — appear in autocomplete when users type "/"
                 await application.bot.set_my_commands(
                     [
-                        ("recent", "Show recent builds"),
-                        ("status", "Check build system health"),
+                        ("status", "System diagnostics"),
                         ("help", "How to use this bot"),
-                    ]
-                )
-
-                # Ensure the chat menu button is set to default (consistent experience across all chats)
-                await application.bot.set_chat_menu_button(
-                    menu_button=MenuButtonDefault()
+                    ],
+                    scope=BotCommandScopeDefault(),
                 )
 
                 self._application = application

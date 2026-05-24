@@ -78,6 +78,15 @@
             <div class="tg-section-footer">Build progress updates in real-time. Only the user who triggered a build can cancel it.</div>
         </div>
 
+        <!-- Section: Recent Completed Builds -->
+        <div class="tg-section">
+            <div class="tg-section-header">Recent Builds</div>
+            <div class="tg-list" id="recentBuildsList">
+                <!-- Rendered dynamically -->
+            </div>
+            <div class="tg-section-footer">Shows the last completed builds with download links.</div>
+        </div>
+
         <!-- Browser Fallback Primary Actions (Only shown outside Telegram) -->
         <div id="fallbackBtnContainer" style="margin-top: auto; padding-top: 16px; width: 100%;">
             <button id="fallbackTriggerBtn" class="tg-primary-button" disabled>
@@ -158,6 +167,27 @@
                 <div class="tg-empty-row">
                     <div class="tg-skeleton" style="width: 36px; height: 36px; border-radius: 50%;"></div>
                     <div class="tg-skeleton" style="width: 200px; height: 13px; border-radius: 4px; margin-top: 8px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Skeleton: Recent Builds section -->
+        <div class="tg-section">
+            <div class="tg-section-header">
+                <div class="tg-skeleton" style="width: 110px; height: 11px; border-radius: 3px;"></div>
+            </div>
+            <div class="tg-list">
+                <div class="tg-list-item" style="cursor: default;">
+                    <div class="tg-list-item-content">
+                        <div class="tg-skeleton" style="width: 140px; height: 16px; border-radius: 4px;"></div>
+                        <div class="tg-skeleton" style="width: 100px; height: 12px; border-radius: 3px; margin-top: 4px;"></div>
+                    </div>
+                </div>
+                <div class="tg-list-item" style="cursor: default;">
+                    <div class="tg-list-item-content">
+                        <div class="tg-skeleton" style="width: 120px; height: 16px; border-radius: 4px;"></div>
+                        <div class="tg-skeleton" style="width: 80px; height: 12px; border-radius: 3px; margin-top: 4px;"></div>
+                    </div>
                 </div>
             </div>
         </div>

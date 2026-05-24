@@ -407,7 +407,7 @@ def test_webapp_trigger_build_happy_path(
     # Verify Telegram notification sent
     mock_bot.send_message.assert_called_once_with(
         chat_id=-12345,
-        text="🔨 <b>Alice started a Stable Release build</b>",
+        text="🔨 <b>Alice started a Stable Release build</b>\n📦 Branch: <code>main</code>",
         parse_mode="HTML",
     )
 
@@ -490,7 +490,7 @@ def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) ->
     # Verify notification is sent to the group chat from start_param (-12345)
     mock_bot.send_message.assert_called_once_with(
         chat_id=-12345,
-        text="🔨 <b>Alice started a Stable Release build</b>",
+        text="🔨 <b>Alice started a Stable Release build</b>\n📦 Branch: <code>main</code>",
         parse_mode="HTML",
     )
 

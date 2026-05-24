@@ -148,12 +148,14 @@ class TestBuildResults:
             request_id="req-123",
             triggered_at=1_700_000_000.0,
             triggered_by="Alice",
+            triggered_by_id=67890,
         )
         ctx._clock_ref[0] = 1_700_000_120.0  # 2 minutes later
         await ctx.on_build_success(
             build,
             {
                 "download_url": "https://drive.google.com/file/123",
+                "commit_hash": "abcdef123",
             },
         )
 
@@ -163,7 +165,10 @@ class TestBuildResults:
         assert call_args[0][0] == 100
         text = call_args[0][1]
         assert "TestApp Stable Release is ready!" in text
-        assert "2 min" in text
+        assert "Branch: <code>main</code>" in text
+        assert "Commit: <code>abcdef1</code>" in text
+        assert "Duration: 2 min" in text
+        assert "Triggered by: Alice" in text
 
         # Verify reply markup download button
         reply_markup = call_args.kwargs.get("reply_markup")
@@ -177,6 +182,7 @@ class TestBuildResults:
             request_id="req-123",
             triggered_at=1_700_000_000.0,
             triggered_by="Alice",
+            triggered_by_id=67890,
         )
         await ctx.on_build_success(build, {"download_url": ""})
 
@@ -191,17 +197,21 @@ class TestBuildResults:
             request_id="req-123",
             triggered_at=1_700_000_000.0,
             triggered_by="Alice",
+            triggered_by_id=67890,
         )
         ctx._clock_ref[0] = 1_700_000_060.0  # 1 minute later
-        await ctx.on_build_failure(build, {})
+        await ctx.on_build_failure(build, {"commit_hash": "abcdef123"})
 
         bot.send_message.assert_awaited_once()
         call_args = bot.send_message.call_args
         assert call_args[0][0] == 100
         text = call_args[0][1]
         assert "TestApp Stable Release build failed" in text
-        assert "1 min" in text
-        assert "main" in text
+        assert "Branch: <code>main</code>" in text
+        assert "Commit: <code>abcdef1</code>" in text
+        assert "Duration: 1 min" in text
+        assert "Triggered by: Alice" in text
+        assert "Contact your admin" in text
 
     async def test_on_build_timeout_sends_notification(self, ctx, bot):
         build = ActiveBuild(
@@ -211,7 +221,9 @@ class TestBuildResults:
             request_id="req-123",
             triggered_at=1_700_000_000.0,
             triggered_by="Alice",
+            triggered_by_id=67890,
         )
+        ctx._clock_ref[0] = 1_700_000_120.0  # 2 minutes later
         await ctx.on_build_timeout(build, {})
 
         bot.send_message.assert_awaited_once()
@@ -219,7 +231,9 @@ class TestBuildResults:
         assert call_args[0][0] == 100
         text = call_args[0][1]
         assert "TestApp Stable Release build timed out" in text
-        assert "main" in text
+        assert "Branch: <code>main</code>" in text
+        assert "Waited: 2 min" in text
+        assert "Triggered by: Alice" in text
 
     async def test_on_build_cancelled_without_user(self, ctx, bot):
         build = ActiveBuild(
@@ -229,11 +243,13 @@ class TestBuildResults:
             request_id="req-123",
             triggered_at=1_700_000_000.0,
             triggered_by="Alice",
+            triggered_by_id=67890,
         )
         await ctx.on_build_cancelled(build)
         bot.send_message.assert_called_once()
         text = bot.send_message.call_args[0][1]
-        assert "TestApp Stable Release build was cancelled" in text
+        assert "TestApp Stable Release build cancelled" in text
+        assert "Branch: <code>main</code>" in text
 
     async def test_on_build_cancelled_with_user(self, ctx, bot):
         build = ActiveBuild(
@@ -243,11 +259,14 @@ class TestBuildResults:
             request_id="req-123",
             triggered_at=1_700_000_000.0,
             triggered_by="Alice",
+            triggered_by_id=67890,
         )
         await ctx.on_build_cancelled(build, cancelled_by="Bob")
         bot.send_message.assert_called_once()
         text = bot.send_message.call_args[0][1]
-        assert "Bob cancelled the TestApp Stable Release build" in text
+        assert "TestApp Stable Release build cancelled" in text
+        assert "Cancelled by: Bob" in text
+        assert "Branch: <code>main</code>" in text
 
     async def test_no_bot_instance_no_crash(self):
         """bot=None → no crash."""
@@ -260,6 +279,7 @@ class TestBuildResults:
             request_id="req-123",
             triggered_at=1_700_000_000.0,
             triggered_by="Alice",
+            triggered_by_id=67890,
         )
         # Should not raise
         await ctx.on_build_success(build, {"download_url": ""})

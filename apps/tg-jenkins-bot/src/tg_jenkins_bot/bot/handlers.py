@@ -130,7 +130,7 @@ async def _ensure_authorized(
 
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start and /help commands — welcome message."""
+    """Handle /start command — welcome message."""
     if not update.message:
         return
 
@@ -141,9 +141,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     app_name = _escape(ctx.config.app_name)
 
     github_url = ctx.config.github_url
-    version_str = f"<i>v{_bot_version()}</i>"
+    version_str = f"v{_bot_version()}"
     footer = (
-        f'<a href="{github_url}">⭐ GitHub</a>  ·  {version_str}'
+        f'<a href="{github_url}">{version_str} · GitHub</a>'
         if github_url
         else version_str
     )
@@ -151,10 +151,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     chat_id = update.effective_chat.id if update.effective_chat else None
 
     await update.message.reply_text(
-        f"👋 Hi! I'll build <b>{app_name}</b> and send you a download link "
-        "when it's ready.\n"
+        f"👋 Hi! I'm your build assistant for <b>{app_name}</b>.\n"
         "\n"
-        "Tap the 🚀 Build button below to get started, or use /recent to see past builds.\n"
+        "Tap 🚀 Build below to open the build panel.\n"
         "\n"
         f"{footer}",
         parse_mode="HTML",
@@ -164,12 +163,63 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ---------------------------------------------------------------------------
-# /status (semi-technical, admin-facing)
+# /help
+# ---------------------------------------------------------------------------
+
+
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /help command — detailed static help message."""
+    if not update.message:
+        return
+
+    if not await _ensure_authorized(update, context):
+        return
+
+    ctx = _get_ctx(context)
+    app_name = _escape(ctx.config.app_name)
+    admin_contact = _escape(ctx.config.admin_contact or "your administrator")
+
+    github_url = ctx.config.github_url
+    version_str = f"v{_bot_version()}"
+    footer = (
+        f'<a href="{github_url}">{version_str} · GitHub</a>'
+        if github_url
+        else version_str
+    )
+
+    await update.message.reply_text(
+        f"ℹ️ <b>{app_name} Build Bot</b>\n"
+        "\n"
+        "🚀 <b>How to Build</b>\n"
+        "Use /start to get the 🚀 Build button, then tap it to\n"
+        "open the build panel. Select a branch and tap Trigger Build.\n"
+        "\n"
+        "📲 <b>Notifications</b>\n"
+        "When your build finishes, I'll send a message here with\n"
+        "a download link. Failed builds include the branch and\n"
+        "commit for debugging.\n"
+        "\n"
+        "💡 <b>Commands</b>\n"
+        "/start — Welcome message + Build button\n"
+        "/status — System diagnostics (technical)\n"
+        "/help — This help message\n"
+        "\n"
+        "🔧 <b>Admin</b>\n"
+        f"Contact {admin_contact} for access issues.\n"
+        "\n"
+        f"{footer}",
+        parse_mode="HTML",
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
+    )
+
+
+# ---------------------------------------------------------------------------
+# /status (technical diagnostic command)
 # ---------------------------------------------------------------------------
 
 
 async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show bot readiness and active builds."""
+    """Show technical diagnostics of the system."""
     if not update.message or not update.effective_chat:
         return
     ctx = _get_ctx(context)
@@ -185,101 +235,45 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Headline
     app_name = _escape(ctx.config.app_name)
-    if building:
-        headline = f"🟡 <b>Building {app_name} ({len(building)} active)</b>"
-    else:
-        headline = f"🟢 <b>Ready to build {app_name}</b>"
+    version = _escape(_bot_version())
+    
+    lines = [
+        f"🔧 <b>{app_name} — System Diagnostics</b>",
+        "",
+        f"Service: <code>tg-jenkins-bot v{version}</code>",
+        "Status: 🟢 Online",
+        f"Active builds: {len(building)}",
+    ]
 
-    lines = [headline, ""]
-
-    # Build counts
-    completed = sm_status.get("completed_count", 0)
-    if completed:
-        lines.append(f"Completed builds: {completed}")
-
-    # Pending builds
+    # Pending builds list
     if building:
         lines.append("")
-        lines.append("In progress:")
+        lines.append("Pending:")
         for b in building:
+            req_id = b.request_id[:8] if b.request_id else "unknown"
             lines.append(
-                f"  • <code>{_escape(b.ref)}</code>"
-                f" (started {ctx.format_elapsed(b.triggered_at)})"
+                f"  • {_escape(b.ref)} (req: <code>{_escape(req_id)}</code>, started {ctx.format_elapsed(b.triggered_at)})"
             )
 
-    # Recent successful build
+    # Recent completed build
     recent = await ctx.build_client.get_recent_builds(count=1)
-    successful = [b for b in recent if b.result == "success"]
-    if successful:
-        last = successful[0]
-        short_hash = last.commit_hash[:7] if last.commit_hash else ""
-        date_str = _format_date(last.completed_at) if last.completed_at else ""
-        parts = [f"✅ {_escape(last.branch or 'unknown')}"]
-        if short_hash:
-            parts.append(f"<code>{_escape(short_hash)}</code>")
-        if date_str:
-            parts.append(date_str)
+    if recent:
+        last = recent[0]
+        result_emoji = "✅" if last.result == "success" else "❌" if last.result == "failure" else "⏰" if last.result == "timeout" else "🛑"
+        short_hash = last.commit_hash[:7] if last.commit_hash else "unknown"
+        date_str = _format_date(last.completed_at) if last.completed_at else "unknown"
         lines.append("")
-        lines.append(f"Last build: {' · '.join(parts)}")
-
-    # Not-ready hint
-    if not building and not completed:
-        lines.append("")
-        lines.append(ctx._admin_hint())
-
-    chat_id = update.effective_chat.id if update.effective_chat else None
-    await update.message.reply_text(
-        "\n".join(lines),
-        parse_mode="HTML",
-        reply_markup=_get_webapp_keyboard(context, chat_id),
-    )
-
-
-# ---------------------------------------------------------------------------
-# /recent command
-# ---------------------------------------------------------------------------
-
-
-async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/recent — show recent successful builds with download links."""
-    if not update.message or not update.effective_chat:
-        return
-    ctx = _get_ctx(context)
-
-    if not await _ensure_authorized(update, context):
-        return
-
-    builds = await ctx.build_client.get_recent_builds(count=5)
-    successful = [b for b in builds if b.result == "success"]
-
-    if not successful:
-        await update.message.reply_text(
-            "📭 No successful builds yet.",
+        lines.append("Last build:")
+        lines.append(
+            f"  {result_emoji} {_escape(last.branch or 'unknown')} · <code>{_escape(short_hash)}</code> · {date_str}"
         )
-        return
 
-    app_name = _escape(ctx.config.app_name)
-    lines = [f"📦 <b>Recent {app_name} Builds</b>\n"]
-    for b in successful:
-        date_str = _format_date(b.completed_at) if b.completed_at else ""
-        duration = _format_duration(b.triggered_at, b.completed_at)
-        parts = [f"<code>{_escape(b.branch or 'unknown')}</code>"]
-        if date_str:
-            parts.append(date_str)
-        if duration:
-            parts.append(duration)
-        entry = " · ".join(parts)
+    # Build manager completed count
+    completed = sm_status.get("completed_count", 0)
+    lines.append("")
+    lines.append(f"Build Manager: {completed} completed")
 
-        if b.download_url:
-            lines.append(
-                f'• ✅ {entry}    <a href="{_escape(b.download_url)}">📲 Download</a>'
-            )
-        else:
-            lines.append(f"• ✅ {entry}")
-
-    chat_id = update.effective_chat.id if update.effective_chat else None
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",
-        reply_markup=_get_webapp_keyboard(context, chat_id),
     )

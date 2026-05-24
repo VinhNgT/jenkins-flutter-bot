@@ -359,7 +359,10 @@ async def trigger_webapp_build(
 
     # 4. Notify Telegram chat
     triggered_by = user.first_name
-    msg_text = f"🔨 <b>{triggered_by} started a {label} build</b>"
+    msg_text = (
+        f"🔨 <b>{triggered_by} started a {label} build</b>\n"
+        f"📦 Branch: <code>{req.branch}</code>"
+    )
     if ctx.bot:
         try:
             await ctx.bot.send_message(
@@ -438,3 +441,30 @@ async def cancel_webapp_build(
         logger.exception("Failed to send cancellation message to Telegram")
 
     return {"ok": True}
+
+
+@router.get("/recent")
+async def get_recent_builds(
+    manager: ManagerDep,
+    user: ValidatedUser,
+) -> dict:
+    """Return recent completed builds for the web app."""
+    ctx = manager.bot_context
+    if ctx is None:
+        raise HTTPException(status_code=503, detail="Bot not initialized")
+
+    builds = await ctx.build_client.get_recent_builds(count=5)
+    return {
+        "builds": [
+            {
+                "branch": b.branch,
+                "commit_hash": b.commit_hash,
+                "result": b.result,
+                "triggered_at": b.triggered_at,
+                "completed_at": b.completed_at,
+                "download_url": b.download_url,
+            }
+            for b in builds
+        ]
+    }
+

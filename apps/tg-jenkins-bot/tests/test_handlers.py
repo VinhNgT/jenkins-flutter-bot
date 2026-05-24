@@ -8,7 +8,7 @@ import pytest
 from telegram import Bot, Chat, Message, Update, User
 
 from tg_jenkins_bot.bot.context import BotContext
-from tg_jenkins_bot.bot.handlers import start_handler, recent_handler, status_handler
+from tg_jenkins_bot.bot.handlers import start_handler, help_handler, status_handler
 
 
 def make_mock_bot() -> AsyncMock:
@@ -140,7 +140,7 @@ class TestCommandHandlers:
 
         update.message.reply_text.assert_called_once()
         text = update.message.reply_text.call_args[0][0]
-        assert "Tap the 🚀 Build button" in text
+        assert "Tap 🚀 Build below" in text
         assert "TestApp" in text
 
     async def test_start_handler_no_button_when_no_short_name(self, ctx, bot) -> None:
@@ -181,29 +181,21 @@ class TestCommandHandlers:
         kwargs = update.message.reply_text.call_args[1]
         assert kwargs.get("reply_markup") is None
 
-    async def test_recent_handler_authorized(self, ctx, bot) -> None:
-        """Verify recent handler returns recent successful builds."""
-        update = make_message_update("/recent", chat_id=12345)
+    async def test_help_handler(self, ctx, bot) -> None:
+        """Verify help handler returns detailed help instructions."""
+        update = make_message_update("/help", chat_id=12345)
         context = _make_context(ctx, bot)
 
-        await recent_handler(update, context)
+        await help_handler(update, context)
 
         update.message.reply_text.assert_called_once()
         text = update.message.reply_text.call_args[0][0]
-        assert "Recent TestApp Builds" in text
-        assert "main" in text
-        assert "Download" in text
-
-    async def test_recent_handler_unauthorized(self, ctx, bot) -> None:
-        """Verify recent handler rejects unauthorized chats."""
-        update = make_message_update("/recent", chat_id=99999)
-        context = _make_context(ctx, bot)
-
-        await recent_handler(update, context)
-
-        update.message.reply_text.assert_called_once()
-        text = update.message.reply_text.call_args[0][0]
-        assert "This chat isn't authorized" in text
+        assert "ℹ️ <b>TestApp Build Bot</b>" in text
+        assert "🚀 <b>How to Build</b>" in text
+        assert "/start" in text
+        assert "/status" in text
+        assert "/help" in text
+        assert "Contact @admin for access issues" in text
 
     async def test_status_handler_ready(self, ctx, bot) -> None:
         """Verify status handler when no builds are active."""
@@ -214,11 +206,12 @@ class TestCommandHandlers:
 
         update.message.reply_text.assert_called_once()
         text = update.message.reply_text.call_args[0][0]
-        assert "Ready to build TestApp" in text
-        assert "Completed builds: 5" in text
+        assert "TestApp — System Diagnostics" in text
+        assert "Service: <code>tg-jenkins-bot v" in text
+        assert "Build Manager: 5 completed" in text
 
     async def test_status_handler_building(self, ctx, bot) -> None:
-        """Verify status handler lists active builds from store."""
+        """Verify status handler lists active builds from store with details."""
         ctx.store.register(
             request_id="req-111",
             chat_id=12345,
@@ -234,8 +227,9 @@ class TestCommandHandlers:
 
         update.message.reply_text.assert_called_once()
         text = update.message.reply_text.call_args[0][0]
-        assert "Building TestApp (1 active)" in text
+        assert "Active builds: 1" in text
         assert "develop" in text
+        assert "req: <code>req-111</code>" in text
 
     async def test_start_handler_private_chat_rejected(self, ctx, bot) -> None:
         """Verify that private chats are rejected and receive an error message with a group redirect button."""

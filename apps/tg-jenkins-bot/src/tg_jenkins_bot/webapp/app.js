@@ -26,6 +26,7 @@ const customBranchRow = document.getElementById('customBranchRow');
 const customInputClear = document.getElementById('customInputClear');
 const buildsList = document.getElementById('buildsList');
 const buildsCountBadge = document.getElementById('buildsCountBadge');
+const recentBuildsList = document.getElementById('recentBuildsList');
 const fallbackBtnContainer = document.getElementById('fallbackBtnContainer');
 const fallbackTriggerBtn = document.getElementById('fallbackTriggerBtn');
 
@@ -200,6 +201,7 @@ function renderMainView() {
     // Clear and display
     resetInputState();
     renderActiveBuilds();
+    fetchRecentBuilds();
     setupRelativeTicker();
     
     // Hide error / loading screen overlays cleanly
@@ -302,6 +304,90 @@ function renderActiveBuilds() {
     
     // Run immediate relative evaluation
     evaluateRelativeTimes();
+}
+
+// Relative time formatting helper
+function getRelativeTimeString(ts) {
+    const diffSec = Math.floor(Date.now() / 1000 - ts);
+    if (diffSec < 60) return 'just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return `${Math.floor(diffSec / 86400)}d ago`;
+}
+
+// Fetch recent completed builds from the API
+async function fetchRecentBuilds() {
+    try {
+        const response = await fetch('/api/webapp/recent', {
+            headers: { 'X-Telegram-Init-Data': initData }
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        renderRecentBuilds(data.builds || []);
+    } catch (err) {
+        console.error("Failed to fetch recent builds:", err);
+    }
+}
+
+// Render recent builds list in UI
+function renderRecentBuilds(builds) {
+    if (!recentBuildsList) return;
+    recentBuildsList.innerHTML = '';
+    
+    if (builds.length === 0) {
+        recentBuildsList.innerHTML = `
+            <div class="tg-empty-row" style="padding: 16px; text-align: center; color: var(--tg-color-hint);">
+                <span>No recent builds yet.</span>
+            </div>
+        `;
+        return;
+    }
+    
+    builds.forEach(build => {
+        const row = document.createElement('div');
+        row.className = 'tg-list-item';
+        row.style.cursor = 'default';
+        
+        const commit = build.commit_hash ? build.commit_hash.substring(0, 7) : '';
+        const branchInfo = commit ? `${build.branch} (${commit})` : build.branch;
+        
+        const relativeTime = getRelativeTimeString(build.completed_at);
+        let durationStr = '';
+        if (build.completed_at && build.triggered_at) {
+            const dur = Math.max(0, Math.floor(build.completed_at - build.triggered_at));
+            if (dur < 60) {
+                durationStr = ` · ${dur}s`;
+            } else {
+                durationStr = ` · ${Math.floor(dur / 60)}m`;
+            }
+        }
+        
+        let rightContent = '';
+        if (build.result === 'success' && build.download_url) {
+            rightContent = `<a href="${build.download_url}" target="_blank" class="tg-download-link">📲 Download</a>`;
+        } else {
+            const badgeClass = build.result || 'cancelled';
+            rightContent = `<span class="tg-result-badge ${badgeClass}">${build.result}</span>`;
+        }
+        
+        const emoji = build.result === 'success' ? '✅' : build.result === 'failure' ? '❌' : build.result === 'timeout' ? '⏰' : '🛑';
+        
+        row.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; flex-grow: 1;">
+                <div style="font-size: 20px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;">
+                    ${emoji}
+                </div>
+                <div class="tg-list-item-content">
+                    <span class="tg-list-item-title">${branchInfo}</span>
+                    <span class="tg-list-item-subtitle">${relativeTime}${durationStr}</span>
+                </div>
+            </div>
+            <div class="tg-list-item-right" style="flex-shrink: 0; padding-left: 8px;">
+                ${rightContent}
+            </div>
+        `;
+        recentBuildsList.appendChild(row);
+    });
 }
 
 // Select a preconfigured branch row
@@ -524,6 +610,7 @@ function startSSEStream() {
             if (JSON.stringify(config.active_builds) !== JSON.stringify(activeBuilds)) {
                 config.active_builds = activeBuilds;
                 renderActiveBuilds();
+                fetchRecentBuilds();
                 validateTriggerState();
             }
         } catch (err) {

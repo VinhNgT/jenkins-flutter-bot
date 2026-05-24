@@ -572,6 +572,32 @@ body.tg-dark .tg-input-clear {
     100% { background-position: -200% 0; }
 }
 
+/* Build result status badges */
+.tg-result-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.tg-result-badge.success { background: rgba(49, 181, 69, 0.12); color: #31b545; }
+.tg-result-badge.failure { background: rgba(255, 59, 48, 0.12); color: var(--tg-color-destructive); }
+.tg-result-badge.timeout { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.tg-result-badge.cancelled { background: rgba(142, 142, 147, 0.12); color: var(--tg-color-hint); }
+
+/* Download link in recent builds */
+.tg-download-link {
+    color: var(--tg-color-link);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 0;
+}
+
 /* ═══════════════════════════════════════════════════
    Telegram SDK Emulator — Browser Development Styles
    Only rendered when tg-emulator.js injects DOM elements.

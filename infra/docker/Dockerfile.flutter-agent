@@ -69,15 +69,27 @@ ENV PATH="${FLUTTER_HOME}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID
 
 # Reduce Gradle memory pressure — critical for x86_64 emulation on ARM64:
 #   - Disable daemon: CI builds don't benefit from a persistent daemon process
-#   - -Xmx4g: with daemon=false, the client JVM IS the build JVM, so set heap directly
+#   - -Xmx512m: with daemon=false the client JVM only forks the build; the real
+#     build heap is governed by org.gradle.jvmargs in gradle.properties
 #   - Disable VFS watching: inotify breaks under emulation (NativeException: error = 4)
-ENV GRADLE_OPTS="-Xmx4g -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false"
+ENV GRADLE_OPTS="-Xmx512m -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false"
 ENV GRADLE_USER_HOME=/home/jenkins/.gradle
 
-# Force Kotlin compiler to run in-process instead of spawning a separate daemon.
-# The Kotlin daemon crashes on startup under x86_64 emulation (exit code 0).
+# Memory-optimized Gradle properties for CI under x86_64 emulation:
+#   - 2 GB build JVM heap with SerialGC (lower overhead than G1)
+#   - Max 2 parallel workers to cap peak memory
+#   - No parallel project compilation (Flutter is single-project)
+#   - No build cache (CI builds are ephemeral)
+#   - Kotlin compiler in-process (daemon crashes under emulation, exit code 0)
 RUN mkdir -p ${GRADLE_USER_HOME} \
-    && echo "kotlin.compiler.execution.strategy=in-process" > ${GRADLE_USER_HOME}/gradle.properties
+    && { \
+        echo "org.gradle.jvmargs=-Xmx2g -XX:+UseSerialGC"; \
+        echo "org.gradle.workers.max=2"; \
+        echo "org.gradle.parallel=false"; \
+        echo "org.gradle.caching=false"; \
+        echo "kotlin.compiler.execution.strategy=in-process"; \
+        echo "kotlin.daemon.jvmargs=-Xmx512m -XX:+UseSerialGC"; \
+    } > ${GRADLE_USER_HOME}/gradle.properties
 
 # Agent control API — uv manages Python since the base image lacks it.
 # Install into /opt/uv-python (not /root/.local) so the jenkins runtime

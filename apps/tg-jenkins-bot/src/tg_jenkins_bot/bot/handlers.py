@@ -15,7 +15,7 @@ from telegram import (
 )
 from telegram.ext import ContextTypes
 
-from .context import BotContext, _format_duration
+from .context import BotContext
 
 logger = logging.getLogger(__name__)
 

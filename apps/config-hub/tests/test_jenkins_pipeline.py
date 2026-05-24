@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from config_hub.jenkins_pipeline import generate_jenkinsfile
 
 
@@ -67,9 +69,6 @@ def test_generate_jenkinsfile_private_repo_shallow_clone():
     )
     assert "CloneOption" not in jenkinsfile_without
 
-
-import pytest
-from unittest.mock import AsyncMock, patch
 
 @pytest.mark.asyncio
 async def test_manager_get_jenkinsfile_explicit_params():

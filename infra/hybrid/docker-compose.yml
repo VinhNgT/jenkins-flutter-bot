@@ -10,3 +10,4 @@ services:
   agent-control:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/agent-control:${IMAGE_TAG:-edge}
+    pull_policy: always

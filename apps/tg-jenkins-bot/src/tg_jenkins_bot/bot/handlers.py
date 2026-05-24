@@ -47,6 +47,7 @@ def _escape(text: str) -> str:
 
 def _get_webapp_keyboard(
     context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None = None,
 ) -> InlineKeyboardMarkup | None:
     """Build a 🚀 Build inline keyboard button that opens the Telegram native Mini App.
 
@@ -67,6 +68,8 @@ def _get_webapp_keyboard(
     if short_name and bot_username:
         # Native Mini App deep link — works in group chats.
         url = f"https://t.me/{bot_username}/{short_name}"
+        if chat_id is not None:
+            url += f"?startapp={chat_id}"
         return InlineKeyboardMarkup(
             [[InlineKeyboardButton(text="🚀 Build", url=url)]]
         )
@@ -89,7 +92,16 @@ async def _ensure_authorized(
     if not msg or not update.effective_chat:
         return False
 
-    chat_id = update.effective_chat.id
+    chat = update.effective_chat
+    if chat.type == "private":
+        await msg.reply_text(
+            "❌ Private chats are disabled.\n"
+            "This bot can only be used in authorized group chats.",
+            parse_mode="HTML",
+        )
+        return False
+
+    chat_id = chat.id
     if chat_id not in _get_ctx(context).config.allowed_chat_ids:
         await msg.reply_text(
             "❌ This chat isn't authorized.\n"
@@ -112,6 +124,10 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Handle /start and /help commands — welcome message."""
     if not update.message:
         return
+
+    if not await _ensure_authorized(update, context):
+        return
+
     ctx = _get_ctx(context)
     app_name = _escape(ctx.config.app_name)
 
@@ -123,6 +139,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         else version_str
     )
 
+    chat_id = update.effective_chat.id if update.effective_chat else None
+
     await update.message.reply_text(
         f"👋 Hi! I'll build <b>{app_name}</b> and send you a download link "
         "when it's ready.\n"
@@ -131,7 +149,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "\n"
         f"{footer}",
         parse_mode="HTML",
-        reply_markup=_get_webapp_keyboard(context),
+        reply_markup=_get_webapp_keyboard(context, chat_id),
         link_preview_options=LinkPreviewOptions(is_disabled=True),
     )
 
@@ -200,10 +218,11 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lines.append("")
         lines.append(ctx._admin_hint())
 
+    chat_id = update.effective_chat.id if update.effective_chat else None
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",
-        reply_markup=_get_webapp_keyboard(context),
+        reply_markup=_get_webapp_keyboard(context, chat_id),
     )
 
 
@@ -249,8 +268,9 @@ async def recent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             lines.append(f"• ✅ {entry}")
 
+    chat_id = update.effective_chat.id if update.effective_chat else None
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",
-        reply_markup=_get_webapp_keyboard(context),
+        reply_markup=_get_webapp_keyboard(context, chat_id),
     )

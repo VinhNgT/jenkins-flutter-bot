@@ -139,17 +139,35 @@ async def validate_webapp_request(
 
     # Determine chat ID
     # In groups/channels, chat.id is present. In private, it's user.id.
+    # If launched via deep link, chat.id is missing but we pass the chat ID as start_param.
     chat_id = None
     chat_data = data.get("chat")
+    start_param = data.get("start_param")
+
     if chat_data and "id" in chat_data:
+        if chat_data.get("type") == "private":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Private chats are disabled. Please use an authorized group.",
+            )
         chat_id = chat_data["id"]
-    elif "id" in user_data:
-        chat_id = user_data["id"]
+    elif start_param:
+        try:
+            chat_id = int(start_param)
+        except ValueError:
+            pass
+
+    # Private chats are disabled (positive chat IDs represent user/private chats)
+    if chat_id is not None and chat_id > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Private chats are disabled. Please use an authorized group.",
+        )
 
     if chat_id is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Could not determine chat ID",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Private chats are disabled. Please use an authorized group.",
         )
 
     # Verify authorization

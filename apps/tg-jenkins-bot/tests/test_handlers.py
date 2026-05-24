@@ -36,11 +36,12 @@ def make_message_update(
     message_id: int = 100,
     update_id: int = 1,
     bot: AsyncMock | None = None,
+    chat_type: str = "group",
 ) -> Update:
     """Create a telegram.Update containing a Message with mocked reply_text."""
     bot = bot or make_mock_bot()
     user = User(id=user_id, is_bot=False, first_name=user_first_name)
-    chat = Chat(id=chat_id, type="group")
+    chat = Chat(id=chat_id, type=chat_type)
 
     # We mock the message that is sent in the update
     message = MagicMock(spec=Message)
@@ -164,7 +165,7 @@ class TestCommandHandlers:
         keyboard = kwargs["reply_markup"]
         assert keyboard is not None
         button = keyboard.inline_keyboard[0][0]
-        assert button.url == "https://t.me/test_bot/builds"
+        assert button.url == "https://t.me/test_bot/builds?startapp=12345"
         assert button.web_app is None
 
     async def test_start_handler_no_button_when_no_webapp_url(self, ctx, bot) -> None:
@@ -233,3 +234,14 @@ class TestCommandHandlers:
         text = update.message.reply_text.call_args[0][0]
         assert "Building TestApp (1 active)" in text
         assert "develop" in text
+
+    async def test_start_handler_private_chat_rejected(self, ctx, bot) -> None:
+        """Verify that private chats are rejected and receive an error message."""
+        update = make_message_update("/start", chat_id=12345, chat_type="private")
+        context = _make_context(ctx, bot)
+
+        await start_handler(update, context)
+
+        update.message.reply_text.assert_called_once()
+        text = update.message.reply_text.call_args[0][0]
+        assert "Private chats are disabled" in text

@@ -39,6 +39,26 @@ def _generate_valid_init_data(token: str, chat_id: int | None = None) -> str:
     return urllib.parse.urlencode(init_params)
 
 
+def _generate_valid_init_data_with_start_param(token: str, start_param: str) -> str:
+    """Generate a valid signed Telegram Web App initData string with start_param."""
+    user = {"id": 67890, "first_name": "Alice", "username": "alice_tg"}
+    init_params = {
+        "user": json.dumps(user),
+        "auth_date": "1715500000",
+        "query_id": "AAH6854",
+        "start_param": start_param,
+    }
+
+    sorted_params = sorted(init_params.items())
+    check_string = "\n".join(f"{k}={v}" for k, v in sorted_params)
+
+    secret_key = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
+    sig = hmac.new(secret_key, check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    init_params["hash"] = sig
+    return urllib.parse.urlencode(init_params)
+
+
 @pytest.fixture
 def mock_build_client():
     client = AsyncMock()
@@ -61,7 +81,7 @@ def app_with_mocks(mock_build_client, mock_bot):
 
     config = BotSettings(
         telegram_token="123456:test-token",
-        allowed_chat_ids=[12345, 67890],
+        allowed_chat_ids=[-12345, -67890],
         app_name="TestApp",
         branches={"Stable Release": "main", "Testing Version": "develop"},
         bot_service_url="http://bot:9090",
@@ -106,7 +126,7 @@ def test_webapp_config_preview_bypass(test_client) -> None:
 
 def test_webapp_config_real_hmac(test_client) -> None:
     """Test config access using valid HMAC signature."""
-    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=12345)
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
     response = test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": init_data},
@@ -118,7 +138,7 @@ def test_webapp_config_real_hmac(test_client) -> None:
 
 def test_webapp_config_invalid_hmac(test_client) -> None:
     """Test config access using invalid HMAC signature."""
-    init_data = _generate_valid_init_data(token="WRONG-TOKEN", chat_id=12345)
+    init_data = _generate_valid_init_data(token="WRONG-TOKEN", chat_id=-12345)
     response = test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": init_data},
@@ -129,18 +149,18 @@ def test_webapp_config_invalid_hmac(test_client) -> None:
 
 def test_webapp_config_unauthorized_chat(test_client) -> None:
     """Test config access from unauthorized chat."""
-    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=99999)
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-99999)
     response = test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": init_data},
     )
     assert response.status_code == 403
-    assert "not authorized" in response.json()["detail"]
+    assert "is not authorized" in response.json()["detail"]
 
 
 def test_webapp_trigger_build_happy_path(test_client, mock_build_client, mock_bot) -> None:
     """Test successful build trigger from Web App."""
-    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=12345)
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
 
     response = test_client.post(
         "/api/webapp/trigger",
@@ -159,7 +179,7 @@ def test_webapp_trigger_build_happy_path(test_client, mock_build_client, mock_bo
 
     # Verify Telegram notification sent
     mock_bot.send_message.assert_called_once_with(
-        chat_id=12345,
+        chat_id=-12345,
         text="🔨 <b>Alice started a Stable Release build</b>",
         parse_mode="HTML",
     )
@@ -167,13 +187,13 @@ def test_webapp_trigger_build_happy_path(test_client, mock_build_client, mock_bo
 
 def test_webapp_trigger_duplicate_blocked(test_client, mock_build_client, app_with_mocks) -> None:
     """Test that starting a build on a branch already building is blocked."""
-    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=12345)
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
     ctx = app_with_mocks.state.manager.bot_context
 
     # Register an active build on 'main'
     ctx.store.register(
         request_id="req-existing",
-        chat_id=12345,
+        chat_id=-12345,
         ref="main",
         label="Stable Release",
         triggered_by="Bob",
@@ -192,13 +212,13 @@ def test_webapp_trigger_duplicate_blocked(test_client, mock_build_client, app_wi
 
 def test_webapp_cancel_build_happy_path(test_client, mock_build_client, app_with_mocks) -> None:
     """Test successful build cancellation from Web App."""
-    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=12345)
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
     ctx = app_with_mocks.state.manager.bot_context
 
     # Register an active build
     ctx.store.register(
         request_id="req-999",
-        chat_id=12345,
+        chat_id=-12345,
         ref="main",
         label="Stable Release",
         triggered_by="Alice",
@@ -218,3 +238,53 @@ def test_webapp_cancel_build_happy_path(test_client, mock_build_client, app_with
 
     # Verify build is consumed from store
     assert len(ctx.store.list_active()) == 0
+
+
+def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) -> None:
+    """Test that chat_id is correctly extracted from start_param (deep link)."""
+    init_data = _generate_valid_init_data_with_start_param(token="123456:test-token", start_param="-12345")
+
+    response = test_client.post(
+        "/api/webapp/trigger",
+        headers={"X-Telegram-Init-Data": init_data},
+        json={"branch": "main"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "request_id": "req-999"}
+
+    # Verify notification is sent to the group chat from start_param (-12345)
+    mock_bot.send_message.assert_called_once_with(
+        chat_id=-12345,
+        text="🔨 <b>Alice started a Stable Release build</b>",
+        parse_mode="HTML",
+    )
+
+
+def test_webapp_private_chat_rejected_via_start_param(test_client) -> None:
+    """Test that Web App triggers in private chats (positive chat IDs) are rejected."""
+    init_data = _generate_valid_init_data_with_start_param(token="123456:test-token", start_param="67890")
+
+    response = test_client.post(
+        "/api/webapp/trigger",
+        headers={"X-Telegram-Init-Data": init_data},
+        json={"branch": "main"},
+    )
+
+    assert response.status_code == 403
+    assert "Private chats are disabled" in response.json()["detail"]
+
+
+def test_webapp_private_chat_rejected_via_fallback(test_client) -> None:
+    """Test that Web App triggers with no group context fall back to private user ID and are rejected."""
+    # Generating without chat_id defaults to Alice's user.id 67890 (positive)
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=None)
+
+    response = test_client.post(
+        "/api/webapp/trigger",
+        headers={"X-Telegram-Init-Data": init_data},
+        json={"branch": "main"},
+    )
+
+    assert response.status_code == 403
+    assert "Private chats are disabled" in response.json()["detail"]

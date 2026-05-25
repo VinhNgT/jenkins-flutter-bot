@@ -19,11 +19,12 @@ The bot acts as a passive frontend and notification layer. All interactive build
 4. **Trigger Build** — User selects a branch option and clicks build. Web App calls `POST /api/webapp/trigger`.
 5. **Trigger Build-Manager** — The bot requests a build from the build-manager (`POST /builds/trigger`) with `BRANCH`, `callback_url`, and a generated `request_id`.
 6. **Register Active Build** — The bot sends a `"🔨 User started a Target build"` confirmation message to the Telegram group chat, registers the active build in `ActiveBuildStore`, and returns success to the Web App.
-7. **Trigger Jenkins** — Build-manager triggers Jenkins (`POST /job/{name}/buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build.
+7. **Initiate VPN & Trigger Jenkins** — Build-manager initiates an OpenVPN connection via `agent-control`, triggers Jenkins (`POST /job/{name}/buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build.
 8. **Jenkins Run** — Jenkins pipeline runs on the agent managed by `agent-control` and archives the resulting APK on success — **no outbound HTTP from the agent**.
 9. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, uploads to Drive via `file-manager`, and forwards the result to the bot's webhook (`POST /callback/build-result`).
 10. **Notify Chat** — Bot consumes the `ActiveBuild` from `ActiveBuildStore` (which automatically updates the SSE stream) and delivers a completely new success/failure/timeout notification message containing a direct Google Drive download link to the group chat. Messages are **immutable** (send-only, fire-and-forget). The bot **never** edits or deletes messages.
-11. **Retrieve History** — Users can browse past successful builds on demand inside the Web App interface, which calls the `GET /api/webapp/recent` endpoint to query the 5 most recent completed builds directly from build-manager (the Telegram chat remains clean of historical spam).
+11. **Disconnect VPN** — Build-manager checks if the pending build queue is empty; if so, it triggers VPN disconnection via `agent-control`.
+12. **Retrieve History** — Users can browse past successful builds on demand inside the Web App interface, which calls the `GET /api/webapp/recent` endpoint to query the 5 most recent completed builds directly from build-manager (the Telegram chat remains clean of historical spam).
 
 ### Security & Access Model
 

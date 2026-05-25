@@ -105,6 +105,7 @@ Key conventions and the *why*:
 - **uv is kept in runtime** — the base image (`jenkins/inbound-agent`) lacks Python 3.12, so uv manages both Python installation and dependencies
 - **`platform: linux/amd64`** in docker-compose — Flutter does not support Android release builds on Linux ARM64; x86_64 emulation is required on Apple Silicon hosts
 - **Gradle memory tuning** — daemon disabled, JVM heap capped. See the Dockerfile comments for rationale.
+- **OpenVPN Support** — the container requires the `NET_ADMIN` capability and access to the `/dev/net/tun` device to manage VPN connections.
 
 ### mock-jenkins (Dev Only)
 

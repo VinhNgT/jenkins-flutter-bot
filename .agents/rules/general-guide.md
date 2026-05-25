@@ -81,7 +81,7 @@ graph TD
 | `config-hub` | 9000 | No | Central operational hub — config proxy, service control, web dashboard (accessed via gateway) |
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
 | `tg-jenkins-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
-| `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
+| `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs, OpenVPN management + control API |
 | `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
 | `gateway` | 80, 9000 | Yes | Caddy Ingress Gateway — secure routing perimeter for public Web App (:80) and admin UI (:9000) |

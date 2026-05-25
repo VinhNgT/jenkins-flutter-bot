@@ -1,6 +1,6 @@
 [project]
 name = "build-manager"
-version = "0.4.2-dev.3"
+version = "0.4.2-dev.4"
 description = "Build lifecycle manager — triggers Jenkins, receives webhooks, uploads artifacts"
 requires-python = ">=3.12"
 dependencies = [

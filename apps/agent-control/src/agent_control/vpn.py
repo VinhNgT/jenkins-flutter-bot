@@ -30,6 +30,11 @@ class VpnManager:
         # OpenVPN processes.
         return resolve_config_path(Path("/app/data/.openvpn.pid"))
 
+    @property
+    def LOG_PATH(self) -> Path:
+        # Log path for OpenVPN output, useful for troubleshooting handshakes
+        # and network routing issues. Redirected under JFB_DATA_DIR in tests.
+        return resolve_config_path(Path("/app/data/openvpn.log"))
 
     @property
     def connected(self) -> bool:
@@ -68,14 +73,20 @@ class VpnManager:
 
         logger.info("Starting OpenVPN tunnel...")
 
-        # Clear old PID if any
+        # Clear old process and PID if any
         if self.PID_PATH.exists():
+            try:
+                pid = int(self.PID_PATH.read_text().strip())
+                logger.info(f"Killing old lingering OpenVPN process (PID {pid}) prior to connection...")
+                os.kill(pid, signal.SIGKILL)
+            except Exception:
+                pass
             try:
                 self.PID_PATH.unlink()
             except OSError:
                 pass
 
-        # Spawns: openvpn --config /app/data/client.ovpn --daemon --writepid /tmp/openvpn.pid
+        # Spawns: openvpn --config /app/data/client.ovpn --daemon --writepid /tmp/openvpn.pid --log /app/data/openvpn.log
         cmd = [
             "openvpn",
             "--config",
@@ -83,6 +94,8 @@ class VpnManager:
             "--daemon",
             "--writepid",
             str(self.PID_PATH),
+            "--log",
+            str(self.LOG_PATH),
         ]
 
         try:

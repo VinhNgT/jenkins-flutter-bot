@@ -13,6 +13,14 @@
         path /webapp* /api/webapp*
     }
 
+    # Stream endpoints require immediate flushing
+    handle /api/webapp/stream {
+        header Cache-Control "no-store"
+        reverse_proxy tg-jenkins-bot:9090 {
+            flush_interval -1
+        }
+    }
+
     handle @bot_routes {
         # Tier 2: Versioned static assets — cache forever (?v=hash invalidates)
         header @bot_static Cache-Control "public, max-age=31536000, immutable"
@@ -52,5 +60,14 @@
     # API responses — never cache config values, secrets, Drive status
     header @hub_api Cache-Control "no-store"
 
-    reverse_proxy config-hub:9000
+    # Stream endpoints require immediate flushing
+    handle /api/services/stream {
+        reverse_proxy config-hub:9000 {
+            flush_interval -1
+        }
+    }
+
+    handle {
+        reverse_proxy config-hub:9000
+    }
 }

@@ -852,9 +852,28 @@ function setupInputListeners() {
     }
 }
 
+// Handle visibility changes for SSE stability
+function handleVisibilityChange() {
+    if (document.hidden) {
+        stopSSEStream();
+    } else {
+        if (config) startSSEStream();
+    }
+}
+
 // Bootstrap Initialization entry points
 document.addEventListener('DOMContentLoaded', () => {
     initContext();
     setupInputListeners();
     fetchConfig();
+    
+    // Wire visibility lifecycles
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', stopSSEStream);
+    window.addEventListener('pageshow', () => { if (!document.hidden && config) startSSEStream(); });
+    
+    if (isTelegram && window.Telegram.WebApp.onEvent) {
+        window.Telegram.WebApp.onEvent('activated', () => { if (config) startSSEStream(); });
+        window.Telegram.WebApp.onEvent('deactivated', stopSSEStream);
+    }
 });

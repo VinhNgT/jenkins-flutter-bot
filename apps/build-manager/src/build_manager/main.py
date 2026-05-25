@@ -64,6 +64,7 @@ def cli() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     uvicorn.run(
         create_app(),
         host="0.0.0.0",

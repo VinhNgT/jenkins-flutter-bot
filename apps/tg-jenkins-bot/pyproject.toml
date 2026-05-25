@@ -1,6 +1,6 @@
 [project]
 name = "tg-jenkins-bot"
-version = "0.4.1-dev.3"
+version = "0.4.2-dev.1"
 description = "Telegram bot frontend for triggering builds via the build-manager service"
 requires-python = ">=3.12"
 dependencies = [

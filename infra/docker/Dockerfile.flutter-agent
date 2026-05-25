@@ -32,7 +32,7 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
 ENV FLUTTER_HOME=/opt/flutter
 ENV PATH="${FLUTTER_HOME}/bin:${PATH}"
 
-RUN git clone https://github.com/flutter/flutter.git -b stable --depth 1 ${FLUTTER_HOME}
+RUN git clone https://github.com/flutter/flutter.git -b 3.41.9 --depth 1 ${FLUTTER_HOME}
 
 # Pre-cache Flutter artifacts so the runtime image is ready to build immediately
 RUN flutter precache --android \

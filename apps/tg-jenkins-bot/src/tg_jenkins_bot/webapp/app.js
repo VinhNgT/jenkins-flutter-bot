@@ -589,6 +589,11 @@ function setLoadingState(isLoading) {
 
 // Open / register SSE updates stream
 function startSSEStream() {
+    // Prevent multiple simultaneous connections if visibility events fire concurrently
+    if (eventSource && (eventSource.readyState === EventSource.CONNECTING || eventSource.readyState === EventSource.OPEN)) {
+        return;
+    }
+    
     if (eventSource) {
         eventSource.close();
     }

@@ -174,10 +174,14 @@ function _renderField(scope, f) {
   } else if (f.field_type === 'select' && f.choices && f.choices.length) {
     const select = document.createElement('select');
     select.name = name;
+    const defaultValue = f.default ? f.default.toLowerCase() : '';
     for (const [value, text] of f.choices) {
       const opt = document.createElement('option');
       opt.value = value;
       opt.textContent = text;
+      if (defaultValue === value.toLowerCase()) {
+        opt.selected = true;
+      }
       select.appendChild(opt);
     }
     fieldDiv.appendChild(select);

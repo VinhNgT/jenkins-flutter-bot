@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, File, UploadFile, HTTPException
 
 from ..config import AgentSettings, _DEFAULT_CONFIG_PATH
 from ..dependencies import ManagerDep
 
 router = APIRouter(prefix="/control", tags=["control"])
+
 
 
 @router.post("/start")
@@ -67,3 +68,55 @@ async def put_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
     save_config_with_merge(AgentSettings, _DEFAULT_CONFIG_PATH, payload)
     return {"status": "saved"}
+
+
+@router.post("/vpn/upload")
+async def upload_vpn_file(manager: ManagerDep, file: UploadFile = File(...)) -> dict[str, Any]:
+    """Upload client.ovpn config file (write-only)."""
+    manager.vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    content = await file.read()
+    try:
+        manager.vpn.OVPN_PATH.write_bytes(content)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
+    return {"status": "uploaded", "size": len(content)}
+
+
+@router.get("/vpn/status")
+async def get_vpn_status(manager: ManagerDep) -> dict[str, Any]:
+    """Return VPN file and connection status."""
+    return manager.vpn.status()
+
+
+@router.delete("/vpn/upload")
+async def delete_vpn_file(manager: ManagerDep) -> dict[str, Any]:
+    """Delete client.ovpn config file."""
+    if manager.vpn.OVPN_PATH.exists():
+        try:
+            manager.vpn.OVPN_PATH.unlink()
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete file: {e}")
+    return {"status": "deleted"}
+
+
+@router.post("/vpn/connect")
+async def connect_vpn(manager: ManagerDep) -> dict[str, Any]:
+    """Connect OpenVPN tunnel."""
+    try:
+        await manager.vpn_connect()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "connecting", "vpn": manager.vpn.status()}
+
+
+@router.post("/vpn/disconnect")
+async def disconnect_vpn(manager: ManagerDep) -> dict[str, Any]:
+    """Disconnect OpenVPN tunnel."""
+    try:
+        await manager.vpn_disconnect()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "disconnected", "vpn": manager.vpn.status()}
+

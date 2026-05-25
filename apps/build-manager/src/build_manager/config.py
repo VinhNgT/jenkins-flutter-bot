@@ -124,3 +124,21 @@ class BuildSettings(ServiceSettings):
             "json_key": "builds.data_path",
         },
     )
+
+    agent_control_url: str = Field(
+        "",
+        title="Agent Control URL",
+        description="Internal URL of the agent-control service for VPN management during builds",
+        json_schema_extra={
+            "group": "Advanced",
+            "help_html": (
+                "Internal URL of the agent-control service "
+                "(e.g., <code>http://agent-control:9091</code>). "
+                "Required when VPN is enabled — the build manager connects "
+                "the VPN before triggering builds and disconnects after "
+                "the last build completes."
+            ),
+            "json_key": "builds.agent_control_url",
+        },
+    )
+

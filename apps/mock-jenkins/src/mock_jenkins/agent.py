@@ -15,12 +15,15 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from pathlib import Path
 import uvicorn
 from agent_control.config import AgentSettings, _DEFAULT_CONFIG_PATH
 from config_core import format_validation_error, get_frontend_schema, read_masked_config, save_config_with_merge
-from fastapi import FastAPI, Request
+from config_core.schema import resolve_config_path
+from fastapi import FastAPI, Request, File, UploadFile, HTTPException
 from pydantic import ValidationError
 from starlette.responses import JSONResponse
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,10 @@ class MockAgentState:
         self._running: bool = False
         self._last_error: str | None = None
         self._started_at: float | None = None
+        self._vpn_connected: bool = False
+        # Use resolve_config_path so this redirects to tmp_path in test
+        # environments, matching the real VpnManager's path resolution.
+        self.OVPN_PATH = resolve_config_path(Path("/app/data/client.ovpn"))
 
     @property
     def running(self) -> bool:
@@ -60,11 +67,20 @@ class MockAgentState:
             config = AgentSettings.load()
         except Exception as exc:
             config_error = format_validation_error(exc)
+        
+        uploaded = self.OVPN_PATH.exists()
+        size = self.OVPN_PATH.stat().st_size if uploaded else 0
+        
         result: dict[str, Any] = {
             "configured": config_error is None,
             "running": self._running,
             "last_error": self._last_error,
             "config_error": config_error,
+            "vpn": {
+                "uploaded": uploaded,
+                "size": size,
+                "connected": self._vpn_connected,
+            }
         }
         if config is not None:
             result["agent_name"] = config.agent_name
@@ -92,12 +108,14 @@ class MockAgentState:
         """Simulate stopping the agent."""
         self._running = False
         self._started_at = None
+        self._vpn_connected = False
         logger.info("Mock agent stopped (simulated)")
 
     async def restart(self) -> None:
         """Simulate restarting the agent."""
         await self.stop()
         await self.start()
+
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +203,65 @@ def create_app() -> FastAPI:
         save_config_with_merge(AgentSettings, _DEFAULT_CONFIG_PATH, payload)
         return {"status": "saved"}
 
+    @app.post("/control/vpn/upload")
+    async def mock_upload_vpn(request: Request, file: UploadFile = File(...)) -> dict[str, Any]:
+        """Mock VPN file upload."""
+        logger.info("POST /control/vpn/upload")
+        manager = request.app.state.manager
+        manager.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        content = await file.read()
+        try:
+            manager.OVPN_PATH.write_bytes(content)
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "uploaded", "size": len(content)}
+
+    @app.get("/control/vpn/status")
+    async def mock_vpn_status(request: Request) -> dict[str, Any]:
+        """Mock VPN status."""
+        logger.info("GET /control/vpn/status")
+        return request.app.state.manager.status()["vpn"]
+
+    @app.delete("/control/vpn/upload")
+    async def mock_delete_vpn(request: Request) -> dict[str, Any]:
+        """Mock VPN file deletion."""
+        logger.info("DELETE /control/vpn/upload")
+        manager = request.app.state.manager
+        if manager.OVPN_PATH.exists():
+            try:
+                manager.OVPN_PATH.unlink()
+            except OSError as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "deleted"}
+
+    @app.post("/control/vpn/connect")
+    async def mock_connect_vpn(request: Request) -> dict[str, Any]:
+        """Mock VPN connection."""
+        logger.info("POST /control/vpn/connect")
+        manager = request.app.state.manager
+        
+        # Check settings
+        config = AgentSettings.load()
+        if not config.vpn_enabled:
+            logger.warning("VPN not enabled in mock settings.")
+            return {"status": "disabled", "vpn": manager.status()["vpn"]}
+            
+        if not manager.OVPN_PATH.exists():
+            raise HTTPException(status_code=400, detail="VPN is enabled but no .ovpn file has been uploaded.")
+            
+        manager._vpn_connected = True
+        return {"status": "connecting", "vpn": manager.status()["vpn"]}
+
+    @app.post("/control/vpn/disconnect")
+    async def mock_disconnect_vpn(request: Request) -> dict[str, Any]:
+        """Mock VPN disconnection."""
+        logger.info("POST /control/vpn/disconnect")
+        manager = request.app.state.manager
+        manager._vpn_connected = False
+        return {"status": "disconnected", "vpn": manager.status()["vpn"]}
+
     return app
+
 
 
 def cli() -> None:

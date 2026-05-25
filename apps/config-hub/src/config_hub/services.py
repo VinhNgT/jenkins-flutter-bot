@@ -137,3 +137,49 @@ class ServiceClient:
             logger.warning("Failed to save config to %s: %s", service, exc)
             return {"status": "error", "detail": f"Cannot reach {service}"}
 
+    async def upload_vpn_file(self, content: bytes, filename: str) -> dict[str, Any]:
+        """Proxy OpenVPN configuration file upload to agent-control."""
+        url = self._service_url("agent")
+        if not url:
+            return {"status": "error", "detail": "Agent service not configured"}
+        try:
+            # Send file as multipart
+            resp = await self._client.post(
+                f"{url}/control/vpn/upload",
+                files={"file": (filename, content)},
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("Failed to proxy VPN upload to agent: %s", exc)
+            return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
+
+    async def vpn_status(self) -> dict[str, Any]:
+        """Proxy VPN status check to agent-control."""
+        url = self._service_url("agent")
+        if not url:
+            return {"uploaded": False, "size": 0, "connected": False, "available": False}
+        try:
+            resp = await self._client.get(f"{url}/control/vpn/status")
+            resp.raise_for_status()
+            data = resp.json()
+            data["available"] = True
+            return data
+        except Exception as exc:
+            logger.warning("Failed to proxy VPN status to agent: %s", exc)
+            return {"uploaded": False, "size": 0, "connected": False, "available": False, "detail": str(exc)}
+
+    async def delete_vpn_file(self) -> dict[str, Any]:
+        """Proxy VPN file deletion to agent-control."""
+        url = self._service_url("agent")
+        if not url:
+            return {"status": "error", "detail": "Agent service not configured"}
+        try:
+            resp = await self._client.delete(f"{url}/control/vpn/upload")
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("Failed to proxy VPN deletion to agent: %s", exc)
+            return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
+
+

@@ -79,3 +79,17 @@ class AgentSettings(ServiceSettings):
             "json_key": "JENKINS_TUNNEL",
         },
     )
+
+    # ── VPN ──
+    vpn_enabled: bool = Field(
+        False,
+        title="Enable VPN",
+        description="Connect to an OpenVPN server during builds (requires .ovpn file upload)",
+        json_schema_extra={
+            "group": "VPN",
+            "field_type": "select",
+            "choices": [["true", "Enabled"], ["false", "Disabled (default)"]],
+            "json_key": "vpn.enabled",
+        },
+    )
+

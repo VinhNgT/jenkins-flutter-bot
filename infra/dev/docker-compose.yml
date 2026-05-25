@@ -34,6 +34,7 @@ services:
     environment:
       FILE_MANAGER_URL: http://file-manager:9092
       JENKINS_URL: http://jenkins:8080
+      AGENT_CONTROL_URL: http://agent-control:9091
     expose:
       - "9010"
     volumes:
@@ -93,6 +94,10 @@ services:
       dockerfile: infra/docker/Dockerfile.flutter-agent
     container_name: agent-control
     restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
     env_file:
       - path: ../env/agent-control.env
         required: false
@@ -104,6 +109,7 @@ services:
       - agent-data:/app/data
     networks:
       - jenkins
+
 
   file-manager:
     build:

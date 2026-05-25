@@ -51,6 +51,7 @@ class BuildCoordinator:
         data_dir: Path,
         jenkins: JenkinsClient,
         file_manager_url: str,
+        agent_control_url: str = "",
         max_recent_builds: int = 3,
         build_timeout: int = 30,
         poll_interval: int = 10,
@@ -61,6 +62,7 @@ class BuildCoordinator:
         self._data_dir = data_dir
         self._jenkins = jenkins
         self._file_manager_url = file_manager_url.rstrip("/")
+        self._agent_control_url = agent_control_url.rstrip("/") if agent_control_url else ""
         self._build_timeout = build_timeout
         self._poll_interval = poll_interval
         self._artifact_pattern = artifact_pattern
@@ -70,6 +72,7 @@ class BuildCoordinator:
         )
         self._http = http_client or httpx.AsyncClient(timeout=30.0)
         self._poll_tasks: dict[str, asyncio.Task[None]] = {}
+
 
     @property
     def tracker(self) -> BuildTracker:
@@ -88,6 +91,31 @@ class BuildCoordinator:
         if self._jenkins:
             await self._jenkins.close()
         await self._http.aclose()
+
+    async def _connect_vpn(self) -> None:
+        """Connect VPN prior to build (best-effort)."""
+        if not self._agent_control_url:
+            return
+        try:
+            logger.info("Initiating VPN connection on agent-control at %s...", self._agent_control_url)
+            resp = await self._http.post(f"{self._agent_control_url}/control/vpn/connect")
+            resp.raise_for_status()
+            logger.info("VPN connection initiated successfully.")
+        except Exception as e:
+            logger.warning("Failed to initiate VPN connection: %s. Proceeding with build...", e)
+
+    async def _disconnect_vpn_if_idle(self) -> None:
+        """Disconnect VPN if no pending builds are left (best-effort)."""
+        if not self._agent_control_url:
+            return
+        if self._tracker.pending_count == 0:
+            try:
+                logger.info("No pending builds left. Initiating VPN disconnection on agent-control...")
+                resp = await self._http.post(f"{self._agent_control_url}/control/vpn/disconnect")
+                resp.raise_for_status()
+                logger.info("VPN disconnection initiated successfully.")
+            except Exception as e:
+                logger.warning("Failed to initiate VPN disconnection: %s", e)
 
     # ------------------------------------------------------------------
     # Build trigger
@@ -113,10 +141,14 @@ class BuildCoordinator:
 
         request_id = BuildTracker.generate_request_id()
 
+        # Initiate VPN connection before triggering Jenkins build
+        await self._connect_vpn()
+
         queue_id = await self._jenkins.trigger_build(
             branch=branch,
             request_id=request_id,
         )
+
 
         self._tracker.add_pending(
             request_id,
@@ -280,6 +312,8 @@ class BuildCoordinator:
         if pending.frontend_callback_url:
             await self._notify_frontend(pending.frontend_callback_url, completed)
 
+        await self._disconnect_vpn_if_idle()
+
         logger.info(
             "Build completed: request_id=%s result=%s",
             request_id,
@@ -323,6 +357,8 @@ class BuildCoordinator:
         # Notify frontend
         if pending.frontend_callback_url:
             await self._notify_frontend(pending.frontend_callback_url, completed)
+
+        await self._disconnect_vpn_if_idle()
 
     # ------------------------------------------------------------------
     # Artifact upload
@@ -423,4 +459,5 @@ class BuildCoordinator:
                 )
 
         self._tracker.consume_pending(request_id)
+        await self._disconnect_vpn_if_idle()
         return {"status": "cancelled"}

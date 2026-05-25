@@ -18,8 +18,10 @@ from config_core import format_validation_error
 from pydantic import ValidationError
 
 from .config import AgentSettings
+from .vpn import VpnManager
 
 logger = logging.getLogger(__name__)
+
 
 # The jenkins-agent entrypoint script reads these env vars and converts them
 # to CLI flags automatically. Since AgentManager passes all values as explicit
@@ -48,6 +50,7 @@ class AgentManager:
         self._config: AgentSettings | None = None
         self._started_at: float | None = None
         self._clock = clock
+        self.vpn = VpnManager()
 
     @property
     def running(self) -> bool:
@@ -96,6 +99,9 @@ class AgentManager:
 
     async def stop(self) -> None:
         """Send SIGTERM, wait 5s, then SIGKILL if needed."""
+        # Always stop VPN on agent stop (safety net)
+        await self.vpn.disconnect()
+
         if not self._process:
             return
 
@@ -116,6 +122,20 @@ class AgentManager:
         await self.stop()
         await self.start()
 
+    async def vpn_connect(self) -> None:
+        """Connect the VPN, if enabled and configured."""
+        config = AgentSettings.load()
+        if not config.vpn_enabled:
+            logger.warning("VPN connection requested but VPN is not enabled in settings.")
+            return
+        if not self.vpn.OVPN_PATH.exists():
+            raise FileNotFoundError("VPN is enabled but no .ovpn file has been uploaded.")
+        await self.vpn.connect()
+
+    async def vpn_disconnect(self) -> None:
+        """Disconnect the VPN."""
+        await self.vpn.disconnect()
+
     def status(self) -> dict[str, Any]:
         """Return the current agent manager status."""
         config_error: str | None = None
@@ -128,6 +148,7 @@ class AgentManager:
             "running": self.running,
             "last_error": self._last_error,
             "config_error": config_error,
+            "vpn": self.vpn.status(),
         }
         if self._config is not None:
             result["agent_name"] = self._config.agent_name
@@ -136,3 +157,4 @@ class AgentManager:
         if self._started_at is not None:
             result["started_at"] = self._started_at
         return result
+

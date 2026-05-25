@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, File, UploadFile
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from ..dependencies import ManagerDep
@@ -78,3 +78,24 @@ async def control_service(
 
     method = getattr(manager.services, action)
     return await method(service)
+
+
+@router.post("/agent/vpn/upload")
+async def proxy_vpn_upload(manager: ManagerDep, file: UploadFile = File(...)) -> dict[str, Any]:
+    """Proxy multipart .ovpn configuration file upload to agent-control."""
+    content = await file.read()
+    return await manager.services.upload_vpn_file(content, file.filename or "client.ovpn")
+
+
+
+@router.get("/agent/vpn/status")
+async def proxy_vpn_status(manager: ManagerDep) -> dict[str, Any]:
+    """Proxy VPN status request to agent-control."""
+    return await manager.services.vpn_status()
+
+
+@router.delete("/agent/vpn/upload")
+async def proxy_vpn_delete(manager: ManagerDep) -> dict[str, Any]:
+    """Proxy VPN config deletion to agent-control."""
+    return await manager.services.delete_vpn_file()
+

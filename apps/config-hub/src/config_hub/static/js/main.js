@@ -105,13 +105,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       const result = await API.saveScope(scope, data);
       if (result) {
         const label = { bot: 'Bot', builds: 'Build Manager', agent: 'Agent', file_manager: 'File Manager' }[scope] || scope;
-        Toast.show(`${label} config saved`, 'success');
+        
+        // Upload pending VPN file if there is one
+        if (scope === 'agent' && window.pendingVpnFile) {
+          const formData = new FormData();
+          formData.append('file', window.pendingVpnFile);
+          try {
+            const uploadRes = await fetch('/api/services/agent/vpn/upload', {
+              method: 'POST',
+              body: formData
+            });
+            if (!uploadRes.ok) throw new Error(`HTTP ${uploadRes.status}`);
+            window.pendingVpnFile = null;
+            Toast.show(`${label} config and OpenVPN profile saved successfully`, 'success');
+          } catch (err) {
+            Toast.show(`Config saved but failed to upload OpenVPN file: ${err.message}`, 'error');
+          }
+        } else {
+          Toast.show(`${label} config saved`, 'success');
+        }
+
         // Clear unsaved indicator
         const actionsEl = document.getElementById(`form-actions-${scope}`);
         if (actionsEl) actionsEl.classList.remove('scope-dirty');
         const freshConfig = await API.getConfig();
         if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
         if (scope === 'file_manager') await refreshDriveCard();
+        if (scope === 'agent' && window.refreshVpnWidgetStatus) {
+          await window.refreshVpnWidgetStatus();
+        }
       }
       return;
     }
@@ -120,9 +142,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const reloadBtn = e.target.closest('[data-reload]');
     if (reloadBtn) {
       const scope = reloadBtn.dataset.reload;
+      if (scope === 'agent') {
+        window.pendingVpnFile = null;
+      }
       const freshConfig = await API.getConfig();
       if (freshConfig) populateScope(scope, freshConfig[scope], freshConfig._secrets_set?.[scope]);
       if (scope === 'file_manager') await refreshDriveCard();
+      if (scope === 'agent' && window.refreshVpnWidgetStatus) {
+        await window.refreshVpnWidgetStatus();
+      }
       // Clear unsaved indicator
       const actionsEl = document.getElementById(`form-actions-${scope}`);
       if (actionsEl) actionsEl.classList.remove('scope-dirty');

@@ -226,11 +226,14 @@ async function _initVpnWidget(container) {
     document.head.appendChild(style);
   }
 
+  let lastRemoteStatus = null;
+
   async function refreshStatus() {
     try {
       const res = await fetch('/api/services/agent/vpn/status');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      lastRemoteStatus = data;
       renderWidget(data);
     } catch (err) {
       container.innerHTML = `
@@ -267,7 +270,52 @@ async function _initVpnWidget(container) {
     statusRow.style.backgroundColor = 'var(--bg-card-sub, rgba(255,255,255,0.03))';
     statusRow.style.border = '1px solid var(--border-color, #2d2d2d)';
 
-    if (status.uploaded) {
+    if (window.pendingVpnFile) {
+      // Local pending upload UI
+      const meta = document.createElement('div');
+      meta.style.display = 'flex';
+      meta.style.flexDirection = 'column';
+      meta.style.gap = '0.25rem';
+      
+      const title = document.createElement('div');
+      title.style.display = 'flex';
+      title.style.alignItems = 'center';
+      title.style.gap = '0.5rem';
+      title.style.fontWeight = '500';
+      title.style.color = 'var(--color-accent, #ffb703)';
+      title.innerHTML = `<span>⚡</span> Ready to Upload`;
+
+      const activeBadge = document.createElement('span');
+      activeBadge.style.fontSize = '0.75rem';
+      activeBadge.style.padding = '0.15rem 0.4rem';
+      activeBadge.style.borderRadius = '4px';
+      activeBadge.style.backgroundColor = 'rgba(255, 183, 3, 0.15)';
+      activeBadge.style.color = 'var(--color-accent, #ffb703)';
+      activeBadge.style.border = '1px solid rgba(255, 183, 3, 0.3)';
+      activeBadge.style.fontWeight = '600';
+      activeBadge.textContent = 'Pending Save';
+      title.appendChild(activeBadge);
+
+      const details = document.createElement('span');
+      details.style.fontSize = '0.85rem';
+      details.style.color = 'var(--text-muted, #888)';
+      const sizeKB = (window.pendingVpnFile.size / 1024).toFixed(2);
+      details.textContent = `${window.pendingVpnFile.name} (${sizeKB} KB) ${status.uploaded ? '— will replace existing file' : ''}`;
+      
+      meta.appendChild(title);
+      meta.appendChild(details);
+      statusRow.appendChild(meta);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn btn-sm btn-secondary';
+      cancelBtn.type = 'button';
+      cancelBtn.textContent = 'Cancel selection';
+      cancelBtn.addEventListener('click', () => {
+        window.pendingVpnFile = null;
+        renderWidget(lastRemoteStatus);
+      });
+      statusRow.appendChild(cancelBtn);
+    } else if (status.uploaded) {
       // Configured UI
       const meta = document.createElement('div');
       meta.style.display = 'flex';
@@ -307,6 +355,33 @@ async function _initVpnWidget(container) {
 
       statusRow.appendChild(meta);
 
+      const actionGroup = document.createElement('div');
+      actionGroup.style.display = 'flex';
+      actionGroup.style.gap = '0.5rem';
+
+      const replaceLabel = document.createElement('label');
+      replaceLabel.className = 'btn btn-sm btn-secondary';
+      replaceLabel.style.cursor = 'pointer';
+      replaceLabel.style.margin = '0';
+      replaceLabel.innerHTML = `
+        Replace file...
+        <input type="file" accept=".ovpn" style="display: none;" />
+      `;
+      const replaceInput = replaceLabel.querySelector('input');
+      replaceInput.addEventListener('change', () => {
+        if (!replaceInput.files.length) return;
+        const file = replaceInput.files[0];
+        if (!file.name.endsWith('.ovpn')) {
+          Toast.show('Please upload a valid .ovpn file', 'error');
+          return;
+        }
+        window.pendingVpnFile = file;
+        const actionsEl = document.getElementById('form-actions-agent');
+        if (actionsEl) actionsEl.classList.add('scope-dirty');
+        renderWidget(lastRemoteStatus);
+      });
+      actionGroup.appendChild(replaceLabel);
+
       const removeBtn = document.createElement('button');
       removeBtn.className = 'btn btn-sm btn-secondary';
       removeBtn.style.borderColor = 'rgba(255, 77, 77, 0.3)';
@@ -328,7 +403,8 @@ async function _initVpnWidget(container) {
           removeBtn.textContent = 'Remove config';
         }
       });
-      statusRow.appendChild(removeBtn);
+      actionGroup.appendChild(removeBtn);
+      statusRow.appendChild(actionGroup);
     } else {
       // Not configured UI
       const meta = document.createElement('div');
@@ -360,33 +436,17 @@ async function _initVpnWidget(container) {
       `;
       
       const fileInput = fileLabel.querySelector('input');
-      fileInput.addEventListener('change', async () => {
+      fileInput.addEventListener('change', () => {
         if (!fileInput.files.length) return;
         const file = fileInput.files[0];
         if (!file.name.endsWith('.ovpn')) {
           Toast.show('Please upload a valid .ovpn file', 'error');
           return;
         }
-
-        fileLabel.style.opacity = '0.6';
-        fileLabel.style.pointerEvents = 'none';
-        fileLabel.innerHTML = `Uploading... <input type="file" accept=".ovpn" style="display: none;" />`;
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-          const res = await fetch('/api/services/agent/vpn/upload', {
-            method: 'POST',
-            body: formData
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          Toast.show('OpenVPN configuration file uploaded successfully', 'success');
-          refreshStatus();
-        } catch (err) {
-          Toast.show(`Failed to upload config: ${err.message}`, 'error');
-          refreshStatus();
-        }
+        window.pendingVpnFile = file;
+        const actionsEl = document.getElementById('form-actions-agent');
+        if (actionsEl) actionsEl.classList.add('scope-dirty');
+        renderWidget(lastRemoteStatus);
       });
 
       statusRow.appendChild(fileLabel);
@@ -396,6 +456,7 @@ async function _initVpnWidget(container) {
   }
 
   // Initial load
+  window.refreshVpnWidgetStatus = refreshStatus;
   await refreshStatus();
 }
 

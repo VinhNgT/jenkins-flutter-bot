@@ -27,6 +27,7 @@ source = { editable = "apps/agent-control" }
 dependencies = [
     { name = "config-core" },
     { name = "fastapi" },
+    { name = "python-multipart" },
     { name = "uvicorn" },
 ]
 
@@ -34,6 +35,7 @@ dependencies = [
 requires-dist = [
     { name = "config-core", editable = "libs/config-core" },
     { name = "fastapi", specifier = ">=0.111.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "uvicorn", specifier = ">=0.29.0" },
 ]
 

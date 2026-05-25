@@ -1,11 +1,8 @@
-import asyncio
 import os
 import signal
-from pathlib import Path
 from unittest.mock import AsyncMock, patch, PropertyMock
 
 import pytest
-from fastapi.testclient import TestClient
 
 from agent_control.vpn import VpnManager
 

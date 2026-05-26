@@ -147,3 +147,72 @@ async def test_coordinator_vpn_best_effort(tmp_path):
     await coord._complete_build(req_id, jenkins_build)
 
     await coord.close()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_vpn_disconnect_on_close(tmp_path):
+    """close() disconnects VPN when pending builds exist."""
+    jenkins = _mock_jenkins()
+
+    vpn_calls = []
+
+    def mock_handler(request: httpx.Request):
+        if "vpn/connect" in str(request.url):
+            vpn_calls.append("connect")
+            return httpx.Response(200, json={"status": "connecting"})
+        if "vpn/disconnect" in str(request.url):
+            vpn_calls.append("disconnect")
+            return httpx.Response(200, json={"status": "disconnected"})
+        return httpx.Response(200, json={})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
+
+    coord = BuildCoordinator(
+        data_dir=tmp_path,
+        jenkins=jenkins,
+        file_manager_url="http://fm:9092",
+        agent_control_url="http://agent-control:9091",
+        http_client=http,
+    )
+
+    await coord.trigger_build("main")
+    assert "connect" in vpn_calls
+
+    # close() should disconnect VPN even with a pending build
+    await coord.close()
+    assert "disconnect" in vpn_calls
+
+
+@pytest.mark.asyncio
+async def test_coordinator_vpn_disconnect_on_trigger_failure(tmp_path):
+    """VPN is disconnected when Jenkins trigger fails."""
+    jenkins = _mock_jenkins()
+    jenkins.trigger_build = AsyncMock(side_effect=RuntimeError("Jenkins down"))
+
+    vpn_calls = []
+
+    def mock_handler(request: httpx.Request):
+        if "vpn/connect" in str(request.url):
+            vpn_calls.append("connect")
+            return httpx.Response(200, json={"status": "connecting"})
+        if "vpn/disconnect" in str(request.url):
+            vpn_calls.append("disconnect")
+            return httpx.Response(200, json={"status": "disconnected"})
+        return httpx.Response(200, json={})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
+
+    coord = BuildCoordinator(
+        data_dir=tmp_path,
+        jenkins=jenkins,
+        file_manager_url="http://fm:9092",
+        agent_control_url="http://agent-control:9091",
+        http_client=http,
+    )
+
+    with pytest.raises(RuntimeError, match="Jenkins down"):
+        await coord.trigger_build("main")
+
+    assert vpn_calls == ["connect", "disconnect"]
+    await coord.close()
+

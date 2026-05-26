@@ -130,6 +130,7 @@ class AgentManager:
             return
         if not self.vpn.OVPN_PATH.exists():
             raise FileNotFoundError("VPN is enabled but no .ovpn file has been uploaded.")
+        self.vpn.set_max_connected_minutes(config.vpn_max_connected_minutes)
         await self.vpn.connect()
 
     async def vpn_disconnect(self) -> None:

@@ -66,6 +66,25 @@ class BuildTracker:
         self._pending: dict[str, PendingBuild] = self._load_pending()
         self._completed: list[CompletedBuild] = self._load_completed()
 
+        # On fresh startup, any persisted pending builds are zombies from a
+        # previous crash — no poll tasks exist for them. Clear them so
+        # pending_count returns to 0 and VPN disconnect is not blocked.
+        self._clear_stale_pending()
+
+    def _clear_stale_pending(self) -> None:
+        """Remove all pending builds left over from a previous process."""
+        if not self._pending:
+            return
+        for req_id, pending in self._pending.items():
+            logger.warning(
+                "Clearing stale pending build: request_id=%s branch=%s "
+                "(leftover from previous process)",
+                req_id,
+                pending.branch,
+            )
+        self._pending.clear()
+        self._save_pending()
+
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------

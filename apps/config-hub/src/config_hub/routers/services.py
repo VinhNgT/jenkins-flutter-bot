@@ -99,3 +99,14 @@ async def proxy_vpn_delete(manager: ManagerDep) -> dict[str, Any]:
     """Proxy VPN config deletion to agent-control."""
     return await manager.services.delete_vpn_file()
 
+
+@router.post("/agent/vpn/connect")
+async def proxy_vpn_connect(manager: ManagerDep) -> dict[str, Any]:
+    """Proxy VPN connect request to agent-control."""
+    return await manager.services.vpn_connect()
+
+
+@router.post("/agent/vpn/disconnect")
+async def proxy_vpn_disconnect(manager: ManagerDep) -> dict[str, Any]:
+    """Proxy VPN disconnect request to agent-control."""
+    return await manager.services.vpn_disconnect()

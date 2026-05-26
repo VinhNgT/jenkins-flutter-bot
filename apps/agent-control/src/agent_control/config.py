@@ -93,3 +93,20 @@ class AgentSettings(ServiceSettings):
         },
     )
 
+    vpn_max_connected_minutes: int = Field(
+        45,
+        title="Max VPN Connection Time",
+        description="Auto-disconnect VPN after this many minutes (safety net)",
+        json_schema_extra={
+            "group": "VPN",
+            "field_type": "number",
+            "help_html": (
+                "Safety limit to prevent orphaned VPN sessions. The VPN"
+                " auto-disconnects after this duration regardless of build"
+                " state. Set to <code>0</code> to disable the safety timer."
+            ),
+            "json_key": "vpn.max_connected_minutes",
+        },
+    )
+
+

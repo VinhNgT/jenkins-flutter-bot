@@ -112,3 +112,65 @@ def test_vpn_endpoints(client):
     resp = client.get("/control/vpn/status")
     assert resp.status_code == 200
     assert resp.json()["uploaded"] is False
+
+
+@pytest.mark.asyncio
+async def test_vpn_safety_timer_auto_disconnects():
+    """Safety timer fires and calls disconnect after max_connected_minutes."""
+    vpn = VpnManager()
+    vpn.set_max_connected_minutes(1)  # 1 minute
+
+    # Mock connect to simulate VPN coming up immediately
+    vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    vpn.OVPN_PATH.write_text("client-config")
+    vpn.PID_PATH.write_text(str(os.getpid()))
+
+    with patch.object(VpnManager, "connected", new_callable=PropertyMock, return_value=True):
+        await vpn.connect()  # Should start safety timer
+
+    # Verify the timer task was created
+    assert vpn._auto_disconnect_task is not None
+    assert not vpn._auto_disconnect_task.done()
+
+    # Cancel it for cleanup (we don't want to actually wait 60s)
+    vpn._cancel_safety_timer()
+    assert vpn._auto_disconnect_task is None
+
+
+@pytest.mark.asyncio
+async def test_vpn_disconnect_cancels_safety_timer():
+    """Explicit disconnect cancels the safety timer."""
+    vpn = VpnManager()
+    vpn.set_max_connected_minutes(45)
+
+    vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    vpn.OVPN_PATH.write_text("client-config")
+    vpn.PID_PATH.write_text(str(os.getpid()))
+
+    with patch.object(VpnManager, "connected", new_callable=PropertyMock, return_value=True):
+        await vpn.connect()
+
+    assert vpn._auto_disconnect_task is not None
+
+    with patch("os.kill"):
+        await vpn.disconnect()
+
+    # Timer should be cancelled after disconnect
+    assert vpn._auto_disconnect_task is None
+
+
+@pytest.mark.asyncio
+async def test_vpn_no_timer_when_disabled():
+    """No safety timer when max_connected_minutes is 0."""
+    vpn = VpnManager()
+    vpn.set_max_connected_minutes(0)
+
+    vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    vpn.OVPN_PATH.write_text("client-config")
+    vpn.PID_PATH.write_text(str(os.getpid()))
+
+    with patch.object(VpnManager, "connected", new_callable=PropertyMock, return_value=True):
+        await vpn.connect()
+
+    assert vpn._auto_disconnect_task is None
+

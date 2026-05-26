@@ -88,6 +88,11 @@ class BuildCoordinator:
 
     async def close(self) -> None:
         """Shut down HTTP clients and cancel pending poll tasks."""
+        # Force-disconnect VPN before tearing down HTTP clients. On shutdown
+        # no poll tasks will run, so any remaining pending builds are
+        # effectively abandoned — leaving VPN connected would be orphaned.
+        await self._force_disconnect_vpn()
+
         for task in self._poll_tasks.values():
             task.cancel()
         self._poll_tasks.clear()
@@ -121,6 +126,22 @@ class BuildCoordinator:
             except Exception as e:
                 logger.warning("Failed to initiate VPN disconnection: %s", e)
 
+    async def _force_disconnect_vpn(self) -> None:
+        """Unconditionally disconnect VPN (best-effort).
+
+        Used during shutdown when pending builds are abandoned and no poll
+        tasks will run to eventually call ``_disconnect_vpn_if_idle``.
+        """
+        if not self._agent_control_url:
+            return
+        try:
+            logger.info("Forcing VPN disconnection on shutdown...")
+            resp = await self._http.post(f"{self._agent_control_url}/control/vpn/disconnect")
+            resp.raise_for_status()
+            logger.info("VPN disconnection initiated successfully.")
+        except Exception as e:
+            logger.warning("Failed to force VPN disconnection: %s", e)
+
     # ------------------------------------------------------------------
     # Build trigger
     # ------------------------------------------------------------------
@@ -148,19 +169,24 @@ class BuildCoordinator:
         # Initiate VPN connection before triggering Jenkins build
         await self._connect_vpn()
 
-        queue_id = await self._jenkins.trigger_build(
-            branch=branch,
-            request_id=request_id,
-        )
+        try:
+            queue_id = await self._jenkins.trigger_build(
+                branch=branch,
+                request_id=request_id,
+            )
 
-
-        self._tracker.add_pending(
-            request_id,
-            branch,
-            queue_id=queue_id,
-            frontend_callback_url=frontend_callback_url,
-            app_name=app_name,
-        )
+            self._tracker.add_pending(
+                request_id,
+                branch,
+                queue_id=queue_id,
+                frontend_callback_url=frontend_callback_url,
+                app_name=app_name,
+            )
+        except Exception:
+            # If Jenkins trigger or state persistence fails after VPN was
+            # connected, disconnect to avoid orphaned VPN sessions.
+            await self._disconnect_vpn_if_idle()
+            raise
 
         # Start per-build poll task
         self._start_poll_task(request_id)
@@ -235,6 +261,16 @@ class BuildCoordinator:
 
         except asyncio.CancelledError:
             return  # Build was cancelled manually
+        except Exception:
+            # Unexpected crash — consume the pending build to unblock VPN
+            # disconnect, otherwise pending_count stays > 0 forever.
+            logger.exception(
+                "Poll worker crashed for %s — consuming pending build",
+                request_id,
+            )
+            self._poll_tasks.pop(request_id, None)
+            self._tracker.consume_pending(request_id)
+            await self._disconnect_vpn_if_idle()
 
     # ------------------------------------------------------------------
     # Build completion

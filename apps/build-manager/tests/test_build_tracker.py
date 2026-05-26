@@ -186,13 +186,15 @@ class TestCompletedBuilds:
 
 
 class TestPersistence:
-    def test_pending_survives_reload(self, tracker_factory):
+    def test_stale_pending_cleared_on_reload(self, tracker_factory):
+        """Pending builds from a previous process are cleared on startup."""
         t1 = tracker_factory()
         t1.add_pending("req1", "main", queue_id=10)
-        # Create new tracker from same directory
+        # A new tracker instance simulates a process restart — stale
+        # pending builds are cleared because no poll tasks exist for them.
         t2 = tracker_factory()
-        assert t2.get_pending("req1") is not None
-        assert t2.get_pending("req1").branch == "main"
+        assert t2.get_pending("req1") is None
+        assert t2.pending_count == 0
 
     def test_completed_survives_reload(self, tracker_factory):
         t1 = tracker_factory()

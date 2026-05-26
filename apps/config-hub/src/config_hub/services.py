@@ -186,4 +186,28 @@ class ServiceClient:
             logger.warning("Failed to proxy VPN deletion to agent: %s", exc)
             return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
 
+    async def vpn_connect(self) -> dict[str, Any]:
+        """Proxy VPN connect to agent-control."""
+        url = self._service_url("agent")
+        if not url:
+            return {"status": "error", "detail": "Agent service not configured"}
+        try:
+            resp = await self._client.post(f"{url}/control/vpn/connect")
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("Failed to proxy VPN connect to agent: %s", exc)
+            return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
 
+    async def vpn_disconnect(self) -> dict[str, Any]:
+        """Proxy VPN disconnect to agent-control."""
+        url = self._service_url("agent")
+        if not url:
+            return {"status": "error", "detail": "Agent service not configured"}
+        try:
+            resp = await self._client.post(f"{url}/control/vpn/disconnect")
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.warning("Failed to proxy VPN disconnect to agent: %s", exc)
+            return {"status": "error", "detail": f"Cannot reach agent: {exc}"}

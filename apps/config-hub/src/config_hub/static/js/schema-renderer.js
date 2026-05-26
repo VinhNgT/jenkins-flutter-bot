@@ -358,6 +358,54 @@ async function _initVpnWidget(container) {
       const actionGroup = document.createElement('div');
       actionGroup.style.display = 'flex';
       actionGroup.style.gap = '0.5rem';
+      actionGroup.style.flexWrap = 'wrap';
+
+      // VPN Connect / Disconnect button
+      if (status.connected) {
+        const disconnectBtn = document.createElement('button');
+        disconnectBtn.className = 'btn btn-sm btn-secondary';
+        disconnectBtn.style.borderColor = 'rgba(255, 77, 77, 0.3)';
+        disconnectBtn.style.color = '#ff4d4d';
+        disconnectBtn.type = 'button';
+        disconnectBtn.textContent = 'Disconnect VPN';
+        disconnectBtn.addEventListener('click', async () => {
+          disconnectBtn.disabled = true;
+          disconnectBtn.textContent = 'Disconnecting...';
+          try {
+            const res = await fetch('/api/services/agent/vpn/disconnect', { method: 'POST' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            Toast.show('VPN disconnected', 'info');
+            await refreshStatus();
+          } catch (err) {
+            Toast.show(`Failed to disconnect VPN: ${err.message}`, 'error');
+            disconnectBtn.disabled = false;
+            disconnectBtn.textContent = 'Disconnect VPN';
+          }
+        });
+        actionGroup.appendChild(disconnectBtn);
+      } else {
+        const connectBtn = document.createElement('button');
+        connectBtn.className = 'btn btn-sm btn-secondary';
+        connectBtn.style.borderColor = 'rgba(255, 183, 3, 0.3)';
+        connectBtn.style.color = 'var(--color-accent, #ffb703)';
+        connectBtn.type = 'button';
+        connectBtn.textContent = 'Connect VPN';
+        connectBtn.addEventListener('click', async () => {
+          connectBtn.disabled = true;
+          connectBtn.textContent = 'Connecting...';
+          try {
+            const res = await fetch('/api/services/agent/vpn/connect', { method: 'POST' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            Toast.show('VPN connected', 'success');
+            await refreshStatus();
+          } catch (err) {
+            Toast.show(`Failed to connect VPN: ${err.message}`, 'error');
+            connectBtn.disabled = false;
+            connectBtn.textContent = 'Connect VPN';
+          }
+        });
+        actionGroup.appendChild(connectBtn);
+      }
 
       const replaceLabel = document.createElement('label');
       replaceLabel.className = 'btn btn-sm btn-secondary';

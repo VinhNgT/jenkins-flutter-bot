@@ -87,7 +87,10 @@ class BuildClient:
         if resp.status_code == 200:
             return resp.json()
 
-        detail = resp.json().get("detail", resp.text[:200])
+        try:
+            detail = resp.json().get("detail", resp.text[:200])
+        except Exception:
+            detail = resp.text[:200] or f"HTTP {resp.status_code}"
         raise BuildClientError(
             detail=f"HTTP {resp.status_code}: {detail}",
             user_message=detail,

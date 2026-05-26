@@ -140,7 +140,7 @@ services:
 
 
   gateway:
-    image: caddy:alpine
+    build: ../gateway
     container_name: gateway
     restart: unless-stopped
     ports:

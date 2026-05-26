@@ -61,7 +61,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (schemas.bot) renderSchemaForm('schema-container-bot', 'bot', schemas.bot);
     if (schemas.builds) renderSchemaForm('schema-container-builds', 'builds', schemas.builds);
     if (schemas.agent) renderSchemaForm('schema-container-agent', 'agent', schemas.agent);
-    if (schemas.file_manager) renderSchemaForm('schema-container-file_manager', 'file_manager', schemas.file_manager);
+    // Only render File Manager schema form if it has fields (not ephemeral)
+    if (schemas.file_manager?.fields?.length) {
+      renderSchemaForm('schema-container-file_manager', 'file_manager', schemas.file_manager);
+    } else if (schemas.file_manager) {
+      // Ephemeral mode: schema has no fields, clear the loading placeholder
+      const container = document.getElementById('schema-container-file_manager');
+      if (container) container.innerHTML = '';
+    }
   }
 
   // Populate the GitHub header link from schema + config
@@ -160,87 +167,97 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ─── OAuth dialog ─────────────────────────────────────────────
-  const oauthDialog = document.getElementById('oauth-dialog');
-  const oauthCancelBtn = document.getElementById('oauth-cancel-btn');
-  const driveToggleBtn = document.getElementById('drive-connect-toggle');
+  // ─── Drive status + backend-aware UI ───────────────────────────
+  // Load Drive status early to determine backend type and toggle UI
+  await refreshDriveCard();
 
-  // Prevent Escape from closing the dialog (would leave Google tab orphaned)
-  oauthDialog.addEventListener('cancel', (e) => e.preventDefault());
+  // ─── OAuth dialog (Google Drive only) ──────────────────────────
+  // Guard: OAuth UI is only functional with the Google Drive backend.
+  // In ephemeral mode, the Drive connection card is hidden, so there
+  // are no buttons to wire up.
+  const driveCard = document.getElementById('drive-connection');
+  if (driveCard && !driveCard.hidden) {
+    const oauthDialog = document.getElementById('oauth-dialog');
+    const oauthCancelBtn = document.getElementById('oauth-cancel-btn');
+    const driveToggleBtn = document.getElementById('drive-connect-toggle');
 
-  // Shared OAuth popup flow — called by both Connect and Change Account
-  async function startOAuthFlow(triggerBtn) {
-    triggerBtn.disabled = true;
+    // Prevent Escape from closing the dialog (would leave Google tab orphaned)
+    oauthDialog.addEventListener('cancel', (e) => e.preventDefault());
 
-    const result = await API.startDriveConnect();
-    if (!result?.auth_url) {
-      triggerBtn.disabled = false;
-      return;
-    }
+    // Shared OAuth popup flow — called by both Connect and Change Account
+    async function startOAuthFlow(triggerBtn) {
+      triggerBtn.disabled = true;
 
-    // Show modal BEFORE opening Google tab so user sees it first
-    oauthDialog.showModal();
-
-    // No 'noopener' — we need window.opener for postMessage callback
-    // and the reference for popup.closed polling
-    const popup = window.open(result.auth_url, '_blank');
-    triggerBtn.disabled = false;
-
-    // Handle popup blocked by browser
-    if (!popup) {
-      oauthDialog.close();
-      Toast.show('Popup was blocked. Please allow popups for this site.', 'error');
-      return;
-    }
-
-    let oauthCompleted = false;
-
-    // Cancel button closes the Google tab → poller detects it → closes dialog
-    oauthCancelBtn.onclick = () => popup.close();
-
-    // Track completion via custom event (set by message listener below)
-    const onComplete = () => { oauthCompleted = true; };
-    window.addEventListener('drive-oauth-done', onComplete, { once: true });
-
-    // Poll for Google tab close — reset UI if user abandoned the flow
-    const poll = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(poll);
-        window.removeEventListener('drive-oauth-done', onComplete);
-        if (!oauthCompleted) {
-          oauthDialog.close();
-          refreshDriveCard();
-        }
+      const result = await API.startDriveConnect();
+      if (!result?.auth_url) {
+        triggerBtn.disabled = false;
+        return;
       }
-    }, 500);
-  }
 
-  // Toggle button — "Connect Google Drive" when disconnected, "Change Account" when connected
-  driveToggleBtn.addEventListener('click', () => startOAuthFlow(driveToggleBtn));
+      // Show modal BEFORE opening Google tab so user sees it first
+      oauthDialog.showModal();
 
-  // Disconnect — deletes the token file without re-authorizing
-  const driveDisconnectBtn = document.getElementById('drive-disconnect');
-  driveDisconnectBtn.addEventListener('click', async () => {
-    driveDisconnectBtn.disabled = true;
-    const result = await API.disconnectDrive();
-    driveDisconnectBtn.disabled = false;
-    if (result) {
-      Toast.show('Google Drive disconnected', 'info');
-      await refreshDriveCard();
+      // No 'noopener' — we need window.opener for postMessage callback
+      // and the reference for popup.closed polling
+      const popup = window.open(result.auth_url, '_blank');
+      triggerBtn.disabled = false;
+
+      // Handle popup blocked by browser
+      if (!popup) {
+        oauthDialog.close();
+        Toast.show('Popup was blocked. Please allow popups for this site.', 'error');
+        return;
+      }
+
+      let oauthCompleted = false;
+
+      // Cancel button closes the Google tab → poller detects it → closes dialog
+      oauthCancelBtn.onclick = () => popup.close();
+
+      // Track completion via custom event (set by message listener below)
+      const onComplete = () => { oauthCompleted = true; };
+      window.addEventListener('drive-oauth-done', onComplete, { once: true });
+
+      // Poll for Google tab close — reset UI if user abandoned the flow
+      const poll = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(poll);
+          window.removeEventListener('drive-oauth-done', onComplete);
+          if (!oauthCompleted) {
+            oauthDialog.close();
+            refreshDriveCard();
+          }
+        }
+      }, 500);
     }
-  });
 
-  // Drive OAuth callback via postMessage from oauth_callback.html
-  window.addEventListener('message', async (event) => {
-    if (event.origin !== window.location.origin) return;
-    if (event.data?.type !== 'drive-oauth-complete') return;
-    // Signal completion FIRST so poller sees oauthCompleted = true
-    window.dispatchEvent(new Event('drive-oauth-done'));
-    oauthDialog.close();
-    const type = event.data.success ? 'success' : 'error';
-    Toast.show(event.data.message, type);
-    await refreshDriveCard();
-  });
+    // Toggle button — "Connect Google Drive" when disconnected, "Change Account" when connected
+    driveToggleBtn.addEventListener('click', () => startOAuthFlow(driveToggleBtn));
+
+    // Disconnect — deletes the token file without re-authorizing
+    const driveDisconnectBtn = document.getElementById('drive-disconnect');
+    driveDisconnectBtn.addEventListener('click', async () => {
+      driveDisconnectBtn.disabled = true;
+      const result = await API.disconnectDrive();
+      driveDisconnectBtn.disabled = false;
+      if (result) {
+        Toast.show('Google Drive disconnected', 'info');
+        await refreshDriveCard();
+      }
+    });
+
+    // Drive OAuth callback via postMessage from oauth_callback.html
+    window.addEventListener('message', async (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== 'drive-oauth-complete') return;
+      // Signal completion FIRST so poller sees oauthCompleted = true
+      window.dispatchEvent(new Event('drive-oauth-done'));
+      oauthDialog.close();
+      const type = event.data.success ? 'success' : 'error';
+      Toast.show(event.data.message, type);
+      await refreshDriveCard();
+    });
+  }
 
   // ─── Jenkinsfile generator ──────────────────────────────────────
   const jfPublicNotices     = document.getElementById('jf-public-notices');

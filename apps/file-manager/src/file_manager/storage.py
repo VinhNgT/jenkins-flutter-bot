@@ -25,10 +25,13 @@ class StorageBackend(Protocol):
     All methods that perform I/O are async so callers never block.
     Implementations that wrap synchronous libraries (e.g. Google
     Drive) should use ``asyncio.to_thread()`` internally.
+
+    Configuration is injected at construction time — protocol methods
+    accept only the minimal data needed for the operation.
     """
 
-    async def upload(self, file_path: str, filename: str) -> UploadResult:
-        """Upload a file and return its ID + public URL."""
+    async def upload(self, data: bytes, filename: str) -> UploadResult:
+        """Upload file content and return its ID + download URL."""
         ...
 
     async def delete(self, file_id: str) -> None:

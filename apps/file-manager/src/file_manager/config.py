@@ -12,12 +12,18 @@ _DEFAULT_CONFIG_PATH = Path("/app/data/storage.json")
 
 
 class StorageSettings(ServiceSettings):
-    """Storage configuration resolved from config file, env, and defaults."""
+    """Storage configuration resolved from config file, env, and defaults.
+
+    Drive OAuth fields default to empty strings so ephemeral mode can
+    start without requiring credentials. When using the Google Drive
+    backend, these must be set via the dashboard or environment.
+    """
 
     config_path: ClassVar[Path] = _DEFAULT_CONFIG_PATH
 
-    # OAuth credentials
+    # OAuth credentials — optional for ephemeral mode
     drive_client_id: str = Field(
+        "",
         title="Drive Client ID",
         description="OAuth 2.0 client ID from Google Cloud Console",
         json_schema_extra={
@@ -36,6 +42,7 @@ class StorageSettings(ServiceSettings):
     )
 
     drive_client_secret: str = Field(
+        "",
         title="Drive Client Secret",
         description="OAuth 2.0 client secret",
         json_schema_extra={

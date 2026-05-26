@@ -3,6 +3,9 @@
 Implements the ``StorageBackend`` protocol using Google Drive as the
 storage provider.  Handles both OAuth token lifecycle and file
 upload/delete operations.
+
+Configuration (client_id, client_secret, folder_name) is injected at
+construction time — protocol methods are backend-agnostic.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -33,10 +37,23 @@ class GoogleDriveBackend:
     Handles OAuth token lifecycle and file upload/delete operations.
     All blocking I/O (disk reads, Google API calls) is offloaded to
     threads via ``asyncio.to_thread()`` to avoid blocking the event loop.
+
+    Configuration is injected at construction — protocol methods accept
+    only the data needed for the operation (bytes + filename).
     """
 
-    def __init__(self, token_path: Path) -> None:
+    def __init__(
+        self,
+        token_path: Path,
+        *,
+        client_id: str,
+        client_secret: str,
+        folder_name: str = "Flutter Builds",
+    ) -> None:
         self._token_path = token_path
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._folder_name = folder_name
         self._pending_flow: Flow | None = None
         self._folder_id_cache: dict[str, str] = {}
         self._cached_creds: Credentials | None = None
@@ -45,8 +62,16 @@ class GoogleDriveBackend:
     def token_path(self) -> Path:
         return self._token_path
 
+    @property
+    def client_id(self) -> str:
+        return self._client_id
+
+    @property
+    def client_secret(self) -> str:
+        return self._client_secret
+
     # ------------------------------------------------------------------
-    # OAuth helpers (migrated from legacy drive module)
+    # OAuth helpers
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -57,29 +82,22 @@ class GoogleDriveBackend:
 
     def _client_config(
         self,
-        client_id: str,
-        client_secret: str,
         redirect_uri: str,
     ) -> dict[str, dict[str, Any]]:
         return {
             "web": {
-                "client_id": client_id,
-                "client_secret": client_secret,
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
                 "redirect_uris": [redirect_uri],
             }
         }
 
-    def _build_flow(
-        self,
-        client_id: str,
-        client_secret: str,
-        redirect_uri: str,
-    ) -> Flow:
+    def _build_flow(self, redirect_uri: str) -> Flow:
         self._allow_insecure_transport(redirect_uri)
         flow = Flow.from_client_config(
-            self._client_config(client_id, client_secret, redirect_uri),
+            self._client_config(redirect_uri),
             scopes=DRIVE_SCOPES,
         )
         flow.redirect_uri = redirect_uri
@@ -106,19 +124,14 @@ class GoogleDriveBackend:
     # OAuth public API
     # ------------------------------------------------------------------
 
-    def start_auth(
-        self,
-        client_id: str,
-        client_secret: str,
-        redirect_uri: str,
-    ) -> str:
+    def start_auth(self, redirect_uri: str) -> str:
         """Generate the OAuth consent URL and store the flow for callback.
 
         Returns the authorization URL the user should open in a browser.
         This is CPU-only (URL construction) — no I/O, safe to call from
         an async context without ``to_thread``.
         """
-        flow = self._build_flow(client_id, client_secret, redirect_uri)
+        flow = self._build_flow(redirect_uri)
         auth_url, _ = flow.authorization_url(
             access_type="offline",
             prompt="consent",
@@ -146,39 +159,33 @@ class GoogleDriveBackend:
             self._exchange_callback_sync, authorization_response
         )
 
-    def _exchange_code_sync(
-        self,
-        code: str,
-        client_id: str,
-        client_secret: str,
-    ) -> None:
+    def _exchange_code_sync(self, code: str) -> None:
         """Exchange a manually-pasted auth code for tokens (blocking)."""
         self._allow_insecure_transport("http://localhost")
         flow = Flow.from_client_config(
-            self._client_config(client_id, client_secret, "http://localhost"),
+            {
+                "web": {
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["http://localhost"],
+                }
+            },
             scopes=DRIVE_SCOPES,
         )
         flow.redirect_uri = "http://localhost"
         flow.fetch_token(code=code)
         self._save_credentials(flow.credentials)
 
-    async def exchange_code(
-        self,
-        code: str,
-        client_id: str,
-        client_secret: str,
-    ) -> None:
+    async def exchange_code(self, code: str) -> None:
         """Exchange a manually-pasted auth code for tokens and save them.
 
         Offloads the blocking ``fetch_token`` HTTP call to a thread.
         """
-        await asyncio.to_thread(
-            self._exchange_code_sync, code, client_id, client_secret
-        )
+        await asyncio.to_thread(self._exchange_code_sync, code)
 
-    def _load_tokens_sync(
-        self, client_id: str, client_secret: str
-    ) -> Credentials | None:
+    def _load_tokens_sync(self) -> Credentials | None:
         """Load saved OAuth tokens from disk, refreshing if needed (blocking).
 
         Performs disk reads, a potential HTTP call to Google's token
@@ -192,8 +199,8 @@ class GoogleDriveBackend:
             token=data.get("token"),
             refresh_token=data.get("refresh_token"),
             token_uri=data.get("token_uri", "https://oauth2.googleapis.com/token"),
-            client_id=data.get("client_id", client_id),
-            client_secret=data.get("client_secret", client_secret),
+            client_id=data.get("client_id", self._client_id),
+            client_secret=data.get("client_secret", self._client_secret),
             scopes=data.get("scopes"),
         )
 
@@ -209,9 +216,7 @@ class GoogleDriveBackend:
 
         return creds if creds.valid else None
 
-    async def load_tokens(
-        self, client_id: str, client_secret: str
-    ) -> Credentials | None:
+    async def load_tokens(self) -> Credentials | None:
         """Load saved OAuth tokens, refreshing if needed.
 
         Offloads blocking disk I/O and Google token refresh to a thread.
@@ -219,9 +224,7 @@ class GoogleDriveBackend:
         if self._cached_creds and self._cached_creds.valid:
             return self._cached_creds
 
-        creds = await asyncio.to_thread(
-            self._load_tokens_sync, client_id, client_secret
-        )
+        creds = await asyncio.to_thread(self._load_tokens_sync)
         self._cached_creds = creds
         return creds
 
@@ -248,12 +251,12 @@ class GoogleDriveBackend:
         """Return the public Google Drive folder browse URL."""
         return f"https://drive.google.com/drive/folders/{folder_id}"
 
-    def _ensure_folder_sync(self, creds: Credentials, folder_name: str) -> str:
+    def _ensure_folder_sync(self, creds: Credentials) -> str:
         """Find or create a Drive folder by name. Returns folder_id."""
         service = self._get_drive_service(creds)
 
         query = (
-            f"name = '{folder_name}' and "
+            f"name = '{self._folder_name}' and "
             f"mimeType = 'application/vnd.google-apps.folder' and "
             f"trashed = false"
         )
@@ -268,33 +271,33 @@ class GoogleDriveBackend:
             folder_id = files[0]["id"]
             logger.info(
                 "Found existing Drive folder '%s' (ID: %s)",
-                folder_name,
+                self._folder_name,
                 folder_id,
             )
         else:
             file_metadata = {
-                "name": folder_name,
+                "name": self._folder_name,
                 "mimeType": "application/vnd.google-apps.folder",
             }
             folder = service.files().create(body=file_metadata, fields="id").execute()
             folder_id = folder["id"]
             logger.info(
                 "Created Drive folder '%s' (ID: %s)",
-                folder_name,
+                self._folder_name,
                 folder_id,
             )
 
         return folder_id
 
-    async def _ensure_folder(self, creds: Credentials, folder_name: str) -> str:
+    async def _ensure_folder(self, creds: Credentials) -> str:
         """Find or create a Drive folder by name. Returns folder_id."""
-        if folder_name in self._folder_id_cache:
-            return self._folder_id_cache[folder_name]
+        if self._folder_name in self._folder_id_cache:
+            return self._folder_id_cache[self._folder_name]
 
         folder_id = await asyncio.to_thread(
-            self._ensure_folder_sync, creds, folder_name
+            self._ensure_folder_sync, creds
         )
-        self._folder_id_cache[folder_name] = folder_id
+        self._folder_id_cache[self._folder_name] = folder_id
         return folder_id
 
     def _upload_file_sync(
@@ -349,60 +352,46 @@ class GoogleDriveBackend:
     # StorageBackend protocol implementation
     # ------------------------------------------------------------------
 
-    async def upload(
-        self,
-        file_path: str,
-        filename: str,
-        *,
-        folder_name: str = "",
-        client_id: str = "",
-        client_secret: str = "",
-    ) -> UploadResult:
-        """Upload a file to Google Drive.
+    async def upload(self, data: bytes, filename: str) -> UploadResult:
+        """Upload file content to Google Drive.
 
-        ``folder_name``, ``client_id``, and ``client_secret`` are passed
-        by the ``StorageManager`` from the resolved config.
+        Writes bytes to a temporary file (Drive API requires a file path
+        for ``MediaFileUpload``), uploads, then cleans up.
         """
-        creds = await self.load_tokens(client_id, client_secret)
+        creds = await self.load_tokens()
         if creds is None:
             raise RuntimeError("Google Drive not connected — no valid tokens")
 
-        folder_id = await self._ensure_folder(creds, folder_name)
-        return await asyncio.to_thread(
-            self._upload_file_sync, file_path, filename, creds, folder_id
-        )
+        folder_id = await self._ensure_folder(creds)
 
-    async def delete(
-        self,
-        file_id: str,
-        *,
-        client_id: str = "",
-        client_secret: str = "",
-    ) -> None:
+        suffix = Path(filename).suffix
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+
+        try:
+            return await asyncio.to_thread(
+                self._upload_file_sync, tmp_path, filename, creds, folder_id
+            )
+        finally:
+            os.unlink(tmp_path)
+
+    async def delete(self, file_id: str) -> None:
         """Delete a file from Google Drive."""
-        creds = await self.load_tokens(client_id, client_secret)
+        creds = await self.load_tokens()
         if creds is None:
             raise RuntimeError("Google Drive not connected — no valid tokens")
         await asyncio.to_thread(self._delete_file_sync, creds, file_id)
 
-    async def is_connected(
-        self,
-        *,
-        client_id: str = "",
-        client_secret: str = "",
-    ) -> bool:
+    async def is_connected(self) -> bool:
         """Return True if valid Drive tokens exist."""
-        return await self.load_tokens(client_id, client_secret) is not None
+        return await self.load_tokens() is not None
 
-    async def status(
-        self,
-        *,
-        client_id: str = "",
-        client_secret: str = "",
-    ) -> dict[str, Any]:
+    async def status(self) -> dict[str, Any]:
         """Return current OAuth connection status."""
         return {
-            "configured": bool(client_id and client_secret),
-            "connected": await self.load_tokens(client_id, client_secret) is not None,
+            "backend": "google_drive",
+            "configured": bool(self._client_id and self._client_secret),
+            "connected": await self.load_tokens() is not None,
             "token_path": str(self._token_path),
         }

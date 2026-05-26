@@ -1,13 +1,12 @@
-"""File upload/delete/cleanup routes — /api/files/*."""
+"""File upload/delete/cleanup/download routes — /api/files/*."""
 
 from __future__ import annotations
 
 import logging
-import os
-import tempfile
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi.responses import Response
 
 from ..dependencies import ManagerDep
 
@@ -28,7 +27,7 @@ async def upload_file(
     Accepts multipart form data with a ``file`` field.
     Returns ``{file_id, download_url}``.
     """
-    if manager.backend is None or manager.config is None:
+    if manager.backend is None:
         raise HTTPException(status_code=503, detail="Storage backend not initialised")
 
     # Early rejection via Content-Length header (fast path).
@@ -39,8 +38,6 @@ async def upload_file(
             detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
         )
 
-    # Write uploaded file to a temp location, then pass to backend
-    suffix = os.path.splitext(file.filename or "file")[1]
     content = await file.read()
 
     # Safety net: enforce after read() in case Content-Length was missing/spoofed.
@@ -50,38 +47,22 @@ async def upload_file(
             detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
         )
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-
     try:
-        result = await manager.backend.upload(
-            file_path=tmp_path,
-            filename=file.filename or "upload",
-            folder_name=manager.config.drive_folder_name,
-            client_id=manager.config.drive_client_id,
-            client_secret=manager.config.drive_client_secret,
-        )
+        result = await manager.backend.upload(content, file.filename or "upload")
         return {"file_id": result.file_id, "download_url": result.download_url}
     except Exception:
         logger.exception("Upload failed")
         raise HTTPException(status_code=500, detail="Upload failed")
-    finally:
-        os.unlink(tmp_path)
 
 
 @router.delete("/{file_id}")
 async def delete_file(manager: ManagerDep, file_id: str) -> dict[str, str]:
     """Delete a single file by ID."""
-    if manager.backend is None or manager.config is None:
+    if manager.backend is None:
         raise HTTPException(status_code=503, detail="Storage backend not initialised")
 
     try:
-        await manager.backend.delete(
-            file_id=file_id,
-            client_id=manager.config.drive_client_id,
-            client_secret=manager.config.drive_client_secret,
-        )
+        await manager.backend.delete(file_id)
         return {"status": "deleted"}
     except Exception:
         logger.exception("Delete failed for %s", file_id)
@@ -94,7 +75,7 @@ async def cleanup_files(manager: ManagerDep, request: Request) -> dict[str, Any]
 
     Returns ``{deleted: [...], errors: [...]}``.
     """
-    if manager.backend is None or manager.config is None:
+    if manager.backend is None:
         raise HTTPException(status_code=503, detail="Storage backend not initialised")
 
     body = await request.json()
@@ -105,11 +86,7 @@ async def cleanup_files(manager: ManagerDep, request: Request) -> dict[str, Any]
 
     for fid in file_ids:
         try:
-            await manager.backend.delete(
-                file_id=fid,
-                client_id=manager.config.drive_client_id,
-                client_secret=manager.config.drive_client_secret,
-            )
+            await manager.backend.delete(fid)
             deleted.append(fid)
         except Exception:
             logger.exception("Failed to delete %s", fid)
@@ -121,9 +98,33 @@ async def cleanup_files(manager: ManagerDep, request: Request) -> dict[str, Any]
 @router.get("/status")
 async def storage_status(manager: ManagerDep) -> dict[str, Any]:
     """Return backend connection status."""
-    if manager.backend is None or manager.config is None:
+    if manager.backend is None:
         return {"connected": False, "detail": "not initialised"}
-    return await manager.backend.status(
-        client_id=manager.config.drive_client_id,
-        client_secret=manager.config.drive_client_secret,
+    return await manager.backend.status()
+
+
+@router.get("/{file_id}/download")
+async def download_file(manager: ManagerDep, file_id: str) -> Response:
+    """Download a file from ephemeral storage.
+
+    Only available when the ephemeral backend is active.
+    Google Drive files are downloaded directly from Drive URLs.
+    """
+    ephemeral = manager.ephemeral_backend
+    if ephemeral is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Download endpoint is only available in ephemeral mode",
+        )
+
+    stored = ephemeral.get(file_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return Response(
+        content=stored.data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{stored.filename}"',
+        },
     )

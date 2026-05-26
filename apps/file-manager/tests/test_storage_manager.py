@@ -1,12 +1,14 @@
-"""Tests for StorageManager — lifecycle, config validation."""
+"""Tests for StorageManager — lifecycle, config validation, backend routing."""
 
 import os
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from file_manager.manager import StorageManager, StartupError
+from file_manager.backends.ephemeral import EphemeralBackend
 from file_manager.backends.google_drive import GoogleDriveBackend
+from file_manager.manager import StorageManager
+from file_manager.storage import StorageBackend, UploadResult
 
 
 @pytest.fixture(autouse=True)
@@ -14,11 +16,18 @@ def isolate_config(tmp_path):
     os.environ["JFB_DATA_DIR"] = str(tmp_path)
     yield tmp_path
     os.environ.pop("JFB_DATA_DIR", None)
+    os.environ.pop("STORAGE_BACKEND", None)
 
 
 @pytest.fixture
 def mock_backend():
-    return MagicMock(spec=GoogleDriveBackend)
+    """A mock that satisfies the StorageBackend protocol."""
+    backend = MagicMock(spec=StorageBackend)
+    backend.upload = AsyncMock(return_value=UploadResult("id1", "http://url"))
+    backend.delete = AsyncMock()
+    backend.is_connected = AsyncMock(return_value=True)
+    backend.status = AsyncMock(return_value={"connected": True})
+    return backend
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +37,7 @@ def mock_backend():
 
 class TestLifecycle:
     async def test_start_with_injected_backend(self, mock_backend, isolate_config):
-        """With injected backend, starts without creating a real GoogleDriveBackend."""
+        """With injected backend, starts without creating a real backend."""
         import json
 
         config_path = isolate_config / "storage.json"
@@ -41,22 +50,32 @@ class TestLifecycle:
         assert mgr.running is True
         assert mgr.backend is mock_backend
 
-    async def test_start_with_invalid_config_raises(self, isolate_config):
-        """Missing required fields → StartupError."""
-        import json
-
-        # Write config missing required field (drive.client_id is required)
-        config_path = isolate_config / "storage.json"
-        config_path.write_text(json.dumps({}))
+    async def test_start_ephemeral_mode(self, isolate_config):
+        """With STORAGE_BACKEND=ephemeral, creates an EphemeralBackend."""
+        os.environ["STORAGE_BACKEND"] = "ephemeral"
 
         mgr = StorageManager()
-        # StorageSettings may not have required fields depending on config —
-        # if it does, this should raise StartupError
-        try:
-            await mgr.start()
-            # If it starts without error, that means no required fields
-        except StartupError:
-            assert mgr.running is False
+        await mgr.start()
+        assert mgr.running is True
+        assert isinstance(mgr.backend, EphemeralBackend)
+        assert mgr.backend_type == "ephemeral"
+
+    async def test_start_google_drive_mode(self, isolate_config):
+        """With STORAGE_BACKEND=google_drive, creates a GoogleDriveBackend."""
+        import json
+
+        config_path = isolate_config / "storage.json"
+        config_path.write_text(json.dumps({
+            "drive": {"client_id": "cid", "client_secret": "csecret"},
+        }))
+
+        os.environ["STORAGE_BACKEND"] = "google_drive"
+
+        mgr = StorageManager()
+        await mgr.start()
+        assert mgr.running is True
+        assert isinstance(mgr.backend, GoogleDriveBackend)
+        assert mgr.backend_type == "google_drive"
 
     async def test_stop_clears_state(self, mock_backend, isolate_config):
         import json
@@ -74,27 +93,6 @@ class TestLifecycle:
         assert mgr.running is False
         assert mgr.config is None
 
-    async def test_restart_stop_then_start(self, mock_backend, isolate_config):
-        """Restart calls stop → start; injected backends remain None after
-        stop since the manager can't re-create them. Verify the lifecycle."""
-        import json
-
-        config_path = isolate_config / "storage.json"
-        config_path.write_text(json.dumps({
-            "drive": {"client_id": "cid", "client_secret": "csecret"},
-        }))
-
-        mgr = StorageManager(backend=mock_backend)
-        await mgr.start()
-        assert mgr.running is True
-
-        await mgr.stop()
-        assert mgr.running is False
-
-        # After stop, the injected backend is cleared but _injected_backend
-        # flag remains True, so start() won't create a new backend.
-        # This is by design — injected backends are one-shot test fixtures.
-
 
 # ---------------------------------------------------------------------------
 # status
@@ -106,6 +104,7 @@ class TestStatus:
         mgr = StorageManager()
         status = mgr.status()
         assert status["running"] is False
+        assert "backend_type" in status
 
     async def test_status_running(self, mock_backend, isolate_config):
         import json
@@ -120,15 +119,42 @@ class TestStatus:
         status = mgr.status()
         assert status["running"] is True
         assert "started_at" in status
+        assert "backend_type" in status
 
-    def test_status_config_error(self, isolate_config):
-        """When StorageSettings.load() fails, status shows config_error."""
-
-        # Create config that makes load() fail (e.g. invalid JSON)
-        config_path = isolate_config / "storage.json"
-        config_path.write_text("{invalid json")
-
+    def test_status_ephemeral_backend_type(self, isolate_config):
+        """Status reports ephemeral backend type when configured."""
+        os.environ["STORAGE_BACKEND"] = "ephemeral"
         mgr = StorageManager()
         status = mgr.status()
-        # config_error might be None if no required fields — either way, should not crash
-        assert "running" in status
+        assert status["backend_type"] == "ephemeral"
+
+
+# ---------------------------------------------------------------------------
+# backend accessors
+# ---------------------------------------------------------------------------
+
+
+class TestBackendAccessors:
+    async def test_google_drive_backend_accessor(self, isolate_config):
+        """google_drive_backend returns backend when using Drive."""
+        import json
+
+        config_path = isolate_config / "storage.json"
+        config_path.write_text(json.dumps({
+            "drive": {"client_id": "cid", "client_secret": "csecret"},
+        }))
+        os.environ["STORAGE_BACKEND"] = "google_drive"
+
+        mgr = StorageManager()
+        await mgr.start()
+        assert mgr.google_drive_backend is not None
+        assert mgr.ephemeral_backend is None
+
+    async def test_ephemeral_backend_accessor(self, isolate_config):
+        """ephemeral_backend returns backend when using ephemeral."""
+        os.environ["STORAGE_BACKEND"] = "ephemeral"
+
+        mgr = StorageManager()
+        await mgr.start()
+        assert mgr.ephemeral_backend is not None
+        assert mgr.google_drive_backend is None

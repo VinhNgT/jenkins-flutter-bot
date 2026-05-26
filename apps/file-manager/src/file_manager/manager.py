@@ -2,11 +2,15 @@
 
 Follows the same manager pattern as other services — mutable state
 attached to ``app.state``, frozen config resolved on demand.
+
+The ``STORAGE_BACKEND`` environment variable selects which backend to
+instantiate: ``"google_drive"`` (default) or ``"ephemeral"``.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -15,8 +19,10 @@ from typing import Any
 from config_core import format_validation_error, resolve_config_path
 from pydantic import ValidationError
 
+from .backends.ephemeral import EphemeralBackend
 from .backends.google_drive import GoogleDriveBackend
 from .config import StorageSettings, _DEFAULT_CONFIG_PATH
+from .storage import StorageBackend
 
 logger = logging.getLogger(__name__)
 
@@ -25,29 +31,74 @@ class StartupError(Exception):
     """Raised when the storage manager fails to start."""
 
 
+def _resolve_backend_type() -> str:
+    """Read the storage backend type from the environment.
+
+    Returns ``"google_drive"`` or ``"ephemeral"``.
+    """
+    raw = os.environ.get("STORAGE_BACKEND", "google_drive").strip().lower()
+    if raw not in ("google_drive", "ephemeral"):
+        logger.warning(
+            "Unknown STORAGE_BACKEND=%r, falling back to 'google_drive'", raw,
+        )
+        return "google_drive"
+    return raw
+
+
 class StorageManager:
-    """Manages the storage backend lifecycle and configuration."""
+    """Manages the storage backend lifecycle and configuration.
+
+    The backend type is determined by the ``STORAGE_BACKEND`` environment
+    variable. In ``"ephemeral"`` mode, files are stored in memory and
+    Drive credentials are not required. In ``"google_drive"`` mode
+    (default), the manager initialises a ``GoogleDriveBackend`` with
+    the resolved config values.
+
+    For testing, pass a ``backend`` override to bypass auto-creation.
+    """
 
     def __init__(
         self,
         *,
-        backend: GoogleDriveBackend | None = None,
+        backend: StorageBackend | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._config: StorageSettings | None = None
-        self._backend: GoogleDriveBackend | None = backend
-        self._injected_backend = backend is not None
+        self._backend: StorageBackend | None = backend
+        self._test_backend = backend
         self._last_error: str | None = None
         self._started_at: float | None = None
         self._clock = clock
+        self._backend_type = _resolve_backend_type()
 
     @property
     def config(self) -> StorageSettings | None:
         return self._config
 
     @property
-    def backend(self) -> GoogleDriveBackend | None:
+    def backend(self) -> StorageBackend | None:
         return self._backend
+
+    @property
+    def backend_type(self) -> str:
+        """Return the configured backend type (``"google_drive"`` or ``"ephemeral"``)."""
+        return self._backend_type
+
+    @property
+    def google_drive_backend(self) -> GoogleDriveBackend | None:
+        """Return the backend only if it is a ``GoogleDriveBackend``.
+
+        Used by OAuth routes that require Drive-specific methods.
+        """
+        return self._backend if isinstance(self._backend, GoogleDriveBackend) else None
+
+    @property
+    def ephemeral_backend(self) -> EphemeralBackend | None:
+        """Return the backend only if it is an ``EphemeralBackend``.
+
+        Used by the download endpoint to retrieve stored files.
+        """
+        return self._backend if isinstance(self._backend, EphemeralBackend) else None
 
     @property
     def running(self) -> bool:
@@ -64,11 +115,22 @@ class StorageManager:
             self._last_error = str(e)
             raise StartupError(str(e)) from e
 
-        if not self._injected_backend:
-            self._backend = GoogleDriveBackend(self._token_path())
+        # Test override — use the injected backend as-is
+        if self._test_backend is not None:
+            self._backend = self._test_backend
+        elif self._backend_type == "ephemeral":
+            self._backend = EphemeralBackend()
+        else:
+            self._backend = GoogleDriveBackend(
+                self._token_path(),
+                client_id=self._config.drive_client_id,
+                client_secret=self._config.drive_client_secret,
+                folder_name=self._config.drive_folder_name,
+            )
+
         self._last_error = None
         self._started_at = self._clock()
-        logger.info("StorageManager started")
+        logger.info("StorageManager started (backend=%s)", self._backend_type)
 
     async def stop(self) -> None:
         """Shut down the storage backend."""
@@ -94,6 +156,7 @@ class StorageManager:
             "running": self.running,
             "last_error": self._last_error,
             "config_error": config_error,
+            "backend_type": self._backend_type,
         }
         if self._started_at is not None:
             result["started_at"] = self._started_at

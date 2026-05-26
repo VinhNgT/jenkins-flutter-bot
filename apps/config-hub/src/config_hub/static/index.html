@@ -81,10 +81,23 @@
           </div>
         </section>
 
-        <!-- ===== Google Drive Config (dynamic) ===== -->
+        <!-- ===== File Manager Config (dynamic) ===== -->
         <section id="panel-file_manager" class="tab-panel" role="tabpanel" hidden>
+          <!-- Ephemeral mode banner — shown when STORAGE_BACKEND=ephemeral -->
+          <div id="ephemeral-banner" class="card ephemeral-banner" hidden>
+            <h3>📦 Ephemeral Storage</h3>
+            <p class="text-muted">
+              Storage is running in <strong>ephemeral mode</strong> — files are
+              stored in memory and will be lost when the service restarts.
+              This is intended for development and testing.
+            </p>
+            <p class="text-muted" style="margin-top:0.5rem">
+              To use persistent storage, set <code>STORAGE_BACKEND=google_drive</code>
+              in the service environment.
+            </p>
+          </div>
           <div id="schema-container-file_manager">
-            <p class="text-muted">Loading Google Drive schema…</p>
+            <p class="text-muted">Loading storage schema…</p>
           </div>
           <div id="drive-connection" class="card" style="margin-top:1.5rem">
             <h3>Google Drive</h3>

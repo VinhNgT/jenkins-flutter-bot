@@ -227,13 +227,29 @@ export async function refreshDriveCard() {
   const el = document.getElementById('drive-status-detail');
   const toggleBtn = document.getElementById('drive-connect-toggle');
   const disconnectBtn = document.getElementById('drive-disconnect');
+  const driveCard = document.getElementById('drive-connection');
+  const ephemeralBanner = document.getElementById('ephemeral-banner');
+  const schemaContainer = document.getElementById('schema-container-file_manager');
 
   if (!drive) {
-    el.textContent = 'Unable to check Drive status.';
+    el.textContent = 'Unable to check storage status.';
     toggleBtn.disabled = true;
     disconnectBtn.disabled = true;
     return;
   }
+
+  // Ephemeral mode — hide Drive UI, show ephemeral banner
+  if (drive.backend === 'ephemeral') {
+    if (driveCard) driveCard.hidden = true;
+    if (schemaContainer) schemaContainer.hidden = true;
+    if (ephemeralBanner) ephemeralBanner.hidden = false;
+    return;
+  }
+
+  // Google Drive mode — show Drive UI, hide ephemeral banner
+  if (driveCard) driveCard.hidden = false;
+  if (schemaContainer) schemaContainer.hidden = false;
+  if (ephemeralBanner) ephemeralBanner.hidden = true;
 
   if (!drive.configured) {
     el.textContent = 'OAuth credentials not configured. Enter your Client ID and Secret above, then save.';

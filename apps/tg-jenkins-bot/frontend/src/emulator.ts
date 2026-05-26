@@ -152,6 +152,7 @@ WebApp.HapticFeedback = {
 const MainButton: TelegramMainButton & { _onClickCb: (() => void) | null; _visible: boolean; _enabled: boolean; _text: string; _color: string; _textColor: string; _progress: boolean; _updateDOM(): void } = {
   _onClickCb: null, _visible: false, _enabled: true, _text: 'CONTINUE', _color: '#2481cc', _textColor: '#ffffff', _progress: false,
   onClick(cb) { this._onClickCb = cb; },
+  offClick(cb) { if (this._onClickCb === cb) this._onClickCb = null; },
   show() { this._visible = true; this._updateDOM(); },
   hide() { this._visible = false; this._updateDOM(); },
   enable() { this._enabled = true; this._updateDOM(); },

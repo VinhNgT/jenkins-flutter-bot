@@ -24,6 +24,7 @@ interface TelegramThemeParams {
 
 interface TelegramMainButton {
   onClick(cb: () => void): void;
+  offClick(cb: () => void): void;
   show(): void;
   hide(): void;
   enable(): void;

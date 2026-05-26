@@ -61,13 +61,6 @@ export default function MainScreen({ config }: MainScreenProps) {
     }
   }, [isEnabled, isTelegram, tg]);
 
-  // Register MainButton click handler once
-  useEffect(() => {
-    if (!isTelegram || !tg) return;
-    tg.MainButton.onClick(handleTrigger);
-    // Hide BackButton on main screen
-    tg.BackButton.hide();
-  }, [isTelegram, tg]);
 
   // Hide browser fallback trigger inside Telegram
   const showFallbackButton = !isTelegram;
@@ -135,6 +128,18 @@ export default function MainScreen({ config }: MainScreenProps) {
       }
     }
   }, [selectedBranch, isDuplicate, initData, isTelegram, tg, haptic, showToast]);
+
+  // Register MainButton click handler
+  useEffect(() => {
+    if (!isTelegram || !tg) return;
+    tg.MainButton.onClick(handleTrigger);
+    // Hide BackButton on main screen
+    tg.BackButton.hide();
+
+    return () => {
+      tg.MainButton.offClick(handleTrigger);
+    };
+  }, [isTelegram, tg, handleTrigger]);
 
   return (
     <div class="container" id="mainScreen" style={{ display: 'flex' }}>

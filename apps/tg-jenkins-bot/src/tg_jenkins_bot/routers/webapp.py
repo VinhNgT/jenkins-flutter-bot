@@ -314,20 +314,20 @@ async def get_webapp_config(
     # Map our bot config branches
     branches_list = []
     for label, ref in ctx.config.branches.items():
-        branches_list.append({"label": label, "ref": ref})
+        branches_list.append(BranchItem(label=label, ref=ref))
 
     # Get active builds formatted for frontend
     active_builds = []
     for build in ctx.list_building():
         active_builds.append(
-            {
-                "request_id": build.request_id,
-                "label": build.label,
-                "ref": build.ref,
-                "triggered_at": build.triggered_at,
-                "triggered_by": build.triggered_by,
-                "triggered_by_id": build.triggered_by_id,
-            }
+            ActiveBuildResponse(
+                request_id=build.request_id,
+                label=build.label,
+                ref=build.ref,
+                triggered_at=build.triggered_at,
+                triggered_by=build.triggered_by,
+                triggered_by_id=build.triggered_by_id,
+            )
         )
 
     return WebAppConfigResponse(

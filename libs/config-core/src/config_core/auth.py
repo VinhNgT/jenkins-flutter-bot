@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 import secrets
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 
 # Read once at import time — the token never changes during a process lifetime.
 _TOKEN = os.environ.get("SERVICE_AUTH_TOKEN", "")

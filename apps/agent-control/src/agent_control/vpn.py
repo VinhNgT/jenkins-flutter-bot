@@ -18,6 +18,11 @@ class VpnManager:
     the other user. Build-manager orchestrates connect/disconnect to keep
     the window as short as possible (active builds only).
 
+    OpenVPN is run as a managed child process (no ``--daemon`` flag).
+    This avoids zombie processes in Docker containers where PID 1 does not
+    reap orphaned children, and gives us direct ``terminate()``/``kill()``
+    control with reliable ``wait()``-based exit detection.
+
     A safety timer auto-disconnects the VPN after a configurable maximum
     duration, preventing orphaned sessions when build-manager crashes or
     fails to issue a disconnect.
@@ -26,6 +31,7 @@ class VpnManager:
     def __init__(self) -> None:
         self._auto_disconnect_task: asyncio.Task[None] | None = None
         self._max_connected_minutes: int = 0
+        self._process: asyncio.subprocess.Process | None = None
 
     @property
     def OVPN_PATH(self) -> Path:
@@ -47,18 +53,7 @@ class VpnManager:
     @property
     def connected(self) -> bool:
         """Check if the OpenVPN process is alive and tun interface exists."""
-        if not self.PID_PATH.exists():
-            return False
-
-        try:
-            pid = int(self.PID_PATH.read_text().strip())
-        except (ValueError, OSError):
-            return False
-
-        # Check if process is running (send signal 0)
-        try:
-            os.kill(pid, 0)
-        except OSError:
+        if self._process is None or self._process.returncode is not None:
             return False
 
         # Check if tun interface is present in /sys/class/net
@@ -86,25 +81,16 @@ class VpnManager:
 
         logger.info("Starting OpenVPN tunnel...")
 
-        # Clear old process and PID if any
-        if self.PID_PATH.exists():
-            try:
-                pid = int(self.PID_PATH.read_text().strip())
-                logger.info(f"Killing old lingering OpenVPN process (PID {pid}) prior to connection...")
-                os.kill(pid, signal.SIGKILL)
-            except Exception:
-                pass
-            try:
-                self.PID_PATH.unlink()
-            except OSError:
-                pass
+        # Kill any lingering process from a previous run
+        await self._kill_existing()
 
-        # Spawns: openvpn --config /app/data/client.ovpn --daemon --writepid /tmp/openvpn.pid --log /app/data/openvpn.log
+        # Run openvpn as a managed child (no --daemon). stdout/stderr go to
+        # the log file; the process stays attached so we can terminate() it
+        # and wait() for clean exit detection.
         cmd = [
             "openvpn",
             "--config",
             str(self.OVPN_PATH),
-            "--daemon",
             "--writepid",
             str(self.PID_PATH),
             "--log",
@@ -112,27 +98,28 @@ class VpnManager:
         ]
 
         try:
-            proc = await asyncio.create_subprocess_exec(
+            self._process = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            stdout, stderr = await proc.communicate()
         except FileNotFoundError:
             logger.error("openvpn executable not found. Make sure it is installed.")
             raise RuntimeError("openvpn executable not found on the system.")
 
-        if proc.returncode != 0:
-            err_msg = stderr.decode().strip()
-            logger.error(f"Failed to start OpenVPN process: {err_msg}")
-            raise RuntimeError(f"OpenVPN failed to start: {err_msg}")
-
-        # Wait for PID file and tun interface
+        # Wait for tun interface to come up
         timeout = 30.0
         poll_interval = 0.5
         elapsed = 0.0
 
         while elapsed < timeout:
+            # Check if process died early (bad config, auth failure, etc.)
+            if self._process.returncode is not None:
+                err_msg = ""
+                if self.LOG_PATH.exists():
+                    err_msg = self.LOG_PATH.read_text().strip().splitlines()[-1]
+                raise RuntimeError(f"OpenVPN exited with code {self._process.returncode}: {err_msg}")
+
             if self.connected:
                 logger.info("VPN connected successfully (tun interface up).")
                 self._start_safety_timer()
@@ -146,68 +133,71 @@ class VpnManager:
         raise TimeoutError("Timeout waiting for VPN connection to establish.")
 
     async def disconnect(self) -> None:
-        """Send SIGTERM to the OpenVPN process, wait 5s, then SIGKILL."""
+        """Terminate the OpenVPN process and wait for it to exit."""
         self._cancel_safety_timer()
 
-        if not self.PID_PATH.exists():
-            logger.info("VPN is not connected (no PID file).")
+        if self._process is None or self._process.returncode is not None:
+            logger.info("VPN is not connected (no running process).")
+            self._cleanup_pid_file()
             return
 
+        pid = self._process.pid
+        logger.info("Disconnecting VPN (PID %d)...", pid)
+
+        # SIGTERM for graceful shutdown
         try:
-            pid = int(self.PID_PATH.read_text().strip())
-        except (ValueError, OSError) as e:
-            logger.warning(f"Could not read OpenVPN PID: {e}")
-            # Remove PID file to clear state
-            try:
-                self.PID_PATH.unlink()
-            except OSError:
-                pass
+            self._process.terminate()
+        except ProcessLookupError:
+            logger.info("OpenVPN process already exited.")
+            self._cleanup_pid_file()
             return
 
-        logger.info(f"Disconnecting VPN (PID {pid})...")
-
-        # Try SIGTERM
+        # Wait for exit with timeout. Since we hold the Process object,
+        # wait() detects exit reliably (no zombie issue).
         try:
-            os.kill(pid, signal.SIGTERM)
-        except OSError as e:
-            logger.warning(f"Failed to send SIGTERM to OpenVPN (PID {pid}): {e}")
-            # Process might already be dead
+            await asyncio.wait_for(self._process.wait(), timeout=10.0)
+            logger.info("OpenVPN process stopped gracefully.")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "OpenVPN process (PID %d) did not stop after 10s. Sending SIGKILL...",
+                pid,
+            )
             try:
-                self.PID_PATH.unlink()
-            except OSError:
+                self._process.kill()
+                await self._process.wait()
+            except ProcessLookupError:
                 pass
-            return
 
-        # Wait for process to exit. OpenVPN's graceful shutdown tears down
-        # routes and closes the tun device, which typically takes 5-8 seconds.
-        timeout = 10.0
-        poll_interval = 0.2
-        elapsed = 0.0
-        while elapsed < timeout:
-            try:
-                os.kill(pid, 0)
-            except OSError:
-                # Process is dead!
-                logger.info("OpenVPN process stopped.")
-                break
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-        else:
-            # Still alive, SIGKILL
-            logger.warning(f"OpenVPN process (PID {pid}) did not stop after {timeout:.0f}s. Sending SIGKILL...")
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError as e:
-                logger.warning(f"Failed to send SIGKILL to OpenVPN: {e}")
+        self._cleanup_pid_file()
+        logger.info("VPN disconnected.")
 
-        # Clean up PID file
+    async def _kill_existing(self) -> None:
+        """Kill any lingering OpenVPN process from a previous run."""
+        # Kill managed process if still alive
+        if self._process is not None and self._process.returncode is None:
+            try:
+                self._process.kill()
+                await self._process.wait()
+            except ProcessLookupError:
+                pass
+            self._process = None
+
+        # Also clean up stale PID file from a --daemon-era process or crash
         if self.PID_PATH.exists():
             try:
-                self.PID_PATH.unlink()
-            except OSError:
+                pid = int(self.PID_PATH.read_text().strip())
+                logger.info("Killing old lingering OpenVPN process (PID %d)...", pid)
+                os.kill(pid, signal.SIGKILL)
+            except Exception:
                 pass
+            self._cleanup_pid_file()
 
-        logger.info("VPN disconnected.")
+    def _cleanup_pid_file(self) -> None:
+        """Remove the PID file if it exists."""
+        try:
+            self.PID_PATH.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     def status(self) -> dict[str, Any]:
         """Return VPN connection status for the control API."""

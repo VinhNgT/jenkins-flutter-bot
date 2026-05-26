@@ -1,6 +1,6 @@
+import asyncio
 import os
-import signal
-from unittest.mock import AsyncMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
 
@@ -18,20 +18,15 @@ async def test_vpn_manager_connect_missing_file():
 
 
 @pytest.mark.asyncio
-async def test_vpn_manager_connect_already_connected(tmp_path):
+async def test_vpn_manager_connect_already_connected():
     vpn = VpnManager()
-    vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
-    vpn.OVPN_PATH.write_text("client-config")
-    vpn.PID_PATH.write_text(str(os.getpid()))
 
-    # Patch connected so the test doesn't depend on /sys/class/net existing
-    # (absent on macOS) or a real tun interface being present (Linux without VPN).
     with patch.object(VpnManager, "connected", new_callable=PropertyMock, return_value=True):
         await vpn.connect()  # Should return early without spawning openvpn
 
 
 @pytest.mark.asyncio
-async def test_vpn_manager_connect_success(tmp_path):
+async def test_vpn_manager_connect_success():
     vpn = VpnManager()
     vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
     vpn.OVPN_PATH.write_text("client-config")
@@ -40,11 +35,10 @@ async def test_vpn_manager_connect_success(tmp_path):
         vpn.PID_PATH.unlink()
 
     mock_proc = AsyncMock()
-    mock_proc.communicate.return_value = (b"", b"")
-    mock_proc.returncode = 0
+    mock_proc.returncode = None  # Process is running (not exited)
+    mock_proc.pid = 99999
 
     async def side_effect(*args, **kwargs):
-        # Simulate PID file creation by openvpn
         vpn.PID_PATH.write_text(str(os.getpid()))
         return mock_proc
 
@@ -53,24 +47,35 @@ async def test_vpn_manager_connect_success(tmp_path):
     ) as mock_exec, patch.object(
         VpnManager, "connected", new_callable=PropertyMock
     ) as mock_connected:
-        # Make self.connected return False first (to trigger execution), then True to simulate tun up
+        # First call: not connected (triggers _kill_existing check), then True
         mock_connected.side_effect = [False, True]
 
         await vpn.connect()
         assert mock_exec.called
-        assert vpn.PID_PATH.exists()
-
 
 
 @pytest.mark.asyncio
-async def test_vpn_manager_disconnect(tmp_path):
+async def test_vpn_manager_disconnect():
+    """Disconnect terminates the managed process and waits for exit."""
     vpn = VpnManager()
-    vpn.PID_PATH.write_text(str(os.getpid()))
 
-    with patch("os.kill") as mock_kill:
-        await vpn.disconnect()
-        mock_kill.assert_any_call(os.getpid(), signal.SIGTERM)
-        assert not vpn.PID_PATH.exists()
+    # Simulate a running process
+    mock_proc = MagicMock()
+    mock_proc.returncode = None  # Still running
+    mock_proc.pid = 99999
+    mock_proc.terminate = MagicMock()
+    mock_proc.kill = MagicMock()
+
+    wait_future = asyncio.get_event_loop().create_future()
+    wait_future.set_result(0)
+    mock_proc.wait = MagicMock(return_value=wait_future)
+
+    vpn._process = mock_proc
+
+    await vpn.disconnect()
+
+    mock_proc.terminate.assert_called_once()
+    assert vpn._auto_disconnect_task is None
 
 
 def test_vpn_endpoints(client):
@@ -120,11 +125,6 @@ async def test_vpn_safety_timer_auto_disconnects():
     vpn = VpnManager()
     vpn.set_max_connected_minutes(1)  # 1 minute
 
-    # Mock connect to simulate VPN coming up immediately
-    vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
-    vpn.OVPN_PATH.write_text("client-config")
-    vpn.PID_PATH.write_text(str(os.getpid()))
-
     with patch.object(VpnManager, "connected", new_callable=PropertyMock, return_value=True):
         await vpn.connect()  # Should start safety timer
 
@@ -143,17 +143,22 @@ async def test_vpn_disconnect_cancels_safety_timer():
     vpn = VpnManager()
     vpn.set_max_connected_minutes(45)
 
-    vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
-    vpn.OVPN_PATH.write_text("client-config")
-    vpn.PID_PATH.write_text(str(os.getpid()))
-
     with patch.object(VpnManager, "connected", new_callable=PropertyMock, return_value=True):
         await vpn.connect()
 
     assert vpn._auto_disconnect_task is not None
 
-    with patch("os.kill"):
-        await vpn.disconnect()
+    # Simulate disconnect with a mock process
+    mock_proc = MagicMock()
+    mock_proc.returncode = None
+    mock_proc.pid = 99999
+    mock_proc.terminate = MagicMock()
+    wait_future = asyncio.get_event_loop().create_future()
+    wait_future.set_result(0)
+    mock_proc.wait = MagicMock(return_value=wait_future)
+    vpn._process = mock_proc
+
+    await vpn.disconnect()
 
     # Timer should be cancelled after disconnect
     assert vpn._auto_disconnect_task is None
@@ -165,12 +170,7 @@ async def test_vpn_no_timer_when_disabled():
     vpn = VpnManager()
     vpn.set_max_connected_minutes(0)
 
-    vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
-    vpn.OVPN_PATH.write_text("client-config")
-    vpn.PID_PATH.write_text(str(os.getpid()))
-
     with patch.object(VpnManager, "connected", new_callable=PropertyMock, return_value=True):
         await vpn.connect()
 
     assert vpn._auto_disconnect_task is None
-

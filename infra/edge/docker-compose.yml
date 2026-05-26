@@ -1,5 +1,8 @@
 # Edge environment — pulls edge images from GHCR (usually built from main branch).
 # Usage: ./compose.sh edge [args]
+#
+# JFB_DEV_MODE is set to "" to override the "true" inherited from dev compose.
+# Edge is a pre-production environment and should behave like production.
 
 name: jfb
 
@@ -10,19 +13,29 @@ services:
   build-manager:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/build-manager:${IMAGE_TAG:-edge}
+    environment:
+      JFB_DEV_MODE: ""
 
   config-hub:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/config-hub:${IMAGE_TAG:-edge}
+    environment:
+      JFB_DEV_MODE: ""
 
   tg-jenkins-bot:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-jenkins-bot:${IMAGE_TAG:-edge}
+    environment:
+      JFB_DEV_MODE: ""
 
   agent-control:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/agent-control:${IMAGE_TAG:-edge}
+    environment:
+      JFB_DEV_MODE: ""
 
   file-manager:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/file-manager:${IMAGE_TAG:-edge}
+    environment:
+      JFB_DEV_MODE: ""

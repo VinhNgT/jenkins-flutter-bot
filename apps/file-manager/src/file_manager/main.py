@@ -7,8 +7,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from starlette.responses import JSONResponse
+
+from config_core import setup_service_logging, verify_service_token
 
 from .manager import StorageManager, StartupError
 from .routers import auth, files
@@ -38,7 +40,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create the FastAPI app hosting file and auth routes."""
-    app = FastAPI(title="file-manager", lifespan=lifespan)
+    app = FastAPI(
+        title="file-manager",
+        lifespan=lifespan,
+        dependencies=[Depends(verify_service_token)],
+    )
     app.state.manager = StorageManager()
 
     @app.exception_handler(StartupError)
@@ -57,8 +63,5 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the file-manager service."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-    )
+    setup_service_logging()
     uvicorn.run(create_app(), host="0.0.0.0", port=9092)

@@ -3,6 +3,11 @@
 Provides ``BootstrapSettings`` (env-only, hard crash),
 ``ServiceSettings`` (JSON > env, soft fail), UI adapter,
 dict helpers, and config I/O utilities used by every service in the stack.
+
+Security primitives:
+  - ``redact`` / ``register_secret`` / ``install_log_redaction`` — secret scrubbing
+  - ``verify_service_token`` / ``get_service_auth_headers`` — inter-service auth
+  - ``setup_service_logging`` — standardised logging with auto-redaction
 """
 
 from config_core.schema import (
@@ -15,4 +20,19 @@ from config_core.schema import (
     save_config_with_merge as save_config_with_merge,
     format_validation_error as format_validation_error,
     resolve_config_path as resolve_config_path,
+)
+
+from config_core.redact import (
+    install_log_redaction as install_log_redaction,
+    register_secret as register_secret,
+    redact as redact,
+)
+
+from config_core.auth import (
+    verify_service_token as verify_service_token,
+    get_service_auth_headers as get_service_auth_headers,
+)
+
+from config_core.logging import (
+    setup_service_logging as setup_service_logging,
 )

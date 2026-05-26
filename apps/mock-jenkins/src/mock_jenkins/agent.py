@@ -18,7 +18,7 @@ from typing import Any
 from pathlib import Path
 import uvicorn
 from agent_control.config import AgentSettings, _DEFAULT_CONFIG_PATH
-from config_core import format_validation_error, get_frontend_schema, read_masked_config, save_config_with_merge
+from config_core import format_validation_error, get_frontend_schema, read_masked_config, save_config_with_merge, setup_service_logging
 from config_core.schema import resolve_config_path
 from fastapi import FastAPI, Request, File, UploadFile, HTTPException
 from pydantic import ValidationError
@@ -266,10 +266,7 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the mock agent server."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-    )
+    setup_service_logging()
     logger.info("Starting mock-agent-control on port %d", MOCK_AGENT_PORT)
     uvicorn.run(create_app(), host="0.0.0.0", port=MOCK_AGENT_PORT)
 

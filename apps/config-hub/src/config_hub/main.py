@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,6 +12,8 @@ import uvicorn
 from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+from config_core import setup_service_logging
 
 from .dependencies import verify_basic_auth
 from .manager import ConfigHubManager
@@ -38,7 +41,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    app = FastAPI(title="config-hub", docs_url="/api/docs", lifespan=lifespan)
+    # Only expose Swagger docs in dev mode — hidden in production.
+    docs_url = "/api/docs" if os.environ.get("JFB_DEV_MODE") else None
+
+    app = FastAPI(title="config-hub", docs_url=docs_url, lifespan=lifespan)
 
     # --- Manager ---
     manager = ConfigHubManager()
@@ -63,10 +69,7 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the config-hub service."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-    )
+    setup_service_logging()
     uvicorn.run(
         create_app(),
         host="0.0.0.0",

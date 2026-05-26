@@ -19,10 +19,17 @@ RUN uv sync --frozen --no-dev --no-editable --package build-manager
 
 FROM python:3.12-slim
 
+RUN adduser --system --no-create-home appuser
+
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
+
+# Data directory needs write access for build state + JSON config
+RUN mkdir -p /app/data && chown appuser /app/data
+
+USER appuser
 
 CMD ["build-manager"]

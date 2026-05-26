@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from starlette.responses import JSONResponse
+
+from config_core import setup_service_logging, verify_service_token
 
 from .manager import BuildManager, StartupError
 from .routers.builds import router as builds_router
@@ -38,10 +41,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    # Only expose Swagger docs in dev mode — hidden in production.
+    docs_url = "/api/docs" if os.environ.get("JFB_DEV_MODE") else None
+
     app = FastAPI(
         title="build-manager",
-        docs_url="/api/docs",
+        docs_url=docs_url,
         lifespan=lifespan,
+        dependencies=[Depends(verify_service_token)],
     )
 
     app.state.manager = BuildManager()
@@ -60,11 +67,7 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the build-manager service."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    setup_service_logging()
     uvicorn.run(
         create_app(),
         host="0.0.0.0",

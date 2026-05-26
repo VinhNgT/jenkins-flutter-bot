@@ -8,6 +8,7 @@ import hmac
 import json
 import logging
 import os
+import time
 import urllib.parse
 from typing import Annotated
 
@@ -132,6 +133,24 @@ def _verify_telegram_init_data(init_data: str, token: str) -> dict:
 
     if not hmac.compare_digest(computed_hash, received_hash):
         raise ValueError("Invalid hash signature")
+
+    # Replay protection: reject initData older than 1 hour.
+    # The HMAC proves authenticity but never expires. Without this check,
+    # a captured initData (from browser history, DevTools, or SSE query
+    # parameter) could be replayed indefinitely. Telegram's own documentation
+    # recommends checking auth_date. The 1-hour window balances security
+    # against clock skew and normal user session lengths.
+    _INIT_DATA_TTL = 3600  # 1 hour
+    auth_date_str = params_dict.get("auth_date")
+    if auth_date_str:
+        try:
+            auth_date = int(auth_date_str)
+            if time.time() - auth_date > _INIT_DATA_TTL:
+                raise ValueError("initData expired (auth_date too old)")
+        except ValueError:
+            raise
+        except (TypeError, OverflowError):
+            pass
 
     # Parse nested JSON structures
     result = {}
@@ -362,7 +381,7 @@ async def stream_active_builds(
             # Hash the canonical JSON for deduplication, but pass the raw list to
             # ServerSentEvent — FastAPI serializes `data` automatically.
             current_str = json.dumps(active_builds, sort_keys=True)
-            current_hash = hashlib.md5(current_str.encode()).hexdigest()
+            current_hash = hashlib.sha256(current_str.encode()).hexdigest()
 
             if last_sent_hash is None or current_hash != last_sent_hash:
                 last_sent_hash = current_hash

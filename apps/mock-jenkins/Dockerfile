@@ -23,10 +23,17 @@ RUN uv sync --frozen --no-dev --no-editable --package mock-jenkins
 
 FROM python:3.12-slim
 
+RUN adduser --system --no-create-home appuser
+
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
+
+# Data directory for mock agent config
+RUN mkdir -p /app/data && chown appuser /app/data
+
+USER appuser
 
 CMD ["mock-jenkins"]

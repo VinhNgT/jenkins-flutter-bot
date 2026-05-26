@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from config_hub.config import HubBootstrap
@@ -10,13 +13,33 @@ from config_hub.manager import ConfigHubManager
 
 
 def test_auth_not_configured(client):
-    """If auth is not configured, endpoints are accessible without credentials."""
+    """If auth is not configured but JFB_DEV_MODE is set, endpoints are accessible."""
     resp = client.get("/api/version")
     assert resp.status_code == 200
     assert "version" in resp.json()
 
     resp = client.get("/")
     assert resp.status_code == 200
+
+
+def test_auth_not_configured_fail_closed_in_production():
+    """If auth is not configured and JFB_DEV_MODE is not set, endpoints return 503."""
+    test_config = HubBootstrap(
+        bot_control_url=None,
+        agent_control_url=None,
+        file_manager_url=None,
+        build_manager_url=None,
+    )
+    app = create_app()
+    app.state.manager = ConfigHubManager(config=test_config)
+
+    # Remove JFB_DEV_MODE to simulate production
+    env = {k: v for k, v in os.environ.items() if k != "JFB_DEV_MODE"}
+    with patch.dict(os.environ, env, clear=True):
+        prod_client = TestClient(app)
+        resp = prod_client.get("/api/version")
+        assert resp.status_code == 503
+        assert "Authentication not configured" in resp.json()["detail"]
 
 
 def test_auth_configured_requires_credentials():

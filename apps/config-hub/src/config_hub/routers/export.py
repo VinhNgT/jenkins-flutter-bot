@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from ..dependencies import ManagerDep
 
 router = APIRouter(prefix="/api", tags=["config-transfer"])
+
+# Maximum import tarball size: 5 MB (config files are tiny).
+MAX_IMPORT_SIZE = 5 * 1024 * 1024
 
 
 @router.get("/export/env")
@@ -36,4 +39,11 @@ async def import_config_tarball(
 ) -> dict[str, Any]:
     """Import configuration from a .tar.gz export."""
     raw = await file.read()
+
+    if len(raw) > MAX_IMPORT_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Import too large (max {MAX_IMPORT_SIZE // (1024 * 1024)} MB)",
+        )
+
     return await manager.import_tarball(raw)

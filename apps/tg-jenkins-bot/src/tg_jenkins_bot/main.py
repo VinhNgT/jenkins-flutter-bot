@@ -9,10 +9,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import JSONResponse
+
+from config_core import setup_service_logging, verify_service_token
 
 from .manager import BotManager, StartupError
 from .routers.callbacks import router as callbacks_router
@@ -47,6 +49,11 @@ class _ScrubInitDataFilter(logging.Filter):
     the EventSource API does not support custom headers. This filter
     prevents the full Telegram authentication payload (user IDs,
     signatures) from being written to disk in access logs.
+
+    Note: This complements (but does not duplicate) the value-level
+    RedactingLogFilter from config-core. That filter scrubs *known*
+    secret values; this filter scrubs the *URL-encoded* initData
+    parameter which contains ephemeral per-session payloads.
     """
 
     _pattern = re.compile(r"init_data=[^ \"]*")
@@ -95,22 +102,20 @@ def create_app() -> FastAPI:
         "/webapp", StaticFiles(directory=str(static_dir)), name="webapp"
     )
 
-    # API routers
-    app.include_router(control_router)
-    app.include_router(callbacks_router)
+    # API routers — control + callbacks require service token auth,
+    # webapp uses Telegram initData auth (different trust boundary).
+    service_auth = [Depends(verify_service_token)]
+    app.include_router(control_router, dependencies=service_auth)
+    app.include_router(callbacks_router, dependencies=service_auth)
     app.include_router(webapp_router)
     return app
 
 
 def cli() -> None:
     """CLI entry point for the tg-jenkins-bot service."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    setup_service_logging()
 
-    # Scrub Telegram init_data from access logs (security)
+    # Scrub Telegram init_data from access logs (URL-level redaction)
     logging.getLogger("uvicorn.access").addFilter(_ScrubInitDataFilter())
 
     uvicorn.run(

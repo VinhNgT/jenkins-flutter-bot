@@ -70,11 +70,22 @@ async def put_config(request: Request) -> dict[str, Any]:
     return {"status": "saved"}
 
 
+# Maximum VPN config file size: 1 MB (.ovpn files are text-based and tiny).
+MAX_VPN_FILE_SIZE = 1 * 1024 * 1024
+
+
 @router.post("/vpn/upload")
 async def upload_vpn_file(manager: ManagerDep, file: UploadFile = File(...)) -> dict[str, Any]:
     """Upload client.ovpn config file (write-only)."""
     manager.vpn.OVPN_PATH.parent.mkdir(parents=True, exist_ok=True)
     content = await file.read()
+
+    if len(content) > MAX_VPN_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"VPN config too large (max {MAX_VPN_FILE_SIZE // (1024 * 1024)} MB)",
+        )
+
     try:
         manager.vpn.OVPN_PATH.write_bytes(content)
     except OSError as e:

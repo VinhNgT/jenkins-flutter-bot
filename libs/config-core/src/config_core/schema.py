@@ -22,6 +22,8 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+from config_core.redact import register_secret
+
 
 def resolve_config_path(path: Path) -> Path:
     """Apply ``JFB_DATA_DIR`` override to a config file path.
@@ -164,7 +166,20 @@ class ServiceSettings(BaseSettings):
     def load(cls) -> Self:
         """Load config from JSON + env. Raises ValidationError if invalid."""
         load_dotenv()
-        return cls()
+        instance = cls()
+
+        # Close the secret lifecycle: secrets are masked on read
+        # (read_masked_config) and now also scrubbed on output (logs).
+        # Any field marked with json_schema_extra={"secret": True} has its
+        # resolved value registered with the process-global SecretRedactor.
+        for name, field in cls.model_fields.items():
+            extra = field.json_schema_extra or {}
+            if isinstance(extra, dict) and extra.get("secret"):
+                value = getattr(instance, name, None)
+                if isinstance(value, str) and value:
+                    register_secret(value)
+
+        return instance
 
 
 def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> dict[str, Any]:

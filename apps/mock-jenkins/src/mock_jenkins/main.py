@@ -15,6 +15,8 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
+from config_core import setup_service_logging
+
 from .config import MockJenkinsConfig
 from .manager import MockBuildManager
 from .routers.jenkins import router as jenkins_router
@@ -39,10 +41,7 @@ def create_app() -> FastAPI:
 
 def cli() -> None:
     """CLI entry point for the mock Jenkins server."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
-    )
+    setup_service_logging()
     config = MockJenkinsConfig()
     logger.info(
         "Starting mock-jenkins on port %d (delay=%ds, failure_rate=%.0f%%)",

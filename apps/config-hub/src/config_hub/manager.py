@@ -13,6 +13,8 @@ from typing import Any
 
 import httpx
 
+from config_core import get_service_auth_headers
+
 from .config import HubBootstrap
 from .env_io import (
     build_export_tarball,
@@ -62,7 +64,9 @@ class ConfigHubManager:
             file_manager_url=resolved.file_manager_url,
             build_manager_url=resolved.build_manager_url,
         )
-        self.fm_client = fm_client or httpx.AsyncClient(timeout=10.0)
+        self.fm_client = fm_client or httpx.AsyncClient(
+            timeout=10.0, headers=get_service_auth_headers()
+        )
 
     async def start(self) -> None:
         """No-op — config-hub has no daemon to start."""
@@ -85,7 +89,9 @@ class ConfigHubManager:
             file_manager_url=resolved.file_manager_url,
             build_manager_url=resolved.build_manager_url,
         )
-        self.fm_client = httpx.AsyncClient(timeout=10.0)
+        self.fm_client = httpx.AsyncClient(
+            timeout=10.0, headers=get_service_auth_headers()
+        )
         logger.info("ConfigHubManager restarted")
 
     def status(self) -> dict[str, Any]:

@@ -35,6 +35,8 @@ services:
       FILE_MANAGER_URL: http://file-manager:9092
       JENKINS_URL: http://jenkins:8080
       AGENT_CONTROL_URL: http://agent-control:9091
+      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      JFB_DEV_MODE: "true"
     expose:
       - "9010"
     volumes:
@@ -60,6 +62,8 @@ services:
       AGENT_CONTROL_URL: http://agent-control:9091
       FILE_MANAGER_URL: http://file-manager:9092
       BUILD_MANAGER_URL: http://build-manager:9010
+      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      JFB_DEV_MODE: "true"
     depends_on:
       - tg-jenkins-bot
       - agent-control
@@ -80,6 +84,8 @@ services:
     environment:
       BOT_SERVICE_URL: "http://tg-jenkins-bot:9090"
       BUILD_MANAGER_URL: "http://build-manager:9010"
+      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      JFB_DEV_MODE: "true"
     expose:
       - "9090"
     volumes:
@@ -103,6 +109,8 @@ services:
         required: false
     environment:
       JENKINS_URL: http://jenkins:8080
+      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      JFB_DEV_MODE: "true"
     expose:
       - "9091"
     volumes:
@@ -124,6 +132,9 @@ services:
       - "9092"
     volumes:
       - storage-data:/app/data
+    environment:
+      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      JFB_DEV_MODE: "true"
     networks:
       - jenkins
 

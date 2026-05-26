@@ -19,10 +19,14 @@ RUN uv sync --frozen --no-dev --no-editable --package config-hub
 
 FROM python:3.12-slim
 
+RUN adduser --system --no-create-home appuser
+
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
+
+USER appuser
 
 CMD ["config-hub"]

@@ -15,9 +15,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
+# Maximum upload size: 500 MB (APK files should never exceed this).
+MAX_UPLOAD_SIZE = 500 * 1024 * 1024
+
 
 @router.post("/upload")
-async def upload_file(manager: ManagerDep, file: UploadFile) -> dict[str, Any]:
+async def upload_file(
+    request: Request, manager: ManagerDep, file: UploadFile,
+) -> dict[str, Any]:
     """Upload a file to the storage backend.
 
     Accepts multipart form data with a ``file`` field.
@@ -26,10 +31,27 @@ async def upload_file(manager: ManagerDep, file: UploadFile) -> dict[str, Any]:
     if manager.backend is None or manager.config is None:
         raise HTTPException(status_code=503, detail="Storage backend not initialised")
 
+    # Early rejection via Content-Length header (fast path).
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
+        )
+
     # Write uploaded file to a temp location, then pass to backend
     suffix = os.path.splitext(file.filename or "file")[1]
+    content = await file.read()
+
+    # Safety net: enforce after read() in case Content-Length was missing/spoofed.
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
+        )
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
+        tmp.write(content)
         tmp_path = tmp.name
 
     try:

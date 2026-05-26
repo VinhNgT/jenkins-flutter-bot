@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 from typing import Annotated
 
@@ -34,14 +35,29 @@ async def verify_basic_auth(
     request: Request,
     credentials: HTTPBasicCredentials | None = Depends(security),
 ) -> None:
-    """Verify HTTP Basic Authentication if configured."""
+    """Verify HTTP Basic Authentication if configured.
+
+    Fail-closed in production: when credentials are not configured and
+    ``JFB_DEV_MODE`` is not set, all requests are rejected with 503.
+    This prevents a misconfigured deployment from exposing the admin
+    dashboard without authentication.
+    """
     manager = request.app.state.manager
     username = manager.auth_username
     password = manager.auth_password
 
-    # Bypassed if authentication is not configured in the environment
     if not username or not password:
-        return
+        # In dev mode, bypass auth for convenience
+        if os.environ.get("JFB_DEV_MODE"):
+            return
+        # Production: reject — credentials must be configured
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Authentication not configured. "
+                "Set CONFIG_HUB_AUTH_USERNAME and CONFIG_HUB_AUTH_PASSWORD."
+            ),
+        )
 
     # EXEMPTION: The Google Drive OAuth callback endpoint must be accessible
     # without credentials. Modern browsers omit cached Basic Auth headers on

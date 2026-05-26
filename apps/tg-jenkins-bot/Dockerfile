@@ -34,10 +34,17 @@ RUN uv sync --frozen --no-dev --no-editable --package tg-jenkins-bot
 # Stage 3: Runtime
 FROM python:3.12-slim
 
+RUN adduser --system --no-create-home appuser
+
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
+
+# Data directory needs write access for JSON config
+RUN mkdir -p /app/data && chown appuser /app/data
+
+USER appuser
 
 CMD ["tg-jenkins-bot"]

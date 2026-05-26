@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import time
 import urllib.parse
 from unittest.mock import AsyncMock
 
@@ -22,7 +23,7 @@ def _generate_valid_init_data(token: str, chat_id: int | None = None) -> str:
     user = {"id": 67890, "first_name": "Alice", "username": "alice_tg"}
     init_params = {
         "user": json.dumps(user),
-        "auth_date": "1715500000",
+        "auth_date": str(int(time.time())),
         "query_id": "AAH6854",
     }
     if chat_id is not None:
@@ -43,7 +44,7 @@ def _generate_valid_init_data_with_start_param(token: str, start_param: str) -> 
     user = {"id": 67890, "first_name": "Alice", "username": "alice_tg"}
     init_params = {
         "user": json.dumps(user),
-        "auth_date": "1715500000",
+        "auth_date": str(int(time.time())),
         "query_id": "AAH6854",
         "start_param": start_param,
     }
@@ -570,6 +571,11 @@ def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) ->
     assert len(ctx.store.list_active()) == 1
 
 
+@pytest.mark.xfail(
+    reason="Vite handles asset hashing via content-hashed filenames; "
+           "the old {{APP_VERSION}}/{{ASSET_HASH}} template markers no longer exist",
+    strict=True,
+)
 def test_webapp_index_replaces_version_and_hash(test_client) -> None:
     """Test that served HTML has APP_VERSION and ASSET_HASH replaced."""
     response = test_client.get("/webapp")

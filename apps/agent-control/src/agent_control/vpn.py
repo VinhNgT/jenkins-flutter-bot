@@ -178,8 +178,9 @@ class VpnManager:
                 pass
             return
 
-        # Wait up to 5s for process to exit
-        timeout = 5.0
+        # Wait for process to exit. OpenVPN's graceful shutdown tears down
+        # routes and closes the tun device, which typically takes 5-8 seconds.
+        timeout = 10.0
         poll_interval = 0.2
         elapsed = 0.0
         while elapsed < timeout:
@@ -193,7 +194,7 @@ class VpnManager:
             elapsed += poll_interval
         else:
             # Still alive, SIGKILL
-            logger.warning(f"OpenVPN process (PID {pid}) did not stop after 5s. Sending SIGKILL...")
+            logger.warning(f"OpenVPN process (PID {pid}) did not stop after {timeout:.0f}s. Sending SIGKILL...")
             try:
                 os.kill(pid, signal.SIGKILL)
             except OSError as e:

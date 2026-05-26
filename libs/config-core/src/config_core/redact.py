@@ -89,11 +89,37 @@ def redact(text: str) -> str:
     return _redactor.redact(text)
 
 
+def _redact_arg(value: object) -> object:
+    """Redact a single log argument.
+
+    String values are redacted directly.  Non-string values (e.g. lists,
+    dicts passed as ``%s`` args) are stringified and checked — if a
+    registered secret is found, the stringified form is returned with
+    secrets replaced.  Primitives that cannot contain secrets are
+    returned unchanged to avoid unnecessary ``str()`` conversions.
+    """
+    if isinstance(value, str):
+        return _redactor.redact(value)
+    # Primitives can never embed a secret substring.
+    if isinstance(value, (int, float, bool, type(None))):
+        return value
+    # For complex types (list, dict, set, …), stringify and check.
+    p = _redactor.pattern
+    if p is None:
+        return value
+    text = str(value)
+    if p.search(text):
+        return p.sub(_REDACTED, text)
+    return value
+
+
 class RedactingLogFilter(logging.Filter):
     """Logging filter that scrubs registered secrets from all log output.
 
-    Redacts both the format string (``record.msg``) and any string
-    arguments (``record.args``) so secrets are never written to disk.
+    Redacts both the format string (``record.msg``) and all arguments
+    (``record.args``) — including non-string types like lists and dicts
+    whose ``str()`` representation may embed secrets — so secret values
+    are never written to disk.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -104,26 +130,29 @@ class RedactingLogFilter(logging.Filter):
         if isinstance(record.msg, str):
             record.msg = _redactor.redact(record.msg)
 
-        # Redact string arguments
+        # Redact arguments (both string and non-string)
         if record.args:
             if isinstance(record.args, dict):
                 record.args = {
-                    k: _redactor.redact(v) if isinstance(v, str) else v
-                    for k, v in record.args.items()
+                    k: _redact_arg(v) for k, v in record.args.items()
                 }
             elif isinstance(record.args, tuple):
-                record.args = tuple(
-                    _redactor.redact(a) if isinstance(a, str) else a
-                    for a in record.args
-                )
+                record.args = tuple(_redact_arg(a) for a in record.args)
         return True
 
 
 def install_log_redaction() -> None:
-    """Install the redacting filter on the root logger.
+    """Install the redacting filter on all root logger handlers.
+
+    Filters on a *logger* only apply to records emitted directly by
+    that logger — records propagated from child loggers skip parent
+    logger filters entirely.  Installing on *handlers* ensures every
+    log record is redacted regardless of which logger emitted it.
 
     Call once in each service's ``cli()`` entrypoint, **after**
-    ``logging.basicConfig()``.  All loggers inherit from root, so
-    every log statement across every module is automatically filtered.
+    ``logging.basicConfig()``.
     """
-    logging.getLogger().addFilter(RedactingLogFilter())
+    f = RedactingLogFilter()
+    root = logging.getLogger()
+    for handler in root.handlers:
+        handler.addFilter(f)

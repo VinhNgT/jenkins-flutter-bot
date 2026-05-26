@@ -75,6 +75,8 @@ class AgentManager:
             config.secret,
             "-name",
             config.agent_name,
+            "-workDir",
+            "/home/jenkins/agent",
         ]
         if config.web_socket:
             command.append("-webSocket")

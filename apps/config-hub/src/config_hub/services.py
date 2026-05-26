@@ -187,18 +187,12 @@ class ServiceClient:
             return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
 
     async def vpn_connect(self) -> dict[str, Any]:
-        """Proxy VPN connect to agent-control.
-
-        Connect blocks until the tun interface is up (up to 30s on the
-        agent side), so a longer per-request timeout is required.
-        """
+        """Proxy VPN connect to agent-control."""
         url = self._service_url("agent")
         if not url:
             return {"status": "error", "detail": "Agent service not configured"}
         try:
-            resp = await self._client.post(
-                f"{url}/control/vpn/connect", timeout=35.0
-            )
+            resp = await self._client.post(f"{url}/control/vpn/connect")
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
@@ -206,18 +200,12 @@ class ServiceClient:
             return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
 
     async def vpn_disconnect(self) -> dict[str, Any]:
-        """Proxy VPN disconnect to agent-control.
-
-        Disconnect sends SIGTERM, waits up to 5s, then SIGKILL — the
-        total round-trip can exceed the default 5s client timeout.
-        """
+        """Proxy VPN disconnect to agent-control."""
         url = self._service_url("agent")
         if not url:
             return {"status": "error", "detail": "Agent service not configured"}
         try:
-            resp = await self._client.post(
-                f"{url}/control/vpn/disconnect", timeout=15.0
-            )
+            resp = await self._client.post(f"{url}/control/vpn/disconnect")
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:

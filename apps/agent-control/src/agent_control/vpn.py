@@ -155,11 +155,11 @@ class VpnManager:
         # Wait for exit with timeout. Since we hold the Process object,
         # wait() detects exit reliably (no zombie issue).
         try:
-            await asyncio.wait_for(self._process.wait(), timeout=10.0)
+            await asyncio.wait_for(self._process.wait(), timeout=5.0)
             logger.info("OpenVPN process stopped gracefully.")
         except asyncio.TimeoutError:
             logger.warning(
-                "OpenVPN process (PID %d) did not stop after 10s. Sending SIGKILL...",
+                "OpenVPN process (PID %d) did not stop after 5s. Sending SIGKILL...",
                 pid,
             )
             try:
@@ -182,7 +182,7 @@ class VpnManager:
                 pass
             self._process = None
 
-        # Also clean up stale PID file from a --daemon-era process or crash
+        # Clean up stale PID file from a previous crash or container restart
         if self.PID_PATH.exists():
             try:
                 pid = int(self.PID_PATH.read_text().strip())

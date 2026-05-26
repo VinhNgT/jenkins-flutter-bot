@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
+import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import uvicorn
@@ -41,20 +40,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.exception("Error during shutdown")
 
 
-def _compute_asset_hash(static_dir: Path) -> str:
-    """Compute a short SHA-256 digest of the cacheable static assets.
+class _ScrubInitDataFilter(logging.Filter):
+    """Redact init_data query params from uvicorn access logs.
 
-    The hash covers the actual file contents of CSS/JS sub-resources
-    referenced from index.html.  It changes if and only if any asset
-    file changes — server restarts with identical code produce the same
-    hash, so no unnecessary cache invalidation occurs.  This replaces
-    the previous APP_VERSION-based cache-busting which was broken in
-    development (always ``0.0.0-dev``).
+    The SSE endpoint must receive init_data via query parameter because
+    the EventSource API does not support custom headers. This filter
+    prevents the full Telegram authentication payload (user IDs,
+    signatures) from being written to disk in access logs.
     """
-    h = hashlib.sha256()
-    for name in ("style.css", "app.js", "tg-emulator.js"):
-        h.update((static_dir / name).read_bytes())
-    return h.hexdigest()[:8]
+
+    _pattern = re.compile(r"init_data=[^ \"]*")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.args:
+            record.args = tuple(
+                self._pattern.sub("init_data=<REDACTED>", str(a))
+                if isinstance(a, str) and "init_data=" in a
+                else a
+                for a in record.args  # type: ignore[union-attr]
+            )
+        return True
 
 
 def create_app() -> FastAPI:
@@ -69,43 +74,23 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
-    # ── Cache-busting for Telegram WebView ────────────────────────
-    # APP_VERSION: package version for display only (UI fingerprint).
-    try:
-        _app_version = pkg_version("tg-jenkins-bot")
-    except Exception:
-        _app_version = "0.0.0-dev"
-
-    # ASSET_HASH: content-based hash for ?v= query strings.
-    # Changes only when actual CSS/JS file contents change — stable
-    # across server restarts with identical code.
+    # ── Webapp static file serving ────────────────────────────────
+    # Vite builds the frontend into this directory with content-hashed
+    # filenames (assets/index-[hash].js). Two-tier caching strategy:
+    #   1. index.html → no-cache (revalidates, picks up new chunk hashes)
+    #   2. assets/*.js/css → immutably cached (hash in filename)
     static_dir = Path(__file__).parent / "webapp"
-    _asset_hash = _compute_asset_hash(static_dir)
-    _index_template = (static_dir / "index.html").read_text()
+    _index_html = (static_dir / "index.html").read_text()
 
     @app.get("/webapp", response_class=HTMLResponse)
     @app.get("/webapp/", response_class=HTMLResponse)
     async def serve_index() -> HTMLResponse:
-        """Serve index.html with content-hash cache-busting.
+        """Serve the Vite-built index.html with no-cache for revalidation."""
+        return HTMLResponse(content=_index_html)
 
-        Two-tier caching strategy:
-        1. This HTML response uses Cache-Control: no-cache — the WebView
-           always revalidates it (cheap 304 for a small file).
-        2. Sub-resources (CSS/JS) use ?v=<asset_hash> in their URLs —
-           cached aggressively, invalidated only when file content
-           actually changes.
-        """
-        html = _index_template.replace(
-            "{{APP_VERSION}}", _app_version
-        ).replace("{{ASSET_HASH}}", _asset_hash)
-        return HTMLResponse(
-            content=html,
-        )
-
-    # Mount remaining static files (CSS, JS, assets/) — served as-is.
-    # html=True is removed: index.html is now served by the explicit
-    # route above. FastAPI evaluates routes before mounts, so GET
-    # /webapp/ hits serve_index() first.
+    # Mount remaining static files (JS, CSS, assets/) — served as-is.
+    # FastAPI evaluates routes before mounts, so GET /webapp/ hits
+    # serve_index() first.
     app.mount(
         "/webapp", StaticFiles(directory=str(static_dir)), name="webapp"
     )
@@ -124,8 +109,13 @@ def cli() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    # Scrub Telegram init_data from access logs (security)
+    logging.getLogger("uvicorn.access").addFilter(_ScrubInitDataFilter())
+
     uvicorn.run(
         create_app(),
         host="0.0.0.0",
         port=9090,
     )
+

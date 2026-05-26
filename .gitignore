@@ -42,3 +42,10 @@ build/
 
 # Runtime data
 data/
+
+# Node.js / Frontend
+node_modules/
+
+# Vite build output — this directory is a build artifact, not source code.
+# Source of truth is apps/tg-jenkins-bot/frontend/src/.
+apps/tg-jenkins-bot/src/tg_jenkins_bot/webapp/

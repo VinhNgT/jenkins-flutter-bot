@@ -43,6 +43,65 @@ class CancelRequest(BaseModel):
     request_id: str
 
 
+# ── Response Models ──────────────────────────────────────────────
+
+
+class BranchItem(BaseModel):
+    """A configured branch option."""
+
+    label: str
+    ref: str
+
+
+class ActiveBuildResponse(BaseModel):
+    """An active build currently in progress."""
+
+    request_id: str
+    label: str
+    ref: str
+    triggered_at: float
+    triggered_by: str
+    triggered_by_id: int
+
+
+class WebAppConfigResponse(BaseModel):
+    """GET /api/webapp/config response."""
+
+    app_name: str
+    branches: list[BranchItem]
+    active_builds: list[ActiveBuildResponse]
+
+
+class RecentBuildItem(BaseModel):
+    """A completed build from history."""
+
+    branch: str
+    commit_hash: str | None
+    result: str
+    triggered_at: float
+    completed_at: float
+    download_url: str | None
+
+
+class RecentBuildsResponse(BaseModel):
+    """GET /api/webapp/recent response."""
+
+    builds: list[RecentBuildItem]
+
+
+class TriggerResponse(BaseModel):
+    """POST /api/webapp/trigger response."""
+
+    ok: bool = True
+    request_id: str
+
+
+class CancelResponse(BaseModel):
+    """POST /api/webapp/cancel response."""
+
+    ok: bool = True
+
+
 def _verify_telegram_init_data(init_data: str, token: str) -> dict:
     """Verify Telegram initData signature and return parsed data.
 
@@ -223,11 +282,11 @@ async def validate_webapp_request(
 ValidatedUser = Annotated[WebAppUser, Depends(validate_webapp_request)]
 
 
-@router.get("/config")
+@router.get("/config", response_model=WebAppConfigResponse)
 async def get_webapp_config(
     manager: ManagerDep,
     user: ValidatedUser,
-) -> dict:
+) -> WebAppConfigResponse:
     """Return configuration and active builds for the web app."""
     ctx = manager.bot_context
     if ctx is None:
@@ -252,11 +311,11 @@ async def get_webapp_config(
             }
         )
 
-    return {
-        "app_name": ctx.config.app_name,
-        "branches": branches_list,
-        "active_builds": active_builds,
-    }
+    return WebAppConfigResponse(
+        app_name=ctx.config.app_name,
+        branches=branches_list,
+        active_builds=active_builds,
+    )
 
 
 @router.get("/stream", response_class=EventSourceResponse)
@@ -324,12 +383,12 @@ async def stream_active_builds(
 
 
 
-@router.post("/trigger")
+@router.post("/trigger", response_model=TriggerResponse)
 async def trigger_webapp_build(
     manager: ManagerDep,
     user: ValidatedUser,
     req: TriggerRequest,
-) -> dict:
+) -> TriggerResponse:
     """Trigger a new build from the Web App."""
     ctx = manager.bot_context
     if ctx is None:
@@ -396,15 +455,15 @@ async def trigger_webapp_build(
         triggered_by_id=user.user_id,
     )
 
-    return {"ok": True, "request_id": request_id}
+    return TriggerResponse(request_id=request_id)
 
 
-@router.post("/cancel")
+@router.post("/cancel", response_model=CancelResponse)
 async def cancel_webapp_build(
     manager: ManagerDep,
     user: ValidatedUser,
     req: CancelRequest,
-) -> dict:
+) -> CancelResponse:
     """Cancel an active build from the Web App."""
     ctx = manager.bot_context
     if ctx is None:
@@ -453,31 +512,31 @@ async def cancel_webapp_build(
     except Exception:
         logger.exception("Failed to send cancellation message to Telegram")
 
-    return {"ok": True}
+    return CancelResponse()
 
 
-@router.get("/recent")
+@router.get("/recent", response_model=RecentBuildsResponse)
 async def get_recent_builds(
     manager: ManagerDep,
     user: ValidatedUser,
-) -> dict:
+) -> RecentBuildsResponse:
     """Return recent completed builds for the web app."""
     ctx = manager.bot_context
     if ctx is None:
         raise HTTPException(status_code=503, detail="Bot not initialized")
 
     builds = await ctx.build_client.get_recent_builds(count=5)
-    return {
-        "builds": [
-            {
-                "branch": b.branch,
-                "commit_hash": b.commit_hash,
-                "result": b.result,
-                "triggered_at": b.triggered_at,
-                "completed_at": b.completed_at,
-                "download_url": b.download_url,
-            }
+    return RecentBuildsResponse(
+        builds=[
+            RecentBuildItem(
+                branch=b.branch,
+                commit_hash=b.commit_hash,
+                result=b.result,
+                triggered_at=b.triggered_at,
+                completed_at=b.completed_at,
+                download_url=b.download_url,
+            )
             for b in builds
         ]
-    }
+    )
 

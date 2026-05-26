@@ -1,6 +1,6 @@
 [project]
 name = "file-manager"
-version = "0.4.3-dev.3"
+version = "0.4.3-dev.4"
 description = "Backend-agnostic file storage service for the Jenkins Flutter Bot stack"
 requires-python = ">=3.12"
 dependencies = [

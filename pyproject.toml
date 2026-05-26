@@ -1,6 +1,6 @@
 [project]
 name = "jenkins-flutter-bot"
-version = "0.4.3-dev.3"
+version = "0.4.3-dev.4"
 description = "CI/CD ecosystem: Telegram bot + Jenkins + Google Drive"
 requires-python = ">=3.12"
 dependencies = [

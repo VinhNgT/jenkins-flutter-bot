@@ -18,24 +18,18 @@ interface RecentBuildsProps {
 }
 
 function RecentBuildRow({ build }: { build: RecentBuild }) {
-  const { haptic } = useTelegram();
+  const { haptic, isTelegram, tg } = useTelegram();
   const { showToast } = useToast();
   const relativeTime = useRelativeTime(build.completed_at);
 
+  const title = build.label || build.branch;
   const commit = build.commit_hash ? build.commit_hash.substring(0, 7) : '';
-  const branchInfo = commit ? `${build.branch} (${commit})` : build.branch;
-
-  let durationStr = '';
-  if (build.completed_at && build.triggered_at) {
-    const dur = Math.max(0, Math.floor(build.completed_at - build.triggered_at));
-    durationStr = dur < 60 ? ` · ${dur}s` : ` · ${Math.floor(dur / 60)}m`;
-  }
 
   const Icon = build.result === 'success' ? CheckCircle2
     : build.result === 'failure' ? XCircle
     : build.result === 'timeout' ? Clock : AlertCircle;
 
-  const iconColor = build.result === 'success' ? 'var(--tg-color-button)' // Green or Primary? Telegram usually uses primary or success color, we'll use button color or native success. Let's stick to standard colors. Let's use a nice hex or inherit. Actually, let's use standard colors: success=#34c759, failure=#ff3b30, timeout=#ff9500
+  const iconColor = build.result === 'success' ? 'var(--tg-color-button)'
     : build.result === 'failure' ? 'var(--tg-color-destructive)'
     : build.result === 'timeout' ? '#ff9500' : 'var(--tg-color-hint)';
 
@@ -47,18 +41,36 @@ function RecentBuildRow({ build }: { build: RecentBuild }) {
     }
   }
 
+  function handleRowClick() {
+    // If the user wants to see the full branch name and commit, they can tap the row.
+    const fullBranchInfo = commit ? `${build.branch} (${commit})` : build.branch;
+    const text = `Target: ${title}\nRef: ${fullBranchInfo}`;
+    if (isTelegram && tg) {
+      tg.showAlert(text);
+    } else {
+      alert(`Build Details\n\n${text}`);
+    }
+  }
+
   return (
-    <div class="tg-list-item" style={{ cursor: 'default' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor }}>
+    <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleRowClick}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, flexShrink: 0 }}>
           <Icon size={22} strokeWidth={2.5} />
         </div>
-        <div class="tg-list-item-content">
-          <span class="tg-list-item-title">{branchInfo}</span>
-          <span class="tg-list-item-subtitle">{relativeTime}{durationStr}</span>
+        <div class="tg-list-item-content" style={{ minWidth: 0 }}>
+          <span class="tg-list-item-title">{title}</span>
+          <span class="tg-list-item-subtitle" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {relativeTime}
+          </span>
+          <div style={{ marginTop: '4px', display: 'flex' }}>
+            <span class="tg-list-item-meta">
+              {commit ? `${build.branch} (${commit})` : build.branch}
+            </span>
+          </div>
         </div>
       </div>
-      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px', display: 'flex', gap: '12px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
         {build.result === 'success' && build.download_url ? (
           <>
             <button onClick={handleCopy} style={{ color: 'var(--tg-color-button)', background: 'none', border: 'none', padding: '0', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>

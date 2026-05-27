@@ -66,23 +66,36 @@ function ActiveBuildRow({ build }: { build: ActiveBuild }) {
     }
   }
 
+  function handleRowClick() {
+    const durInfo = relativeTime ? `Started: ${relativeTime}` : '';
+    const text = `Target: ${build.label}\nRef: ${build.ref}\nTriggered by: ${build.triggered_by}\n${durInfo}`;
+    if (isTelegram && tg) {
+      tg.showAlert(text);
+    } else {
+      alert(`Active Build Details\n\n${text}`);
+    }
+  }
+
   return (
-    <div class="tg-list-item" style={{ cursor: 'default' }}>
+    <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleRowClick}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1 }}>
         {/* iOS-style spinner — custom SVG matching Telegram's native loading indicator */}
         <svg class="spinner-ios" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" stroke="var(--tg-color-divider)" stroke-width="2.5" />
           <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
         </svg>
-        <div class="tg-list-item-content">
+        <div class="tg-list-item-content" style={{ minWidth: 0 }}>
           <span class="tg-list-item-title">{build.label}</span>
-          <span class="tg-list-item-subtitle" style={{ display: 'flex', alignItems: 'center' }}>
-            <span class="pulsing-dot" />
-            by {build.triggered_by} · {relativeTime}
+          <span class="tg-list-item-subtitle" style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span class="pulsing-dot" style={{ flexShrink: 0 }} />
+            <span>by {build.triggered_by} · {relativeTime}</span>
           </span>
+          <div style={{ marginTop: '4px', display: 'flex' }}>
+            <span class="tg-list-item-meta">{build.ref}</span>
+          </div>
         </div>
       </div>
-      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px' }}>
+      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px' }} onClick={(e) => e.stopPropagation()}>
         {canCancel ? (
           <button
             class="tg-cancel-action"

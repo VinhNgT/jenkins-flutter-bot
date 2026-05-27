@@ -80,6 +80,7 @@ class RecentBuildItem(BaseModel):
     """A completed build from history."""
 
     branch: str
+    label: str | None = None
     commit_hash: str | None
     result: str
     triggered_at: float
@@ -554,11 +555,14 @@ async def get_recent_builds(
     if ctx is None:
         raise HTTPException(status_code=503, detail="Bot not initialized")
 
+    branches_map = {v: k for k, v in ctx.config.branches.items()}
+
     builds = await ctx.build_client.get_recent_builds(count=5)
     return RecentBuildsResponse(
         builds=[
             RecentBuildItem(
                 branch=b.branch,
+                label=branches_map.get(b.branch, b.branch),
                 commit_hash=b.commit_hash,
                 result=b.result,
                 triggered_at=b.triggered_at,

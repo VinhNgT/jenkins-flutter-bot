@@ -33,9 +33,11 @@ export default function BranchSelector({ branches, selectedBranch, onSelect }: B
             class={`tg-list-item${selectedBranch === branch.ref ? ' selected' : ''}`}
             onClick={() => handleClick(branch.ref)}
           >
-            <div class="tg-list-item-content">
+            <div class="tg-list-item-content" style={{ minWidth: 0 }}>
               <span class="tg-list-item-title">{branch.label}</span>
-              <span class="tg-list-item-subtitle">{branch.ref}</span>
+              <div style={{ marginTop: '2px', display: 'flex' }}>
+                <span class="tg-list-item-meta">{branch.ref}</span>
+              </div>
             </div>
             <div class="tg-radio-icon">
               <Check size={20} strokeWidth={2.5} />

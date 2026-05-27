@@ -21,6 +21,7 @@ export interface ActiveBuild {
 /** A completed build from build history. */
 export interface RecentBuild {
   branch: string;
+  label?: string;
   commit_hash: string | null;
   result: string;
   triggered_at: number;

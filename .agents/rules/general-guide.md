@@ -131,6 +131,7 @@ graph TD
 13. **Do NOT allow unauthorized users to cancel builds** (enforce Telegram ID verification).
 14. **Do NOT use static/pinned versioning for asset cache-busting** in development — enforce content-hash filenames via Vite.
 15. **Do NOT log secrets in plaintext** — use `register_secret()` and `install_log_redaction()` from `config-core`.
+16. **Do NOT hand off broken code** — Always validate syntax (e.g., `npm run typecheck` for frontend, running/typechecking Python for backend) before declaring a task complete.
 
 ---
 

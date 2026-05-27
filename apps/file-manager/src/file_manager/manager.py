@@ -195,7 +195,8 @@ class StorageManager:
         """Reconcile the local build log against actual Google Drive contents.
 
         - **Stale log entries** (file_id deleted externally) are removed.
-        - **Orphaned Drive files** (not tracked by any record) are deleted.
+        - **Recovered orphans** (not tracked locally) are added to the log.
+        - **Evicted records** (exceeding max_records) are removed from Drive.
 
         Best-effort: if Drive is not connected (tokens missing/expired),
         reconciliation is skipped silently so it doesn't block startup.
@@ -209,8 +210,7 @@ class StorageManager:
             logger.exception("Failed to list Drive files — skipping reconciliation")
             return
 
-        drive_ids = {f["id"] for f in drive_files}
-        stale, orphans = build_log.reconcile(drive_ids)
+        stale, evicted = build_log.reconcile(drive_files)
 
         if stale:
             logger.info(
@@ -219,19 +219,23 @@ class StorageManager:
                 [r.request_id for r in stale],
             )
 
-        for orphan_id in orphans:
-            # Find the filename for logging (if available)
-            name = next((f["name"] for f in drive_files if f["id"] == orphan_id), orphan_id)
+        for record in evicted:
+            if not record.file_id:
+                continue
             try:
-                await backend.delete(orphan_id)
-                logger.info("Reconciliation: deleted orphaned Drive file %s (%s)", name, orphan_id)
+                await backend.delete(record.file_id)
+                logger.info(
+                    "Reconciliation: evicted and deleted excess Drive file %s (%s)",
+                    record.branch,
+                    record.file_id,
+                )
             except Exception:
                 logger.exception(
-                    "Reconciliation: failed to delete orphaned file %s (%s)",
-                    name,
-                    orphan_id,
+                    "Reconciliation: failed to delete evicted file %s (%s)",
+                    record.branch,
+                    record.file_id,
                 )
 
-        if not stale and not orphans:
+        if not stale and not evicted:
             logger.info("Reconciliation: build log and Drive index are in sync")
 

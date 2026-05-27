@@ -330,7 +330,7 @@ class GoogleDriveBackend:
         )
 
         file_id = file["id"]
-        web_link = f"https://drive.google.com/uc?export=download&id={file_id}"
+        web_link = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
 
         # Grant public read access to this file only.
         service.permissions().create(
@@ -386,7 +386,7 @@ class GoogleDriveBackend:
     def _list_files_sync(self, creds: Credentials, folder_id: str) -> list[dict[str, str]]:
         """List all files in the Drive folder (blocking).
 
-        Returns a list of ``{id, name}`` dicts for every non-trashed
+        Returns a list of ``{id, name, createdTime}`` dicts for every non-trashed
         file in the folder. Handles pagination for large result sets.
         """
         service = self._get_drive_service(creds)
@@ -400,7 +400,7 @@ class GoogleDriveBackend:
                 .list(
                     q=query,
                     spaces="drive",
-                    fields="nextPageToken, files(id, name)",
+                    fields="nextPageToken, files(id, name, createdTime)",
                     pageToken=page_token,
                     pageSize=100,
                 )
@@ -416,7 +416,7 @@ class GoogleDriveBackend:
     async def list_files(self) -> list[dict[str, str]]:
         """List all files in the configured Drive folder.
 
-        Returns a list of ``{id, name}`` dicts. Requires valid tokens
+        Returns a list of ``{id, name, createdTime}`` dicts. Requires valid tokens
         and an existing folder.
         """
         creds = await self.load_tokens()

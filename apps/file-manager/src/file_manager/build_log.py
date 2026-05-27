@@ -11,6 +11,7 @@ strategy is determined by the storage backend:
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 from dataclasses import asdict, dataclass
@@ -138,21 +139,27 @@ class BuildLog:
         """Return all file IDs referenced by build log records."""
         return {r.file_id for r in self._records if r.file_id}
 
-    def reconcile(self, drive_file_ids: set[str]) -> tuple[list[BuildRecord], set[str]]:
+    def reconcile(
+        self, drive_files: list[dict[str, str]]
+    ) -> tuple[list[BuildRecord], list[BuildRecord]]:
         """Cross-reference the build log against actual Drive contents.
 
         Args:
-            drive_file_ids: Set of file IDs that currently exist in Drive.
+            drive_files: List of file metadata dicts currently in Drive
+                (e.g. ``[{"id": "...", "name": "...", "createdTime": "..."}]``).
 
         Returns:
-            A tuple of ``(stale_records, orphan_file_ids)``:
+            A tuple of ``(stale_records, evicted_records)``:
 
             - **stale_records** — build log entries whose ``file_id`` is no
               longer present in Drive. These are removed from the log.
-            - **orphan_file_ids** — Drive files not referenced by any build
-              log record. The caller should delete these.
+            - **evicted_records** — records that were pushed out because
+              recovering orphaned Drive files exceeded ``max_records``.
+              The caller should delete their files from Drive.
         """
-        # Identify stale records: log entries pointing to missing Drive files
+        drive_file_ids = {f["id"] for f in drive_files}
+
+        # 1. Identify stale records: log entries pointing to missing Drive files
         stale: list[BuildRecord] = []
         kept: list[BuildRecord] = []
         for record in self._records:
@@ -161,13 +168,54 @@ class BuildLog:
             else:
                 kept.append(record)
 
-        # Identify orphan Drive files: present in Drive but not in any record
+        # 2. Identify and recover orphan Drive files
         tracked_ids = {r.file_id for r in kept if r.file_id}
-        orphans = drive_file_ids - tracked_ids
+        orphans = [f for f in drive_files if f["id"] not in tracked_ids]
 
-        if stale:
-            self._records = kept
+        recovered: list[BuildRecord] = []
+        for f in orphans:
+            file_id = f["id"]
+            name = f.get("name", "Recovered File")
+
+            # Parse createdTime (e.g. "2026-05-27T01:23:45.000Z") to float timestamp
+            created_time_str = f.get("createdTime")
+            timestamp = 0.0
+            if created_time_str:
+                try:
+                    # Google Drive API uses RFC 3339 format
+                    dt = datetime.datetime.fromisoformat(
+                        created_time_str.replace("Z", "+00:00")
+                    )
+                    timestamp = dt.timestamp()
+                except ValueError:
+                    pass
+
+            recovered.append(
+                BuildRecord(
+                    request_id=f"recovered-{file_id}",
+                    branch=name,
+                    commit_hash="",
+                    result="success",
+                    triggered_at=timestamp,
+                    completed_at=timestamp,
+                    download_url=f"https://drive.google.com/file/d/{file_id}/view?usp=sharing",
+                    file_id=file_id,
+                )
+            )
+
+        # 3. Combine and enforce retention
+        combined = kept + recovered
+
+        # Sort chronologically by completed_at
+        combined.sort(key=lambda r: r.completed_at)
+
+        evicted: list[BuildRecord] = []
+        while len(combined) > self._max_records:
+            evicted.append(combined.pop(0))
+
+        # Only save if we modified the state
+        if stale or recovered or evicted:
+            self._records = combined
             self._save()
 
-        return stale, orphans
-
+        return stale, evicted

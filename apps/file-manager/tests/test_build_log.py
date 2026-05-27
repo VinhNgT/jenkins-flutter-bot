@@ -134,53 +134,88 @@ class TestReconcile:
         _record(build_log, "req2", file_id="f2")
 
         # f1 no longer exists in Drive
-        stale, orphans = build_log.reconcile({"f2"})
+        stale, evicted = build_log.reconcile([{"id": "f2", "name": "f2.apk"}])
 
         assert len(stale) == 1
         assert stale[0].request_id == "req1"
-        assert orphans == set()
+        assert evicted == []
         assert len(build_log.recent()) == 1
 
-    def test_detects_orphaned_files(self, build_log):
-        """Drive files not tracked by any record are reported as orphans."""
+    def test_recovers_orphaned_files(self, build_log):
+        """Drive files not tracked by any record are recovered as synthetic records."""
         _record(build_log, "req1", file_id="f1")
 
-        stale, orphans = build_log.reconcile({"f1", "f_orphan_1", "f_orphan_2"})
+        stale, evicted = build_log.reconcile([
+            {"id": "f1", "name": "f1.apk"},
+            {"id": "f_orphan_1", "name": "app-release.apk"},
+        ])
 
         assert stale == []
-        assert orphans == {"f_orphan_1", "f_orphan_2"}
-        assert len(build_log.recent()) == 1  # unchanged
+        assert evicted == []
+        recent = build_log.recent()
+        assert len(recent) == 2
+        # It's sorted by completed_at, let's just find it
+        recovered = next(r for r in recent if r.file_id == "f_orphan_1")
+        assert recovered.request_id == "recovered-f_orphan_1"
+        assert recovered.branch == "app-release.apk"
+        assert recovered.result == "success"
+        assert "view?usp=sharing" in recovered.download_url
 
-    def test_mixed_stale_and_orphans(self, build_log):
-        """Both stale records and orphaned files are handled in one call."""
+    def test_parses_created_time(self, build_log):
+        """Recovers orphan and correctly parses its createdTime."""
+        stale, evicted = build_log.reconcile([
+            {"id": "f1", "name": "f1.apk", "createdTime": "2026-05-27T01:23:45.000Z"}
+        ])
+
+        assert stale == []
+        assert evicted == []
+        recent = build_log.recent()
+        assert len(recent) == 1
+        assert recent[0].completed_at > 0
+
+    def test_evicts_excess_records(self, build_log):
+        """If recovering orphans exceeds max_records, the oldest are evicted."""
+        # max_records is 3
+        _record(build_log, "req1", file_id="f1")  # completed_at 2.0
+        
+        stale, evicted = build_log.reconcile([
+            {"id": "f1", "name": "f1.apk"},
+            {"id": "f_orphan_1", "createdTime": "2026-05-27T10:00:00.000Z"},
+            {"id": "f_orphan_2", "createdTime": "2026-05-27T11:00:00.000Z"},
+            {"id": "f_orphan_3", "createdTime": "2026-05-27T12:00:00.000Z"},
+        ])
+
+        assert stale == []
+        # Total records = 1 kept + 3 recovered = 4. Max = 3. One must be evicted.
+        # req1 has completed_at=2.0 (1970-01-01), so it's the oldest!
+        assert len(evicted) == 1
+        assert evicted[0].request_id == "req1"
+        assert len(build_log.recent()) == 3
+
+    def test_mixed_stale_and_recovery(self, build_log):
+        """Both stale records and recovered files handled in one call."""
         _record(build_log, "req1", file_id="f_gone")
         _record(build_log, "req2", file_id="f2")
 
-        stale, orphans = build_log.reconcile({"f2", "f_orphan"})
+        stale, evicted = build_log.reconcile([
+            {"id": "f2", "name": "f2.apk"},
+            {"id": "f_orphan", "name": "orphan.apk"},
+        ])
 
         assert len(stale) == 1
         assert stale[0].file_id == "f_gone"
-        assert orphans == {"f_orphan"}
-        assert len(build_log.recent()) == 1
-
-    def test_in_sync(self, build_log):
-        """When everything matches, returns empty collections."""
-        _record(build_log, "req1", file_id="f1")
-
-        stale, orphans = build_log.reconcile({"f1"})
-
-        assert stale == []
-        assert orphans == set()
+        assert evicted == []
+        assert len(build_log.recent()) == 2
 
     def test_records_without_file_id_are_kept(self, build_log):
         """Failed build records (no file_id) survive reconciliation."""
         _record(build_log, "fail1", result="failure")  # no file_id
         _record(build_log, "req1", file_id="f1")
 
-        stale, orphans = build_log.reconcile({"f1"})
+        stale, evicted = build_log.reconcile([{"id": "f1", "name": "f1.apk"}])
 
         assert stale == []
-        assert orphans == set()
+        assert evicted == []
         assert len(build_log.recent()) == 2
 
     def test_stale_records_persisted_to_disk(self, tmp_path):
@@ -189,7 +224,7 @@ class TestReconcile:
         _record(log, "req1", file_id="f1")
         _record(log, "req2", file_id="f2")
 
-        log.reconcile({"f2"})  # f1 is stale
+        log.reconcile([{"id": "f2", "name": "f2.apk"}])  # f1 is stale
 
         # Reload from disk
         log2 = BuildLog(data_dir=tmp_path, max_records=5, persistent=True)
@@ -201,10 +236,10 @@ class TestReconcile:
         _record(build_log, "req1", file_id="f1")
         _record(build_log, "fail1", result="failure")
 
-        stale, orphans = build_log.reconcile(set())
+        stale, evicted = build_log.reconcile([])
 
         assert len(stale) == 1
         assert stale[0].file_id == "f1"
-        assert orphans == set()
+        assert evicted == []
         # The failure record (no file_id) survives
         assert len(build_log.recent()) == 1

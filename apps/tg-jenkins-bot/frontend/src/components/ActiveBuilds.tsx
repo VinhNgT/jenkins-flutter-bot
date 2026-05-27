@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'preact/hooks';
-import { Monitor } from 'lucide-preact';
+import { Monitor, StopCircle } from 'lucide-preact';
 import { useTelegram } from '../context/TelegramContext';
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
@@ -95,7 +95,9 @@ function ActiveBuildRow({ build }: { build: ActiveBuild }) {
                 <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
               </svg>
             ) : (
-              <span>🚫 Cancel</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <StopCircle size={14} strokeWidth={2.5} /> Cancel
+              </span>
             )}
           </button>
         ) : (

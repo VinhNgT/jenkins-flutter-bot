@@ -5,7 +5,9 @@
  */
 
 import { useEffect, useState } from 'preact/hooks';
+import { CheckCircle2, XCircle, Clock, AlertCircle, Copy, Download } from 'lucide-preact';
 import { useTelegram } from '../context/TelegramContext';
+import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
 import { fetchRecentBuilds } from '../api';
 import type { RecentBuild } from '../types';
@@ -16,6 +18,8 @@ interface RecentBuildsProps {
 }
 
 function RecentBuildRow({ build }: { build: RecentBuild }) {
+  const { haptic } = useTelegram();
+  const { showToast } = useToast();
   const relativeTime = useRelativeTime(build.completed_at);
 
   const commit = build.commit_hash ? build.commit_hash.substring(0, 7) : '';
@@ -27,26 +31,43 @@ function RecentBuildRow({ build }: { build: RecentBuild }) {
     durationStr = dur < 60 ? ` · ${dur}s` : ` · ${Math.floor(dur / 60)}m`;
   }
 
-  const emoji = build.result === 'success' ? '✅'
-    : build.result === 'failure' ? '❌'
-    : build.result === 'timeout' ? '⏰' : '🛑';
+  const Icon = build.result === 'success' ? CheckCircle2
+    : build.result === 'failure' ? XCircle
+    : build.result === 'timeout' ? Clock : AlertCircle;
+
+  const iconColor = build.result === 'success' ? 'var(--tg-color-button)' // Green or Primary? Telegram usually uses primary or success color, we'll use button color or native success. Let's stick to standard colors. Let's use a nice hex or inherit. Actually, let's use standard colors: success=#34c759, failure=#ff3b30, timeout=#ff9500
+    : build.result === 'failure' ? 'var(--tg-color-destructive)'
+    : build.result === 'timeout' ? '#ff9500' : 'var(--tg-color-hint)';
+
+  function handleCopy() {
+    if (build.download_url) {
+      navigator.clipboard.writeText(build.download_url);
+      haptic.impact('soft');
+      showToast('Download link copied to clipboard!');
+    }
+  }
 
   return (
     <div class="tg-list-item" style={{ cursor: 'default' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1 }}>
-        <div style={{ fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px' }}>
-          {emoji}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor }}>
+          <Icon size={22} strokeWidth={2.5} />
         </div>
         <div class="tg-list-item-content">
           <span class="tg-list-item-title">{branchInfo}</span>
           <span class="tg-list-item-subtitle">{relativeTime}{durationStr}</span>
         </div>
       </div>
-      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px' }}>
+      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
         {build.result === 'success' && build.download_url ? (
-          <a href={build.download_url} target="_blank" rel="noopener noreferrer" class="tg-download-link">
-            📲 Download
-          </a>
+          <>
+            <button onClick={handleCopy} style={{ color: 'var(--tg-color-button)', background: 'none', border: 'none', padding: '0', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+              <Copy size={16} /> Copy
+            </button>
+            <a href={build.download_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--tg-color-button)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: '500' }}>
+              <Download size={16} /> Get
+            </a>
+          </>
         ) : (
           <span class={`tg-result-badge ${build.result ?? 'cancelled'}`}>
             {build.result}

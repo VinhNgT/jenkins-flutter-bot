@@ -593,15 +593,5 @@ body.tg-dark .tg-input-clear {
     opacity: 0.6;
 }
 
-/* Download link in recent builds */
-.tg-download-link {
-    color: var(--tg-color-link);
-    font-size: 13px;
-    font-weight: 500;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 0;
-}
+
 

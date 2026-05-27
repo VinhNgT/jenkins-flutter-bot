@@ -16,7 +16,7 @@ interface TelegramContextValue {
   userId: number | null;
   haptic: {
     tap(): void;
-    impact(style: 'light' | 'medium' | 'heavy'): void;
+    impact(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'): void;
     notification(type: 'error' | 'success' | 'warning'): void;
   };
 }
@@ -72,9 +72,9 @@ export function TelegramProvider({ children }: { children: ComponentChildren }) 
 
     const haptic = {
       tap() {
-        try { if (isTelegram) tg!.HapticFeedback.selectionChanged(); } catch { /* noop */ }
+        // Disabled: Haptics reserved for important actions/events only
       },
-      impact(style: 'light' | 'medium' | 'heavy') {
+      impact(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') {
         try { if (isTelegram) tg!.HapticFeedback.impactOccurred(style); } catch { /* noop */ }
       },
       notification(type: 'error' | 'success' | 'warning') {

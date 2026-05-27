@@ -89,3 +89,13 @@ Real-time data uses custom `useSSE()` hooks that manage `EventSource` lifecycle,
 ## Telegram Design Language
 
 Both frontends follow Telegram's design patterns (per `custom-rule.md`). The bot webapp integrates with `window.Telegram.WebApp` for theming, haptic feedback, and back-button handling. The emulator mode (`emulator.ts`) provides a browser-based preview for development without Telegram.
+
+---
+
+## Native-First Principle
+
+Whenever interacting with the user or OS inside a Telegram Mini App, you MUST prioritize native `window.Telegram.WebApp` APIs over web wrappers:
+- **Alerts/Dialogs**: Never use `window.alert`, `window.confirm`, or custom HTML modal dialogs for basic prompts. Use `tg.showAlert()`, `tg.showConfirm()`, and `tg.showPopup()`.
+- **Storage**: Never use `localStorage` for cross-device persistence. Use `tg.CloudStorage` or `tg.DeviceStorage`.
+- **Buttons**: Use `tg.MainButton` and `tg.SecondaryButton` for primary actions instead of sticky HTML footers.
+- **Iconography**: Avoid text emojis (`✅`, `❌`). Use clean, monocolor vector icons (`lucide-preact`) to match Telegram's native aesthetic.

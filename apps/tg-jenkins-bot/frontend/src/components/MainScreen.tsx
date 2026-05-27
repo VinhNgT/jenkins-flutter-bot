@@ -96,9 +96,11 @@ export default function MainScreen({ config }: MainScreenProps) {
   const handleTrigger = useCallback(async () => {
     if (!selectedBranch) return;
 
-    // Show duplicate toast before hitting the API
+    // Show duplicate alert before hitting the API
     if (isDuplicate) {
-      showToast(`A build on '${selectedBranch}' is already running. Please wait or cancel it first.`, 'error');
+      const msg = `A build on '${selectedBranch}' is already running. Please wait or cancel it first.`;
+      if (isTelegram && tg) tg.showAlert(msg);
+      else showToast(msg, 'error');
       return;
     }
 
@@ -123,7 +125,9 @@ export default function MainScreen({ config }: MainScreenProps) {
     } catch (err) {
       console.error(err);
       haptic.notification('error');
-      showToast(err instanceof Error ? err.message : 'Failed to trigger build. Please retry.', 'error');
+      const msg = err instanceof Error ? err.message : 'Failed to trigger build. Please retry.';
+      if (isTelegram && tg) tg.showAlert(msg);
+      else showToast(msg, 'error');
     } finally {
       setIsLoading(false);
       if (isTelegram && tg) {

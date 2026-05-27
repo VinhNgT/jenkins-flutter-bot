@@ -92,6 +92,8 @@ interface TelegramWebApp {
   setBackgroundColor(color: string): void;
   setBottomBarColor?(color: string): void;
   showPopup(params: TelegramPopupParams, callback?: (buttonId: string) => void): void;
+  showAlert(message: string, callback?: () => void): void;
+  showConfirm(message: string, callback?: (isConfirmed: boolean) => void): void;
   openTelegramLink(url: string): void;
   onEvent(event: string, callback: () => void): void;
   offEvent(event: string, callback: () => void): void;

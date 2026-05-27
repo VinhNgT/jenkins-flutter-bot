@@ -1,13 +1,13 @@
 /**
- * RecentBuilds — Completed builds list with result badges and downloads.
+ * RecentBuilds — Completed builds list with result badges.
  *
- * Uses .tg-result-badge, .tg-download-link classes from the TGUI stylesheet.
+ * Uses .tg-result-badge classes from the TGUI stylesheet.
+ * Tapping a row navigates to the build detail screen.
  */
 
 import { useEffect, useState } from 'preact/hooks';
-import { CheckCircle2, XCircle, Clock, AlertCircle, Copy, Download } from 'lucide-preact';
+import { CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-preact';
 import { useTelegram } from '../context/TelegramContext';
-import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
 import { fetchRecentBuilds } from '../api';
 import type { RecentBuild } from '../types';
@@ -15,11 +15,11 @@ import type { RecentBuild } from '../types';
 interface RecentBuildsProps {
   /** Incremented when a build completes to trigger a refetch. */
   refreshKey: number;
+  onSelect: (build: RecentBuild) => void;
 }
 
-function RecentBuildRow({ build }: { build: RecentBuild }) {
-  const { haptic, isTelegram, tg } = useTelegram();
-  const { showToast } = useToast();
+function RecentBuildRow({ build, onSelect }: { build: RecentBuild; onSelect: (build: RecentBuild) => void }) {
+  const { haptic } = useTelegram();
   const relativeTime = useRelativeTime(build.completed_at);
 
   const title = build.label || build.branch;
@@ -33,27 +33,16 @@ function RecentBuildRow({ build }: { build: RecentBuild }) {
     : build.result === 'failure' ? 'var(--tg-color-destructive)'
     : build.result === 'timeout' ? '#ff9500' : 'var(--tg-color-hint)';
 
-  function handleCopy() {
-    if (build.download_url) {
-      navigator.clipboard.writeText(build.download_url);
-      haptic.impact('soft');
-      showToast('Download link copied to clipboard!');
-    }
-  }
+  // Subtitle: relative time + short commit hash for identification
+  const subtitle = commit ? `${relativeTime} · ${commit}` : relativeTime;
 
-  function handleRowClick() {
-    // If the user wants to see the full branch name and commit, they can tap the row.
-    const fullBranchInfo = commit ? `${build.branch} (${commit})` : build.branch;
-    const text = `Target: ${title}\nRef: ${fullBranchInfo}`;
-    if (isTelegram && tg) {
-      tg.showAlert(text);
-    } else {
-      alert(`Build Details\n\n${text}`);
-    }
+  function handleClick() {
+    haptic.impact('light');
+    onSelect(build);
   }
 
   return (
-    <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleRowClick}>
+    <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleClick}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, flexShrink: 0 }}>
           <Icon size={22} strokeWidth={2.5} />
@@ -61,36 +50,20 @@ function RecentBuildRow({ build }: { build: RecentBuild }) {
         <div class="tg-list-item-content" style={{ minWidth: 0 }}>
           <span class="tg-list-item-title">{title}</span>
           <span class="tg-list-item-subtitle" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {relativeTime}
+            {subtitle}
           </span>
-          <div style={{ marginTop: '4px', display: 'flex' }}>
-            <span class="tg-list-item-meta">
-              {commit ? `${build.branch} (${commit})` : build.branch}
-            </span>
-          </div>
         </div>
       </div>
-      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px', display: 'flex', gap: '12px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
-        {build.result === 'success' && build.download_url ? (
-          <>
-            <button onClick={handleCopy} style={{ color: 'var(--tg-color-button)', background: 'none', border: 'none', padding: '0', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
-              <Copy size={16} /> Copy
-            </button>
-            <a href={build.download_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--tg-color-button)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: '500' }}>
-              <Download size={16} /> Get
-            </a>
-          </>
-        ) : (
-          <span class={`tg-result-badge ${build.result ?? 'cancelled'}`}>
-            {build.result}
-          </span>
-        )}
+      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px' }}>
+        <span class={`tg-result-badge ${build.result ?? 'cancelled'}`}>
+          {build.result}
+        </span>
       </div>
     </div>
   );
 }
 
-export default function RecentBuilds({ refreshKey }: RecentBuildsProps) {
+export default function RecentBuilds({ refreshKey, onSelect }: RecentBuildsProps) {
   const { initData } = useTelegram();
   const [builds, setBuilds] = useState<RecentBuild[]>([]);
 
@@ -109,12 +82,12 @@ export default function RecentBuilds({ refreshKey }: RecentBuildsProps) {
             <span>No recent builds yet.</span>
           </div>
         ) : (
-          builds.map((build, i) => (
-            <RecentBuildRow key={`${build.branch}-${build.completed_at}-${i}`} build={build} />
+          builds.map((build) => (
+            <RecentBuildRow key={build.request_id} build={build} onSelect={onSelect} />
           ))
         )}
       </div>
-      <div class="tg-section-footer">Shows the last completed builds with download links.</div>
+      <div class="tg-section-footer">Tap a build for details, download links, and diagnostics.</div>
     </div>
   );
 }

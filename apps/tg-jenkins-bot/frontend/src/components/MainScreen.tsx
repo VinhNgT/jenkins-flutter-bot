@@ -13,13 +13,14 @@ import BranchSelector from './BranchSelector';
 import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
 import RecentBuilds from './RecentBuilds';
-import type { AppConfig } from '../types';
+import type { ActiveBuild, AppConfig, RecentBuild } from '../types';
 
 interface MainScreenProps {
   config: AppConfig;
+  onBuildSelect: (build: ActiveBuild | RecentBuild, type: 'active' | 'recent') => void;
 }
 
-export default function MainScreen({ config }: MainScreenProps) {
+export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
   const { tg, isTelegram, initData, haptic } = useTelegram();
   const { showToast } = useToast();
 
@@ -171,9 +172,9 @@ export default function MainScreen({ config }: MainScreenProps) {
         onClear={handleCustomClear}
       />
 
-      <ActiveBuilds builds={config.active_builds} />
+      <ActiveBuilds builds={config.active_builds} onSelect={(b) => onBuildSelect(b, 'active')} />
 
-      <RecentBuilds refreshKey={recentRefreshKey} />
+      <RecentBuilds refreshKey={recentRefreshKey} onSelect={(b) => onBuildSelect(b, 'recent')} />
 
       {/* App Version */}
       <div class="tg-section-footer build-fingerprint">

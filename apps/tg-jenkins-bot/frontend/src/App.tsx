@@ -3,15 +3,16 @@
  * and routes between LoadingScreen, ErrorScreen, and MainScreen.
  */
 
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useTelegram } from './context/TelegramContext';
 import { useSSE } from './hooks/useSSE';
-import { fetchConfig, ApiError } from './api';
+import { fetchConfig, fetchRecentBuilds, ApiError } from './api';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import MainScreen from './components/MainScreen';
-import type { ActiveBuild, AppConfig, ApiErrorDetail } from './types';
+import BuildDetailScreen from './components/BuildDetailScreen';
+import type { ActiveBuild, RecentBuild, AppConfig, ApiErrorDetail } from './types';
 
 interface ErrorState {
   title: string;
@@ -24,6 +25,23 @@ export default function App() {
 
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
+
+  // Navigation: selected build for detail screen
+  type SelectedBuild =
+    | { type: 'active'; data: ActiveBuild }
+    | { type: 'recent'; data: RecentBuild }
+    | null;
+  const [selectedBuild, setSelectedBuild] = useState<SelectedBuild>(null);
+  const selectedBuildRef = useRef(selectedBuild);
+  selectedBuildRef.current = selectedBuild;
+
+  function handleBuildSelect(build: ActiveBuild | RecentBuild, type: 'active' | 'recent') {
+    setSelectedBuild({ type, data: build } as SelectedBuild);
+  }
+
+  function handleDetailBack() {
+    setSelectedBuild(null);
+  }
 
   // If not in Telegram and not in preview mode, block access
   const hasTelegram = isTelegram || initData === 'preview';
@@ -73,7 +91,31 @@ export default function App() {
       if (JSON.stringify(prev.active_builds) === JSON.stringify(builds)) return prev;
       return { ...prev, active_builds: builds };
     });
-  }, []);
+
+    // Auto-transition: if viewing an active build detail and it just completed,
+    // fetch recent builds and switch to the completed result screen.
+    const sel = selectedBuildRef.current;
+    if (sel?.type === 'active') {
+      const stillActive = builds.some((b) => b.request_id === sel.data.request_id);
+      if (!stillActive) {
+        const completedRequestId = (sel.data as ActiveBuild).request_id;
+        fetchRecentBuilds(initData)
+          .then((recent) => {
+            const match = recent.find((r) => r.request_id === completedRequestId);
+            if (match) {
+              setSelectedBuild({ type: 'recent', data: match });
+            } else {
+              // Build completed but not yet in recent — return to main
+              setSelectedBuild(null);
+            }
+          })
+          .catch(() => {
+            // Fetch failed — return to main screen gracefully
+            setSelectedBuild(null);
+          });
+      }
+    }
+  }, [initData]);
 
   useSSE(sseUrl, handleBuildsUpdate);
 
@@ -123,7 +165,11 @@ export default function App() {
           detail={error.detail}
         />
       ) : config ? (
-        <MainScreen config={config} />
+        selectedBuild ? (
+          <BuildDetailScreen build={selectedBuild} onBack={handleDetailBack} />
+        ) : (
+          <MainScreen config={config} onBuildSelect={handleBuildSelect} />
+        )
       ) : (
         <LoadingScreen />
       )}

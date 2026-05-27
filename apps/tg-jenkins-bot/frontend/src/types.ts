@@ -20,6 +20,7 @@ export interface ActiveBuild {
 
 /** A completed build from build history. */
 export interface RecentBuild {
+  request_id: string;
   branch: string;
   label?: string;
   commit_hash: string | null;
@@ -27,6 +28,7 @@ export interface RecentBuild {
   triggered_at: number;
   completed_at: number;
   download_url: string | null;
+  file_size: number;
 }
 
 /** GET /api/webapp/config response. */

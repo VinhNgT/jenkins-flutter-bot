@@ -42,6 +42,7 @@ interface TelegramMainButton {
 
 interface TelegramBackButton {
   onClick(cb: () => void): void;
+  offClick(cb: () => void): void;
   show(): void;
   hide(): void;
 }

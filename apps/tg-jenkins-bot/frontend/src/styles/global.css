@@ -597,5 +597,117 @@ body.tg-dark .tg-input-clear {
     opacity: 0.6;
 }
 
+/* Build Detail Screen */
+.tg-detail-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 24px 8px;
+    gap: 4px;
+}
 
+.tg-detail-header-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+}
 
+.tg-detail-header-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--tg-color-text);
+}
+
+.tg-detail-header-subtitle {
+    font-size: 14px;
+    color: var(--tg-color-hint);
+}
+
+/* Key-value pair rows inside grouped sections */
+.tg-kv-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    min-height: 44px;
+    position: relative;
+    gap: 16px;
+}
+
+.tg-kv-row:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 0;
+    height: 0.5px;
+    background-color: var(--tg-color-divider);
+}
+
+.tg-kv-label {
+    font-size: 15px;
+    color: var(--tg-color-text);
+    font-weight: 400;
+    flex-shrink: 0;
+}
+
+.tg-kv-value {
+    font-size: 15px;
+    color: var(--tg-color-hint);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.tg-kv-value.mono {
+    font-family: monospace;
+    font-size: 14px;
+}
+
+/* Tappable action rows inside grouped sections */
+.tg-action-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 24px;
+    min-height: 44px;
+    position: relative;
+    cursor: pointer;
+    gap: 12px;
+    color: var(--tg-color-link);
+    font-size: 15px;
+    font-weight: 400;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+    font-family: var(--font-family);
+    transition: background-color 0.15s ease;
+}
+
+.tg-action-row:active {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+body.tg-dark .tg-action-row:active {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.tg-action-row:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 60px;
+    right: 0;
+    height: 0.5px;
+    background-color: var(--tg-color-divider);
+}
+
+.tg-action-row svg {
+    flex-shrink: 0;
+}

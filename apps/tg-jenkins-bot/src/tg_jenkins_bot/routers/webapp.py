@@ -79,6 +79,7 @@ class WebAppConfigResponse(BaseModel):
 class RecentBuildItem(BaseModel):
     """A completed build from history."""
 
+    request_id: str
     branch: str
     label: str | None = None
     commit_hash: str | None
@@ -86,6 +87,7 @@ class RecentBuildItem(BaseModel):
     triggered_at: float
     completed_at: float
     download_url: str | None
+    file_size: int = 0
 
 
 class RecentBuildsResponse(BaseModel):
@@ -561,6 +563,7 @@ async def get_recent_builds(
     return RecentBuildsResponse(
         builds=[
             RecentBuildItem(
+                request_id=b.request_id,
                 branch=b.branch,
                 label=branches_map.get(b.branch, b.branch),
                 commit_hash=b.commit_hash,
@@ -568,6 +571,7 @@ async def get_recent_builds(
                 triggered_at=b.triggered_at,
                 completed_at=b.completed_at,
                 download_url=b.download_url,
+                file_size=b.file_size,
             )
             for b in builds
         ]

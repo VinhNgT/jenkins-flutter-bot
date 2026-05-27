@@ -319,6 +319,9 @@ class BuildCoordinator:
                     "Artifact download failed for %s", request_id
                 )
 
+        # Capture artifact size before uploading
+        artifact_size = len(artifact_data[1]) if artifact_data else 0
+
         # Record build in file-manager (with or without artifact)
         record_result = await self._record_build(
             request_id=request_id,
@@ -328,6 +331,7 @@ class BuildCoordinator:
             triggered_at=pending.triggered_at,
             completed_at=now,
             artifact=artifact_data,
+            file_size=artifact_size,
         )
 
         if pending.frontend_callback_url:
@@ -411,6 +415,7 @@ class BuildCoordinator:
         triggered_at: float,
         completed_at: float,
         artifact: tuple[str, bytes] | None = None,
+        file_size: int = 0,
     ) -> dict[str, Any]:
         """Send build metadata (and optional artifact) to file-manager.
 
@@ -426,6 +431,7 @@ class BuildCoordinator:
             "result": result,
             "triggered_at": str(triggered_at),
             "completed_at": str(completed_at),
+            "file_size": str(file_size),
         }
 
         files = None

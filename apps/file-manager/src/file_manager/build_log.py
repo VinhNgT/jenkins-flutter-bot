@@ -32,6 +32,7 @@ class BuildRecord:
     completed_at: float
     download_url: str = ""
     file_id: str = ""
+    file_size: int = 0
 
 
 class BuildLog:
@@ -93,6 +94,7 @@ class BuildLog:
         completed_at: float,
         download_url: str = "",
         file_id: str = "",
+        file_size: int = 0,
     ) -> list[BuildRecord]:
         """Append a build record and enforce retention.
 
@@ -108,6 +110,7 @@ class BuildLog:
             completed_at=completed_at,
             download_url=download_url,
             file_id=file_id,
+            file_size=file_size,
         )
         self._records.append(entry)
 

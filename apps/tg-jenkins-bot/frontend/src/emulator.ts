@@ -186,6 +186,7 @@ WebApp.MainButton = MainButton;
 const BackButton: TelegramBackButton & { _onClickCb: (() => void) | null; _visible: boolean; _updateDOM(): void } = {
   _onClickCb: null, _visible: false,
   onClick(cb) { this._onClickCb = cb; },
+  offClick(cb) { if (this._onClickCb === cb) this._onClickCb = null; },
   show() { this._visible = true; this._updateDOM(); },
   hide() { this._visible = false; this._updateDOM(); },
   _updateDOM() {

@@ -44,10 +44,12 @@ graph TD
     CH -. "configures & controls" .-> managed
 
     BOT -- trigger --> BM
+    BOT -- recent builds --> FM
     BM -- trigger --> JNK
     JNK -- dispatches --> AGT
     BM -- polls --> JNK
-    BM -- upload --> FM
+    BM -- build record --> FM
+    BM -- vpn --> AGT
     BM -- callback --> BOT
 ```
 
@@ -56,8 +58,8 @@ graph TD
 | `config-hub` | 9000 | No | Central operational hub — config proxy, service control, web dashboard (accessed via gateway) |
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
 | `tg-jenkins-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
-| `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs + control API |
-| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
+| `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs, OpenVPN management + control API |
+| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, build log, retention enforcement |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
 | `gateway` | 80, 9000 | Yes | Caddy Ingress Gateway — secure routing perimeter for public Web App (:80) and admin UI (:9000) |
 | `cloudflared` | — | No | Cloudflare Tunnel — secure HTTPS tunnel connecting local gateway to Cloudflare |
@@ -85,8 +87,8 @@ Open **http://localhost:9000** and follow the **[Setup Guide](docs/setup-guide.m
 | [tg-jenkins-bot](apps/tg-jenkins-bot/) | Telegram bot — slash-command interface, notification rendering | [README](apps/tg-jenkins-bot/README.md) |
 | [config-hub](apps/config-hub/) | Central operational hub — config proxy, service control, web dashboard | [README](apps/config-hub/README.md) |
 | [build-manager](apps/build-manager/) | Build orchestration — Jenkins trigger, job/state tracking | [README](apps/build-manager/README.md) |
-| [file-manager](apps/file-manager/) | Storage backend — Google Drive OAuth, APK upload/download links | [README](apps/file-manager/README.md) |
-| [agent-control](apps/agent-control/) | HTTP control wrapper for the Jenkins agent subprocess | [README](apps/agent-control/README.md) |
+| [file-manager](apps/file-manager/) | Storage backend — Google Drive OAuth, build log, retention | [README](apps/file-manager/README.md) |
+| [agent-control](apps/agent-control/) | Jenkins agent control wrapper + OpenVPN management | [README](apps/agent-control/README.md) |
 | [mock-jenkins](apps/mock-jenkins/) | Dev/test mock — simulates Jenkins + agent-control APIs | [README](apps/mock-jenkins/README.md) |
 
 ## Libraries

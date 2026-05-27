@@ -72,7 +72,7 @@ git push origin v1.2.3
 
 </details>
 
-This starts all six services:
+This starts all eight containers:
 
 | Service          | URL                    | Purpose                                           |
 | ---------------- | ---------------------- | ------------------------------------------------- |
@@ -80,8 +80,8 @@ This starts all six services:
 | `gateway`        | http://localhost:9000   | Ingress Gateway (proxies to config-hub)           |
 | `config-hub`     | Internal (:9000)       | Configuration dashboard and operational hub       |
 | `tg-jenkins-bot` | Internal (:9090)       | Telegram bot + webhook receiver (publicly proxied to gateway:80) |
-| `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs + control API |
-| `file-manager`   | Internal (:9092)       | Google Drive OAuth and APK upload/download        |
+| `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs, OpenVPN management + control API |
+| `file-manager`   | Internal (:9092)       | Google Drive OAuth, build log, and retention enforcement |
 | `build-manager`  | Internal (:9010)       | Jenkins build trigger and job state tracking      |
 
 > [!NOTE]

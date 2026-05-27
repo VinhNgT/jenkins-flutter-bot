@@ -1,12 +1,12 @@
 ---
 trigger: glob
-description: Python coding conventions, tooling, and project structure patterns.
+description: Python coding conventions, tooling, and backend project structure patterns.
 globs: **/*.py
 ---
 
-# Coding Conventions
+# Python Conventions
 
-Triggered when editing Python files. Covers the Python stack, coding style, and project structure patterns used across all apps.
+Triggered when editing Python files. Covers the Python stack, coding style, and backend project structure patterns used across all apps.
 
 ---
 
@@ -59,13 +59,13 @@ This structure applies to all FastAPI services: `tg-jenkins-bot`, `agent-control
 
 `config-hub` uses `BootstrapSettings` (env-only, no JSON file) since it has no dashboard-editable config. `mock-jenkins` imports the real `AgentSettings` from `agent-control` for its mock agent-control server.
 
-The bot additionally has a sub-package (`bot/`) and a static (`webapp/`) directory for the Telegram Web App assets.
+The bot additionally has a sub-package (`bot/`) for Telegram handlers. For frontend conventions (Preact + Vite), see `web-conventions.md`.
 
 ### Shared Library
 
 One library lives in `libs/` using PyPA `src` layout:
 
-- **`config-core`** — `BootstrapSettings` and `ServiceSettings` Pydantic base classes, `get_frontend_schema()`, `ConfigDocument`, `get_secret_keys()`, `read_masked_config()`, `save_config_with_merge()`.
+- **`config-core`** — `BootstrapSettings` and `ServiceSettings` Pydantic base classes, `get_frontend_schema()`, `ConfigDocument`, config I/O helpers (`get_secret_keys()`, `read_masked_config()`, `save_config_with_merge()`), security primitives (`verify_service_token()`, `register_secret()`, `setup_service_logging()`).
 
 ---
 

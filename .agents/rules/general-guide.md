@@ -67,10 +67,12 @@ graph TD
     CH -. "configures & controls" .-> managed
 
     BOT -- trigger --> BM
+    BOT -- recent builds --> FM
     BM -- trigger --> JNK
     JNK -- dispatches --> AGT
     BM -- polls --> JNK
-    BM -- upload --> FM
+    BM -- build record --> FM
+    BM -- vpn --> AGT
     BM -- callback --> BOT
 ```
 
@@ -82,7 +84,7 @@ graph TD
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
 | `tg-jenkins-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
 | `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs, OpenVPN management + control API |
-| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, APK upload/download |
+| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, build log, retention enforcement, ephemeral storage |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
 | `gateway` | 80, 9000 | Yes | Caddy Ingress Gateway — secure routing perimeter for public Web App (:80) and admin UI (:9000) |
 | `cloudflared` | — | No | Cloudflare Tunnel — secure HTTPS tunnel connecting local gateway to Cloudflare |
@@ -103,9 +105,12 @@ graph TD
 10. **Refactor Notification**: Explain and align refactor plans with the user before executing large-scale refactors.
 11. **Config Hub Basic Authentication**: Config Hub is secured using HTTP Basic Authentication (`CONFIG_HUB_AUTH_USERNAME`/`PASSWORD`). The Drive OAuth callback (`/api/drive/oauth/callback`) is exempted to avoid cross-origin redirect credentials-stripping.
 12. **Real-Time Event Streaming (SSE)**: Service status checks and Web App active builds are streamed in real time via Server-Sent Events (SSE). Streams utilize asyncio event queues or content MD5 hashing to push updates only on state mutations.
-13. **SHA-256 Content-Based Cache-Busting**: Sub-resources (style.css, app.js, tg-emulator.js) are versioned via a content-hash query parameter (`?v=<asset_hash>`) and cached aggressively, while the entrypoint HTML revalidates (`no-cache`).
+13. **SHA-256 Content-Based Cache-Busting**: Vite produces content-hashed filenames for sub-resources (JS, CSS), cached aggressively, while the entrypoint HTML revalidates (`no-cache`).
 14. **Group-Only Web App Enforcements**: The Telegram Web App and its endpoints are strictly disabled in private 1-on-1 chats.
 15. **User-Authorized Build Cancellation**: Only the user who originally triggered a specific build (verified via Telegram user ID correlation) is authorized to cancel it.
+16. **Drive-as-Source-of-Truth Reconciliation**: On startup, file-manager reconciles its build log against actual Google Drive contents — recovering orphan files and pruning stale records.
+17. **Inter-Service Bearer Token Auth**: Optional `SERVICE_AUTH_TOKEN` for defence-in-depth on internal `/control/*` and `/api/*` endpoints. Bypassed in dev/test mode.
+18. **Log Redaction**: Secrets registered via `register_secret()` are automatically scrubbed from all log output. Enabled at service startup via `setup_service_logging()`.
 
 ---
 
@@ -124,7 +129,8 @@ graph TD
 11. **Do NOT secure the Google Drive OAuth callback** with Basic Authentication.
 12. **Do NOT permit private chats** to access the Telegram Mini App (reject positive chat IDs).
 13. **Do NOT allow unauthorized users to cancel builds** (enforce Telegram ID verification).
-14. **Do NOT use static/pinned versioning for asset cache-busting** in development — enforce SHA-256 hashing.
+14. **Do NOT use static/pinned versioning for asset cache-busting** in development — enforce content-hash filenames via Vite.
+15. **Do NOT log secrets in plaintext** — use `register_secret()` and `install_log_redaction()` from `config-core`.
 
 ---
 

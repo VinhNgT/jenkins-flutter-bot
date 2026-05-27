@@ -80,8 +80,9 @@ Each rule file covers a single concern domain:
 | File | Concern |
 |------|---------|
 | `general-guide.md` | Project identity, repo layout, service topology, hard constraints |
-| `coding-conventions.md` | Language, tooling, project structure patterns |
-| `config-and-secrets.md` | Schema system, precedence chain, secret masking |
+| `python-conventions.md` | Python language, tooling, backend project structure patterns |
+| `web-conventions.md` | Frontend stack, project structure, build pipeline, state management |
+| `config-and-secrets.md` | Schema system, precedence chain, secret masking, inter-service auth |
 | `docker-and-infra.md` | Containers, volumes, networking, CI/CD pipeline |
 | `communication-flows.md` | Service-to-service protocols, OAuth, build flow |
 | `doc-style-guide.md` | Meta-guide — how to write and maintain rule files |
@@ -146,7 +147,7 @@ When making significant architectural changes, review rule files for staleness:
 
 1. **Service count** — did you add or remove a service? Update `general-guide.md` topology.
 2. **Volume layout** — did you rename or add volumes? Update `docker-and-infra.md`.
-3. **Shared libraries** — did you extract or rename a library? Update `coding-conventions.md` and `general-guide.md`.
+3. **Shared libraries** — did you extract or rename a library? Update `python-conventions.md` and `general-guide.md`.
 4. **Config scopes** — did you rename or add a config scope? Update `config-and-secrets.md`.
 5. **Communication patterns** — did you add a new service-to-service flow? Update `communication-flows.md`.
 6. **Hard constraints** — did you establish a new boundary? Add it to `general-guide.md`.

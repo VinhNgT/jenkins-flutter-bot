@@ -21,10 +21,10 @@ The bot acts as a passive frontend and notification layer. All interactive build
 6. **Register Active Build** — The bot sends a `"🔨 User started a Target build"` confirmation message to the Telegram group chat, registers the active build in `ActiveBuildStore`, and returns success to the Web App.
 7. **Initiate VPN & Trigger Jenkins** — Build-manager initiates an OpenVPN connection via `agent-control`, triggers Jenkins (`POST /job/{name}/buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build.
 8. **Jenkins Run** — Jenkins pipeline runs on the agent managed by `agent-control` and archives the resulting APK on success — **no outbound HTTP from the agent**.
-9. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, uploads to Drive via `file-manager`, and forwards the result to the bot's webhook (`POST /callback/build-result`).
+9. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, and sends build metadata + artifact to file-manager via `POST /api/files/builds/record`. File-manager uploads to the storage backend (Google Drive or ephemeral), records the build in its build log, enforces retention, and returns the download URL. Build-manager forwards the result to the bot's webhook (`POST /callback/build-result`).
 10. **Notify Chat** — Bot consumes the `ActiveBuild` from `ActiveBuildStore` (which automatically updates the SSE stream) and delivers a completely new success/failure/timeout notification message containing a direct Google Drive download link to the group chat. Messages are **immutable** (send-only, fire-and-forget). The bot **never** edits or deletes messages.
 11. **Disconnect VPN** — Build-manager checks if the pending build queue is empty; if so, it triggers VPN disconnection via `agent-control`.
-12. **Retrieve History** — Users can browse past successful builds on demand inside the Web App interface, which calls the `GET /api/webapp/recent` endpoint to query the 5 most recent completed builds directly from build-manager (the Telegram chat remains clean of historical spam).
+12. **Retrieve History** — Users can browse past successful builds on demand inside the Web App interface, which calls the `GET /api/webapp/recent` endpoint. The bot queries file-manager directly (`GET /api/files/builds/recent`) for completed build history (the Telegram chat remains clean of historical spam).
 
 ### Security & Access Model
 
@@ -123,9 +123,10 @@ Each uploaded APK is made individually accessible — the Drive **folder** stays
 
 ## Build State Management
 
-Build state is split across two services:
+Build state is split across three services:
 
-- **build-manager** — maintains the authoritative build registry: in-progress and completed builds, Jenkins job metadata, Drive file links. Owns build completion detection (per-build poll worker `asyncio` tasks), artifact download, and retention enforcement (`max_recent_builds` eviction with Drive file cleanup). The poll worker queries Jenkins at configurable intervals and downloads the artifact directly from the Jenkins archive upon success.
+- **build-manager** — owns **pending builds** (in-flight) and poll workers. Manages build triggering, Jenkins polling, artifact downloading, and result forwarding. Completed builds are handed off to file-manager.
+- **file-manager** — owns the **build log**: completed build records, download URL tracking, retention enforcement (`max_recent_builds` eviction with backend file cleanup), and Drive reconciliation on startup (cross-references the log against actual Drive contents to recover orphans and prune stale records).
 - **tg-jenkins-bot** — maintains active builds in-memory via `ActiveBuildStore` mapping `request_id -> ActiveBuild`. Used strictly to correlate webhook callback results back to the Telegram chat.
 
 Jenkins owns all raw build metadata (status, duration, branch, commit). The bot queries build-manager for summaries — it never queries Jenkins directly for build info.

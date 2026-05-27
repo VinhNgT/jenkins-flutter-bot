@@ -10,6 +10,7 @@ Centralized configuration proxy and web dashboard for the Jenkins Flutter Bot mi
 - **Drive OAuth** — proxies browser-redirect and headless code-exchange OAuth flows to file-manager
 - **Config Export/Import** — tarball-based portable configuration transfer
 - **Jenkinsfile Generation** — renders customized Jenkins pipelines from current build-manager config
+- **Basic Authentication** — optional HTTP Basic Auth for securing the dashboard (`CONFIG_HUB_AUTH_USERNAME`/`PASSWORD`)
 
 ## Architecture
 
@@ -44,6 +45,8 @@ UI scope names map to their owning services:
 | `AGENT_CONTROL_URL` | Base URL of the agent-control API (default: `http://agent-control:9091`) |
 | `FILE_MANAGER_URL` | Base URL of the file-manager API (default: `http://file-manager:9092`) |
 | `BUILD_MANAGER_URL` | Base URL of the build-manager API (default: `http://build-manager:9010`) |
+| `CONFIG_HUB_AUTH_USERNAME` | (Optional) HTTP Basic Auth username for dashboard access |
+| `CONFIG_HUB_AUTH_PASSWORD` | (Optional) HTTP Basic Auth password for dashboard access |
 
 ## Running
 

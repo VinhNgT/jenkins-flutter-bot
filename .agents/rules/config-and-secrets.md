@@ -1,7 +1,7 @@
 ---
 trigger: glob
 description: Pydantic configuration system, secret masking, deep merge, config transfer, and dynamic UI rendering.
-globs: **/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/schema-renderer.js, **/env_io.py, **/config_store.py
+globs: "**/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/SchemaForm.tsx, **/env_io.py, **/config_store.py"
 ---
 
 # Configuration & Secrets
@@ -39,7 +39,7 @@ Add a Pydantic `Field()` to the owning module's `config.py` `ServiceSettings` su
 ```
 config.py (ServiceSettings subclass with Field() declarations)
     → routers/control.py (GET /control/schema → serialized JSON)
-    → config-hub (fetches schemas from all services → schema-renderer.js renders forms)
+    → config-hub (fetches schemas from all services → SchemaForm component renders forms)
 ```
 
 ---
@@ -97,8 +97,31 @@ This is critical for the config-hub workflow. Do not replace deep merge with a f
 
 ## Dynamic UI Rendering
 
-The config-hub renders forms dynamically from service schemas. It fetches schemas from all four owning services via HTTP and `schema-renderer.js` generates form elements from the field metadata.
+The config-hub renders forms dynamically from service schemas. It fetches schemas from all four owning services via HTTP and the `SchemaForm` Preact component generates form elements from the field metadata.
 
 ### Frontend Form Convention
 
 Dynamic form inputs follow the `scope:dotted.key` naming convention (e.g., `bot:telegram.bot_token`, `file_manager:drive.client_id`). The scope prefix determines which config section the field belongs to when building the save payload. See `communication-flows.md` for the scope-to-service translation.
+
+---
+
+## Inter-Service Authentication
+
+Optional `SERVICE_AUTH_TOKEN` provides defence-in-depth for internal `/control/*` and `/api/*` endpoints:
+
+- **When set** — all inter-service HTTP calls must include it as a `Bearer` token in the `Authorization` header. Invalid or missing tokens are rejected with 401/403.
+- **When unset** — auth is bypassed (dev/test mode).
+
+The primitives live in `config-core`:
+- **Inbound**: `verify_service_token` — FastAPI dependency added to apps via `dependencies=[Depends(verify_service_token)]`.
+- **Outbound**: `get_service_auth_headers()` — returns headers for httpx clients (`ServiceClient`, `BuildClient`, etc.).
+
+---
+
+## Log Redaction
+
+Secrets registered via `register_secret()` are automatically scrubbed from all log output. This prevents accidental leakage of tokens, API keys, and OAuth secrets in service logs.
+
+- `setup_service_logging()` installs the redaction filter and configures standardised logging format. Called once in each service's `cli()` entry point.
+- `register_secret(value)` registers a secret value for redaction. Called when secrets are loaded from config.
+- Part of `config-core`, not individual services.

@@ -17,8 +17,8 @@ For the authoritative volume list, see `docker-compose.yml`. Key design decision
 - Each service has its own isolated data volume — no volumes are shared between services.
 - **`bot-data`** holds `tg-jenkins-bot` JSON config (interaction states are transient and held strictly in-memory).
 - **`agent-data`** holds the `agent-control` JSON config.
-- **`build-manager-data`** holds build registry state + `build-manager` JSON config.
-- **`storage-data`** holds Drive OAuth tokens + `file-manager` JSON config.
+- **`build-manager-data`** holds `build-manager` JSON config (pending builds are tracked in-memory only).
+- **`storage-data`** holds Drive OAuth tokens, `build_log.json` (completed build records), and `file-manager` JSON config.
 - **`jenkins-data`** holds Jenkins home — decoupled from all other services.
 - **`mock-agent-data`** (mock mode only) holds the agent JSON config used by the mock `agent-control` server.
 - Config crosses service boundaries via HTTP (`/control/config`), not via shared mounts.
@@ -34,7 +34,7 @@ All services share a single Docker bridge network. Only two ports are exposed to
 
 Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), build-manager (`9010`), and config-hub (`9000`) ports are internal only. Config-hub is never exposed to the host directly.
 
-Additionally, the **Caddy Ingress Gateway** (`gateway` service) acts as the secure routing perimeter for **both** local administrative traffic (via `:9000` on the host) and public Web App traffic (via internal port `:80`). It proxies public Telegram Web App paths (`/webapp*` and `/api/webapp*`) to `tg-jenkins-bot:9090` while blocking all other public traffic. A **Cloudflare Tunnel** (`cloudflared` service) interfaces directly with `gateway:80` to safely expose the Web App endpoints over HTTPS.
+Additionally, the **Caddy Ingress Gateway** (`gateway` service) acts as the secure routing perimeter for **both** local administrative traffic (via `:9000` on the host) and public Web App traffic (via internal port `:80`). It proxies public Telegram Web App paths (`/webapp*` and `/api/webapp*`) to `tg-jenkins-bot:9090` while blocking all other public traffic. Rate-limiting is applied to public endpoints to prevent abuse. A **Cloudflare Tunnel** (`cloudflared` service) interfaces directly with `gateway:80` to safely expose the Web App endpoints over HTTPS.
 
 Do not expose bot, agent-control, file-manager, or build-manager ports to the host.
 

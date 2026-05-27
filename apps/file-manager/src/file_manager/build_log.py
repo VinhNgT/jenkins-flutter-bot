@@ -38,7 +38,7 @@ class BuildLog:
     """Completed build log with configurable persistence.
 
     When ``persistent=True``, records are saved to
-    ``data_dir / "build_log.json"`` on every mutation.
+    ``data_dir / filename`` on every mutation.
     When ``persistent=False``, records are held in-memory only —
     the log starts empty on each process start.
     """
@@ -49,11 +49,12 @@ class BuildLog:
         data_dir: Path,
         max_records: int = 5,
         persistent: bool = True,
+        filename: str = "build_log.json",
     ) -> None:
         self._data_dir = data_dir
         self._max_records = max_records
         self._persistent = persistent
-        self._log_path = data_dir / "build_log.json" if persistent else None
+        self._log_path = data_dir / filename if persistent else None
         self._records: list[BuildRecord] = self._load()
 
     # ------------------------------------------------------------------

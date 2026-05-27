@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from .backends.ephemeral import EphemeralBackend
 from .backends.google_drive import GoogleDriveBackend
+from .backends.log_only import LogOnlyBackend
 from .build_log import BuildLog
 from .config import StorageSettings, _DEFAULT_CONFIG_PATH
 from .storage import StorageBackend
@@ -38,7 +39,7 @@ def _resolve_backend_type() -> str:
     Returns ``"google_drive"`` or ``"ephemeral"``.
     """
     raw = os.environ.get("STORAGE_BACKEND", "google_drive").strip().lower()
-    if raw not in ("google_drive", "ephemeral"):
+    if raw not in ("google_drive", "ephemeral", "log_only"):
         logger.warning(
             "Unknown STORAGE_BACKEND=%r, falling back to 'google_drive'", raw,
         )
@@ -127,6 +128,8 @@ class StorageManager:
             self._backend = self._test_backend
         elif self._backend_type == "ephemeral":
             self._backend = EphemeralBackend()
+        elif self._backend_type == "log_only":
+            self._backend = LogOnlyBackend()
         else:
             self._backend = GoogleDriveBackend(
                 self._token_path(),
@@ -139,6 +142,7 @@ class StorageManager:
             data_dir=resolve_config_path(_DEFAULT_CONFIG_PATH).parent,
             max_records=self._config.max_recent_builds,
             persistent=(self._backend_type != "ephemeral"),
+            filename=f"build_log_{self._backend_type}.json",
         )
 
         # Reconcile the build log against actual Drive contents at startup.

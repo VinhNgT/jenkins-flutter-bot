@@ -7,6 +7,7 @@ import pytest
 
 from file_manager.backends.ephemeral import EphemeralBackend
 from file_manager.backends.google_drive import GoogleDriveBackend
+from file_manager.backends.log_only import LogOnlyBackend
 from file_manager.manager import StorageManager
 from file_manager.storage import StorageBackend, UploadResult
 
@@ -59,6 +60,16 @@ class TestLifecycle:
         assert mgr.running is True
         assert isinstance(mgr.backend, EphemeralBackend)
         assert mgr.backend_type == "ephemeral"
+
+    async def test_start_log_only_mode(self, isolate_config):
+        """With STORAGE_BACKEND=log_only, creates a LogOnlyBackend."""
+        os.environ["STORAGE_BACKEND"] = "log_only"
+
+        mgr = StorageManager()
+        await mgr.start()
+        assert mgr.running is True
+        assert isinstance(mgr.backend, LogOnlyBackend)
+        assert mgr.backend_type == "log_only"
 
     async def test_start_google_drive_mode(self, isolate_config):
         """With STORAGE_BACKEND=google_drive, creates a GoogleDriveBackend."""
@@ -127,6 +138,13 @@ class TestStatus:
         mgr = StorageManager()
         status = mgr.status()
         assert status["backend_type"] == "ephemeral"
+
+    def test_status_log_only_backend_type(self, isolate_config):
+        """Status reports log_only backend type when configured."""
+        os.environ["STORAGE_BACKEND"] = "log_only"
+        mgr = StorageManager()
+        status = mgr.status()
+        assert status["backend_type"] == "log_only"
 
 
 # ---------------------------------------------------------------------------

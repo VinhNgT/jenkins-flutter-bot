@@ -1,7 +1,7 @@
 ---
 trigger: glob
-globs: "**/.agents/rules/*.md, **/README.md"
 description: MUST read before creating or editing any documentation, rule files, or READMEs. Defines the principles for writing durable, useful agent guidelines.
+globs: **/.agents/rules/*.md, **/README.md
 ---
 
 # Doc Style Guide

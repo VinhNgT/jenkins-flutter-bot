@@ -1,7 +1,7 @@
 ---
 trigger: glob
 description: Python coding conventions, tooling, and project structure patterns.
-globs: "**/*.py"
+globs: **/*.py
 ---
 
 # Coding Conventions

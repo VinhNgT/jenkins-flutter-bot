@@ -1,7 +1,7 @@
 ---
 trigger: glob
-globs: "**/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/schema-renderer.js, **/env_io.py, **/config_store.py"
 description: Pydantic configuration system, secret masking, deep merge, config transfer, and dynamic UI rendering.
+globs: **/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/schema-renderer.js, **/env_io.py, **/config_store.py
 ---
 
 # Configuration & Secrets

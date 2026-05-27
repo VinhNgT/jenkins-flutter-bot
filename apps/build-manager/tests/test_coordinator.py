@@ -1,4 +1,4 @@
-"""Tests for BuildCoordinator — full lifecycle, timeout, eviction, cancellation."""
+"""Tests for BuildCoordinator — full lifecycle, timeout, cancellation."""
 
 from unittest.mock import AsyncMock
 
@@ -36,9 +36,14 @@ def _mock_jenkins(
 
 
 def _file_manager_handler(request: httpx.Request):
-    """Mock file-manager HTTP handler."""
-    if "upload" in str(request.url):
+    """Mock file-manager HTTP handler.
+
+    Responds to both the new ``POST /api/files/builds/record`` endpoint
+    and file DELETE requests.
+    """
+    if "builds/record" in str(request.url):
         return httpx.Response(200, json={
+            "status": "recorded",
             "download_url": "https://drive.google.com/file/123",
             "file_id": "drive_file_123",
         })
@@ -64,7 +69,6 @@ def coordinator(tmp_path):
         data_dir=tmp_path,
         jenkins=jenkins,
         file_manager_url="http://file-manager:9092",
-        max_recent_builds=3,
         build_timeout=30,
         poll_interval=1,
         http_client=http,
@@ -86,16 +90,6 @@ class TestTriggerBuild:
         assert "request_id" in result
         assert coordinator.tracker.pending_count == 1
         assert len(coordinator._poll_tasks) == 1
-        await coordinator.close()
-
-    async def test_queue_full_rejects(self, coordinator):
-        """Raises when max pending reached."""
-        for i in range(3):
-            await coordinator.trigger_build(f"branch-{i}")
-
-        with pytest.raises(JenkinsTriggerError) as exc_info:
-            await coordinator.trigger_build("one-too-many")
-        assert "queue" in exc_info.value.user_message.lower()
         await coordinator.close()
 
     async def test_jenkins_trigger_failure_propagates(self, tmp_path):
@@ -120,7 +114,7 @@ class TestTriggerBuild:
 
 
 class TestCompleteBuild:
-    async def test_success_uploads_artifact(self, coordinator):
+    async def test_success_sends_record_to_file_manager(self, coordinator):
         # Setup: add a pending build
         coordinator._jenkins.trigger_build = AsyncMock(return_value=42)
         result = await coordinator.trigger_build(
@@ -143,10 +137,6 @@ class TestCompleteBuild:
 
         # Pending should be consumed
         assert coordinator.tracker.get_pending(request_id) is None
-        # Completed should be recorded
-        recent = coordinator.tracker.recent_builds()
-        assert len(recent) == 1
-        assert recent[0].result == "success"
         await coordinator.close()
 
     async def test_success_derives_filename_from_app_name(self, coordinator):
@@ -162,8 +152,8 @@ class TestCompleteBuild:
             return_value=("app-release.apk", b"apk-data")
         )
 
-        # Mock _upload_artifact to capture the filename
-        coordinator._upload_artifact = AsyncMock(
+        # Mock _record_build to capture the call
+        coordinator._record_build = AsyncMock(
             return_value={"download_url": "https://drive.google.com/file/123", "file_id": "drive_file_123"}
         )
 
@@ -175,14 +165,15 @@ class TestCompleteBuild:
         )
         await coordinator._complete_build(request_id, jenkins_build)
 
-        # Verify that _upload_artifact was called with a derived filename
-        assert coordinator._upload_artifact.called
-        called_args, called_kwargs = coordinator._upload_artifact.call_args
-        uploaded_filename = called_args[0]
-        
+        # Verify that _record_build was called with artifact containing derived filename
+        assert coordinator._record_build.called
+        call_kwargs = coordinator._record_build.call_args.kwargs
+        artifact = call_kwargs["artifact"]
+        assert artifact is not None
+        filename, content = artifact
         # Expected pattern: my-awesome-app-{YYYYMMDD}-{HHmmss}-{requestId8}.apk
-        assert uploaded_filename.startswith("my-awesome-app-")
-        assert uploaded_filename.endswith(f"-{request_id[:8]}.apk")
+        assert filename.startswith("my-awesome-app-")
+        assert filename.endswith(f"-{request_id[:8]}.apk")
         await coordinator.close()
 
     async def test_failure_no_upload(self, coordinator):
@@ -197,8 +188,6 @@ class TestCompleteBuild:
         await coordinator._complete_build(request_id, jenkins_build)
 
         coordinator._jenkins.download_artifact.assert_not_awaited()
-        recent = coordinator.tracker.recent_builds()
-        assert recent[0].result == "failure"
         await coordinator.close()
 
     async def test_already_consumed_is_noop(self, coordinator):
@@ -213,8 +202,6 @@ class TestCompleteBuild:
             branch="main", commit_hash="a" * 40, request_id=request_id,
         )
         await coordinator._complete_build(request_id, jenkins_build)
-        # No completed build recorded since pending was already consumed
-        assert coordinator.tracker.recent_builds() == []
         await coordinator.close()
 
 
@@ -224,15 +211,14 @@ class TestCompleteBuild:
 
 
 class TestTimeout:
-    async def test_records_timeout_result(self, coordinator):
+    async def test_records_timeout(self, coordinator):
         result = await coordinator.trigger_build("main")
         request_id = result["request_id"]
 
         await coordinator._handle_timeout(request_id)
 
-        recent = coordinator.tracker.recent_builds()
-        assert len(recent) == 1
-        assert recent[0].result == "timeout"
+        # Pending should be consumed
+        assert coordinator.tracker.get_pending(request_id) is None
         await coordinator.close()
 
     async def test_timeout_already_consumed(self, coordinator):
@@ -240,46 +226,47 @@ class TestTimeout:
         request_id = result["request_id"]
         coordinator.tracker.consume_pending(request_id)
 
+        # Should be a no-op (no crash)
         await coordinator._handle_timeout(request_id)
-        assert coordinator.tracker.recent_builds() == []
         await coordinator.close()
 
 
 # ---------------------------------------------------------------------------
-# _evict_builds
+# _record_build
 # ---------------------------------------------------------------------------
 
 
-class TestEviction:
-    async def test_deletes_drive_files(self, coordinator):
-        from build_manager.builds.state import CompletedBuild
-
-        evicted = [
-            CompletedBuild(
-                request_id="old1", branch="main", commit_hash="a" * 40,
-                result="success", triggered_at=1.0, completed_at=2.0,
-                file_id="drive_file_old1",
-            )
-        ]
-        await coordinator._evict_builds(evicted)
-        # No error means the DELETE was sent successfully
+class TestRecordBuild:
+    async def test_sends_metadata_to_file_manager(self, coordinator):
+        """Verify _record_build sends proper form data."""
+        result = await coordinator._record_build(
+            request_id="req1",
+            branch="main",
+            commit_hash="a" * 40,
+            result="success",
+            triggered_at=1.0,
+            completed_at=2.0,
+        )
+        assert result["status"] == "recorded"
         await coordinator.close()
 
-    async def test_no_file_id_skipped(self, coordinator):
-        from build_manager.builds.state import CompletedBuild
-
-        evicted = [
-            CompletedBuild(
-                request_id="old1", branch="main", commit_hash="a" * 40,
-                result="success", triggered_at=1.0, completed_at=2.0,
-                file_id="",  # no file_id
-            )
-        ]
-        # Should not raise or send DELETE
-        await coordinator._evict_builds(evicted)
+    async def test_sends_artifact_with_metadata(self, coordinator):
+        """Verify artifact is included when provided."""
+        result = await coordinator._record_build(
+            request_id="req1",
+            branch="main",
+            commit_hash="a" * 40,
+            result="success",
+            triggered_at=1.0,
+            completed_at=2.0,
+            artifact=("test.apk", b"fake-apk-data"),
+        )
+        assert result["status"] == "recorded"
+        assert result["download_url"] == "https://drive.google.com/file/123"
         await coordinator.close()
 
-    async def test_failure_logged_not_raised(self, tmp_path):
+    async def test_failure_returns_empty_dict(self, tmp_path):
+        """When file-manager is down, returns empty dict (best-effort)."""
         def error_handler(request: httpx.Request):
             return httpx.Response(500, text="Server Error")
 
@@ -293,17 +280,15 @@ class TestEviction:
             http_client=http,
         )
 
-        from build_manager.builds.state import CompletedBuild
-
-        evicted = [
-            CompletedBuild(
-                request_id="old1", branch="main", commit_hash="a" * 40,
-                result="success", triggered_at=1.0, completed_at=2.0,
-                file_id="drive_file_old1",
-            )
-        ]
-        # Should log error but NOT propagate
-        await coord._evict_builds(evicted)
+        result = await coord._record_build(
+            request_id="req1",
+            branch="main",
+            commit_hash="a" * 40,
+            result="success",
+            triggered_at=1.0,
+            completed_at=2.0,
+        )
+        assert result == {}
         await coord.close()
 
 
@@ -327,14 +312,16 @@ class TestNotifyFrontend:
             http_client=http,
         )
 
-        from build_manager.builds.state import CompletedBuild
-
-        completed = CompletedBuild(
-            request_id="req1", branch="main", commit_hash="a" * 40,
-            result="success", triggered_at=1.0, completed_at=2.0,
-        )
         # Should not raise
-        await coord._notify_frontend("http://bot:9090/callback", completed)
+        await coord._notify_frontend(
+            "http://bot:9090/callback",
+            request_id="req1",
+            branch="main",
+            commit_hash="a" * 40,
+            result="success",
+            triggered_at=1.0,
+            completed_at=2.0,
+        )
         await coord.close()
 
 

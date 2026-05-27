@@ -1,4 +1,4 @@
-"""Tests for BuildClient — the bot's async HTTP client for build-manager."""
+"""Tests for BuildClient — the bot's async HTTP client for build-manager and file-manager."""
 
 import pytest
 import httpx
@@ -7,10 +7,18 @@ from tg_jenkins_bot.build_client import BuildClient, BuildClientError, BuildResu
 
 
 def _build_client(handler) -> BuildClient:
-    """Create a BuildClient backed by MockTransport."""
+    """Create a BuildClient backed by MockTransport.
+
+    The same mock transport handles both build-manager and file-manager
+    requests — the test handler inspects the URL to route.
+    """
     transport = httpx.MockTransport(handler)
     client = httpx.AsyncClient(transport=transport)
-    return BuildClient("http://build-manager:9010", client=client)
+    return BuildClient(
+        "http://build-manager:9010",
+        "http://file-manager:9092",
+        client=client,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +105,7 @@ class TestCancelBuild:
 
 
 # ---------------------------------------------------------------------------
-# get_recent_builds
+# get_recent_builds (queries file-manager)
 # ---------------------------------------------------------------------------
 
 
@@ -156,7 +164,7 @@ class TestGetRecentBuilds:
 class TestGetBuildStatus:
     async def test_success(self):
         def handler(request: httpx.Request):
-            return httpx.Response(200, json={"pending_count": 1, "completed_count": 5})
+            return httpx.Response(200, json={"pending_count": 1})
 
         client = _build_client(handler)
         status = await client.get_build_status()
@@ -169,5 +177,5 @@ class TestGetBuildStatus:
 
         client = _build_client(handler)
         status = await client.get_build_status()
-        assert status == {"pending_count": 0, "completed_count": 0}
+        assert status == {"pending_count": 0}
         await client.close()

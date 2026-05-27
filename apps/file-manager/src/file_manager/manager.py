@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from .backends.ephemeral import EphemeralBackend
 from .backends.google_drive import GoogleDriveBackend
+from .build_log import BuildLog
 from .config import StorageSettings, _DEFAULT_CONFIG_PATH
 from .storage import StorageBackend
 
@@ -66,6 +67,7 @@ class StorageManager:
         self._config: StorageSettings | None = None
         self._backend: StorageBackend | None = backend
         self._test_backend = backend
+        self._build_log: BuildLog | None = None
         self._last_error: str | None = None
         self._started_at: float | None = None
         self._clock = clock
@@ -83,6 +85,11 @@ class StorageManager:
     def backend_type(self) -> str:
         """Return the configured backend type (``"google_drive"`` or ``"ephemeral"``)."""
         return self._backend_type
+
+    @property
+    def build_log(self) -> BuildLog | None:
+        """Return the build log, or None if the manager hasn't started."""
+        return self._build_log
 
     @property
     def google_drive_backend(self) -> GoogleDriveBackend | None:
@@ -128,6 +135,11 @@ class StorageManager:
                 folder_name=self._config.drive_folder_name,
             )
 
+        self._build_log = BuildLog(
+            data_dir=resolve_config_path(_DEFAULT_CONFIG_PATH).parent,
+            max_records=self._config.max_recent_builds,
+            persistent=(self._backend_type != "ephemeral"),
+        )
         self._last_error = None
         self._started_at = self._clock()
         logger.info("StorageManager started (backend=%s)", self._backend_type)
@@ -135,6 +147,7 @@ class StorageManager:
     async def stop(self) -> None:
         """Shut down the storage backend."""
         self._backend = None
+        self._build_log = None
         self._config = None
         self._started_at = None
         logger.info("StorageManager stopped")

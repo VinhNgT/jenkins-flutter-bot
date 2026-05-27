@@ -84,12 +84,15 @@ services:
     environment:
       BOT_SERVICE_URL: "http://tg-jenkins-bot:9090"
       BUILD_MANAGER_URL: "http://build-manager:9010"
+      FILE_MANAGER_URL: "http://file-manager:9092"
       SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
       JFB_DEV_MODE: "true"
     expose:
       - "9090"
     volumes:
       - bot-data:/app/data
+    depends_on:
+      - file-manager
     networks:
       - jenkins
 

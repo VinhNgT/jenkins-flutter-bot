@@ -208,7 +208,6 @@ class TestCommandHandlers:
         text = update.message.reply_text.call_args[0][0]
         assert "TestApp — System Diagnostics" in text
         assert "Service: <code>tg-jenkins-bot v" in text
-        assert "Build Manager: 5 completed" in text
 
     async def test_status_handler_building(self, ctx, bot) -> None:
         """Verify status handler lists active builds from store with details."""

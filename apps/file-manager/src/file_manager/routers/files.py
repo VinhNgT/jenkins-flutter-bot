@@ -1,11 +1,16 @@
-"""File upload/delete/cleanup/download routes — /api/files/*."""
+"""File and build log routes — /api/files/*.
+
+Manages build artifact uploads, build log queries, and file lifecycle
+operations. The upload endpoint accepts build metadata alongside an
+optional artifact file, recording both in the build log.
+"""
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from ..dependencies import ManagerDep
@@ -18,55 +23,152 @@ router = APIRouter(prefix="/api/files", tags=["files"])
 MAX_UPLOAD_SIZE = 500 * 1024 * 1024
 
 
-@router.post("/upload")
-async def upload_file(
-    request: Request, manager: ManagerDep, file: UploadFile,
-) -> dict[str, Any]:
-    """Upload a file to the storage backend.
+# ------------------------------------------------------------------
+# Build log endpoints
+# ------------------------------------------------------------------
 
-    Accepts multipart form data with a ``file`` field.
-    Returns ``{file_id, download_url}``.
+
+@router.post("/builds/record")
+async def record_build(
+    request: Request,
+    manager: ManagerDep,
+    request_id: str = Form(...),
+    branch: str = Form(...),
+    commit_hash: str = Form(""),
+    result: str = Form(...),
+    triggered_at: float = Form(...),
+    completed_at: float = Form(...),
+    file: UploadFile | None = None,
+) -> dict[str, Any]:
+    """Record a completed build, optionally uploading an artifact.
+
+    Accepts multipart form data with build metadata fields and an optional
+    ``file`` field. When a file is present (successful builds), it is stored
+    in the backend and the download URL is recorded. When absent
+    (failures/timeouts), only metadata is logged.
+
+    Enforces retention — evicts the oldest records and deletes their
+    backend files.
     """
     if manager.backend is None:
         raise HTTPException(status_code=503, detail="Storage backend not initialised")
+    if manager.build_log is None:
+        raise HTTPException(status_code=503, detail="Build log not initialised")
 
-    # Early rejection via Content-Length header (fast path).
-    content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > MAX_UPLOAD_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
-        )
+    download_url = ""
+    file_id = ""
 
-    content = await file.read()
+    # Upload artifact if provided
+    if file is not None:
+        # Early rejection via Content-Length header (fast path).
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
+            )
 
-    # Safety net: enforce after read() in case Content-Length was missing/spoofed.
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
-        )
+        content = await file.read()
 
-    try:
-        result = await manager.backend.upload(content, file.filename or "upload")
-        return {"file_id": result.file_id, "download_url": result.download_url}
-    except Exception:
-        logger.exception("Upload failed")
-        raise HTTPException(status_code=500, detail="Upload failed")
+        # Safety net: enforce after read() in case Content-Length was missing.
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Upload too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
+            )
+
+        try:
+            upload_result = await manager.backend.upload(
+                content, file.filename or "upload"
+            )
+            download_url = upload_result.download_url
+            file_id = upload_result.file_id
+        except Exception:
+            logger.exception("Upload failed")
+            raise HTTPException(status_code=500, detail="Upload failed")
+
+    # Record in build log and enforce retention
+    evicted = manager.build_log.record(
+        request_id=request_id,
+        branch=branch,
+        commit_hash=commit_hash,
+        result=result,
+        triggered_at=triggered_at,
+        completed_at=completed_at,
+        download_url=download_url,
+        file_id=file_id,
+    )
+
+    # Delete backend files for evicted records (best-effort)
+    for record in evicted:
+        if record.file_id:
+            try:
+                await manager.backend.delete(record.file_id)
+                logger.info(
+                    "Evicted build %s — deleted file %s",
+                    record.request_id,
+                    record.file_id,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to delete file %s for evicted build %s",
+                    record.file_id,
+                    record.request_id,
+                )
+
+    return {
+        "status": "recorded",
+        "file_id": file_id,
+        "download_url": download_url,
+    }
+
+
+@router.get("/builds/recent")
+async def get_recent_builds(
+    manager: ManagerDep, count: int = 5
+) -> dict[str, Any]:
+    """Return recent completed build records, newest first."""
+    if manager.build_log is None:
+        raise HTTPException(status_code=503, detail="Build log not initialised")
+
+    records = manager.build_log.recent(count)
+    return {
+        "builds": [
+            {
+                "request_id": r.request_id,
+                "branch": r.branch,
+                "commit_hash": r.commit_hash,
+                "result": r.result,
+                "triggered_at": r.triggered_at,
+                "completed_at": r.completed_at,
+                "download_url": r.download_url,
+            }
+            for r in records
+        ]
+    }
+
+
+# ------------------------------------------------------------------
+# File lifecycle endpoints
+# ------------------------------------------------------------------
 
 
 @router.delete("/{file_id}")
 async def delete_file(manager: ManagerDep, file_id: str) -> dict[str, str]:
-    """Delete a single file by ID."""
+    """Delete a single file by ID and remove its build log record."""
     if manager.backend is None:
         raise HTTPException(status_code=503, detail="Storage backend not initialised")
 
     try:
         await manager.backend.delete(file_id)
-        return {"status": "deleted"}
     except Exception:
         logger.exception("Delete failed for %s", file_id)
         raise HTTPException(status_code=500, detail="Delete failed")
+
+    if manager.build_log is not None:
+        manager.build_log.remove_by_file_id(file_id)
+
+    return {"status": "deleted"}
 
 
 @router.post("/cleanup")
@@ -88,19 +190,13 @@ async def cleanup_files(manager: ManagerDep, request: Request) -> dict[str, Any]
         try:
             await manager.backend.delete(fid)
             deleted.append(fid)
+            if manager.build_log is not None:
+                manager.build_log.remove_by_file_id(fid)
         except Exception:
             logger.exception("Failed to delete %s", fid)
             errors.append({"file_id": fid, "error": "delete failed"})
 
     return {"deleted": deleted, "errors": errors}
-
-
-@router.get("/status")
-async def storage_status(manager: ManagerDep) -> dict[str, Any]:
-    """Return backend connection status."""
-    if manager.backend is None:
-        return {"connected": False, "detail": "not initialised"}
-    return await manager.backend.status()
 
 
 @router.get("/{file_id}/download")

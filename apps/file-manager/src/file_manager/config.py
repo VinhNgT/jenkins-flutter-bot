@@ -67,3 +67,14 @@ class StorageSettings(ServiceSettings):
             "json_key": "drive.folder_name",
         },
     )
+
+    # Build log
+    max_recent_builds: int = Field(
+        5,
+        title="Max Recent Builds",
+        description="Number of completed build records to retain (oldest are evicted)",
+        json_schema_extra={
+            "group": "Storage Settings",
+            "json_key": "storage.max_recent_builds",
+        },
+    )

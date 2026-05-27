@@ -268,11 +268,6 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"  {result_emoji} {_escape(last.branch or 'unknown')} · <code>{_escape(short_hash)}</code> · {date_str}"
         )
 
-    # Build manager completed count
-    completed = sm_status.get("completed_count", 0)
-    lines.append("")
-    lines.append(f"Build Manager: {completed} completed")
-
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="HTML",

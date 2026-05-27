@@ -12,6 +12,7 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
         webapp_url="tendoo-tg-bot.vinhngt.dev",
     )
     assert config1.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -22,6 +23,7 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
         webapp_url="tendoo-tg-bot.vinhngt.dev/",
     )
     assert config2.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -32,6 +34,7 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
         webapp_url="tendoo-tg-bot.vinhngt.dev/webapp",
     )
     assert config3.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -42,6 +45,7 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
         webapp_url="https://tendoo-tg-bot.vinhngt.dev/webapp/",
     )
     assert config4.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -52,6 +56,7 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
     )
     assert config5.webapp_url == "http://localhost:9090/webapp/"

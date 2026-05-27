@@ -3,8 +3,11 @@
 Exposes the build lifecycle to frontends:
   - POST /api/builds/trigger           — start a new build
   - GET  /api/builds/pending           — list in-flight builds
-  - GET  /api/builds/recent            — list completed builds
   - POST /api/builds/{id}/cancel       — cancel a pending build
+  - GET  /api/builds/status            — pending build summary
+
+Completed build history is served by file-manager
+(``GET /api/files/builds/recent``).
 """
 
 from __future__ import annotations
@@ -59,26 +62,6 @@ async def list_pending(coord: CoordinatorDep) -> dict[str, Any]:
             }
             for k, v in pending.items()
         }
-    }
-
-
-@router.get("/recent")
-async def list_recent(coord: CoordinatorDep, count: int = 10) -> dict[str, Any]:
-    """List recent completed builds."""
-    builds = coord.tracker.recent_builds(count)
-    return {
-        "builds": [
-            {
-                "request_id": b.request_id,
-                "branch": b.branch,
-                "commit_hash": b.commit_hash,
-                "result": b.result,
-                "triggered_at": b.triggered_at,
-                "completed_at": b.completed_at,
-                "download_url": b.download_url,
-            }
-            for b in builds
-        ]
     }
 
 

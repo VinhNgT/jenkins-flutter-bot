@@ -1,8 +1,9 @@
-"""Build Manager API client.
+"""Build service API clients.
 
-Provides a typed async interface to the build-manager service.
-The bot delegates all build lifecycle operations here — triggering,
-cancelling, querying recent builds, and checking status.
+Provides typed async interfaces to both the build-manager and
+file-manager services. The bot delegates build lifecycle operations
+to build-manager (trigger, cancel, status) and queries file-manager
+directly for completed build history.
 """
 
 from __future__ import annotations
@@ -20,12 +21,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class BuildResult:
-    """A completed build returned by the build manager API."""
+    """A completed build returned by the file-manager build log."""
 
     request_id: str
     branch: str
     commit_hash: str
-    result: str  # "success" or "failure"
+    result: str  # "success" | "failure" | "timeout" | "cancelled"
     triggered_at: float
     completed_at: float
     download_url: str = ""
@@ -43,12 +44,21 @@ class BuildClientError(Exception):
 
 
 class BuildClient:
-    """Async HTTP client for the build-manager API."""
+    """Async HTTP client for build-manager and file-manager APIs.
+
+    Build lifecycle (trigger, cancel, status) goes to build-manager.
+    Completed build history goes to file-manager.
+    """
 
     def __init__(
-        self, base_url: str, *, client: httpx.AsyncClient | None = None
+        self,
+        build_manager_url: str,
+        file_manager_url: str,
+        *,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
-        self._base_url = base_url.rstrip("/")
+        self._build_url = build_manager_url.rstrip("/")
+        self._file_url = file_manager_url.rstrip("/")
         self._client = client or httpx.AsyncClient(
             timeout=30.0, headers=get_service_auth_headers()
         )
@@ -66,7 +76,7 @@ class BuildClient:
 
         Raises ``BuildClientError`` on failure.
         """
-        url = f"{self._base_url}/api/builds/trigger"
+        url = f"{self._build_url}/api/builds/trigger"
         try:
             payload = {"branch": branch, "callback_url": callback_url}
             if app_name:
@@ -98,7 +108,7 @@ class BuildClient:
 
     async def cancel_build(self, request_id: str) -> dict[str, str]:
         """Cancel a pending build via the build manager."""
-        url = f"{self._base_url}/api/builds/{request_id}/cancel"
+        url = f"{self._build_url}/api/builds/{request_id}/cancel"
         try:
             resp = await self._client.post(url)
             return resp.json()
@@ -107,8 +117,8 @@ class BuildClient:
             return {"status": "error"}
 
     async def get_recent_builds(self, count: int = 5) -> list[BuildResult]:
-        """Fetch recent completed builds from the build manager."""
-        url = f"{self._base_url}/api/builds/recent"
+        """Fetch recent completed builds from file-manager."""
+        url = f"{self._file_url}/api/files/builds/recent"
         try:
             resp = await self._client.get(url, params={"count": count})
             if resp.status_code != 200:
@@ -132,13 +142,13 @@ class BuildClient:
             return []
 
     async def get_build_status(self) -> dict[str, Any]:
-        """Fetch build manager status."""
-        url = f"{self._base_url}/api/builds/status"
+        """Fetch build manager status (pending builds only)."""
+        url = f"{self._build_url}/api/builds/status"
         try:
             resp = await self._client.get(url)
             if resp.status_code != 200:
-                return {"pending_count": 0, "completed_count": 0}
+                return {"pending_count": 0}
             return resp.json()
         except Exception:
             logger.exception("Failed to fetch build status")
-            return {"pending_count": 0, "completed_count": 0}
+            return {"pending_count": 0}

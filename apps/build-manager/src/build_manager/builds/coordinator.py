@@ -6,9 +6,8 @@ completion.  When a build finishes, it downloads archived artifacts, uploads
 them to file-manager, and forwards results to registered frontend callback
 URLs.
 
-Owns:
-  - Per-build poll tasks (periodically checks Jenkins until done or timeout)
-  - Build retention enforcement (evicts old builds, deletes Drive files)
+Completed build history is owned by file-manager — the coordinator sends
+build metadata alongside artifacts via ``POST /api/files/builds/record``.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ import httpx
 from config_core import get_service_auth_headers
 
 from .jenkins_client import JenkinsBuild, JenkinsClient, JenkinsTriggerError
-from .state import BuildTracker, CompletedBuild
+from .state import BuildTracker
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class BuildCoordinator:
         3. A per-build poll task starts (periodic ``asyncio.sleep``)
         4. Poll task queries Jenkins REST API every ``poll_interval`` seconds
         5. When build finishes → downloads artifact from Jenkins archive
-        6. Uploads to file-manager, enforces retention
+        6. Sends artifact + metadata to file-manager via ``POST /api/files/builds/record``
         7. Forwards the result to the frontend callback URL
         8. If ``build_timeout`` minutes elapse without completion → timeout
     """
@@ -54,7 +53,6 @@ class BuildCoordinator:
         jenkins: JenkinsClient,
         file_manager_url: str,
         agent_control_url: str = "",
-        max_recent_builds: int = 3,
         build_timeout: int = 30,
         poll_interval: int = 10,
         artifact_pattern: str = "*.apk",
@@ -70,7 +68,7 @@ class BuildCoordinator:
         self._artifact_pattern = artifact_pattern
         self._clock = clock
         self._tracker = BuildTracker(
-            data_dir, max_recent_builds=max_recent_builds, clock=clock,
+            data_dir, clock=clock,
         )
         self._http = http_client or httpx.AsyncClient(
             timeout=30.0, headers=get_service_auth_headers()
@@ -155,15 +153,6 @@ class BuildCoordinator:
 
         Raises ``JenkinsTriggerError`` on failure.
         """
-        if self._tracker.is_queue_full:
-            raise JenkinsTriggerError(
-                detail="Queue full: pending builds == max_recent_builds",
-                user_message=(
-                    "The build queue is full. Please wait for an existing build "
-                    "to finish or cancel one before starting a new build."
-                ),
-            )
-
         request_id = BuildTracker.generate_request_id()
 
         # Initiate VPN connection before triggering Jenkins build
@@ -281,16 +270,15 @@ class BuildCoordinator:
     ) -> None:
         """Process a completed Jenkins build.
 
-        Downloads the artifact (if success), uploads to file-manager,
-        records the completion, enforces retention, and notifies the frontend.
+        Downloads the artifact (if success), sends it with metadata to
+        file-manager, and notifies the frontend.
         """
         pending = self._tracker.consume_pending(request_id)
         if pending is None:
             return  # Already consumed by cancellation
 
         now = self._clock()
-        download_url = ""
-        file_id = ""
+        artifact_data: tuple[str, bytes] | None = None
 
         # Jenkins uses uppercase (SUCCESS/FAILURE/ABORTED), we use lowercase
         if jenkins_build.result == "SUCCESS":
@@ -308,8 +296,7 @@ class BuildCoordinator:
                 if artifact:
                     original_name, content = artifact
                     # Build a descriptive filename:
-                    # {jobName}-{YYYYMMDD}-{HHmmss}-{requestId8}.apk
-                    # If app_name is provided, use a sanitized version of it.
+                    # {baseName}-{YYYYMMDD}-{HHmmss}-{requestId8}.apk
                     suffix = Path(original_name).suffix  # .apk
                     dt = datetime.fromtimestamp(now, tz=timezone.utc)
                     if pending.app_name:
@@ -326,31 +313,34 @@ class BuildCoordinator:
                         f"-{dt.strftime('%H%M%S')}"
                         f"-{request_id[:8]}{suffix}"
                     )
-                    upload_result = await self._upload_artifact(
-                        upload_name, content
-                    )
-                    download_url = upload_result.get("download_url", "")
-                    file_id = upload_result.get("file_id", "")
+                    artifact_data = (upload_name, content)
             except Exception:
                 logger.exception(
-                    "Artifact download/upload failed for %s", request_id
+                    "Artifact download failed for %s", request_id
                 )
 
-        completed, evicted = self._tracker.record_completed(
-            request_id,
+        # Record build in file-manager (with or without artifact)
+        record_result = await self._record_build(
+            request_id=request_id,
             branch=pending.branch,
             commit_hash=jenkins_build.commit_hash,
             result=build_status,
             triggered_at=pending.triggered_at,
             completed_at=now,
-            download_url=download_url,
-            file_id=file_id,
+            artifact=artifact_data,
         )
 
-        await self._evict_builds(evicted)
-
         if pending.frontend_callback_url:
-            await self._notify_frontend(pending.frontend_callback_url, completed)
+            await self._notify_frontend(
+                pending.frontend_callback_url,
+                request_id=request_id,
+                branch=pending.branch,
+                commit_hash=jenkins_build.commit_hash,
+                result=build_status,
+                triggered_at=pending.triggered_at,
+                completed_at=now,
+                download_url=record_result.get("download_url", ""),
+            )
 
         await self._disconnect_vpn_if_idle()
 
@@ -367,7 +357,7 @@ class BuildCoordinator:
     async def _handle_timeout(self, request_id: str) -> None:
         """Handle a build that exceeded its timeout.
 
-        Consumes the pending record, records a timeout completion,
+        Consumes the pending record, records a timeout in file-manager,
         and notifies the frontend callback.
         """
         pending = self._tracker.consume_pending(request_id)
@@ -382,8 +372,9 @@ class BuildCoordinator:
             now - pending.triggered_at,
         )
 
-        completed, evicted = self._tracker.record_completed(
-            request_id,
+        # Record timeout in file-manager (no artifact)
+        await self._record_build(
+            request_id=request_id,
             branch=pending.branch,
             commit_hash="",
             result="timeout",
@@ -391,12 +382,18 @@ class BuildCoordinator:
             completed_at=now,
         )
 
-        # Evict old builds (best-effort)
-        await self._evict_builds(evicted)
-
         # Notify frontend
         if pending.frontend_callback_url:
-            await self._notify_frontend(pending.frontend_callback_url, completed)
+            await self._notify_frontend(
+                pending.frontend_callback_url,
+                request_id=request_id,
+                branch=pending.branch,
+                commit_hash="",
+                result="timeout",
+                triggered_at=pending.triggered_at,
+                completed_at=now,
+                download_url="",
+            )
 
         await self._disconnect_vpn_if_idle()
 
@@ -404,66 +401,72 @@ class BuildCoordinator:
     # Artifact upload
     # ------------------------------------------------------------------
 
-    async def _upload_artifact(
-        self, filename: str, content: bytes
+    async def _record_build(
+        self,
+        *,
+        request_id: str,
+        branch: str,
+        commit_hash: str,
+        result: str,
+        triggered_at: float,
+        completed_at: float,
+        artifact: tuple[str, bytes] | None = None,
     ) -> dict[str, Any]:
-        """Upload a build artifact to the file-manager service."""
-        url = f"{self._file_manager_url}/api/files/upload"
-        resp = await self._http.post(
-            url,
-            files={"file": (filename, content)},
-        )
-        resp.raise_for_status()
-        return resp.json()
+        """Send build metadata (and optional artifact) to file-manager.
 
-    async def _evict_builds(self, evicted: list[CompletedBuild]) -> None:
-        """Delete Drive files for evicted builds.
-
-        Best-effort — failures are logged but never propagated.
+        Calls ``POST /api/files/builds/record`` with multipart form data.
+        Returns the response JSON (contains ``file_id`` and ``download_url``
+        when an artifact was uploaded).
         """
-        for build in evicted:
-            if not build.file_id:
-                continue
-            try:
-                url = f"{self._file_manager_url}/api/files/{build.file_id}"
-                resp = await self._http.delete(url)
-                if resp.status_code < 400:
-                    logger.info(
-                        "Evicted build %s — deleted Drive file %s",
-                        build.request_id,
-                        build.file_id,
-                    )
-                else:
-                    logger.error(
-                        "Failed to delete Drive file %s for evicted build %s: %d",
-                        build.file_id,
-                        build.request_id,
-                        resp.status_code,
-                    )
-            except Exception:
-                logger.exception(
-                    "Failed to delete Drive file %s for evicted build %s",
-                    build.file_id,
-                    build.request_id,
-                )
+        url = f"{self._file_manager_url}/api/files/builds/record"
+        form_data = {
+            "request_id": request_id,
+            "branch": branch,
+            "commit_hash": commit_hash,
+            "result": result,
+            "triggered_at": str(triggered_at),
+            "completed_at": str(completed_at),
+        }
+
+        files = None
+        if artifact is not None:
+            filename, content = artifact
+            files = {"file": (filename, content)}
+
+        try:
+            resp = await self._http.post(url, data=form_data, files=files)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception:
+            logger.exception(
+                "Failed to record build %s in file-manager", request_id
+            )
+            return {}
 
     async def _notify_frontend(
         self,
         callback_url: str,
-        completed: CompletedBuild,
+        *,
+        request_id: str,
+        branch: str,
+        commit_hash: str,
+        result: str,
+        triggered_at: float,
+        completed_at: float,
+        download_url: str = "",
     ) -> None:
         """Forward a build result to the frontend's callback URL.
 
         Best-effort — errors are logged but never propagated.
         """
         payload = {
-            "request_id": completed.request_id,
-            "branch": completed.branch,
-            "commit_hash": completed.commit_hash,
-            "result": completed.result,
-            "triggered_at": completed.triggered_at,
-            "completed_at": completed.completed_at,
-            "download_url": completed.download_url,
+            "request_id": request_id,
+            "branch": branch,
+            "commit_hash": commit_hash,
+            "result": result,
+            "triggered_at": triggered_at,
+            "completed_at": completed_at,
+            "download_url": download_url,
         }
         try:
             resp = await self._http.post(callback_url, json=payload)

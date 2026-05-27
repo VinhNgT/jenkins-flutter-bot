@@ -22,7 +22,7 @@ def isolate_config(tmp_path):
 def mock_coordinator(tmp_path):
     """Create a mock coordinator with a real tracker."""
     coord = MagicMock(spec=BuildCoordinator)
-    coord.tracker = BuildTracker(tmp_path, max_recent_builds=3)
+    coord.tracker = BuildTracker(tmp_path)
     coord.trigger_build = AsyncMock()
     coord.cancel_build = AsyncMock()
     return coord
@@ -102,30 +102,6 @@ def test_list_pending_with_data(client, mock_coordinator):
 
 
 # ---------------------------------------------------------------------------
-# GET /api/builds/recent
-# ---------------------------------------------------------------------------
-
-
-def test_list_recent_empty(client, mock_coordinator):
-    resp = client.get("/api/builds/recent")
-    assert resp.status_code == 200
-    assert resp.json()["builds"] == []
-
-
-def test_list_recent_with_data(client, mock_coordinator):
-    mock_coordinator.tracker.record_completed(
-        "req1", branch="main", commit_hash="a" * 40,
-        result="success", triggered_at=1.0, completed_at=2.0,
-        download_url="https://example.com/file.apk",
-    )
-    resp = client.get("/api/builds/recent")
-    builds = resp.json()["builds"]
-    assert len(builds) == 1
-    assert builds[0]["request_id"] == "req1"
-    assert builds[0]["download_url"] == "https://example.com/file.apk"
-
-
-# ---------------------------------------------------------------------------
 # POST /api/builds/{id}/cancel
 # ---------------------------------------------------------------------------
 
@@ -153,4 +129,3 @@ def test_build_status_response(client, mock_coordinator):
     assert resp.status_code == 200
     data = resp.json()
     assert "pending_count" in data
-    assert "completed_count" in data

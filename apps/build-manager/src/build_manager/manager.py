@@ -61,7 +61,6 @@ class BuildManager:
             jenkins=jenkins,
             file_manager_url=config.file_manager_url,
             agent_control_url=config.agent_control_url,
-            max_recent_builds=config.max_recent_builds,
             build_timeout=config.build_timeout,
             poll_interval=config.poll_interval,
             artifact_pattern=config.artifact_pattern,

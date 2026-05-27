@@ -1,8 +1,8 @@
-"""Build state tracking — pending and completed build registries.
+"""Pending build state tracking.
 
-The ``BuildTracker`` is a frontend-agnostic state manager.  It tracks
-which builds are pending (waiting for a webhook callback), which have
-completed, and which frontend callback URLs should be notified.
+The ``BuildTracker`` manages in-flight builds only. Completed build
+history is owned by the file-manager service, which stores both
+artifacts and their metadata.
 """
 
 from __future__ import annotations
@@ -31,40 +31,23 @@ class PendingBuild:
     app_name: str | None = None
 
 
-@dataclass(frozen=True)
-class CompletedBuild:
-    """A build that has finished (success or failure)."""
-
-    request_id: str
-    branch: str
-    commit_hash: str
-    result: str  # "success" or "failure"
-    triggered_at: float
-    completed_at: float
-    download_url: str = ""
-    file_id: str = ""
-
-
 class BuildTracker:
-    """Manages in-flight and completed build state.
+    """Manages in-flight build state.
 
-    State is persisted to JSON files so builds survive service restarts.
+    Pending builds are persisted to a JSON file so the tracker can
+    detect and clear zombie builds from a previous process on startup.
     """
 
     def __init__(
         self,
         data_dir: Path,
         *,
-        max_recent_builds: int = 5,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._data_dir = data_dir
-        self._max_recent_builds = max_recent_builds
         self._clock = clock
         self._pending_path = data_dir / "pending_builds.json"
-        self._completed_path = data_dir / "completed_builds.json"
         self._pending: dict[str, PendingBuild] = self._load_pending()
-        self._completed: list[CompletedBuild] = self._load_completed()
 
         # On fresh startup, any persisted pending builds are zombies from a
         # previous crash — no poll tasks exist for them. Clear them so
@@ -114,33 +97,6 @@ class BuildTracker:
         }
         self._pending_path.write_text(json.dumps(data))
 
-    def _load_completed(self) -> list[CompletedBuild]:
-        if not self._completed_path.exists():
-            return []
-        try:
-            data = json.loads(self._completed_path.read_text())
-            return [CompletedBuild(**entry) for entry in data]
-        except Exception:
-            logger.exception("Failed to load completed builds")
-            return []
-
-    def _save_completed(self) -> None:
-        self._data_dir.mkdir(parents=True, exist_ok=True)
-        data = [
-            {
-                "request_id": c.request_id,
-                "branch": c.branch,
-                "commit_hash": c.commit_hash,
-                "result": c.result,
-                "triggered_at": c.triggered_at,
-                "completed_at": c.completed_at,
-                "download_url": c.download_url,
-                "file_id": c.file_id,
-            }
-            for c in self._completed
-        ]
-        self._completed_path.write_text(json.dumps(data))
-
     # ------------------------------------------------------------------
     # Pending build operations
     # ------------------------------------------------------------------
@@ -153,11 +109,6 @@ class BuildTracker:
     @property
     def pending_count(self) -> int:
         return len(self._pending)
-
-    @property
-    def is_queue_full(self) -> bool:
-        """True if the number of pending builds has reached the limit."""
-        return self.pending_count >= self._max_recent_builds
 
     def add_pending(
         self,
@@ -196,63 +147,10 @@ class BuildTracker:
         """Return a snapshot of all pending builds."""
         return dict(self._pending)
 
-    # ------------------------------------------------------------------
-    # Completed build operations
-    # ------------------------------------------------------------------
-
-    def record_completed(
-        self,
-        request_id: str,
-        *,
-        branch: str,
-        commit_hash: str,
-        result: str,
-        triggered_at: float,
-        completed_at: float,
-        download_url: str = "",
-        file_id: str = "",
-    ) -> tuple[CompletedBuild, list[CompletedBuild]]:
-        """Record a completed build and enforce retention.
-
-        Returns ``(new_build, evicted_builds)`` where ``evicted_builds``
-        is the list of builds that were removed to stay within
-        ``max_recent_builds``.  The caller is responsible for cleaning up
-        external resources (e.g. Drive files) for evicted builds.
-        """
-        completed = CompletedBuild(
-            request_id=request_id,
-            branch=branch,
-            commit_hash=commit_hash,
-            result=result,
-            triggered_at=triggered_at,
-            completed_at=completed_at,
-            download_url=download_url,
-            file_id=file_id,
-        )
-        self._completed.append(completed)
-
-        # Enforce retention — evict oldest builds beyond the limit
-        evicted: list[CompletedBuild] = []
-        while len(self._completed) > self._max_recent_builds:
-            evicted.append(self._completed.pop(0))
-
-        self._save_completed()
-        return completed, evicted
-
-    def recent_builds(
-        self, count: int = 10, *, success_only: bool = False
-    ) -> list[CompletedBuild]:
-        """Return the most recent completed builds, newest first."""
-        builds = self._completed
-        if success_only:
-            builds = [b for b in builds if b.result == "success"]
-        return list(reversed(builds[-count:]))
-
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable summary of the build state."""
         return {
             "pending_count": self.pending_count,
-            "completed_count": len(self._completed),
             "pending": {
                 k: {"branch": v.branch, "triggered_at": v.triggered_at}
                 for k, v in self._pending.items()

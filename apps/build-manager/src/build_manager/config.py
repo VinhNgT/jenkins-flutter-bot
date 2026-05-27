@@ -68,15 +68,6 @@ class BuildSettings(ServiceSettings):
             "json_key": "builds.file_manager_url",
         },
     )
-    max_recent_builds: int = Field(
-        5,
-        title="Max Recent Builds",
-        description="Maximum number of completed builds to keep. Older builds and their Drive files are automatically deleted.",
-        json_schema_extra={
-            "group": "Advanced",
-            "json_key": "builds.max_recent_builds",
-        },
-    )
     build_timeout: int = Field(
         30,
         title="Build Timeout (minutes)",

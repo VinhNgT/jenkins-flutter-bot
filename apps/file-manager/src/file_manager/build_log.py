@@ -132,3 +132,42 @@ class BuildLog:
         self._records = [r for r in self._records if r.file_id != file_id]
         if len(self._records) != before:
             self._save()
+
+    @property
+    def file_ids(self) -> set[str]:
+        """Return all file IDs referenced by build log records."""
+        return {r.file_id for r in self._records if r.file_id}
+
+    def reconcile(self, drive_file_ids: set[str]) -> tuple[list[BuildRecord], set[str]]:
+        """Cross-reference the build log against actual Drive contents.
+
+        Args:
+            drive_file_ids: Set of file IDs that currently exist in Drive.
+
+        Returns:
+            A tuple of ``(stale_records, orphan_file_ids)``:
+
+            - **stale_records** — build log entries whose ``file_id`` is no
+              longer present in Drive. These are removed from the log.
+            - **orphan_file_ids** — Drive files not referenced by any build
+              log record. The caller should delete these.
+        """
+        # Identify stale records: log entries pointing to missing Drive files
+        stale: list[BuildRecord] = []
+        kept: list[BuildRecord] = []
+        for record in self._records:
+            if record.file_id and record.file_id not in drive_file_ids:
+                stale.append(record)
+            else:
+                kept.append(record)
+
+        # Identify orphan Drive files: present in Drive but not in any record
+        tracked_ids = {r.file_id for r in kept if r.file_id}
+        orphans = drive_file_ids - tracked_ids
+
+        if stale:
+            self._records = kept
+            self._save()
+
+        return stale, orphans
+

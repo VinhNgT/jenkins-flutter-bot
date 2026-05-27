@@ -383,6 +383,48 @@ class GoogleDriveBackend:
             raise RuntimeError("Google Drive not connected — no valid tokens")
         await asyncio.to_thread(self._delete_file_sync, creds, file_id)
 
+    def _list_files_sync(self, creds: Credentials, folder_id: str) -> list[dict[str, str]]:
+        """List all files in the Drive folder (blocking).
+
+        Returns a list of ``{id, name}`` dicts for every non-trashed
+        file in the folder. Handles pagination for large result sets.
+        """
+        service = self._get_drive_service(creds)
+        query = f"'{folder_id}' in parents and trashed = false"
+        files: list[dict[str, str]] = []
+        page_token: str | None = None
+
+        while True:
+            resp = (
+                service.files()
+                .list(
+                    q=query,
+                    spaces="drive",
+                    fields="nextPageToken, files(id, name)",
+                    pageToken=page_token,
+                    pageSize=100,
+                )
+                .execute()
+            )
+            files.extend(resp.get("files", []))
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
+
+        return files
+
+    async def list_files(self) -> list[dict[str, str]]:
+        """List all files in the configured Drive folder.
+
+        Returns a list of ``{id, name}`` dicts. Requires valid tokens
+        and an existing folder.
+        """
+        creds = await self.load_tokens()
+        if creds is None:
+            raise RuntimeError("Google Drive not connected — no valid tokens")
+        folder_id = await self._ensure_folder(creds)
+        return await asyncio.to_thread(self._list_files_sync, creds, folder_id)
+
     async def is_connected(self) -> bool:
         """Return True if valid Drive tokens exist."""
         return await self.load_tokens() is not None

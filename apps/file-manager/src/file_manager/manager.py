@@ -140,6 +140,14 @@ class StorageManager:
             max_records=self._config.max_recent_builds,
             persistent=(self._backend_type != "ephemeral"),
         )
+
+        # Reconcile the build log against actual Drive contents at startup.
+        # This removes stale log entries (file deleted externally) and purges
+        # orphaned Drive files (uploaded but never recorded, or outlived their
+        # log entry due to a crash).
+        if self._backend_type == "google_drive" and isinstance(self._backend, GoogleDriveBackend):
+            await self._reconcile_drive_index(self._backend, self._build_log)
+
         self._last_error = None
         self._started_at = self._clock()
         logger.info("StorageManager started (backend=%s)", self._backend_type)
@@ -174,3 +182,56 @@ class StorageManager:
         if self._started_at is not None:
             result["started_at"] = self._started_at
         return result
+
+    # ------------------------------------------------------------------
+    # Drive index reconciliation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _reconcile_drive_index(
+        backend: GoogleDriveBackend,
+        build_log: BuildLog,
+    ) -> None:
+        """Reconcile the local build log against actual Google Drive contents.
+
+        - **Stale log entries** (file_id deleted externally) are removed.
+        - **Orphaned Drive files** (not tracked by any record) are deleted.
+
+        Best-effort: if Drive is not connected (tokens missing/expired),
+        reconciliation is skipped silently so it doesn't block startup.
+        """
+        try:
+            drive_files = await backend.list_files()
+        except RuntimeError:
+            logger.info("Drive not connected — skipping index reconciliation")
+            return
+        except Exception:
+            logger.exception("Failed to list Drive files — skipping reconciliation")
+            return
+
+        drive_ids = {f["id"] for f in drive_files}
+        stale, orphans = build_log.reconcile(drive_ids)
+
+        if stale:
+            logger.info(
+                "Reconciliation: removed %d stale log entries (files deleted externally): %s",
+                len(stale),
+                [r.request_id for r in stale],
+            )
+
+        for orphan_id in orphans:
+            # Find the filename for logging (if available)
+            name = next((f["name"] for f in drive_files if f["id"] == orphan_id), orphan_id)
+            try:
+                await backend.delete(orphan_id)
+                logger.info("Reconciliation: deleted orphaned Drive file %s (%s)", name, orphan_id)
+            except Exception:
+                logger.exception(
+                    "Reconciliation: failed to delete orphaned file %s (%s)",
+                    name,
+                    orphan_id,
+                )
+
+        if not stale and not orphans:
+            logger.info("Reconciliation: build log and Drive index are in sync")
+

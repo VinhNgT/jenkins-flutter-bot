@@ -31,6 +31,7 @@ export interface RecentBuild {
 /** GET /api/webapp/config response. */
 export interface AppConfig {
   app_name: string;
+  app_version: string;
   branches: Branch[];
   active_builds: ActiveBuild[];
 }

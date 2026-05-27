@@ -167,9 +167,9 @@ export default function MainScreen({ config }: MainScreenProps) {
 
       <RecentBuilds refreshKey={recentRefreshKey} />
 
-      {/* Diagnostic fingerprint */}
+      {/* App Version */}
       <div class="tg-section-footer build-fingerprint">
-        Preact {/* version marker for cache diagnostics */}
+        v{config.app_version}
       </div>
 
       {/* Browser fallback trigger button (hidden in Telegram) */}

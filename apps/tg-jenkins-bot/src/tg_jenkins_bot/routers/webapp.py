@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import importlib.metadata
 import json
 import logging
 import os
+import re
 import time
 import urllib.parse
 from typing import Annotated
@@ -69,6 +71,7 @@ class WebAppConfigResponse(BaseModel):
     """GET /api/webapp/config response."""
 
     app_name: str
+    app_version: str
     branches: list[BranchItem]
     active_builds: list[ActiveBuildResponse]
 
@@ -330,8 +333,15 @@ async def get_webapp_config(
             )
         )
 
+    try:
+        v = importlib.metadata.version("tg-jenkins-bot")
+        v = re.sub(r"^(\d+\.\d+\.\d+)\.(dev|rc)(\d+)$", r"\1-\2.\3", v)
+    except importlib.metadata.PackageNotFoundError:
+        v = "unknown"
+
     return WebAppConfigResponse(
         app_name=ctx.config.app_name,
+        app_version=v,
         branches=branches_list,
         active_builds=active_builds,
     )

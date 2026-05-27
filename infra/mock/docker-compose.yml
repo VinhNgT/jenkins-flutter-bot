@@ -50,10 +50,10 @@ services:
     networks:
       - jenkins
 
-  # Use ephemeral in-memory storage instead of Google Drive
+  # Use log_only storage instead of Google Drive
   file-manager:
     environment:
-      STORAGE_BACKEND: ephemeral
+      STORAGE_BACKEND: log_only
 
   # Expose bot port for local browser testing of the Telegram Mini App.
   # Injects JFB_DEV_MODE to enable the backend's preview authentication

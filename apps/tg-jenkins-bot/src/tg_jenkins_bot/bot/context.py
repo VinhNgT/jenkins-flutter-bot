@@ -128,8 +128,13 @@ class BotContext:
         lines.append(f"👤 Triggered by: {_escape(build.triggered_by)}")
         text = "\n".join(lines) + "\n"
 
+        # Telegram inline keyboard buttons require publicly-reachable HTTPS
+        # URLs. Non-HTTPS URLs (e.g. internal Docker hostnames from the
+        # ephemeral storage backend in mock/dev) are rejected by the
+        # Telegram API. Only attach the download button when the URL is
+        # valid for Telegram.
         reply_markup = None
-        if download_url:
+        if download_url and download_url.startswith("https://"):
             reply_markup = InlineKeyboardMarkup(
                 [[InlineKeyboardButton("📥 Download APK", url=download_url)]]
             )

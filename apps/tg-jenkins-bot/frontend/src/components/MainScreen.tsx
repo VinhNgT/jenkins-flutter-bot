@@ -42,24 +42,28 @@ export default function MainScreen({ config }: MainScreenProps) {
 
   // Check if selected branch already has an active build
   const isDuplicate = config.active_builds.some((b) => b.ref === selectedBranch);
-  const isEnabled = selectedBranch != null && selectedBranch.trim() !== '' && !isDuplicate && !isLoading;
+  const hasSelection = selectedBranch != null && selectedBranch.trim() !== '';
+  const isVisible = (hasSelection && !isDuplicate) || isLoading;
+  const isEnabled = isVisible && !isLoading;
 
   // Sync MainButton visibility
   useEffect(() => {
     if (!isTelegram || !tg) return;
 
-    if (isEnabled) {
-      tg.MainButton.setParams({
-        text: 'TRIGGER BUILD',
-        color: tg.themeParams.button_color ?? '#2481cc',
-        text_color: tg.themeParams.button_text_color ?? '#ffffff',
-        is_active: true,
-        is_visible: true,
-      });
+    if (isVisible) {
+      if (!isLoading) {
+        tg.MainButton.setParams({
+          text: 'TRIGGER BUILD',
+          color: tg.themeParams.button_color ?? '#2481cc',
+          text_color: tg.themeParams.button_text_color ?? '#ffffff',
+          is_active: true,
+          is_visible: true,
+        });
+      }
     } else {
       tg.MainButton.hide();
     }
-  }, [isEnabled, isTelegram, tg]);
+  }, [isVisible, isLoading, isTelegram, tg]);
 
 
   // Hide browser fallback trigger inside Telegram

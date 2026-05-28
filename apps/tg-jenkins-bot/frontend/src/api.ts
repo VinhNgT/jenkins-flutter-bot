@@ -56,14 +56,14 @@ export async function fetchRecentBuilds(initData: string): Promise<RecentBuild[]
 }
 
 /** POST /api/webapp/trigger — Trigger a new build. Returns request_id. */
-export async function triggerBuild(initData: string, branch: string): Promise<string> {
+export async function triggerBuild(initData: string, branch: string, notify: boolean = true): Promise<string> {
   const res = await fetch('/api/webapp/trigger', {
     method: 'POST',
     headers: {
       ...authHeaders(initData),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ branch }),
+    body: JSON.stringify({ branch, notify }),
   });
   const data = await handleResponse<{ ok: boolean; request_id: string }>(res);
   return data.request_id;

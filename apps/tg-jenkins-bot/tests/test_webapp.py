@@ -412,12 +412,8 @@ def test_webapp_trigger_build_happy_path(
         callback_url="http://bot:9090/callback/build-result",
     )
 
-    # Verify Telegram notification sent
-    mock_bot.send_message.assert_called_once_with(
-        chat_id=-12345,
-        text="🔨 <b>Alice started a Stable Release build</b>\n📦 Branch: <code>main</code>",
-        parse_mode="HTML",
-    )
+    # No trigger notification — only build result notifications exist
+    mock_bot.send_message.assert_not_called()
 
 
 def test_webapp_trigger_duplicate_blocked(
@@ -495,12 +491,33 @@ def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) ->
     assert response.status_code == 200
     assert response.json() == {"ok": True, "request_id": "req-999"}
 
-    # Verify notification is sent to the group chat from start_param (-12345)
-    mock_bot.send_message.assert_called_once_with(
-        chat_id=-12345,
-        text="🔨 <b>Alice started a Stable Release build</b>\n📦 Branch: <code>main</code>",
-        parse_mode="HTML",
+    # No trigger notification — only build result notifications exist
+    mock_bot.send_message.assert_not_called()
+
+
+def test_webapp_trigger_build_notify_false(
+    test_client, mock_build_client, mock_bot, app_with_mocks
+) -> None:
+    """Test that notify=false stores the build with notify=False."""
+    init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
+
+    response = test_client.post(
+        "/api/webapp/trigger",
+        headers={"X-Telegram-Init-Data": init_data},
+        json={"branch": "main", "notify": False},
     )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+    # Verify the build is stored with notify=False
+    ctx = app_with_mocks.state.manager.bot_context
+    active = ctx.store.list_active()
+    assert len(active) == 1
+    assert active[0].notify is False
+
+    # No messages sent
+    mock_bot.send_message.assert_not_called()
 
 
 def test_webapp_private_chat_rejected_via_start_param(test_client) -> None:

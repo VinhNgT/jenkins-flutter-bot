@@ -791,3 +791,35 @@ body.tg-dark .tg-action-row:active {
 .tg-action-row svg {
     flex-shrink: 0;
 }
+
+/* iOS-style toggle switch */
+.tg-toggle-track {
+    width: 51px;
+    height: 31px;
+    border-radius: 15.5px;
+    background-color: rgba(120, 120, 128, 0.32);
+    position: relative;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background-color 0.25s ease;
+}
+
+.tg-toggle-track.tg-toggle-on {
+    background-color: var(--tg-color-button);
+}
+
+.tg-toggle-thumb {
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.tg-toggle-on .tg-toggle-thumb {
+    transform: translateX(20px);
+}

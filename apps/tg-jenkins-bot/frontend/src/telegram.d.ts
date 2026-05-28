@@ -65,6 +65,14 @@ interface TelegramPopupParams {
   buttons?: TelegramPopupButton[];
 }
 
+interface TelegramCloudStorage {
+  setItem(key: string, value: string, callback?: (err: string | null, stored: boolean) => void): void;
+  getItem(key: string, callback: (err: string | null, value: string) => void): void;
+  getItems(keys: string[], callback: (err: string | null, values: Record<string, string>) => void): void;
+  removeItem(key: string, callback?: (err: string | null, removed: boolean) => void): void;
+  getKeys(callback: (err: string | null, keys: string[]) => void): void;
+}
+
 interface TelegramWebApp {
   initData: string;
   initDataUnsafe: {
@@ -84,6 +92,7 @@ interface TelegramWebApp {
   MainButton: TelegramMainButton;
   BackButton: TelegramBackButton;
   HapticFeedback: TelegramHapticFeedback;
+  CloudStorage: TelegramCloudStorage;
 
   ready(): void;
   expand(): void;

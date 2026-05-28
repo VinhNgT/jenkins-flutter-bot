@@ -112,7 +112,7 @@ class BotContext:
 
     async def on_build_success(self, build: ActiveBuild, result: dict) -> None:
         """Handle successful build — notify user with download link."""
-        if not self.bot:
+        if not self.bot or not build.notify:
             return
         duration = _format_duration(build.triggered_at, self._clock())
         download_url = result.get("download_url", "")
@@ -147,7 +147,7 @@ class BotContext:
 
     async def on_build_failure(self, build: ActiveBuild, result: dict) -> None:
         """Handle failed build — notify user."""
-        if not self.bot:
+        if not self.bot or not build.notify:
             return
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
@@ -168,7 +168,7 @@ class BotContext:
 
     async def on_build_timeout(self, build: ActiveBuild, result: dict) -> None:
         """Handle timed-out build — notify user."""
-        if not self.bot:
+        if not self.bot or not build.notify:
             return
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
@@ -188,7 +188,7 @@ class BotContext:
         self, build: ActiveBuild, cancelled_by: str | None = None
     ) -> None:
         """Handle cancelled build — notify user."""
-        if not self.bot:
+        if not self.bot or not build.notify:
             return
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)

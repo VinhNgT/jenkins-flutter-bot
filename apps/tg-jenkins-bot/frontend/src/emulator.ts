@@ -148,6 +148,40 @@ WebApp.HapticFeedback = {
   notificationOccurred: (type) => { console.log('📳 [Haptic] notificationOccurred:', type); const d = type === 'error' ? 60 : type === 'warning' ? 40 : 20; try { navigator.vibrate?.(d); } catch { /* noop */ } },
 };
 
+// CloudStorage — localStorage-backed mock for emulator
+const CS_PREFIX = '__tg_cloud_';
+WebApp.CloudStorage = {
+  setItem(key, value, cb) {
+    try { localStorage.setItem(CS_PREFIX + key, value); cb?.(null, true); }
+    catch (e) { cb?.(String(e), false); }
+  },
+  getItem(key, cb) {
+    try { cb(null, localStorage.getItem(CS_PREFIX + key) ?? ''); }
+    catch (e) { cb(String(e), ''); }
+  },
+  getItems(keys, cb) {
+    try {
+      const result: Record<string, string> = {};
+      for (const k of keys) result[k] = localStorage.getItem(CS_PREFIX + k) ?? '';
+      cb(null, result);
+    } catch (e) { cb(String(e), {}); }
+  },
+  removeItem(key, cb) {
+    try { localStorage.removeItem(CS_PREFIX + key); cb?.(null, true); }
+    catch (e) { cb?.(String(e), false); }
+  },
+  getKeys(cb) {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith(CS_PREFIX)) keys.push(k.slice(CS_PREFIX.length));
+      }
+      cb(null, keys);
+    } catch (e) { cb(String(e), []); }
+  },
+};
+
 // MainButton
 const MainButton: TelegramMainButton & { _onClickCb: (() => void) | null; _visible: boolean; _enabled: boolean; _text: string; _color: string; _textColor: string; _progress: boolean; _updateDOM(): void } = {
   _onClickCb: null, _visible: false, _enabled: true, _text: 'CONTINUE', _color: '#2481cc', _textColor: '#ffffff', _progress: false,

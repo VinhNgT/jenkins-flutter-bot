@@ -38,6 +38,7 @@ class TriggerRequest(BaseModel):
     """Request payload to trigger a build."""
 
     branch: str
+    notify: bool = True
 
 
 class CancelRequest(BaseModel):
@@ -461,30 +462,15 @@ async def trigger_webapp_build(
             detail="Build manager did not return a request ID",
         )
 
-    # 4. Notify Telegram chat
-    triggered_by = user.first_name
-    msg_text = (
-        f"🔨 <b>{triggered_by} started a {label} build</b>\n"
-        f"📦 Branch: <code>{req.branch}</code>"
-    )
-    if ctx.bot:
-        try:
-            await ctx.bot.send_message(
-                chat_id=user.chat_id,
-                text=msg_text,
-                parse_mode="HTML",
-            )
-        except Exception:
-            logger.exception("Failed to send trigger message to Telegram")
-
-    # 5. Register in store
+    # 4. Register in store
     ctx.store.register(
         request_id=request_id,
         chat_id=user.chat_id,
         ref=req.branch,
         label=label,
-        triggered_by=triggered_by,
+        triggered_by=user.first_name,
         triggered_by_id=user.user_id,
+        notify=req.notify,
     )
 
     return TriggerResponse(request_id=request_id)

@@ -19,6 +19,7 @@ class ActiveBuild:
     triggered_at: float
     triggered_by: str  # user display name
     triggered_by_id: int = 0  # user Telegram ID
+    notify: bool = True  # whether to send result notification to chat
 
 
 class ActiveBuildStore:
@@ -54,6 +55,8 @@ class ActiveBuildStore:
         label: str,
         triggered_by: str,
         triggered_by_id: int = 0,
+        *,
+        notify: bool = True,
     ) -> ActiveBuild:
         """Register a new active build."""
         build = ActiveBuild(
@@ -64,6 +67,7 @@ class ActiveBuildStore:
             triggered_at=self._clock(),
             triggered_by=triggered_by,
             triggered_by_id=triggered_by_id,
+            notify=notify,
         )
         self._builds[request_id] = build
         self._notify_listeners()

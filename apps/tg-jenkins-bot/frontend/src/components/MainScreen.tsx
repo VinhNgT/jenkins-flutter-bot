@@ -14,6 +14,7 @@ import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
 import RecentBuilds from './RecentBuilds';
 import { useMainButton } from '../hooks/useMainButton';
+import { useCloudStorage } from '../hooks/useCloudStorage';
 import type { AppConfig } from '../types';
 
 interface MainScreenProps {
@@ -31,6 +32,8 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
   const [isCustom, setIsCustom] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [recentRefreshKey, setRecentRefreshKey] = useState(0);
+  const [notifyChat, setNotifyChat, notifyLoading] = useCloudStorage('notify_completion', true);
+  const notifyLoaded = !notifyLoading;
 
   // Detect when a build disappears from active → trigger recent builds refresh
   const [prevBuildIds, setPrevBuildIds] = useState<string[]>([]);
@@ -43,10 +46,11 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
     setPrevBuildIds(currentIds);
   }, [config.active_builds]);
 
-  // Check if selected branch already has an active build
+  // Check if selected branch already has an active build.
+  // Block trigger until CloudStorage preference is loaded to avoid race conditions.
   const isDuplicate = config.active_builds.some((b) => b.ref === selectedBranch);
   const hasSelection = selectedBranch != null && selectedBranch.trim() !== '';
-  const isVisible = (hasSelection && !isDuplicate) || isLoading;
+  const isVisible = (hasSelection && !isDuplicate && notifyLoaded) || isLoading;
   const isEnabled = isVisible && !isLoading;
 
 
@@ -92,7 +96,7 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
     setIsLoading(true);
 
     try {
-      await triggerBuild(initData, selectedBranch);
+      await triggerBuild(initData, selectedBranch, notifyChat);
 
       // Reset selection
       setSelectedBranch(null);
@@ -110,7 +114,7 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBranch, isDuplicate, initData, isTelegram, tg, haptic, showToast]);
+  }, [selectedBranch, isDuplicate, initData, isTelegram, tg, haptic, showToast, notifyChat]);
 
   // Declarative MainButton — the hook manages show/hide, progress,
   // click handler registration, and cleanup automatically.
@@ -153,6 +157,26 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
         onInput={handleCustomInput}
         onClear={handleCustomClear}
       />
+
+      {notifyLoaded && (
+        <div class="tg-section">
+          <div class="tg-list">
+            <div
+              class="tg-list-item"
+              id="notifyToggle"
+              onClick={() => { haptic.tap(); setNotifyChat(!notifyChat); }}
+            >
+              <div class="tg-list-item-content">
+                <span class="tg-list-item-title">Notify on completion</span>
+              </div>
+              <div class={`tg-toggle-track${notifyChat ? ' tg-toggle-on' : ''}`}>
+                <div class="tg-toggle-thumb" />
+              </div>
+            </div>
+          </div>
+          <div class="tg-section-footer">Send a chat message when the build finishes.</div>
+        </div>
+      )}
 
       <ActiveBuilds builds={config.active_builds} onSelect={(b) => onBuildSelect('active', b.request_id)} />
 

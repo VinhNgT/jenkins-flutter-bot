@@ -1,0 +1,65 @@
+/* Stack Navigator — View Transition animations for push/pop navigation.
+ *
+ * Uses the View Transitions API with directional types to animate
+ * screen transitions like iOS/Telegram navigation controllers:
+ *   push (forward)  → new screen slides in from the right
+ *   pop  (backward) → current screen slides out to the right
+ *
+ * Progressive enhancement: browsers without View Transitions API
+ * receive instant DOM updates. prefers-reduced-motion disables
+ * all animations entirely.
+ */
+
+/* ── Shared transition settings ─────────────────────────────── */
+
+::view-transition-group(root) {
+    animation-duration: 0.3s;
+    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    animation-fill-mode: both;
+}
+
+/* ── Slide keyframes ────────────────────────────────────────── */
+
+@keyframes nav-slide-from-right {
+    from { transform: translateX(100%); }
+}
+
+@keyframes nav-slide-to-right {
+    to { transform: translateX(100%); }
+}
+
+@keyframes nav-fade-out {
+    to { opacity: 0; }
+}
+
+@keyframes nav-fade-in {
+    from { opacity: 0; }
+}
+
+/* ── Push (forward): old fades, new slides in from right ───── */
+
+html:active-view-transition-type(forward)::view-transition-old(root) {
+    animation-name: nav-fade-out;
+}
+
+html:active-view-transition-type(forward)::view-transition-new(root) {
+    animation-name: nav-slide-from-right;
+}
+
+/* ── Pop (backward): old slides out to right, new fades in ── */
+
+html:active-view-transition-type(backward)::view-transition-old(root) {
+    animation-name: nav-slide-to-right;
+}
+
+html:active-view-transition-type(backward)::view-transition-new(root) {
+    animation-name: nav-fade-in;
+}
+
+/* ── Accessibility: respect reduced motion ──────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(root) {
+        animation: none !important;
+    }
+}

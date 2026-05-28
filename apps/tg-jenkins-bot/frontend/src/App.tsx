@@ -1,12 +1,12 @@
 /**
  * App — Root component. Manages config fetching, SSE streaming,
- * and provides the router for MainScreen / BuildDetailScreen navigation.
+ * and provides stack navigation for MainScreen / BuildDetailScreen.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Router, useLocation, useRoute } from 'wouter-preact';
 import { useTelegram } from './context/TelegramContext';
 import { useSSE } from './hooks/useSSE';
+import { useNavigator } from './hooks/useNavigator';
 import { fetchConfig, fetchRecentBuilds, ApiError } from './api';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
@@ -21,18 +21,17 @@ interface ErrorState {
   detail: ApiErrorDetail | null;
 }
 
-/** Inner app wrapped by the Router — has access to useLocation(). */
 function AppShell() {
   const { initData, isTelegram } = useTelegram();
-  const [, navigate] = useLocation();
+  const navigator = useNavigator();
 
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
 
-  // Keep a ref to current location for SSE auto-transition
-  const locationRef = useRef('/');
-  const [location] = useLocation();
-  locationRef.current = location;
+  // Ref mirrors the navigator's current screen for SSE callback
+  // (callbacks close over stale hook state without this).
+  const currentRef = useRef(navigator.current);
+  currentRef.current = navigator.current;
 
   // If not in Telegram and not in preview mode, block access
   const hasTelegram = isTelegram || initData === 'preview';
@@ -83,31 +82,29 @@ function AppShell() {
       return { ...prev, active_builds: builds };
     });
 
-    // Auto-transition: if viewing an active build detail and it just completed,
-    // fetch recent builds and switch to the completed result screen.
-    const currentPath = locationRef.current;
-    const activeMatch = currentPath.match(/^\/build\/active\/(.+)$/);
-    if (activeMatch) {
-      const viewingRequestId = decodeURIComponent(activeMatch[1]!);
-      const stillActive = builds.some((b) => b.request_id === viewingRequestId);
+    // Auto-transition: if viewing an active build detail and it just
+    // completed, fetch recent builds and switch to the result screen.
+    const viewing = currentRef.current;
+    if (viewing?.type === 'active') {
+      const stillActive = builds.some((b) => b.request_id === viewing.id);
       if (!stillActive) {
         fetchRecentBuilds(initData)
           .then((recent) => {
-            const match = recent.find((r) => r.request_id === viewingRequestId);
+            const match = recent.find((r) => r.request_id === viewing.id);
             if (match) {
-              navigate(`/build/recent/${encodeURIComponent(match.request_id)}`, { replace: true });
+              navigator.replace({ screen: 'build-detail', type: 'recent', id: match.request_id });
             } else {
               // Build completed but not yet in recent — return to main
-              navigate('/', { replace: true });
+              navigator.pop();
             }
           })
           .catch(() => {
             // Fetch failed — return to main screen gracefully
-            navigate('/', { replace: true });
+            navigator.pop();
           });
       }
     }
-  }, [initData, navigate]);
+  }, [initData, navigator]);
 
   useSSE(sseUrl, handleBuildsUpdate);
 
@@ -128,17 +125,21 @@ function AppShell() {
 
   // MainScreen stays mounted to preserve state (branch selection, scroll, etc.).
   // BuildDetailScreen overlays on top — MainScreen's scroll is never disturbed.
-  const [isDetailRoute, detailParams] = useRoute('/build/:type/:id');
-
   return (
     <>
-      <MainScreen config={config} />
-      {isDetailRoute && detailParams && (
+      <MainScreen
+        config={config}
+        onBuildSelect={(type, id) =>
+          navigator.push({ screen: 'build-detail', type, id })
+        }
+      />
+      {navigator.current && (
         <div class="screen-overlay">
           <BuildDetailScreen
             config={config}
-            type={detailParams.type as 'active' | 'recent'}
-            id={decodeURIComponent(detailParams.id)}
+            type={navigator.current.type}
+            id={navigator.current.id}
+            onBack={() => navigator.pop()}
           />
         </div>
       )}
@@ -149,9 +150,7 @@ function AppShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <Router base="/webapp">
-        <AppShell />
-      </Router>
+      <AppShell />
     </ErrorBoundary>
   );
 }

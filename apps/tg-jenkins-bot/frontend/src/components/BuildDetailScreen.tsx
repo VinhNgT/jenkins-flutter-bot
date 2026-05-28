@@ -10,7 +10,6 @@
  */
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { useLocation } from 'wouter-preact';
 import {
   CheckCircle2, XCircle, Clock, AlertCircle,
   GitBranch, Hash, Timer, User, Calendar, CalendarCheck,
@@ -26,6 +25,7 @@ interface BuildDetailScreenProps {
   config: AppConfig;
   type: 'active' | 'recent';
   id: string;
+  onBack: () => void;
 }
 
 /** Format a byte count as a human-readable file size. */
@@ -72,10 +72,9 @@ function getResultVisuals(result: string) {
   }
 }
 
-export default function BuildDetailScreen({ config, type, id }: BuildDetailScreenProps) {
+export default function BuildDetailScreen({ config, type, id, onBack }: BuildDetailScreenProps) {
   const { isTelegram, tg, initData, userId, haptic } = useTelegram();
   const { showToast } = useToast();
-  const [, navigate] = useLocation();
   const [cancelling, setCancelling] = useState(false);
 
   // Resolve build data: active builds come from live config, recent builds are fetched
@@ -90,13 +89,13 @@ export default function BuildDetailScreen({ config, type, id }: BuildDetailScree
           setRecentBuild(match);
         } else {
           // Build not found — navigate back
-          navigate('/', { replace: true });
+          onBack();
         }
       })
       .catch(() => {
-        navigate('/', { replace: true });
+        onBack();
       });
-  }, [type, id, initData, navigate]);
+  }, [type, id, initData, onBack]);
 
   const activeBuild = type === 'active'
     ? config.active_builds.find((b) => b.request_id === id) ?? null
@@ -147,7 +146,7 @@ export default function BuildDetailScreen({ config, type, id }: BuildDetailScree
   const duration = completedAt && triggeredAt ? completedAt - triggeredAt : null;
 
   function handleBack() {
-    navigate('/');
+    onBack();
   }
 
   // --- Cancel build via tg.MainButton ---
@@ -165,7 +164,7 @@ export default function BuildDetailScreen({ config, type, id }: BuildDetailScree
         await cancelBuildApi(initData, requestId);
         haptic.notification('success');
         showToast('Build successfully cancelled.');
-        navigate('/');
+        onBack();
       } catch (err) {
         console.error(err);
         haptic.notification('error');
@@ -199,7 +198,7 @@ export default function BuildDetailScreen({ config, type, id }: BuildDetailScree
         await doCancel();
       }
     }
-  }, [canCancel, ref, requestId, initData, isTelegram, tg, haptic, showToast, navigate]);
+  }, [canCancel, ref, requestId, initData, isTelegram, tg, haptic, showToast, onBack]);
 
   // Wire tg.BackButton and tg.MainButton
   useEffect(() => {

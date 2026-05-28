@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Router, Route, useLocation } from 'wouter-preact';
+import { Router, useLocation, useRoute } from 'wouter-preact';
 import { useTelegram } from './context/TelegramContext';
 import { useSSE } from './hooks/useSSE';
 import { fetchConfig, fetchRecentBuilds, ApiError } from './api';
@@ -23,7 +23,7 @@ interface ErrorState {
 
 /** Inner app wrapped by the Router — has access to useLocation(). */
 function AppShell() {
-  const { initData, isTelegram, tg } = useTelegram();
+  const { initData, isTelegram } = useTelegram();
   const [, navigate] = useLocation();
 
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -111,45 +111,6 @@ function AppShell() {
 
   useSSE(sseUrl, handleBuildsUpdate);
 
-  // BackButton handler for retrying from error screen
-  useEffect(() => {
-    if (!isTelegram || !tg) return;
-
-    const handleBack = () => {
-      setError(null);
-      setConfig(null);
-      if (tg.BackButton) tg.BackButton.hide();
-      // Refetch config
-      fetchConfig(initData)
-        .then((cfg) => {
-          setConfig(cfg);
-          setError(null);
-        })
-        .catch((err) => {
-          console.error(err);
-          setError({
-            title: 'Service Offline',
-            description: 'The build orchestration controller is currently offline or unreachable.',
-            detail: { error: 'service_offline' },
-          });
-        });
-    };
-
-    tg.BackButton.onClick(handleBack);
-    return () => {
-      tg.BackButton.offClick(handleBack);
-    };
-  }, [isTelegram, tg, initData]);
-
-  // Show BackButton when in error state
-  useEffect(() => {
-    if (!isTelegram || !tg) return;
-    if (error) {
-      tg.BackButton.show();
-    } else {
-      tg.BackButton.hide();
-    }
-  }, [error, isTelegram, tg]);
 
   if (error) {
     return (
@@ -165,20 +126,22 @@ function AppShell() {
     return <LoadingScreen />;
   }
 
+  // MainScreen stays mounted to preserve state (branch selection, scroll, etc.).
+  // Hidden via CSS when viewing a build detail route.
+  const [isDetailRoute, detailParams] = useRoute('/build/:type/:id');
+
   return (
     <>
-      <Route path="/">
+      <div style={{ display: isDetailRoute ? 'none' : 'contents' }}>
         <MainScreen config={config} />
-      </Route>
-      <Route path="/build/:type/:id">
-        {(params) => (
-          <BuildDetailScreen
-            config={config}
-            type={params.type as 'active' | 'recent'}
-            id={decodeURIComponent(params.id)}
-          />
-        )}
-      </Route>
+      </div>
+      {isDetailRoute && detailParams && (
+        <BuildDetailScreen
+          config={config}
+          type={detailParams.type as 'active' | 'recent'}
+          id={decodeURIComponent(detailParams.id)}
+        />
+      )}
     </>
   );
 }

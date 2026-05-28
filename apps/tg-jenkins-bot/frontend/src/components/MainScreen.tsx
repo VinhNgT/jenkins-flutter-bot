@@ -5,7 +5,7 @@
  * Manages branch selection state and the trigger build action.
  */
 
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { useTelegram } from '../context/TelegramContext';
 import { useToast } from '../context/ToastContext';
 import { triggerBuild } from '../api';
@@ -13,14 +13,16 @@ import BranchSelector from './BranchSelector';
 import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
 import RecentBuilds from './RecentBuilds';
+import { useMainButton } from '../hooks/useMainButton';
 import type { AppConfig } from '../types';
 
 interface MainScreenProps {
   config: AppConfig;
+  isActive: boolean;
   onBuildSelect: (type: 'active' | 'recent', id: string) => void;
 }
 
-export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
+export default function MainScreen({ config, isActive, onBuildSelect }: MainScreenProps) {
   const { tg, isTelegram, initData, haptic } = useTelegram();
   const { showToast } = useToast();
 
@@ -46,25 +48,6 @@ export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
   const hasSelection = selectedBranch != null && selectedBranch.trim() !== '';
   const isVisible = (hasSelection && !isDuplicate) || isLoading;
   const isEnabled = isVisible && !isLoading;
-
-  // Sync MainButton visibility
-  useEffect(() => {
-    if (!isTelegram || !tg) return;
-
-    if (isVisible) {
-      if (!isLoading) {
-        tg.MainButton.setParams({
-          text: 'TRIGGER BUILD',
-          color: tg.themeParams.button_color ?? '#2481cc',
-          text_color: tg.themeParams.button_text_color ?? '#ffffff',
-          is_active: true,
-          is_visible: true,
-        });
-      }
-    } else {
-      tg.MainButton.hide();
-    }
-  }, [isVisible, isLoading, isTelegram, tg]);
 
 
   // Hide browser fallback trigger inside Telegram
@@ -108,11 +91,6 @@ export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
     haptic.impact('medium');
     setIsLoading(true);
 
-    if (isTelegram && tg) {
-      tg.MainButton.showProgress(false);
-      tg.MainButton.disable();
-    }
-
     try {
       await triggerBuild(initData, selectedBranch);
 
@@ -131,24 +109,28 @@ export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
       else showToast(msg, 'error');
     } finally {
       setIsLoading(false);
-      if (isTelegram && tg) {
-        tg.MainButton.hideProgress();
-        tg.MainButton.enable();
-      }
     }
   }, [selectedBranch, isDuplicate, initData, isTelegram, tg, haptic, showToast]);
 
-  // Register MainButton click handler
-  useEffect(() => {
-    if (!isTelegram || !tg) return;
-    tg.MainButton.onClick(handleTrigger);
-    // Hide BackButton on main screen
-    tg.BackButton.hide();
-
-    return () => {
-      tg.MainButton.offClick(handleTrigger);
+  // Declarative MainButton — the hook manages show/hide, progress,
+  // click handler registration, and cleanup automatically.
+  const buttonConfig = useMemo(() => {
+    if (!isVisible) return null;
+    return {
+      text: 'TRIGGER BUILD',
+      loading: isLoading,
+      disabled: !isEnabled,
+      onClick: handleTrigger,
     };
-  }, [isTelegram, tg, handleTrigger]);
+  }, [isVisible, isLoading, isEnabled, handleTrigger]);
+
+  useMainButton(buttonConfig, isActive);
+
+  // Hide BackButton on main screen
+  useEffect(() => {
+    if (!isTelegram || !tg || !isActive) return;
+    tg.BackButton.hide();
+  }, [isTelegram, tg, isActive]);
 
   return (
     <div class="container" id="mainScreen" style={{ display: 'flex' }}>

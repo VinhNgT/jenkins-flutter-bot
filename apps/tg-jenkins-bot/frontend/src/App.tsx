@@ -129,6 +129,7 @@ function AppShell() {
     <>
       <MainScreen
         config={config}
+        isActive={navigator.current === null}
         onBuildSelect={(type, id) =>
           navigator.push({ screen: 'build-detail', type, id })
         }

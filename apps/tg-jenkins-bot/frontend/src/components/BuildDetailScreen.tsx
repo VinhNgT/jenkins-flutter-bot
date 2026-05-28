@@ -5,11 +5,11 @@
  * key-value rows. Supports both active builds (with cancel action)
  * and completed recent builds (with download actions).
  *
- * Receives the build type and request ID from the router. Resolves
+ * Receives the build type and request ID as props. Resolves
  * active builds from config state and fetches recent builds via API.
  */
 
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import {
   CheckCircle2, XCircle, Clock, AlertCircle,
   GitBranch, Hash, Timer, User, Calendar, CalendarCheck,
@@ -18,6 +18,7 @@ import {
 import { useTelegram } from '../context/TelegramContext';
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
+import { useMainButton } from '../hooks/useMainButton';
 import { cancelBuild as cancelBuildApi, fetchRecentBuilds } from '../api';
 import type { ActiveBuild, RecentBuild, AppConfig } from '../types';
 
@@ -156,10 +157,6 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
 
     const doCancel = async () => {
       setCancelling(true);
-      if (isTelegram && tg) {
-        tg.MainButton.showProgress(false);
-        tg.MainButton.disable();
-      }
       try {
         await cancelBuildApi(initData, requestId);
         haptic.notification('success');
@@ -172,10 +169,6 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
         if (isTelegram && tg) tg.showAlert(msg);
         else showToast(msg, 'error');
         setCancelling(false);
-        if (isTelegram && tg) {
-          tg.MainButton.hideProgress();
-          tg.MainButton.enable();
-        }
       }
     };
 
@@ -200,35 +193,34 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
     }
   }, [canCancel, ref, requestId, initData, isTelegram, tg, haptic, showToast, onBack]);
 
-  // Wire tg.BackButton and tg.MainButton
+  // Declarative MainButton — the hook manages show/hide, progress,
+  // click handler registration, and cleanup automatically.
+  const cancelButtonConfig = useMemo(() => {
+    if (!canCancel) return null;
+    return {
+      text: 'CANCEL BUILD',
+      color: '#ff3b30',
+      textColor: '#ffffff',
+      loading: cancelling,
+      disabled: cancelling,
+      onClick: handleCancel,
+    };
+  }, [canCancel, cancelling, handleCancel]);
+
+  useMainButton(cancelButtonConfig, true);
+
+  // Wire tg.BackButton
   useEffect(() => {
     if (!isTelegram || !tg) return;
 
     tg.BackButton.show();
     tg.BackButton.onClick(handleBack);
 
-    if (canCancel) {
-      tg.MainButton.setParams({
-        text: 'CANCEL BUILD',
-        color: '#ff3b30',
-        text_color: '#ffffff',
-        is_active: !cancelling,
-        is_visible: true,
-      });
-      tg.MainButton.onClick(handleCancel);
-    } else {
-      tg.MainButton.hide();
-    }
-
     return () => {
       tg.BackButton.offClick(handleBack);
       tg.BackButton.hide();
-      tg.MainButton.hide();
-      if (canCancel) {
-        tg.MainButton.offClick(handleCancel);
-      }
     };
-  }, [isTelegram, tg, canCancel, cancelling, handleCancel]);
+  }, [isTelegram, tg]);
 
   function handleCopyLink() {
     if (downloadUrl) {

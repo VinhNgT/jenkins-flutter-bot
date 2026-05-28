@@ -90,6 +90,10 @@ def create_app() -> FastAPI:
     # fallback is needed — the app always loads at /webapp/ and handles
     # screen transitions internally via push/pop state.
     static_dir = Path(__file__).parent / "webapp"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    index_html = static_dir / "index.html"
+    if not index_html.exists():
+        index_html.write_text("<!DOCTYPE html><html><body>WebApp Placeholder</body></html>")
     app.mount(
         "/webapp", StaticFiles(directory=str(static_dir), html=True), name="webapp"
     )

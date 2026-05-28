@@ -80,7 +80,7 @@ def _get_webapp_keyboard(
 def _format_date(ts: float) -> str:
     """Format a Unix timestamp as '6 May at 14:30' in UTC."""
     dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-    return dt.strftime("%-d %b at %H:%M")
+    return f"{dt.day} {dt.strftime('%b at %H:%M')}"
 
 
 async def _ensure_authorized(

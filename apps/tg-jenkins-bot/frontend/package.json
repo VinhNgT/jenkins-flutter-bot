@@ -10,9 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "preact": "^10.25.0",
     "@preact/signals": "^2.0.0",
-    "lucide-preact": "^0.475.0"
+    "lucide-preact": "^0.475.0",
+    "preact": "^10.25.0",
+    "wouter-preact": "^3.10.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.0",

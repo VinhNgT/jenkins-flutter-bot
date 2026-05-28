@@ -1,9 +1,10 @@
 /**
  * App — Root component. Manages config fetching, SSE streaming,
- * and routes between LoadingScreen, ErrorScreen, and MainScreen.
+ * and provides the router for MainScreen / BuildDetailScreen navigation.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { Router, Route, useLocation } from 'wouter-preact';
 import { useTelegram } from './context/TelegramContext';
 import { useSSE } from './hooks/useSSE';
 import { fetchConfig, fetchRecentBuilds, ApiError } from './api';
@@ -12,7 +13,7 @@ import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import MainScreen from './components/MainScreen';
 import BuildDetailScreen from './components/BuildDetailScreen';
-import type { ActiveBuild, RecentBuild, AppConfig, ApiErrorDetail } from './types';
+import type { ActiveBuild, AppConfig, ApiErrorDetail } from './types';
 
 interface ErrorState {
   title: string;
@@ -20,28 +21,18 @@ interface ErrorState {
   detail: ApiErrorDetail | null;
 }
 
-export default function App() {
+/** Inner app wrapped by the Router — has access to useLocation(). */
+function AppShell() {
   const { initData, isTelegram, tg } = useTelegram();
+  const [, navigate] = useLocation();
 
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
 
-  // Navigation: selected build for detail screen
-  type SelectedBuild =
-    | { type: 'active'; data: ActiveBuild }
-    | { type: 'recent'; data: RecentBuild }
-    | null;
-  const [selectedBuild, setSelectedBuild] = useState<SelectedBuild>(null);
-  const selectedBuildRef = useRef(selectedBuild);
-  selectedBuildRef.current = selectedBuild;
-
-  function handleBuildSelect(build: ActiveBuild | RecentBuild, type: 'active' | 'recent') {
-    setSelectedBuild({ type, data: build } as SelectedBuild);
-  }
-
-  function handleDetailBack() {
-    setSelectedBuild(null);
-  }
+  // Keep a ref to current location for SSE auto-transition
+  const locationRef = useRef('/');
+  const [location] = useLocation();
+  locationRef.current = location;
 
   // If not in Telegram and not in preview mode, block access
   const hasTelegram = isTelegram || initData === 'preview';
@@ -94,28 +85,29 @@ export default function App() {
 
     // Auto-transition: if viewing an active build detail and it just completed,
     // fetch recent builds and switch to the completed result screen.
-    const sel = selectedBuildRef.current;
-    if (sel?.type === 'active') {
-      const stillActive = builds.some((b) => b.request_id === sel.data.request_id);
+    const currentPath = locationRef.current;
+    const activeMatch = currentPath.match(/^\/build\/active\/(.+)$/);
+    if (activeMatch) {
+      const viewingRequestId = decodeURIComponent(activeMatch[1]!);
+      const stillActive = builds.some((b) => b.request_id === viewingRequestId);
       if (!stillActive) {
-        const completedRequestId = (sel.data as ActiveBuild).request_id;
         fetchRecentBuilds(initData)
           .then((recent) => {
-            const match = recent.find((r) => r.request_id === completedRequestId);
+            const match = recent.find((r) => r.request_id === viewingRequestId);
             if (match) {
-              setSelectedBuild({ type: 'recent', data: match });
+              navigate(`/build/recent/${encodeURIComponent(match.request_id)}`, { replace: true });
             } else {
               // Build completed but not yet in recent — return to main
-              setSelectedBuild(null);
+              navigate('/', { replace: true });
             }
           })
           .catch(() => {
             // Fetch failed — return to main screen gracefully
-            setSelectedBuild(null);
+            navigate('/', { replace: true });
           });
       }
     }
-  }, [initData]);
+  }, [initData, navigate]);
 
   useSSE(sseUrl, handleBuildsUpdate);
 
@@ -144,6 +136,9 @@ export default function App() {
     };
 
     tg.BackButton.onClick(handleBack);
+    return () => {
+      tg.BackButton.offClick(handleBack);
+    };
   }, [isTelegram, tg, initData]);
 
   // Show BackButton when in error state
@@ -156,23 +151,44 @@ export default function App() {
     }
   }, [error, isTelegram, tg]);
 
+  if (error) {
+    return (
+      <ErrorScreen
+        title={error.title}
+        description={error.description}
+        detail={error.detail}
+      />
+    );
+  }
+
+  if (!config) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <>
+      <Route path="/">
+        <MainScreen config={config} />
+      </Route>
+      <Route path="/build/:type/:id">
+        {(params) => (
+          <BuildDetailScreen
+            config={config}
+            type={params.type as 'active' | 'recent'}
+            id={decodeURIComponent(params.id)}
+          />
+        )}
+      </Route>
+    </>
+  );
+}
+
+export default function App() {
   return (
     <ErrorBoundary>
-      {error ? (
-        <ErrorScreen
-          title={error.title}
-          description={error.description}
-          detail={error.detail}
-        />
-      ) : config ? (
-        selectedBuild ? (
-          <BuildDetailScreen build={selectedBuild} onBack={handleDetailBack} />
-        ) : (
-          <MainScreen config={config} onBuildSelect={handleBuildSelect} />
-        )
-      ) : (
-        <LoadingScreen />
-      )}
+      <Router base="/webapp">
+        <AppShell />
+      </Router>
     </ErrorBoundary>
   );
 }

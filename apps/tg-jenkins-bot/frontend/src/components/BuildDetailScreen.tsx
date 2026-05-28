@@ -4,9 +4,13 @@
  * Displays build metadata in Telegram-style grouped sections with
  * key-value rows. Supports both active builds (with cancel action)
  * and completed recent builds (with download actions).
+ *
+ * Receives the build type and request ID from the router. Resolves
+ * active builds from config state and fetches recent builds via API.
  */
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useLocation } from 'wouter-preact';
 import {
   CheckCircle2, XCircle, Clock, AlertCircle,
   GitBranch, Hash, Timer, User, Calendar, CalendarCheck,
@@ -15,16 +19,13 @@ import {
 import { useTelegram } from '../context/TelegramContext';
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
-import { cancelBuild as cancelBuildApi } from '../api';
-import type { ActiveBuild, RecentBuild } from '../types';
-
-type BuildDetailBuild =
-  | { type: 'active'; data: ActiveBuild }
-  | { type: 'recent'; data: RecentBuild };
+import { cancelBuild as cancelBuildApi, fetchRecentBuilds } from '../api';
+import type { ActiveBuild, RecentBuild, AppConfig } from '../types';
 
 interface BuildDetailScreenProps {
-  build: BuildDetailBuild;
-  onBack: () => void;
+  config: AppConfig;
+  type: 'active' | 'recent';
+  id: string;
 }
 
 /** Format a byte count as a human-readable file size. */
@@ -71,13 +72,50 @@ function getResultVisuals(result: string) {
   }
 }
 
-export default function BuildDetailScreen({ build, onBack }: BuildDetailScreenProps) {
+export default function BuildDetailScreen({ config, type, id }: BuildDetailScreenProps) {
   const { isTelegram, tg, initData, userId, haptic } = useTelegram();
   const { showToast } = useToast();
+  const [, navigate] = useLocation();
   const [cancelling, setCancelling] = useState(false);
 
-  const isActive = build.type === 'active';
-  const data = build.data;
+  // Resolve build data: active builds come from live config, recent builds are fetched
+  const [recentBuild, setRecentBuild] = useState<RecentBuild | null>(null);
+
+  useEffect(() => {
+    if (type !== 'recent') return;
+    fetchRecentBuilds(initData)
+      .then((builds) => {
+        const match = builds.find((b) => b.request_id === id);
+        if (match) {
+          setRecentBuild(match);
+        } else {
+          // Build not found — navigate back
+          navigate('/', { replace: true });
+        }
+      })
+      .catch(() => {
+        navigate('/', { replace: true });
+      });
+  }, [type, id, initData, navigate]);
+
+  const activeBuild = type === 'active'
+    ? config.active_builds.find((b) => b.request_id === id) ?? null
+    : null;
+
+  const isActive = type === 'active';
+  const data: ActiveBuild | RecentBuild | null = isActive ? activeBuild : recentBuild;
+
+  // Loading state while fetching recent build
+  if (!data) {
+    return (
+      <div class="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <svg class="spinner-ios" style={{ width: '28px', height: '28px', color: 'var(--tg-color-link)' }} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="var(--tg-color-divider)" stroke-width="2.5" />
+          <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+        </svg>
+      </div>
+    );
+  }
 
   // Derive common fields
   const label = isActive ? data.label : (data as RecentBuild).label || (data as RecentBuild).branch;
@@ -108,6 +146,10 @@ export default function BuildDetailScreen({ build, onBack }: BuildDetailScreenPr
   // Duration (only for completed builds)
   const duration = completedAt && triggeredAt ? completedAt - triggeredAt : null;
 
+  function handleBack() {
+    navigate('/');
+  }
+
   // --- Cancel build via tg.MainButton ---
   const handleCancel = useCallback(async () => {
     if (!canCancel) return;
@@ -123,7 +165,7 @@ export default function BuildDetailScreen({ build, onBack }: BuildDetailScreenPr
         await cancelBuildApi(initData, requestId);
         haptic.notification('success');
         showToast('Build successfully cancelled.');
-        onBack();
+        navigate('/');
       } catch (err) {
         console.error(err);
         haptic.notification('error');
@@ -157,14 +199,14 @@ export default function BuildDetailScreen({ build, onBack }: BuildDetailScreenPr
         await doCancel();
       }
     }
-  }, [canCancel, ref, requestId, initData, isTelegram, tg, haptic, showToast, onBack]);
+  }, [canCancel, ref, requestId, initData, isTelegram, tg, haptic, showToast, navigate]);
 
   // Wire tg.BackButton and tg.MainButton
   useEffect(() => {
     if (!isTelegram || !tg) return;
 
     tg.BackButton.show();
-    tg.BackButton.onClick(onBack);
+    tg.BackButton.onClick(handleBack);
 
     if (canCancel) {
       tg.MainButton.setParams({
@@ -180,14 +222,14 @@ export default function BuildDetailScreen({ build, onBack }: BuildDetailScreenPr
     }
 
     return () => {
-      tg.BackButton.offClick(onBack);
+      tg.BackButton.offClick(handleBack);
       tg.BackButton.hide();
       tg.MainButton.hide();
       if (canCancel) {
         tg.MainButton.offClick(handleCancel);
       }
     };
-  }, [isTelegram, tg, onBack, canCancel, cancelling, handleCancel]);
+  }, [isTelegram, tg, canCancel, cancelling, handleCancel]);
 
   function handleCopyLink() {
     if (downloadUrl) {

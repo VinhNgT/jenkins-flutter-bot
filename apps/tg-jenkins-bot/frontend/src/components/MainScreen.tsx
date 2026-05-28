@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useLocation } from 'wouter-preact';
 import { useTelegram } from '../context/TelegramContext';
 import { useToast } from '../context/ToastContext';
 import { triggerBuild } from '../api';
@@ -13,16 +14,16 @@ import BranchSelector from './BranchSelector';
 import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
 import RecentBuilds from './RecentBuilds';
-import type { ActiveBuild, AppConfig, RecentBuild } from '../types';
+import type { AppConfig } from '../types';
 
 interface MainScreenProps {
   config: AppConfig;
-  onBuildSelect: (build: ActiveBuild | RecentBuild, type: 'active' | 'recent') => void;
 }
 
-export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
+export default function MainScreen({ config }: MainScreenProps) {
   const { tg, isTelegram, initData, haptic } = useTelegram();
   const { showToast } = useToast();
+  const [, navigate] = useLocation();
 
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState('');
@@ -172,9 +173,9 @@ export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
         onClear={handleCustomClear}
       />
 
-      <ActiveBuilds builds={config.active_builds} onSelect={(b) => onBuildSelect(b, 'active')} />
+      <ActiveBuilds builds={config.active_builds} onSelect={(b) => navigate(`/build/active/${encodeURIComponent(b.request_id)}`)} />
 
-      <RecentBuilds refreshKey={recentRefreshKey} onSelect={(b) => onBuildSelect(b, 'recent')} />
+      <RecentBuilds refreshKey={recentRefreshKey} onSelect={(b) => navigate(`/build/recent/${encodeURIComponent(b.request_id)}`)} />
 
       {/* App Version */}
       <div class="tg-section-footer build-fingerprint">

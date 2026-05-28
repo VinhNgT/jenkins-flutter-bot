@@ -1,12 +1,15 @@
 /**
- * BuildDetailScreen — Full-screen detail view for a build.
+ * BuildDetailScreen — Unified full-screen detail view for a build.
  *
  * Displays build metadata in Telegram-style grouped sections with
- * key-value rows. Supports both active builds (with cancel action)
- * and completed recent builds (with download actions).
+ * key-value rows. Renders a single continuous screen for all build
+ * states: active (building), success, failure, timeout, and cancelled.
  *
- * Receives the build type and request ID as props. Resolves
- * active builds from config state and fetches recent builds via API.
+ * Uses a shimmer skeleton on cold opens (tapping a recent build from
+ * the list). When a build completes while the user is viewing it, the
+ * screen transitions in-place — the last-known active build data stays
+ * visible while the completed result loads, then the UI smoothly
+ * updates (icon, subtitle, new rows) without any loading flash.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
@@ -26,6 +29,9 @@ interface BuildDetailScreenProps {
   config: AppConfig;
   type: 'active' | 'recent';
   id: string;
+  /** Whether this screen is the active (topmost) screen.
+   *  False during exit animation — triggers immediate MainButton/BackButton hide. */
+  isActive: boolean;
   onBack: () => void;
 }
 
@@ -73,13 +79,29 @@ function getResultVisuals(result: string) {
   }
 }
 
-export default function BuildDetailScreen({ config, type, id, onBack }: BuildDetailScreenProps) {
+export default function BuildDetailScreen({ config, type, id, isActive, onBack }: BuildDetailScreenProps) {
   const { isTelegram, tg, initData, userId, haptic } = useTelegram();
   const { showToast } = useToast();
   const [cancelling, setCancelling] = useState(false);
 
   // Resolve build data: active builds come from live config, recent builds are fetched
   const [recentBuild, setRecentBuild] = useState<RecentBuild | null>(null);
+
+  // Preserve the last-known active build so the screen stays populated
+  // during the active→recent transition (build completes while viewing).
+  const [lastActiveBuild, setLastActiveBuild] = useState<ActiveBuild | null>(null);
+
+  const activeBuild = type === 'active'
+    ? config.active_builds.find((b) => b.request_id === id) ?? null
+    : null;
+
+  // Snapshot the active build whenever it's available, so it persists
+  // through the type switch from 'active' to 'recent'.
+  useEffect(() => {
+    if (activeBuild) {
+      setLastActiveBuild(activeBuild);
+    }
+  }, [activeBuild]);
 
   useEffect(() => {
     if (type !== 'recent') return;
@@ -98,48 +120,87 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
       });
   }, [type, id, initData, onBack]);
 
-  const activeBuild = type === 'active'
-    ? config.active_builds.find((b) => b.request_id === id) ?? null
-    : null;
+  // Determine the resolved data and current display mode.
+  // During active→recent transition, fall back to the last active build
+  // to keep the screen populated while the recent result loads.
+  const isActiveBuild = type === 'active';
+  const resolvedData: ActiveBuild | RecentBuild | null =
+    isActiveBuild ? activeBuild : (recentBuild ?? lastActiveBuild);
 
-  const isActive = type === 'active';
-  const data: ActiveBuild | RecentBuild | null = isActive ? activeBuild : recentBuild;
+  // Whether we're displaying active-style UI (spinner, cancel button).
+  // True when actively building OR during the brief transition window
+  // where we're showing cached active data while recent loads.
+  const showingActiveUI = isActiveBuild || (!isActiveBuild && !recentBuild && lastActiveBuild !== null);
 
-  // Loading state while fetching recent build
-  if (!data) {
+  // Shimmer skeleton loading state — only shown on cold opens
+  // (e.g. tapping a recent build from the list), never during
+  // live active→recent transitions.
+  if (!resolvedData) {
     return (
-      <div class="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-        <svg class="spinner-ios" style={{ width: '28px', height: '28px', color: 'var(--tg-color-link)' }} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" stroke="var(--tg-color-divider)" stroke-width="2.5" />
-          <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-        </svg>
+      <div class="container" style={{ display: 'flex' }}>
+        {/* Skeleton: Hero header */}
+        <div class="tg-detail-header">
+          <div class="tg-skeleton" style={{ width: '56px', height: '56px', borderRadius: '50%', marginBottom: '8px' }} />
+          <div class="tg-skeleton" style={{ width: '140px', height: '20px', borderRadius: '6px' }} />
+          <div class="tg-skeleton" style={{ width: '100px', height: '14px', borderRadius: '4px', marginTop: '4px' }} />
+        </div>
+        {/* Skeleton: Build Information section */}
+        <div class="tg-section">
+          <div class="tg-section-header">
+            <div class="tg-skeleton" style={{ width: '120px', height: '12px', borderRadius: '4px' }} />
+          </div>
+          <div class="tg-list">
+            {[1, 2, 3, 4].map((i) => (
+              <div class="tg-kv-row" key={i}>
+                <div class="tg-skeleton" style={{ width: '80px', height: '14px', borderRadius: '4px' }} />
+                <div class="tg-skeleton" style={{ width: '100px', height: '14px', borderRadius: '4px' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Skeleton: Diagnostics section */}
+        <div class="tg-section">
+          <div class="tg-section-header">
+            <div class="tg-skeleton" style={{ width: '90px', height: '12px', borderRadius: '4px' }} />
+          </div>
+          <div class="tg-list">
+            <div class="tg-kv-row">
+              <div class="tg-skeleton" style={{ width: '80px', height: '14px', borderRadius: '4px' }} />
+              <div class="tg-skeleton" style={{ width: '140px', height: '14px', borderRadius: '4px' }} />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   // Derive common fields
-  const label = isActive ? data.label : (data as RecentBuild).label || (data as RecentBuild).branch;
-  const ref = isActive ? (data as ActiveBuild).ref : (data as RecentBuild).branch;
-  const triggeredAt = data.triggered_at;
-  const requestId = isActive ? (data as ActiveBuild).request_id : (data as RecentBuild).request_id;
+  const label = showingActiveUI
+    ? resolvedData.label ?? ''
+    : (resolvedData as RecentBuild).label || (resolvedData as RecentBuild).branch;
+  const ref = showingActiveUI
+    ? (resolvedData as ActiveBuild).ref
+    : (resolvedData as RecentBuild).branch;
+  const triggeredAt = resolvedData.triggered_at;
+  const requestId = resolvedData.request_id;
 
   // Active build fields
-  const triggeredBy = isActive ? (data as ActiveBuild).triggered_by : null;
-  const triggeredById = isActive ? (data as ActiveBuild).triggered_by_id : null;
-  const canCancel = isActive && (initData === 'preview' || (userId != null && triggeredById === userId));
+  const triggeredBy = showingActiveUI ? (resolvedData as ActiveBuild).triggered_by : null;
+  const triggeredById = showingActiveUI ? (resolvedData as ActiveBuild).triggered_by_id : null;
+  const canCancel = showingActiveUI && isActiveBuild && (initData === 'preview' || (userId != null && triggeredById === userId));
 
   // Recent build fields
-  const result = isActive ? null : (data as RecentBuild).result;
-  const completedAt = isActive ? null : (data as RecentBuild).completed_at;
-  const commitHash = isActive ? null : (data as RecentBuild).commit_hash;
-  const downloadUrl = isActive ? null : (data as RecentBuild).download_url;
-  const fileSize = isActive ? 0 : (data as RecentBuild).file_size;
+  const result = showingActiveUI ? null : (resolvedData as RecentBuild).result;
+  const completedAt = showingActiveUI ? null : (resolvedData as RecentBuild).completed_at;
+  const commitHash = showingActiveUI ? null : (resolvedData as RecentBuild).commit_hash;
+  const downloadUrl = showingActiveUI ? null : (resolvedData as RecentBuild).download_url;
+  const fileSize = showingActiveUI ? 0 : (resolvedData as RecentBuild).file_size;
 
   // Relative time for header subtitle
-  const relativeTime = useRelativeTime(isActive ? triggeredAt : (completedAt ?? 0));
+  const relativeTime = useRelativeTime(showingActiveUI ? triggeredAt : (completedAt ?? 0));
 
   // Visuals for header icon
-  const visuals = isActive
+  const visuals = showingActiveUI
     ? { Icon: Timer, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', label: 'Building' }
     : getResultVisuals(result ?? '');
 
@@ -207,20 +268,25 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
     };
   }, [canCancel, cancelling, handleCancel]);
 
-  useMainButton(cancelButtonConfig, true);
+  useMainButton(cancelButtonConfig, isActive);
 
   // Wire tg.BackButton
   useEffect(() => {
     if (!isTelegram || !tg) return;
 
-    tg.BackButton.show();
-    tg.BackButton.onClick(handleBack);
+    if (isActive) {
+      tg.BackButton.show();
+      tg.BackButton.onClick(handleBack);
+    } else {
+      tg.BackButton.offClick(handleBack);
+      tg.BackButton.hide();
+    }
 
     return () => {
       tg.BackButton.offClick(handleBack);
       tg.BackButton.hide();
     };
-  }, [isTelegram, tg]);
+  }, [isTelegram, tg, isActive]);
 
   function handleCopyLink() {
     if (downloadUrl) {
@@ -230,7 +296,7 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
     }
   }
 
-  const headerSubtitle = isActive
+  const headerSubtitle = showingActiveUI
     ? `Building · started ${relativeTime}`
     : `${visuals.label} · ${relativeTime}`;
 
@@ -242,7 +308,7 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
           class="tg-detail-header-icon"
           style={{ backgroundColor: visuals.bg, color: visuals.color }}
         >
-          {isActive ? (
+          {showingActiveUI ? (
             <svg class="spinner-ios" style={{ width: '28px', height: '28px' }} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="12" cy="12" r="10" stroke="var(--tg-color-divider)" stroke-width="2.5" />
               <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />

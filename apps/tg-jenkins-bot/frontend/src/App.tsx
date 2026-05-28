@@ -123,28 +123,36 @@ function AppShell() {
     return <LoadingScreen />;
   }
 
-  // MainScreen stays mounted to preserve state (branch selection, scroll, etc.).
-  // BuildDetailScreen overlays on top — MainScreen's scroll is never disturbed.
+  // The active detail screen — either the current screen or the one
+  // being animated out (delayed unmount during pop).
+  const detailScreen = navigator.current ?? navigator.exiting;
+
+  // CSS class on the viewport controls the transform animation.
+  const vpClass = `nav-viewport${navigator.phase !== 'idle' ? ` nav-${navigator.phase}` : ''}`;
+
   return (
-    <>
-      <MainScreen
-        config={config}
-        isActive={navigator.current === null}
-        onBuildSelect={(type, id) =>
-          navigator.push({ screen: 'build-detail', type, id })
-        }
-      />
-      {navigator.current && (
-        <div class="screen-overlay">
+    <div class={vpClass}>
+      <div class="nav-screen nav-screen--main">
+        <MainScreen
+          config={config}
+          isActive={navigator.current === null && navigator.exiting === null}
+          onBuildSelect={(type, id) =>
+            navigator.push({ screen: 'build-detail', type, id })
+          }
+        />
+      </div>
+      {detailScreen && (
+        <div class="nav-screen nav-screen--detail">
           <BuildDetailScreen
             config={config}
-            type={navigator.current.type}
-            id={navigator.current.id}
+            type={detailScreen.type}
+            id={detailScreen.id}
+            isActive={navigator.current !== null}
             onBack={() => navigator.pop()}
           />
         </div>
       )}
-    </>
+    </div>
   );
 }
 

@@ -48,23 +48,26 @@ export function useMainButton(
   useEffect(() => {
     if (!isTelegram || !tg) return;
 
+    // Narrowed references — non-null after the guard above.
+    const btn = tg.MainButton;
+    const theme = tg.themeParams;
+
     // When not active or no config, fully reset and yield control
     if (!isActive || !config) {
-      // Remove any previously registered handler
       if (onClickRef.current) {
-        tg.MainButton.offClick(onClickRef.current);
+        btn.offClick(onClickRef.current);
         onClickRef.current = null;
       }
-      tg.MainButton.hideProgress();
-      tg.MainButton.hide();
+      btn.hideProgress();
+      btn.hide();
       return;
     }
 
     // Apply desired state
-    const color = config.color ?? tg.themeParams.button_color ?? '#2481cc';
-    const textColor = config.textColor ?? tg.themeParams.button_text_color ?? '#ffffff';
+    const color = config.color ?? theme.button_color ?? '#2481cc';
+    const textColor = config.textColor ?? theme.button_text_color ?? '#ffffff';
 
-    tg.MainButton.setParams({
+    btn.setParams({
       text: config.text,
       color,
       text_color: textColor,
@@ -74,32 +77,32 @@ export function useMainButton(
 
     // Sync progress spinner
     if (config.loading) {
-      tg.MainButton.showProgress(false);
-      tg.MainButton.disable();
+      btn.showProgress(false);
+      btn.disable();
     } else {
-      tg.MainButton.hideProgress();
+      btn.hideProgress();
       if (!config.disabled) {
-        tg.MainButton.enable();
+        btn.enable();
       }
     }
 
     // Swap click handler if it changed
     if (onClickRef.current !== config.onClick) {
       if (onClickRef.current) {
-        tg.MainButton.offClick(onClickRef.current);
+        btn.offClick(onClickRef.current);
       }
-      tg.MainButton.onClick(config.onClick);
+      btn.onClick(config.onClick);
       onClickRef.current = config.onClick;
     }
 
     // Full cleanup on unmount or dependency change
     return () => {
       if (onClickRef.current) {
-        tg.MainButton.offClick(onClickRef.current);
+        btn.offClick(onClickRef.current);
         onClickRef.current = null;
       }
-      tg.MainButton.hideProgress();
-      tg.MainButton.hide();
+      btn.hideProgress();
+      btn.hide();
     };
   }, [isTelegram, tg, isActive, config?.text, config?.color, config?.textColor,
       config?.loading, config?.disabled, config?.onClick]);

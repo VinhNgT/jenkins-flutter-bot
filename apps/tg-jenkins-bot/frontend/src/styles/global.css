@@ -29,6 +29,7 @@
 
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
     --transition-speed: 0.22s;
+    --nav-transition-ms: 300;
     --border-radius-card: 12px;
 }
 
@@ -76,22 +77,8 @@ body {
     background-color: var(--tg-color-secondary-bg);
     color: var(--tg-color-text);
     line-height: 1.45;
-    /* TGUI List iOS: padding 10px 18px + Telegram SDK safe area insets.
-       The SDK injects --tg-safe-area-inset-* vars; env() is fallback
-       for browser preview outside Telegram. */
-    padding: calc(10px + var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px)))
-             calc(18px + var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px)))
-             calc(40px + var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
-             calc(18px + var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px)));
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow-x: hidden;
-    /* Hide scrollbar track — Telegram Mini Apps are mobile-first;
-       persistent scrollbar tracks look non-native. Applied to html
-       because the viewport scroll container is <html>, not <body>,
-       when body uses min-height: 100vh. */
-    scrollbar-width: none;
+    margin: 0;
+    overflow: hidden;
     transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
 }
 
@@ -114,35 +101,83 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
     animation: fadeIn var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Full-screen overlay for detail screens. Covers the MainScreen
-   underneath without disturbing its scroll position. */
-.screen-overlay {
+/* ── Stack Navigator — CSS transform-based screen transitions ──
+ *
+ * .nav-viewport is the fixed full-screen container.
+ * .nav-screen is the base class for each screen within.
+ * Navigation phases (pushing/pushed/popping) are applied as classes
+ * on the viewport, driving CSS transform transitions on screens.
+ *
+ * MainScreen always stays at x:0 (shifts to -30% when detail is shown).
+ * DetailScreen slides from x:100% (offscreen right) to x:0 (onscreen).
+ */
+
+.nav-viewport {
     position: fixed;
     inset: 0;
-    z-index: 10;
-    background-color: var(--tg-color-secondary-bg);
+    overflow: hidden;
+}
+
+.nav-screen {
+    position: absolute;
+    inset: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    will-change: transform;
+    /* Telegram safe-area padding — accounts for notches, home bars,
+       and system UI on iOS/Android. */
     padding: calc(10px + var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px)))
              calc(18px + var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px)))
              calc(40px + var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
              calc(18px + var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px)));
-    /* Hide the scrollbar track — Telegram Mini Apps target mobile
-       WebViews where native scrollbars are overlay-style (auto-hiding).
-       A persistent scrollbar track looks non-native and can clash with
-       the main screen's scrollbar color. */
+    /* Hide scrollbar track — Telegram Mini Apps target mobile
+       WebViews where native scrollbars are overlay-style. */
     scrollbar-width: none;
 }
 
-.screen-overlay::-webkit-scrollbar {
+.nav-screen::-webkit-scrollbar {
     display: none;
 }
 
-/* Lock body scroll while a detail overlay is active to prevent
-   the MainScreen scrollbar from showing behind the overlay. */
-body:has(.screen-overlay) {
-    overflow: hidden;
+/* ── Main screen positioning ─────────────────────────────────── */
+
+.nav-screen--main {
+    z-index: 1;
+    transform: translateX(0);
+    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
+    background-color: var(--tg-color-secondary-bg);
+}
+
+/* ── Detail screen positioning ───────────────────────────────── */
+
+.nav-screen--detail {
+    z-index: 10;
+    background-color: var(--tg-color-secondary-bg);
+    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Initial mount: detail screen is offscreen right (before push animation) */
+.nav-pushing .nav-screen--detail {
+    transform: translateX(100%);
+}
+
+/* Pushed: detail screen is onscreen, main screen shifts left */
+.nav-pushed .nav-screen--main {
+    transform: translateX(-30%);
+}
+
+.nav-pushed .nav-screen--detail {
+    transform: translateX(0);
+}
+
+/* Popping: detail screen slides back offscreen right */
+.nav-popping .nav-screen--main {
+    transform: translateX(0);
+}
+
+.nav-popping .nav-screen--detail {
+    transform: translateX(100%);
 }
 
 /* Native Header layout */
@@ -659,6 +694,7 @@ body.tg-dark .tg-input-clear {
     align-items: center;
     justify-content: center;
     margin-bottom: 8px;
+    transition: background-color 0.35s ease, color 0.35s ease;
 }
 
 .tg-detail-header-title {

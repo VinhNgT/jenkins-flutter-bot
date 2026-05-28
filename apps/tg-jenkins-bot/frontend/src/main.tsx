@@ -10,7 +10,6 @@ import { TelegramProvider } from './context/TelegramContext';
 import { ToastProvider } from './context/ToastContext';
 import App from './App';
 import './styles/global.css';
-import './styles/navigator.css';
 
 // Conditionally load the Telegram SDK emulator in dev mode.
 // The emulator injects window.Telegram.WebApp on localhost

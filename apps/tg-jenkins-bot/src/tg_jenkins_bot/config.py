@@ -65,7 +65,11 @@ class BotSettings(ServiceSettings):
         default={"Stable Release": "main", "Testing Version": "develop"},
         title="Build Options",
         description="Mapping of display label → git branch (e.g. 'Stable Release' → 'main')",
-        json_schema_extra={"group": "Application", "json_key": "bot.branches"},
+        json_schema_extra={
+            "group": "Application",
+            "json_key": "bot.branches",
+            "field_type": "key_value",
+        },
     )
     webapp_url: str = Field(
         title="Web App URL",

@@ -32,6 +32,20 @@ export default function App() {
   const [version, setVersion] = useState<string | null>(null);
   const [githubUrl, setGithubUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [reloadSeq, setReloadSeq] = useState(0);
+  const [dirtyScopes, setDirtyScopes] = useState<Record<Scope, boolean>>({
+    bot: false,
+    agent: false,
+    file_manager: false,
+    builds: false,
+  });
+
+  const handleDirtyChange = useCallback((scope: Scope, isDirty: boolean) => {
+    setDirtyScopes((prev) => {
+      if (prev[scope] === isDirty) return prev;
+      return { ...prev, [scope]: isDirty };
+    });
+  }, []);
 
   // Initial data load
   useEffect(() => {
@@ -88,6 +102,7 @@ export default function App() {
     ]);
     if (schemaResult) setSchemas(schemaResult);
     if (configResult) setConfig(configResult);
+    setReloadSeq((prev) => prev + 1);
   }, []);
 
   // Fatal error state
@@ -148,6 +163,7 @@ export default function App() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
           statuses={statuses}
+          dirtyScopes={dirtyScopes}
         />
 
         <main class="content">
@@ -161,51 +177,42 @@ export default function App() {
           )}
 
           {/* Config tabs */}
-          {SCOPE_TABS.includes(activeTab as Scope) && schemas && (
-            (() => {
-              const scope = activeTab as Scope;
-              const schema = schemas[scope];
+          {schemas && SCOPE_TABS.map((scope) => {
+            const schema = schemas[scope];
+            if (!schema) return null;
 
-              if (!schema) {
-                return (
-                  <div>
-                    <h2 class="panel-title">Loading…</h2>
-                    <div class="skeleton">
-                      <div class="skeleton-line skeleton-line--medium" />
-                      <div class="skeleton-line skeleton-line--short" />
-                    </div>
-                  </div>
-                );
-              }
+            const isVisible = activeTab === scope;
 
-              // Ephemeral mode: file_manager schema has no fields
-              if (scope === 'file_manager' && !schema.fields?.length) {
-                return (
-                  <div>
-                    <h2 class="panel-title">{schema.title}</h2>
-                    <p class="panel-desc" dangerouslySetInnerHTML={{ __html: schema.description }} />
-                    <p class="text-muted">
-                      No configuration fields — ephemeral storage mode has no
-                      configurable settings.
-                    </p>
-                  </div>
-                );
-              }
-
+            // Ephemeral mode: file_manager schema has no fields
+            if (scope === 'file_manager' && !schema.fields?.length) {
               return (
-                <div>
-                  <SchemaForm
-                    scope={scope}
-                    schema={schema}
-                    config={config?.[scope] ?? null}
-                    onConfigReload={handleConfigReload}
-                  />
-                  {/* VPN widget under the agent config form */}
-                  {scope === 'agent' && <VpnWidget />}
+                <div key={scope} style={{ display: isVisible ? 'block' : 'none' }}>
+                  <h2 class="panel-title">{schema.title}</h2>
+                  <p class="panel-desc" dangerouslySetInnerHTML={{ __html: schema.description }} />
+                  <p class="text-muted">
+                    No configuration fields — ephemeral storage mode has no
+                    configurable settings.
+                  </p>
                 </div>
               );
-            })()
-          )}
+            }
+
+            const formKey = `${scope}-${reloadSeq}-${config?.[scope] ? JSON.stringify(config[scope]?.values) : 'empty'}`;
+            return (
+              <div key={scope} style={{ display: isVisible ? 'block' : 'none' }}>
+                <SchemaForm
+                  key={formKey}
+                  scope={scope}
+                  schema={schema}
+                  config={config?.[scope] ?? null}
+                  onConfigReload={handleConfigReload}
+                  onDirtyChange={handleDirtyChange}
+                />
+                {/* VPN widget under the agent config form */}
+                {scope === 'agent' && <VpnWidget />}
+              </div>
+            );
+          })}
 
           {/* Jenkinsfile generator */}
           {activeTab === 'jenkinsfile' && <JenkinsfilePanel />}

@@ -2,7 +2,7 @@
 trigger: always_on
 ---
 
-- You fully own this project, you can make cut-crossing changes, rewrite anything as you please, you MUST pursue architecture perfection. Backward-compatibility is optional.
+- You fully own this project, you can make cut-crossing changes, rewrite anything as you please, you MUST pursue architecture perfection. Backward-compatibility is not required unless explicitly told, prefer removing old code instead.
 - When the task is getting overwhelm, take a step back and consider if the project's architecture need to be revised.
 - All FastAPI microservices must follow the same architecture and design pattern, notify me of any mismatches so we can correct them.
 - Avoid building agent-control locally. Use GitHub workflow for it.
@@ -10,3 +10,5 @@ trigger: always_on
 - When designing UI/UX, follow Telegram design language.
 - You must follow latest industry standard, FastAPI best practices.
 - DO NOT do anything if given an unreasonable request, take your time and explain why. You want perfection.
+- Prefer only rebuild/relaunch containers affected by your changes.
+- Use bash to run .sh on Windows.

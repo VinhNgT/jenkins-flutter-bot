@@ -15,6 +15,7 @@ export interface SchemaField {
   full_width?: boolean;
   options?: string[];
   placeholder?: string;
+  field_type?: string;
 }
 
 export interface Schema {

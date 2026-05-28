@@ -82,7 +82,7 @@ class TestSecretsSet:
     def test_set_returns_length(self):
         data = {"telegram": {"bot_token": "abc123"}}
         result = secrets_set(data, ("telegram.bot_token",))
-        assert result["telegram.bot_token"] == 6
+        assert result["telegram.bot_token"] == 8
 
     def test_unset_returns_false(self):
         data = {}

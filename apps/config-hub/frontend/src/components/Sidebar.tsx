@@ -14,6 +14,7 @@ interface SidebarProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
   statuses: ServiceStatuses | null;
+  dirtyScopes?: Record<Scope, boolean>;
 }
 
 const SERVICE_TABS: { id: Scope; label: string }[] = [
@@ -39,6 +40,7 @@ export default function Sidebar({
   activeTab,
   onTabChange,
   statuses,
+  dirtyScopes,
 }: SidebarProps) {
   return (
     <nav class="sidebar" role="tablist">
@@ -58,6 +60,7 @@ export default function Sidebar({
 
       {SERVICE_TABS.map(({ id, label }) => {
         const state = statuses ? healthState(statuses[id]) : 'offline';
+        const isDirty = !!dirtyScopes?.[id];
         return (
           <button
             key={id}
@@ -67,7 +70,10 @@ export default function Sidebar({
             aria-selected={activeTab === id}
           >
             {label}
-            <span class={`sidebar-dot sidebar-dot--${state}`} />
+            <div class="sidebar-status-container">
+              {isDirty && <span class="sidebar-unsaved-badge">Unsaved</span>}
+              <span class={`sidebar-dot sidebar-dot--${state}`} />
+            </div>
           </button>
         );
       })}

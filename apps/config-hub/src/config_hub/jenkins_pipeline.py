@@ -22,15 +22,15 @@ def _load_templates() -> tuple[dict[str, Template], dict[str, str]]:
     """Load and cache Groovy templates and snippet strings on first use."""
     return (
         {
-            "pipeline": Template((_TEMPLATE_DIR / "pipeline.groovy").read_text()),
-            "checkout_private": Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text()),
-            "checkout_public": Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text()),
+            "pipeline": Template((_TEMPLATE_DIR / "pipeline.groovy").read_text(encoding="utf-8")),
+            "checkout_private": Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text(encoding="utf-8")),
+            "checkout_public": Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text(encoding="utf-8")),
         },
         {
-            "properties": (_TEMPLATE_DIR / "properties.groovy").read_text(),
-            "post_actions": (_TEMPLATE_DIR / "post_actions.groovy").read_text(),
-            "extensions": (_TEMPLATE_DIR / "extensions.groovy").read_text(),
-            "clone_opts": (_TEMPLATE_DIR / "clone_opts.groovy").read_text(),
+            "properties": (_TEMPLATE_DIR / "properties.groovy").read_text(encoding="utf-8"),
+            "post_actions": (_TEMPLATE_DIR / "post_actions.groovy").read_text(encoding="utf-8"),
+            "extensions": (_TEMPLATE_DIR / "extensions.groovy").read_text(encoding="utf-8"),
+            "clone_opts": (_TEMPLATE_DIR / "clone_opts.groovy").read_text(encoding="utf-8"),
         },
     )
 

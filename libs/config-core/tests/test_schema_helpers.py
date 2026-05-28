@@ -168,7 +168,7 @@ def test_read_masked_reports_lengths(isolate_config):
 
     result = read_masked_config(_TestSettings, Path("/app/data/test.json"))
 
-    assert result["secret_lengths"]["telegram.bot_token"] == len("secret123")
+    assert result["secret_lengths"]["telegram.bot_token"] == 8
 
 
 def test_read_masked_missing_file(isolate_config):

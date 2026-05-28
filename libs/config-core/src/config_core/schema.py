@@ -347,7 +347,7 @@ def read_masked_config(
     for key in secret_keys:
         value = doc.get(key)
         if value not in (None, ""):
-            secret_lengths[key] = len(str(value))
+            secret_lengths[key] = 8
             doc.set(key, None)
         else:
             secret_lengths[key] = False

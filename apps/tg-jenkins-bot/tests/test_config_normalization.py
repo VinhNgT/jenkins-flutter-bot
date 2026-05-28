@@ -60,3 +60,42 @@ def test_webapp_url_normalization() -> None:
         webapp_url="http://localhost:9090",
     )
     assert config5.webapp_url == "http://localhost:9090/webapp/"
+
+
+def test_branches_parsing() -> None:
+    # 1. Dictionary input
+    config1 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+        branches={"Production": "main", "Staging": "develop"},
+    )
+    assert config1.branches == {"Production": "main", "Staging": "develop"}
+
+    # 2. JSON string input (as sent by our new KeyValueEditor)
+    config2 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+        branches='{"Production": "main", "Staging": "develop"}',
+    )
+    assert config2.branches == {"Production": "main", "Staging": "develop"}
+
+    # 3. Comma-separated string input fallback
+    config3 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[12345],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+        branches="main, develop",
+    )
+    assert config3.branches == {"main": "main", "develop": "develop"}
+

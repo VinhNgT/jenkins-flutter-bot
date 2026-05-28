@@ -51,12 +51,23 @@ export default function VpnWidget({ onPendingFileChange }: VpnWidgetProps) {
   useEffect(() => {
     (window as unknown as Record<string, unknown>).pendingVpnFile = pendingFile;
     onPendingFileChange?.(pendingFile);
+    window.dispatchEvent(new Event('vpn-file-change'));
   }, [pendingFile, onPendingFileChange]);
 
   // Also expose refresh function globally for the save handler
   useEffect(() => {
     (window as unknown as Record<string, unknown>).refreshVpnWidgetStatus = refreshStatus;
   }, [refreshStatus]);
+
+  // Expose clear function globally for the save handler
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).clearPendingVpnFile = () => {
+      setPendingFile(null);
+    };
+    return () => {
+      delete (window as unknown as Record<string, unknown>).clearPendingVpnFile;
+    };
+  }, []);
 
   function handleFileSelect(file: File) {
     if (!file.name.endsWith('.ovpn')) {

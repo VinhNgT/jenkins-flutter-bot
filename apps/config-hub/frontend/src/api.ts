@@ -20,6 +20,48 @@ async function request<T>(url: string, init?: RequestInit): Promise<T | null> {
   return (await res.json()) as T;
 }
 
+function normalizeSchema(schema: Schemas | null): Schemas | null {
+  if (!schema) return null;
+  const normalized: Schemas = {} as Schemas;
+  for (const [scope, scopeSchema] of Object.entries(schema)) {
+    const fields = (scopeSchema.fields || []).map((f: any) => {
+      const choices: [string, string][] = f.choices || [];
+      
+      let type = f.type || f.field_type || 'string';
+      
+      const isBoolChoices = choices.length === 2 && 
+        choices.some(c => c[0] === 'true') && 
+        choices.some(c => c[0] === 'false');
+        
+      if (isBoolChoices || type === 'boolean') {
+        type = 'boolean';
+      } else if (choices.length > 0 || f.field_type === 'select') {
+        type = 'select';
+      } else if (f.field_type === 'integer' || f.field_type === 'number') {
+        type = 'integer';
+      }
+      
+      let options = f.options;
+      if (!options && choices.length > 0) {
+        options = choices.map(c => c[0]);
+      }
+      
+      return {
+        ...f,
+        type,
+        options,
+        choices,
+      };
+    });
+    
+    normalized[scope as Scope] = {
+      ...scopeSchema,
+      fields,
+    };
+  }
+  return normalized;
+}
+
 export const API = {
   async getConfig(): Promise<ConfigData | null> {
     try {
@@ -31,7 +73,8 @@ export const API = {
 
   async getSchema(): Promise<Schemas | null> {
     try {
-      return await request<Schemas>('/api/config/schema');
+      const data = await request<Schemas>('/api/config/schema');
+      return normalizeSchema(data);
     } catch {
       return null;
     }

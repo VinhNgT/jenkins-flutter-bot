@@ -120,18 +120,20 @@ class ConfigHubManager:
     async def get_config_for_ui(self) -> dict[str, Any]:
         """Return all config values from all services for the dashboard."""
         result: dict[str, Any] = {}
-        secrets_set: dict[str, Any] = {}
 
         for scope, svc in _SCOPE_TO_SERVICE.items():
             config = await self.services.get_config(svc)
             if config:
-                result[scope] = config.get("values", {})
-                secrets_set[scope] = config.get("secret_lengths", {})
+                result[scope] = {
+                    "values": config.get("values", {}),
+                    "secret_lengths": config.get("secret_lengths", {}),
+                }
             else:
-                result[scope] = {}
-                secrets_set[scope] = {}
+                result[scope] = {
+                    "values": {},
+                    "secret_lengths": {},
+                }
 
-        result["_secrets_set"] = secrets_set
         return result
 
     async def save_scope(self, scope: str, payload: dict[str, Any]) -> None:

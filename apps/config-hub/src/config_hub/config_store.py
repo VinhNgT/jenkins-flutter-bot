@@ -121,7 +121,7 @@ def secrets_set(
     for field in secret_fields:
         value = doc.get(field)
         if value not in (None, ""):
-            result[field] = len(str(value))
+            result[field] = 8
         else:
             result[field] = False
     return result

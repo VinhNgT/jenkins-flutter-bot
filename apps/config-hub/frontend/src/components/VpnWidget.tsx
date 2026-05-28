@@ -4,139 +4,127 @@
  * Displays upload status, allows selecting/replacing/removing .ovpn files,
  * and provides VPN connect/disconnect controls.
  *
- * Uses a pending file pattern: the selected file is stored in component
- * state until the parent form is saved, at which point the file is
- * uploaded as part of the agent config save.
+ * VPN file upload is immediate (not pending) — the file is uploaded directly
+ * to the agent service when selected, independent of the config form save.
  */
 
+import {
+  FileUp,
+  Loader2,
+  PlugZap,
+  RefreshCw,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  Unplug,
+} from 'lucide-preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
+import { API } from '../api';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from './ConfirmDialog';
+import type { VpnStatus } from '../types';
 
-interface VpnStatus {
-  uploaded: boolean;
-  connected: boolean;
-  size: number;
-}
-
-interface VpnWidgetProps {
-  /** Callback to signal the parent SchemaForm that a VPN file is pending upload. */
-  onPendingFileChange?: (file: File | null) => void;
-}
-
-export default function VpnWidget({ onPendingFileChange }: VpnWidgetProps) {
+export default function VpnWidget() {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [status, setStatus] = useState<VpnStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refreshStatus = useCallback(async () => {
-    try {
-      const res = await fetch('/api/services/agent/vpn/status');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as VpnStatus;
-      setStatus(data);
-    } catch {
-      setStatus(null);
-    } finally {
-      setLoading(false);
-    }
+    const result = await API.vpnStatus();
+    setStatus(result);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     refreshStatus();
   }, [refreshStatus]);
 
-  // Expose pending file to parent via window for the save handler
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).pendingVpnFile = pendingFile;
-    onPendingFileChange?.(pendingFile);
-    window.dispatchEvent(new Event('vpn-file-change'));
-  }, [pendingFile, onPendingFileChange]);
-
-  // Also expose refresh function globally for the save handler
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).refreshVpnWidgetStatus = refreshStatus;
-  }, [refreshStatus]);
-
-  // Expose clear function globally for the save handler
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).clearPendingVpnFile = () => {
-      setPendingFile(null);
-    };
-    return () => {
-      delete (window as unknown as Record<string, unknown>).clearPendingVpnFile;
-    };
-  }, []);
-
-  function handleFileSelect(file: File) {
+  async function handleFileSelect(file: File) {
     if (!file.name.endsWith('.ovpn')) {
       showToast('Please upload a valid .ovpn file', 'error');
       return;
     }
-    setPendingFile(file);
+    setBusy(true);
+    const result = await API.vpnUpload(file);
+    if (result) {
+      showToast('OpenVPN configuration uploaded successfully', 'success');
+      await refreshStatus();
+    } else {
+      showToast('Failed to upload OpenVPN configuration', 'error');
+    }
+    setBusy(false);
   }
 
   async function handleConnect() {
     setBusy(true);
-    try {
-      const res = await fetch('/api/services/agent/vpn/connect', { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await API.vpnConnect();
+    if (result) {
       showToast('VPN connected', 'success');
       await refreshStatus();
-    } catch (err) {
-      showToast(`Failed to connect VPN: ${(err as Error).message}`, 'error');
-    } finally {
-      setBusy(false);
+    } else {
+      showToast('Failed to connect VPN', 'error');
     }
+    setBusy(false);
   }
 
   async function handleDisconnect() {
     setBusy(true);
-    try {
-      const res = await fetch('/api/services/agent/vpn/disconnect', { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await API.vpnDisconnect();
+    if (result) {
       showToast('VPN disconnected', 'info');
       await refreshStatus();
-    } catch (err) {
-      showToast(`Failed to disconnect VPN: ${(err as Error).message}`, 'error');
-    } finally {
-      setBusy(false);
+    } else {
+      showToast('Failed to disconnect VPN', 'error');
     }
+    setBusy(false);
   }
 
   async function handleRemove() {
-    if (!confirm('Remove the uploaded OpenVPN configuration file? This will stop VPN builds.')) return;
+    const confirmed = await confirm({
+      title: 'Remove VPN Configuration?',
+      message:
+        'This will delete the uploaded OpenVPN configuration file. VPN-dependent builds will fail until a new file is uploaded.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!confirmed) return;
+
     setBusy(true);
-    try {
-      const res = await fetch('/api/services/agent/vpn/upload', { method: 'DELETE' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await API.vpnDelete();
+    if (result) {
       showToast('OpenVPN configuration file removed', 'info');
       await refreshStatus();
-    } catch (err) {
-      showToast(`Failed to delete config: ${(err as Error).message}`, 'error');
-    } finally {
-      setBusy(false);
+    } else {
+      showToast('Failed to delete configuration', 'error');
     }
+    setBusy(false);
   }
 
+  // ─── Loading State ───────────────────────────────────────────
   if (loading) {
     return (
-      <div class="vpn-upload-container">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--tg-color-hint)', fontSize: '13px' }}>
-          <span class="spinner" />
+      <div class="card" id="vpn-connection">
+        <h2>OpenVPN Connection</h2>
+        <div class="vpn-loading">
+          <Loader2 class="icon spinner-icon" size={14} />
           Loading OpenVPN configuration status…
         </div>
       </div>
     );
   }
 
+  // ─── Error State ─────────────────────────────────────────────
   if (!status) {
     return (
-      <div class="vpn-upload-container">
-        <div style={{ color: 'var(--tg-color-destructive)', fontSize: '13px' }}>
-          Failed to load VPN status.{' '}
+      <div class="card" id="vpn-connection">
+        <h2>OpenVPN Connection</h2>
+        <div class="vpn-error">
+          <ShieldAlert class="icon" size={14} />
+          Failed to load VPN status.
           <button class="btn btn-sm btn-secondary" onClick={refreshStatus}>
+            <RefreshCw class="icon" size={12} />
             Retry
           </button>
         </div>
@@ -144,135 +132,85 @@ export default function VpnWidget({ onPendingFileChange }: VpnWidgetProps) {
     );
   }
 
+  // ─── Configured State ────────────────────────────────────────
   return (
-    <div class="vpn-upload-container">
-      <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '14px', fontWeight: 600 }}>
-        OpenVPN Config File (.ovpn)
-      </h4>
+    <div class="card" id="vpn-connection">
+      <h2>OpenVPN Connection</h2>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          padding: '1rem',
-          borderRadius: 'var(--border-radius-card)',
-          backgroundColor: 'rgba(255,255,255,0.03)',
-          border: '1px solid var(--tg-color-separator)',
-        }}
-      >
-        {/* Pending file state */}
-        {pendingFile ? (
+      <p class="text-muted" id="vpn-status-detail">
+        {status.uploaded ? (
           <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500, color: 'var(--tg-color-warning)' }}>
-                ⚡ Ready to Upload
-                <span style={{
-                  fontSize: '12px', padding: '2px 6px', borderRadius: '4px',
-                  backgroundColor: 'rgba(224, 168, 48, 0.15)', color: 'var(--tg-color-warning)',
-                  border: '1px solid rgba(224, 168, 48, 0.3)', fontWeight: 600,
-                }}>
-                  Pending Save
-                </span>
-              </div>
-              <span style={{ fontSize: '13px', color: 'var(--tg-color-hint)' }}>
-                {pendingFile.name} ({(pendingFile.size / 1024).toFixed(2)} KB)
-                {status.uploaded && ' — will replace existing file'}
-              </span>
-            </div>
-            <button
-              class="btn btn-sm btn-secondary"
-              onClick={() => setPendingFile(null)}
-            >
-              Cancel selection
-            </button>
-          </>
-        ) : status.uploaded ? (
-          /* Configured state */
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500, color: 'var(--tg-color-success)' }}>
-                ✓ Configured
-                {status.connected && (
-                  <span style={{
-                    fontSize: '12px', padding: '2px 6px', borderRadius: '4px',
-                    backgroundColor: 'rgba(49, 181, 69, 0.15)', color: 'var(--tg-color-success)',
-                    border: '1px solid rgba(49, 181, 69, 0.3)', fontWeight: 600,
-                  }}>
-                    Active Build Connection
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: '13px', color: 'var(--tg-color-hint)' }}>
-                .ovpn file uploaded ({(status.size / 1024).toFixed(2)} KB)
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {status.connected ? (
-                <button
-                  class="btn btn-sm btn-danger"
-                  disabled={busy}
-                  onClick={handleDisconnect}
-                >
-                  Disconnect VPN
-                </button>
-              ) : (
-                <button
-                  class="btn btn-sm btn-secondary"
-                  style={{ borderColor: 'rgba(224, 168, 48, 0.3)', color: 'var(--tg-color-warning)' }}
-                  disabled={busy}
-                  onClick={handleConnect}
-                >
-                  Connect VPN
-                </button>
-              )}
-              <label class="btn btn-sm btn-secondary" style={{ cursor: 'pointer', margin: 0 }}>
-                Replace file…
-                <input
-                  type="file"
-                  accept=".ovpn"
-                  style={{ display: 'none' }}
-                  onChange={(e) => {
-                    const file = (e.target as HTMLInputElement).files?.[0];
-                    if (file) handleFileSelect(file);
-                  }}
-                />
-              </label>
-              <button
-                class="btn btn-sm btn-danger"
-                disabled={busy}
-                onClick={handleRemove}
-              >
-                Remove config
-              </button>
-            </div>
+            <span class={status.connected ? 'text-success' : 'text-warning'}>
+              {status.connected ? 'Connected' : 'Disconnected'}
+            </span>
+            {status.connected && (
+              <span class="badge badge--running" style={{ marginLeft: '8px' }}>Active Connection</span>
+            )}
+            {` — File uploaded (${(status.size / 1024).toFixed(2)} KB)`}
           </>
         ) : (
-          /* Not configured state */
+          <span class="text-muted">No configuration uploaded. Upload a .ovpn file to enable private network builds.</span>
+        )}
+      </p>
+
+      <div class="form-actions" style={{ borderTop: 'none', paddingTop: '8px' }}>
+        {status.uploaded ? (
           <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ fontWeight: 500, color: 'var(--tg-color-hint)' }}>
-                No configuration uploaded
-              </div>
-              <span style={{ fontSize: '13px', color: 'var(--tg-color-hint)' }}>
-                Upload a .ovpn file to enable private network builds.
-              </span>
-            </div>
-            <label class="btn btn-sm btn-secondary" style={{ cursor: 'pointer', margin: 0 }}>
-              Choose file…
+            {status.connected ? (
+              <button
+                class="btn btn-danger btn-sm"
+                disabled={busy}
+                onClick={handleDisconnect}
+              >
+                <Unplug class="icon" size={12} />
+                Disconnect
+              </button>
+            ) : (
+              <button
+                class="btn btn-accent btn-sm"
+                disabled={busy}
+                onClick={handleConnect}
+              >
+                <PlugZap class="icon" size={12} />
+                Connect
+              </button>
+            )}
+            <label class="btn btn-secondary btn-sm vpn-file-label">
+              <FileUp class="icon" size={12} />
+              Replace file…
               <input
                 type="file"
                 accept=".ovpn"
-                style={{ display: 'none' }}
+                class="vpn-file-input"
                 onChange={(e) => {
                   const file = (e.target as HTMLInputElement).files?.[0];
                   if (file) handleFileSelect(file);
                 }}
               />
             </label>
+            <button
+              class="btn btn-danger btn-sm"
+              disabled={busy}
+              onClick={handleRemove}
+            >
+              <Trash2 class="icon" size={12} />
+              Remove
+            </button>
           </>
+        ) : (
+          <label class="btn btn-accent btn-sm vpn-file-label">
+            <Upload class="icon" size={12} />
+            Choose file…
+            <input
+              type="file"
+              accept=".ovpn"
+              class="vpn-file-input"
+              onChange={(e) => {
+                const file = (e.target as HTMLInputElement).files?.[0];
+                if (file) handleFileSelect(file);
+              }}
+            />
+          </label>
         )}
       </div>
     </div>

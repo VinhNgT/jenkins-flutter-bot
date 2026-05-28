@@ -5,7 +5,7 @@
  * with configurable options. Persists repo params in localStorage.
  */
 
-import { FileCode, Copy } from 'lucide-preact';
+import { FileCode, Copy, Info } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
@@ -186,7 +186,7 @@ export default function JenkinsfilePanel() {
           {/* Warning notices */}
           {repoUrlWarning && (
             <div class="jf-placeholder-notice">
-              <span class="notice-icon">ℹ️</span>
+              <Info class="notice-icon" size={14} />
               <span>
                 Using placeholder <code>&lt;YOUR_REPO_URL&gt;</code>. Configure
                 your Git URL in the <strong>Repository Settings</strong> above for
@@ -196,7 +196,7 @@ export default function JenkinsfilePanel() {
           )}
           {activeTab === 'private' && credentialsWarning && (
             <div class="jf-placeholder-notice">
-              <span class="notice-icon">ℹ️</span>
+              <Info class="notice-icon" size={14} />
               <span>
                 Using placeholder <code>&lt;YOUR_CREDENTIALS_ID&gt;</code>.
                 Configure your Credentials ID in the{' '}

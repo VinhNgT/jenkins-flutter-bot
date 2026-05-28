@@ -7,6 +7,7 @@ high-level methods that routes delegate to.
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 from typing import Any
@@ -107,22 +108,24 @@ class ConfigHubManager:
     # ------------------------------------------------------------------
 
     async def fetch_all_schemas(self) -> dict[str, Any]:
-        """Fetch schemas from all managed services."""
-        return {
-            scope: await self.services.schema(svc)
-            for scope, svc in _SCOPE_TO_SERVICE.items()
-        }
+        """Fetch schemas from all managed services concurrently."""
+        scopes = list(_SCOPE_TO_SERVICE.keys())
+        services = list(_SCOPE_TO_SERVICE.values())
+        results = await asyncio.gather(*(self.services.schema(s) for s in services))
+        return dict(zip(scopes, results))
 
     # ------------------------------------------------------------------
     # Config CRUD (proxied to owning services)
     # ------------------------------------------------------------------
 
     async def get_config_for_ui(self) -> dict[str, Any]:
-        """Return all config values from all services for the dashboard."""
-        result: dict[str, Any] = {}
+        """Return all config values from all services concurrently."""
+        scopes = list(_SCOPE_TO_SERVICE.keys())
+        services = list(_SCOPE_TO_SERVICE.values())
+        configs = await asyncio.gather(*(self.services.get_config(s) for s in services))
 
-        for scope, svc in _SCOPE_TO_SERVICE.items():
-            config = await self.services.get_config(svc)
+        result: dict[str, Any] = {}
+        for scope, config in zip(scopes, configs):
             if config:
                 result[scope] = {
                     "values": config.get("values", {}),
@@ -160,16 +163,26 @@ class ConfigHubManager:
     async def export_env(self) -> dict[str, Any]:
         """Generate per-service env file contents for preview.
 
-        Fetches config and schemas from all services via HTTP, then
+        Fetches config and schemas from all services concurrently via HTTP, then
         generates env file content for each service.
         """
-        schemas: dict[str, Any] = {}
-        configs: dict[str, Any] = {}
+        scopes = list(_SCOPE_TO_SERVICE.keys())
+        services = list(_SCOPE_TO_SERVICE.values())
 
-        for scope, svc in _SCOPE_TO_SERVICE.items():
-            schemas[scope] = await self.services.schema(svc)
-            config = await self.services.get_config(svc)
-            configs[scope] = config.get("values", {}) if config else {}
+        # Parallel fetch of all schemas and configs (8 total calls)
+        schema_calls = [self.services.schema(s) for s in services]
+        config_calls = [self.services.get_config(s) for s in services]
+
+        fetched = await asyncio.gather(*schema_calls, *config_calls)
+
+        fetched_schemas = fetched[:len(services)]
+        fetched_configs = fetched[len(services):]
+
+        schemas = dict(zip(scopes, fetched_schemas))
+        configs = {
+            scope: (config.get("values", {}) if config else {})
+            for scope, config in zip(scopes, fetched_configs)
+        }
 
         files, warnings = generate_env_files(
             bot_config=configs.get("bot", {}),
@@ -191,13 +204,23 @@ class ConfigHubManager:
 
     async def export_tarball(self) -> bytes:
         """Build a .tar.gz containing all config as env files."""
-        schemas: dict[str, Any] = {}
-        configs: dict[str, Any] = {}
+        scopes = list(_SCOPE_TO_SERVICE.keys())
+        services = list(_SCOPE_TO_SERVICE.values())
 
-        for scope, svc in _SCOPE_TO_SERVICE.items():
-            schemas[scope] = await self.services.schema(svc)
-            config = await self.services.get_config(svc)
-            configs[scope] = config.get("values", {}) if config else {}
+        # Parallel fetch of all schemas and configs (8 total calls)
+        schema_calls = [self.services.schema(s) for s in services]
+        config_calls = [self.services.get_config(s) for s in services]
+
+        fetched = await asyncio.gather(*schema_calls, *config_calls)
+
+        fetched_schemas = fetched[:len(services)]
+        fetched_configs = fetched[len(services):]
+
+        schemas = dict(zip(scopes, fetched_schemas))
+        configs = {
+            scope: (config.get("values", {}) if config else {})
+            for scope, config in zip(scopes, fetched_configs)
+        }
 
         files, _ = generate_env_files(
             bot_config=configs.get("bot", {}),
@@ -215,13 +238,19 @@ class ConfigHubManager:
         Parses the tarball, extracts env values, converts to JSON config,
         and saves via PUT /control/config to each owning service.
         """
+        bot_schema, agent_schema, file_manager_schema = await asyncio.gather(
+            self.services.schema("bot"),
+            self.services.schema("agent"),
+            self.services.schema("file_manager"),
+        )
+
         parsed = import_tarball(
             tarball_bytes=raw,
-            bot_schema=await self.services.schema("bot"),
-            agent_schema=await self.services.schema("agent"),
+            bot_schema=bot_schema,
+            agent_schema=agent_schema,
             bot_config_path=None,
             agent_config_path=None,
-            file_manager_schema=await self.services.schema("file_manager"),
+            file_manager_schema=file_manager_schema,
             file_manager_config_path=None,
         )
 

@@ -249,6 +249,7 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
             "required": effectively_required,
             "field_type": extra.get("field_type", "password" if is_secret else "text"),
             "choices": extra.get("choices", []),
+            "order": extra.get("order", 999),
             "value_type": "str",  # Simplified, since pydantic parses everything
         }
         fields.append(field_def)

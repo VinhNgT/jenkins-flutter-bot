@@ -20,6 +20,7 @@ class AgentSettings(ServiceSettings):
         description="Must match the node name in Jenkins",
         json_schema_extra={
             "group": "Agent Connection",
+            "order": 1,
             "help_html": (
                 "Must exactly match the node name in Jenkins. Create the node:"
                 " <strong>Manage Jenkins</strong> → <strong>Nodes</strong>"
@@ -35,6 +36,7 @@ class AgentSettings(ServiceSettings):
         description="Authentication secret from the Jenkins node",
         json_schema_extra={
             "group": "Agent Connection",
+            "order": 2,
             "help_html": (
                 "After creating the node in Jenkins, go to"
                 " <strong>Nodes</strong> → click the agent name → the secret"
@@ -53,6 +55,7 @@ class AgentSettings(ServiceSettings):
         description="Same Jenkins controller URL used for the agent's inbound connection",
         json_schema_extra={
             "group": "Agent Connection",
+            "order": 3,
             "help_html": "URL of the Jenkins controller (e.g., <code>http://jenkins:8080</code> for internal, or <code>https://jenkins.yourdomain.com</code> if external).",
             "json_key": "agent.jenkins_url",
         },
@@ -64,6 +67,7 @@ class AgentSettings(ServiceSettings):
         description="WebSocket recommended; disable only for direct TCP tunnels",
         json_schema_extra={
             "group": "Advanced",
+            "order": 1,
             "field_type": "select",
             "choices": [["true", "Enabled (default)"], ["false", "Disabled (TCP)"]],
             "json_key": "JENKINS_WEB_SOCKET",
@@ -76,6 +80,7 @@ class AgentSettings(ServiceSettings):
         description="TCP tunnel endpoint (only when WebSocket is disabled)",
         json_schema_extra={
             "group": "Advanced",
+            "order": 2,
             "json_key": "JENKINS_TUNNEL",
         },
     )
@@ -87,6 +92,7 @@ class AgentSettings(ServiceSettings):
         description="Connect to an OpenVPN server during builds (requires .ovpn file upload)",
         json_schema_extra={
             "group": "VPN",
+            "order": 1,
             "field_type": "select",
             "choices": [["true", "Enabled"], ["false", "Disabled (default)"]],
             "json_key": "vpn.enabled",
@@ -99,6 +105,7 @@ class AgentSettings(ServiceSettings):
         description="Auto-disconnect VPN after this many minutes (safety net)",
         json_schema_extra={
             "group": "VPN",
+            "order": 2,
             "field_type": "number",
             "help_html": (
                 "Safety limit to prevent orphaned VPN sessions. The VPN"

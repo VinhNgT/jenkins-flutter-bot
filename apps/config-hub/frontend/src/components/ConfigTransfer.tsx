@@ -5,7 +5,7 @@
  * tarball, and importing a tarball with drag-and-drop.
  */
 
-import { Download, Upload, Copy, FileCode } from 'lucide-preact';
+import { Download, Upload, Copy, FileCode, CheckCircle, XCircle, SkipForward, AlertTriangle } from 'lucide-preact';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
@@ -142,7 +142,7 @@ export default function ConfigTransfer() {
           {exportData.warnings?.length ? (
             <div class="export-warnings">
               {exportData.warnings.map((w, i) => (
-                <p key={i}>⚠️ {w}</p>
+                <p key={i}><AlertTriangle class="icon" size={12} /> {w}</p>
               ))}
             </div>
           ) : null}
@@ -239,7 +239,7 @@ export default function ConfigTransfer() {
         <div class="import-results">
           {importResults.applied?.length ? (
             <>
-              <h4>✅ Applied ({importResults.applied.length})</h4>
+              <h4><CheckCircle class="icon" size={14} /> Applied ({importResults.applied.length})</h4>
               <ul>
                 {importResults.applied.map((s) => (
                   <li key={s}>{s}</li>
@@ -249,7 +249,7 @@ export default function ConfigTransfer() {
           ) : null}
           {importResults.skipped_empty?.length ? (
             <>
-              <h4>⏭️ Skipped ({importResults.skipped_empty.length})</h4>
+              <h4><SkipForward class="icon" size={14} /> Skipped ({importResults.skipped_empty.length})</h4>
               <ul>
                 {importResults.skipped_empty.map((s) => (
                   <li key={s}>{s}</li>
@@ -269,7 +269,7 @@ export default function ConfigTransfer() {
           ) : null}
           {importResults.parse_errors?.length ? (
             <>
-              <h4>❌ Errors ({importResults.parse_errors.length})</h4>
+              <h4><XCircle class="icon" size={14} /> Errors ({importResults.parse_errors.length})</h4>
               <ul>
                 {importResults.parse_errors.map((s) => (
                   <li key={s}>{s}</li>
@@ -279,7 +279,7 @@ export default function ConfigTransfer() {
           ) : null}
           {importResults.warnings?.length ? (
             <>
-              <h4>⚠️ Warnings ({importResults.warnings.length})</h4>
+              <h4><AlertTriangle class="icon" size={14} /> Warnings ({importResults.warnings.length})</h4>
               <ul>
                 {importResults.warnings.map((s) => (
                   <li key={s}>{s}</li>

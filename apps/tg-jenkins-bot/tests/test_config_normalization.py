@@ -99,3 +99,50 @@ def test_branches_parsing() -> None:
     )
     assert config3.branches == {"main": "main", "develop": "develop"}
 
+
+def test_allowed_chat_ids_parsing() -> None:
+    # 1. Raw list of integers
+    config1 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids=[123, -456],
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+    )
+    assert config1.allowed_chat_ids == [123, -456]
+
+    # 2. Comma-separated string
+    config2 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids="123, -456",
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+    )
+    assert config2.allowed_chat_ids == [123, -456]
+
+    # 3. JSON array string
+    config3 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids="[123, -456]",
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+    )
+    assert config3.allowed_chat_ids == [123, -456]
+
+    # 4. Empty string
+    config4 = BotSettings(
+        telegram_token="123456:test-token",
+        allowed_chat_ids="",
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+    )
+    assert config4.allowed_chat_ids == []
+
+

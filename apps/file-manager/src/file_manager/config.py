@@ -28,6 +28,7 @@ class StorageSettings(ServiceSettings):
         description="OAuth 2.0 client ID from Google Cloud Console",
         json_schema_extra={
             "group": "OAuth Credentials",
+            "order": 1,
             "help_html": (
                 'Go to <a href="https://console.cloud.google.com/apis/credentials"'
                 ' target="_blank" rel="noopener">Google Cloud Console → APIs'
@@ -47,6 +48,7 @@ class StorageSettings(ServiceSettings):
         description="OAuth 2.0 client secret",
         json_schema_extra={
             "group": "OAuth Credentials",
+            "order": 2,
             "help_html": (
                 "Shown on the same credentials page as the Client ID."
                 " Click the OAuth client you just created to view the secret."
@@ -64,6 +66,7 @@ class StorageSettings(ServiceSettings):
         description="Drive folder for build artifacts (auto-created if missing)",
         json_schema_extra={
             "group": "Storage Settings",
+            "order": 1,
             "json_key": "drive.folder_name",
         },
     )
@@ -75,6 +78,7 @@ class StorageSettings(ServiceSettings):
         description="Number of completed build records to retain (oldest are evicted)",
         json_schema_extra={
             "group": "Storage Settings",
+            "order": 2,
             "json_key": "storage.max_recent_builds",
         },
     )

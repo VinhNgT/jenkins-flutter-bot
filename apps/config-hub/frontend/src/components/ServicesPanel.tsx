@@ -1,23 +1,23 @@
 /**
- * Dashboard — Service status grid with summary bar.
+ * ServicesPanel — Service status grid with summary bar.
  *
  * Composes ServiceCard components in a 2-column grid.
  * Shows Drive connection or ephemeral banner based on storage backend.
  */
 
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { API } from '../api';
-import { useSSE } from '../hooks/useSSE';
 import ServiceCard from './ServiceCard';
 import DriveCard from './DriveCard';
 import EphemeralBanner from './EphemeralBanner';
+import VpnWidget from './VpnWidget';
 import type { DriveStatus, ServiceStatuses } from '../types';
-import type { TabId } from './Sidebar';
+import type { SectionId } from './Sidebar';
 
-interface DashboardProps {
+interface ServicesPanelProps {
   statuses: ServiceStatuses | null;
   onStatusUpdate: (statuses: ServiceStatuses) => void;
-  onNavigate: (tab: TabId) => void;
+  onNavigate: (tab: SectionId) => void;
 }
 
 type HealthState = 'running' | 'stopped' | 'needs-config' | 'offline';
@@ -36,28 +36,15 @@ const SERVICE_LIST: { scope: 'bot' | 'builds' | 'agent' | 'file_manager'; label:
   { scope: 'file_manager', label: 'File Manager' },
 ];
 
-export default function Dashboard({
+export default function ServicesPanel({
   statuses,
   onStatusUpdate,
   onNavigate,
-}: DashboardProps) {
+}: ServicesPanelProps) {
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
 
-  // SSE stream for real-time status updates
-  const handleSSE = useCallback(
-    (data: ServiceStatuses) => {
-      onStatusUpdate(data);
-      setLastRefreshed(new Date().toLocaleTimeString());
-    },
-    [onStatusUpdate],
-  );
-
-  useSSE<ServiceStatuses>('/api/services/stream', handleSSE, {
-    eventName: 'status',
-  });
-
-  // Initial fetch + Drive status
+  // Initial fetch + 5-second short polling interval
   useEffect(() => {
     async function load() {
       const [statusResult, driveResult] = await Promise.all([
@@ -71,7 +58,17 @@ export default function Dashboard({
       setDriveStatus(driveResult);
     }
     load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const interval = setInterval(async () => {
+      const statusResult = await API.getServiceStatus();
+      if (statusResult) {
+        onStatusUpdate(statusResult);
+        setLastRefreshed(new Date().toLocaleTimeString());
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [onStatusUpdate]);
 
   async function refreshAll() {
     const [statusResult, driveResult] = await Promise.all([
@@ -151,6 +148,8 @@ export default function Dashboard({
           />
         ))}
       </div>
+
+      <VpnWidget />
 
       {/* Storage backend UI */}
       {isEphemeral ? (

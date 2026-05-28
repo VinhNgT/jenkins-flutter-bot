@@ -23,6 +23,7 @@ class BotSettings(ServiceSettings):
         description="Token from @BotFather",
         json_schema_extra={
             "group": "Telegram",
+            "order": 1,
             "help_html": (
                 'Message <a href="https://t.me/BotFather" target="_blank"'
                 ' rel="noopener">@BotFather</a> with <code>/newbot</code> to get'
@@ -34,9 +35,10 @@ class BotSettings(ServiceSettings):
     )
     allowed_chat_ids: list[int] = Field(
         title="Allowed Chat IDs",
-        description="Comma-separated list of chat IDs allowed to use the bot",
+        description="List of chat IDs allowed to use the bot",
         json_schema_extra={
             "group": "Telegram",
+            "order": 2,
             "help_html": (
                 "You can find your chat ID by messaging"
                 ' <a href="https://t.me/userinfobot" target="_blank"'
@@ -45,13 +47,14 @@ class BotSettings(ServiceSettings):
                 " <code>-100123456789</code>."
             ),
             "json_key": "telegram.allowed_chat_ids",
+            "field_type": "chat_id_list",
         },
     )
     admin_contact: str = Field(
         "an admin",
         title="Admin Contact",
         description="Shown to unauthorized users (e.g. '@username' or 'an admin')",
-        json_schema_extra={"group": "Telegram", "json_key": "telegram.admin_contact"},
+        json_schema_extra={"group": "Telegram", "order": 3, "json_key": "telegram.admin_contact"},
     )
 
     # Application
@@ -59,7 +62,7 @@ class BotSettings(ServiceSettings):
         "My App",
         title="App Name",
         description="Name of the app being built (used in messages)",
-        json_schema_extra={"group": "Application", "json_key": "bot.app_name"},
+        json_schema_extra={"group": "Application", "order": 1, "json_key": "bot.app_name"},
     )
     branches: dict[str, str] = Field(
         default={"Stable Release": "main", "Testing Version": "develop"},
@@ -67,6 +70,7 @@ class BotSettings(ServiceSettings):
         description="Mapping of display label → git branch (e.g. 'Stable Release' → 'main')",
         json_schema_extra={
             "group": "Application",
+            "order": 2,
             "json_key": "bot.branches",
             "field_type": "key_value",
         },
@@ -74,7 +78,7 @@ class BotSettings(ServiceSettings):
     webapp_url: str = Field(
         title="Web App URL",
         description="Public HTTPS URL for the Telegram Web App (e.g. https://your-host/webapp/)",
-        json_schema_extra={"group": "Application", "json_key": "bot.webapp_url"},
+        json_schema_extra={"group": "Application", "order": 3, "json_key": "bot.webapp_url"},
     )
     webapp_short_name: str = Field(
         "",
@@ -85,7 +89,7 @@ class BotSettings(ServiceSettings):
             "Telegram Mini App panel in group chats via t.me/bot/shortname. "
             "Leave blank to fall back to a standard in-app browser button."
         ),
-        json_schema_extra={"group": "Application", "json_key": "bot.webapp_short_name"},
+        json_schema_extra={"group": "Application", "order": 4, "json_key": "bot.webapp_short_name"},
     )
 
     @field_validator("webapp_url", mode="before")
@@ -115,6 +119,7 @@ class BotSettings(ServiceSettings):
         description="Public web URL of the repository. Used to add a GitHub link to the bot's welcome message.",
         json_schema_extra={
             "group": "Project",
+            "order": 1,
             "json_key": "project.github_url",
         },
     )
@@ -125,6 +130,7 @@ class BotSettings(ServiceSettings):
         description="Internal URL for this service's webhook endpoint",
         json_schema_extra={
             "group": "Advanced",
+            "order": 1,
             "help_html": "Internal URL where this bot receives webhooks (e.g., <code>http://tg-jenkins-bot:9090</code>). Normally provided by the deployment environment.",
             "json_key": "bot.service_url",
         },
@@ -134,6 +140,7 @@ class BotSettings(ServiceSettings):
         description="Internal URL of the build-manager service",
         json_schema_extra={
             "group": "Advanced",
+            "order": 2,
             "help_html": "Internal URL of the build-manager service (e.g., <code>http://build-manager:9010</code>). Normally provided by the deployment environment.",
             "json_key": "bot.build_manager_url",
         },
@@ -143,6 +150,7 @@ class BotSettings(ServiceSettings):
         description="Internal URL of the file-manager service",
         json_schema_extra={
             "group": "Advanced",
+            "order": 3,
             "help_html": "Internal URL of the file-manager service (e.g., <code>http://file-manager:9092</code>). Used to query build history.",
             "json_key": "bot.file_manager_url",
         },
@@ -176,7 +184,19 @@ class BotSettings(ServiceSettings):
     @classmethod
     def parse_allowed_chat_ids(cls, v: Any) -> list[int]:
         if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [int(x) for x in parsed]
+                except Exception:
+                    pass
             return [int(x.strip()) for x in v.split(",") if x.strip()]
+        if isinstance(v, list):
+            return [int(x) for x in v]
         return v
 
     @property

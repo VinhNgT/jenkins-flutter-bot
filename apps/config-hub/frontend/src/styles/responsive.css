@@ -1,0 +1,66 @@
+/* ─── Mobile / Tablet ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .app-body {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        min-width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 4px 8px;
+        border-right: none;
+        border-bottom: 1px solid var(--tg-color-separator);
+        gap: 0;
+    }
+
+    .sidebar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sidebar-btn {
+        white-space: nowrap;
+        padding: 6px 10px;
+        font-size: 12.5px;
+        border-left: none;
+        border-bottom: 2px solid transparent;
+    }
+
+    .sidebar-btn.active {
+        border-bottom-color: var(--tg-color-link);
+        border-left: none;
+    }
+
+    .sidebar-divider {
+        width: 1px;
+        height: auto;
+        margin: 2px 4px;
+    }
+
+    .sidebar-label {
+        display: none;
+    }
+
+    .sidebar-dot {
+        display: none;
+    }
+
+    .content {
+        padding: 12px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tips-grid {
+        grid-template-columns: 1fr;
+    }
+}

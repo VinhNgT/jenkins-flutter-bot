@@ -1,20 +1,26 @@
 /**
  * App — Root application component.
  *
- * Manages global state: schemas, configs, service statuses, active tab.
+ * Manages global state: schemas, configs, service statuses, active section.
  * Orchestrates data fetching on mount and delegates to child components.
+ *
+ * UI sections map to backend scopes:
+ *   services  → dashboard (all scopes)
+ *   telegram  → bot scope
+ *   jenkins   → agent + builds scopes
+ *   storage   → file_manager scope
+ *   tools     → jenkinsfile + config transfer
  */
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Github } from 'lucide-preact';
 import { API } from './api';
 import Sidebar from './components/Sidebar';
-import type { TabId } from './components/Sidebar';
-import Dashboard from './components/Dashboard';
+import type { SectionId } from './components/Sidebar';
+import ServicesPanel from './components/ServicesPanel';
 import SchemaForm from './components/SchemaForm';
 import JenkinsfilePanel from './components/JenkinsfilePanel';
 import ConfigTransfer from './components/ConfigTransfer';
-import VpnWidget from './components/VpnWidget';
 import type {
   ConfigData,
   Schemas,
@@ -22,10 +28,30 @@ import type {
   ServiceStatuses,
 } from './types';
 
-const SCOPE_TABS: Scope[] = ['bot', 'builds', 'agent', 'file_manager'];
+/**
+ * Section definitions — maps each UI section to its backend scope(s)
+ * and display metadata. Order here determines render order.
+ */
+const SECTION_SCOPES: Record<string, { scopes: Scope[]; title: string; description: string }> = {
+  telegram: {
+    scopes: ['bot'],
+    title: 'Telegram',
+    description: 'Bot identity, chat permissions, and application settings.',
+  },
+  jenkins: {
+    scopes: ['agent', 'builds'],
+    title: 'Jenkins',
+    description: 'Jenkins agent connection, build orchestration, and VPN configuration.',
+  },
+  storage: {
+    scopes: ['file_manager'],
+    title: 'Storage',
+    description: 'File storage backend and Google Drive integration.',
+  },
+};
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [activeTab, setActiveTab] = useState<SectionId>('services');
   const [schemas, setSchemas] = useState<Schemas | null>(null);
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [statuses, setStatuses] = useState<ServiceStatuses | null>(null);
@@ -131,6 +157,7 @@ export default function App() {
     );
   }
 
+
   return (
     <>
       {/* Header */}
@@ -167,28 +194,29 @@ export default function App() {
         />
 
         <main class="content">
-          {/* Dashboard */}
-          {activeTab === 'dashboard' && (
-            <Dashboard
+          {/* Services Panel */}
+          {activeTab === 'services' && (
+            <ServicesPanel
               statuses={statuses}
               onStatusUpdate={handleStatusUpdate}
               onNavigate={setActiveTab}
             />
           )}
 
-          {/* Config tabs */}
-          {schemas && SCOPE_TABS.map((scope) => {
-            const schema = schemas[scope];
-            if (!schema) return null;
+          {/* Config sections: Telegram, Jenkins, Storage */}
+          {schemas && Object.entries(SECTION_SCOPES).map(([sectionId, { scopes, title, description }]) => {
+            const isVisible = activeTab === sectionId;
 
-            const isVisible = activeTab === scope;
+            // Check if all scopes in this section have empty schemas (ephemeral mode)
+            const allEmpty = scopes.every(
+              s => !schemas[s]?.fields?.length
+            );
 
-            // Ephemeral mode: file_manager schema has no fields
-            if (scope === 'file_manager' && !schema.fields?.length) {
+            if (allEmpty) {
               return (
-                <div key={scope} style={{ display: isVisible ? 'block' : 'none' }}>
-                  <h2 class="panel-title">{schema.title}</h2>
-                  <p class="panel-desc" dangerouslySetInnerHTML={{ __html: schema.description }} />
+                <div key={sectionId} style={{ display: isVisible ? 'block' : 'none' }}>
+                  <h2 class="panel-title">{title}</h2>
+                  <p class="panel-desc">{description}</p>
                   <p class="text-muted">
                     No configuration fields — ephemeral storage mode has no
                     configurable settings.
@@ -197,28 +225,42 @@ export default function App() {
               );
             }
 
-            const formKey = `${scope}-${reloadSeq}-${config?.[scope] ? JSON.stringify(config[scope]?.values) : 'empty'}`;
             return (
-              <div key={scope} style={{ display: isVisible ? 'block' : 'none' }}>
-                <SchemaForm
-                  key={formKey}
-                  scope={scope}
-                  schema={schema}
-                  config={config?.[scope] ?? null}
-                  onConfigReload={handleConfigReload}
-                  onDirtyChange={handleDirtyChange}
-                />
-                {/* VPN widget under the agent config form */}
-                {scope === 'agent' && <VpnWidget />}
+              <div key={sectionId} style={{ display: isVisible ? 'block' : 'none' }}>
+                <h2 class="panel-title">{title}</h2>
+                <p class="panel-desc">{description}</p>
+
+                {/* Render a SchemaForm for each scope in this section */}
+                {scopes.map(scope => {
+                  const schema = schemas[scope];
+                  if (!schema?.fields?.length) return null;
+
+                  const formKey = `${scope}-${reloadSeq}-${config?.[scope] ? JSON.stringify(config[scope]?.values) : 'empty'}`;
+                  return (
+                    <SchemaForm
+                      key={formKey}
+                      scope={scope}
+                      schema={schema}
+                      config={config?.[scope] ?? null}
+                      onConfigReload={handleConfigReload}
+                      onDirtyChange={handleDirtyChange}
+                    />
+                  );
+                })}
+
               </div>
             );
           })}
 
-          {/* Jenkinsfile generator */}
-          {activeTab === 'jenkinsfile' && <JenkinsfilePanel />}
-
-          {/* Config transfer */}
-          {activeTab === 'export' && <ConfigTransfer />}
+          {/* Tools section — Jenkinsfile + Config Transfer */}
+          {activeTab === 'tools' && (
+            <div>
+              <JenkinsfilePanel />
+              <div style={{ marginTop: '24px' }}>
+                <ConfigTransfer />
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </>

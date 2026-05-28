@@ -68,6 +68,14 @@ export interface DriveStatus {
   total_size_bytes?: number;
 }
 
+/* ─── VPN ─────────────────────────────────────────────────────── */
+
+export interface VpnStatus {
+  uploaded: boolean;
+  connected: boolean;
+  size: number;
+}
+
 /* ─── Jenkinsfile ─────────────────────────────────────────────── */
 
 export interface JenkinsfileResult {

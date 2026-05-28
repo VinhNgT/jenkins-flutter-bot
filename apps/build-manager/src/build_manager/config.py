@@ -22,6 +22,7 @@ class BuildSettings(ServiceSettings):
         description="Username for Jenkins API authentication",
         json_schema_extra={
             "group": "Jenkins",
+            "order": 1,
             "help_html": "Your Jenkins username used for authenticating API calls.",
             "json_key": "jenkins.user",
         },
@@ -31,6 +32,7 @@ class BuildSettings(ServiceSettings):
         description="API token for Jenkins authentication",
         json_schema_extra={
             "group": "Jenkins",
+            "order": 2,
             "help_html": (
                 "Go to Jenkins → your profile → <strong>Configure</strong>"
                 " → <strong>API Token</strong> → <strong>Add new Token</strong>."
@@ -45,6 +47,7 @@ class BuildSettings(ServiceSettings):
         description="Name of the Jenkins pipeline job to trigger",
         json_schema_extra={
             "group": "Jenkins",
+            "order": 3,
             "help_html": "The exact name of the Jenkins pipeline job that the bot should trigger.",
             "json_key": "jenkins.job_name",
         },
@@ -55,6 +58,7 @@ class BuildSettings(ServiceSettings):
         description="Jenkins controller URL for API calls",
         json_schema_extra={
             "group": "Jenkins",
+            "order": 4,
             "help_html": "URL of the Jenkins controller (e.g., <code>http://jenkins:8080</code> for internal, or <code>https://jenkins.yourdomain.com</code> if external).",
             "json_key": "jenkins.url",
         },
@@ -64,6 +68,7 @@ class BuildSettings(ServiceSettings):
         description="Internal URL of the file-manager service",
         json_schema_extra={
             "group": "Advanced",
+            "order": 1,
             "help_html": "Internal URL of the file-manager service (e.g., <code>http://file-manager:9092</code>). Normally provided by the deployment environment.",
             "json_key": "builds.file_manager_url",
         },
@@ -74,6 +79,7 @@ class BuildSettings(ServiceSettings):
         description="How long before a pending build is considered dead and its frontend is notified",
         json_schema_extra={
             "group": "Advanced",
+            "order": 2,
             "json_key": "builds.build_timeout",
         },
     )
@@ -83,6 +89,7 @@ class BuildSettings(ServiceSettings):
         description="How often to check Jenkins for build completion",
         json_schema_extra={
             "group": "Advanced",
+            "order": 3,
             "help_html": (
                 "Seconds between Jenkins API checks while a build is "
                 "running. Lower values give faster notifications but "
@@ -97,6 +104,7 @@ class BuildSettings(ServiceSettings):
         description="Glob pattern to match build artifacts in the Jenkins archive",
         json_schema_extra={
             "group": "Advanced",
+            "order": 4,
             "help_html": (
                 "Pattern to find the build artifact. Default "
                 "<code>*.apk</code> matches any APK. Change to "
@@ -111,6 +119,7 @@ class BuildSettings(ServiceSettings):
         description="Directory for persistent build state files",
         json_schema_extra={
             "group": "Advanced",
+            "order": 5,
             "help_html": "The directory inside the container where the build manager persists its state. You normally do not need to change this.",
             "json_key": "builds.data_path",
         },
@@ -122,6 +131,7 @@ class BuildSettings(ServiceSettings):
         description="Internal URL of the agent-control service for VPN management during builds",
         json_schema_extra={
             "group": "Advanced",
+            "order": 6,
             "help_html": (
                 "Internal URL of the agent-control service "
                 "(e.g., <code>http://agent-control:9091</code>). "

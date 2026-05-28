@@ -1,0 +1,273 @@
+/* ─── App Shell ───────────────────────────────────────────────── */
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-lg);
+    height: 50px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--tg-color-bg) 60%, var(--tg-color-secondary-bg)),
+        var(--tg-color-bg)
+    );
+    border-bottom: 1px solid var(--tg-color-separator);
+}
+
+.app-header h1 {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-left: auto;
+}
+
+.version-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--tg-color-hint);
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 999px;
+    padding: 2px 8px;
+    letter-spacing: 0.03em;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.version-badge.loaded {
+    opacity: 1;
+}
+
+.github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--tg-color-hint);
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 999px;
+    padding: 4px 12px;
+    text-decoration: none;
+    transition: color var(--transition-fast), background var(--transition-fast),
+        border-color var(--transition-fast);
+}
+
+.github-link:hover {
+    color: var(--tg-color-link);
+    background: color-mix(in srgb, var(--tg-color-link) 8%, var(--tg-color-bg));
+    border-color: color-mix(
+        in srgb,
+        var(--tg-color-link) 40%,
+        var(--tg-color-separator)
+    );
+    text-decoration: none;
+}
+
+.github-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    fill: currentColor;
+}
+
+/* ─── Layout: Sidebar + Content ───────────────────────────────── */
+.app-body {
+    display: flex;
+    min-height: calc(100vh - 50px);
+}
+
+/* ─── Sidebar ─────────────────────────────────────────────────── */
+.sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--tg-color-bg);
+    border-right: 1px solid var(--tg-color-separator);
+    padding: 10px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.sidebar-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--tg-color-hint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 10px 16px 4px;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: var(--tg-color-separator);
+    margin: var(--space-sm) 14px;
+}
+
+.sidebar-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    background: none;
+    border: none;
+    padding: var(--space-sm) var(--space-md);
+    color: var(--tg-color-hint);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    border-left: 2px solid transparent;
+    position: relative;
+    transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.sidebar-btn:hover {
+    color: var(--tg-color-text);
+    background: color-mix(
+        in srgb,
+        var(--tg-color-text) 4%,
+        var(--tg-color-bg)
+    );
+}
+
+.sidebar-btn.active {
+    color: var(--tg-color-text);
+    background: color-mix(
+        in srgb,
+        var(--tg-color-text) 6%,
+        var(--tg-color-bg)
+    );
+    border-left-color: var(--tg-color-link);
+    font-weight: 600;
+}
+
+.sidebar-btn--primary {
+    font-weight: 600;
+}
+
+.sidebar-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.sidebar-btn.active .sidebar-icon {
+    opacity: 1;
+}
+
+.sidebar-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-left: auto;
+    flex-shrink: 0;
+    transition: background var(--transition);
+}
+
+.sidebar-dot--running {
+    background: var(--tg-color-success);
+}
+.sidebar-dot--needs-config {
+    background: var(--tg-color-warning);
+}
+.sidebar-dot--stopped {
+    background: var(--tg-color-link);
+}
+.sidebar-dot--offline {
+    background: var(--tg-color-hint);
+}
+
+.sidebar-status-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.sidebar-unsaved-badge {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--tg-color-warning);
+    background-color: color-mix(in srgb, var(--tg-color-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tg-color-warning) 30%, transparent);
+    border-radius: 4px;
+    padding: 2px 6px;
+    line-height: 1;
+    flex-shrink: 0;
+    animation: fadeIn var(--transition-fast);
+}
+
+/* ─── Content Area ────────────────────────────────────────────── */
+.content {
+    flex: 1;
+    min-width: 0;
+    max-width: var(--content-max-w);
+    padding: 20px 28px 48px;
+}
+
+.panel-title {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.panel-desc {
+    margin: 0 0 var(--space-md);
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    line-height: 1.6;
+    max-width: 620px;
+}
+
+.panel-desc code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 3px;
+    padding: 1px 4px;
+}
+
+.panel-subtitle {
+    margin: var(--space-lg) 0 var(--space-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--tg-color-text);
+}
+
+.panel-subtitle:first-of-type {
+    margin-top: 0;
+}
+
+/* Spacing between sequential schema forms inside a merged section */
+.schema-form-container + .schema-form-container {
+    margin-top: var(--space-xl);
+}
+
+/* ─── Tab Panels ──────────────────────────────────────────────── */
+.tab-panel {
+    display: none;
+    animation: fadeIn 0.2s ease;
+}
+
+.tab-panel.active {
+    display: block;
+}

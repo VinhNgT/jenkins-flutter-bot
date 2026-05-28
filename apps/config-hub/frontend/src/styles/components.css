@@ -1,0 +1,572 @@
+/* ─── Telegram Grouped Sections ───────────────────────────────── */
+.tg-section {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--space-md);
+}
+
+.tg-section-header {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--tg-color-section-header);
+    padding: 20px 24px 4px 22px;
+    letter-spacing: 0.3px;
+}
+
+.tg-section-footer {
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    padding: var(--space-sm) var(--space-md) 0;
+    line-height: 1.4;
+}
+
+/* ─── Cards (Desktop) ─────────────────────────────────────────── */
+.card {
+    background: var(--tg-color-section-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: var(--space-md) 18px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: box-shadow var(--transition);
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.card + .card {
+    margin-top: 10px;
+}
+
+.card h2,
+.card h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--tg-color-hint);
+}
+
+/* ─── Telegram List (Grouped Rows) ────────────────────────────── */
+.tg-list {
+    background: var(--tg-color-section-bg);
+    border-radius: var(--border-radius-card);
+    overflow: hidden;
+    border: 1px solid var(--tg-color-separator);
+    transition: background-color var(--transition-speed) ease;
+}
+
+.tg-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-lg);
+    position: relative;
+    cursor: pointer;
+    min-height: 48px;
+    background: transparent;
+    transition: background-color 0.15s ease;
+}
+
+.tg-list-item:active {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.tg-list-item:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 0;
+    height: 0.5px;
+    background-color: var(--tg-color-divider);
+}
+
+.tg-list-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-grow: 1;
+    padding: var(--space-md) var(--space-sm) var(--space-md) 0;
+}
+
+.tg-list-item-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--tg-color-text);
+}
+
+.tg-list-item-subtitle {
+    font-size: 13px;
+    color: var(--tg-color-subtitle);
+}
+
+/* ─── Status Grid (Dashboard) ─────────────────────────────────── */
+.status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.status-grid > .card + .card {
+    margin-top: 0;
+}
+
+.status-card {
+    display: flex;
+    flex-direction: column;
+    border-left: 4px solid transparent;
+    transition: border-left-color 0.2s ease;
+}
+
+.status-card--running {
+    border-left-color: var(--tg-color-success);
+}
+.status-card--stopped {
+    border-left-color: var(--tg-color-link);
+}
+.status-card--needs-config {
+    border-left-color: var(--tg-color-warning);
+}
+.status-card--offline {
+    border-left-color: var(--tg-color-hint);
+}
+
+.status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+}
+
+.status-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--tg-color-text);
+}
+
+.status-details {
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    margin-bottom: 10px;
+    font-family: var(--font-mono);
+    line-height: 1.7;
+}
+
+.status-details p {
+    margin: 0;
+}
+
+.status-controls {
+    display: flex;
+    gap: var(--space-xs);
+    margin-top: auto;
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--tg-color-separator);
+}
+
+/* ─── Badges ──────────────────────────────────────────────────── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+.badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.badge--running {
+    color: var(--tg-color-success);
+}
+.badge--running::before {
+    background: var(--tg-color-success);
+}
+.badge--awaiting {
+    color: var(--tg-color-warning);
+}
+.badge--awaiting::before {
+    background: var(--tg-color-warning);
+}
+.badge--stopped {
+    color: var(--tg-color-link);
+}
+.badge--stopped::before {
+    background: var(--tg-color-link);
+}
+.badge--offline {
+    color: var(--tg-color-hint);
+}
+.badge--offline::before {
+    background: var(--tg-color-hint);
+}
+.badge--connected {
+    color: var(--tg-color-success);
+}
+.badge--connected::before {
+    background: var(--tg-color-success);
+}
+.badge--disconnected {
+    color: var(--tg-color-warning);
+}
+.badge--disconnected::before {
+    background: var(--tg-color-warning);
+}
+
+.badge-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────── */
+.btn {
+    font: inherit;
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--tg-color-bg);
+    color: var(--tg-color-text);
+    transition: background var(--transition-fast),
+        border-color var(--transition-fast), transform 80ms ease;
+}
+
+.btn:hover:not(:disabled) {
+    background: color-mix(
+        in srgb,
+        var(--tg-color-text) 8%,
+        var(--tg-color-bg)
+    );
+}
+
+.btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-accent {
+    background: var(--tg-color-link);
+    border-color: var(--tg-color-link);
+    color: #fff;
+}
+
+.btn-accent:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--tg-color-link) 85%, white);
+    border-color: color-mix(in srgb, var(--tg-color-link) 85%, white);
+}
+
+.btn-secondary {
+    background: var(--tg-color-bg);
+    color: var(--tg-color-text);
+    border-color: color-mix(
+        in srgb,
+        var(--tg-color-text) 12%,
+        var(--tg-color-separator)
+    );
+}
+
+.btn-danger {
+    background: transparent;
+    color: var(--tg-color-destructive);
+    border-color: color-mix(
+        in srgb,
+        var(--tg-color-text) 12%,
+        var(--tg-color-separator)
+    );
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: rgba(255, 59, 48, 0.1);
+}
+
+.btn-sm {
+    font-size: 12px;
+    padding: 4px 10px;
+}
+
+.btn svg.icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+    margin-right: 4px;
+}
+
+.btn-sm svg.icon {
+    width: 12px;
+    height: 12px;
+    vertical-align: -2px;
+    margin-right: 3px;
+}
+
+/* ─── Toast ───────────────────────────────────────────────────── */
+.toast-container {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    padding: 8px 14px;
+    border-radius: var(--border-radius-card);
+    font-size: 13px;
+    font-weight: 500;
+    max-width: 360px;
+    word-break: break-word;
+    background: var(--tg-color-bg);
+    border: 1px solid
+        color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+    color: var(--tg-color-text);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.toast.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.toast--success {
+    border-left: 3px solid var(--tg-color-success);
+}
+.toast--error {
+    border-left: 3px solid var(--tg-color-destructive);
+}
+.toast--info {
+    border-left: 3px solid var(--tg-color-link);
+}
+
+/* ─── Dialogs ─────────────────────────────────────────────────── */
+.confirm-dialog,
+.oauth-dialog {
+    background: var(--tg-color-bg);
+    border: 1px solid
+        color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+    border-radius: var(--border-radius-card);
+    padding: 28px 28px 22px;
+    min-width: 320px;
+    max-width: 420px;
+    color: var(--tg-color-text);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.confirm-dialog::backdrop,
+.oauth-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+}
+
+.dialog-icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+
+.dialog-icon svg {
+    width: 40px;
+    height: 40px;
+    color: var(--tg-color-link);
+}
+
+.dialog-title {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.dialog-msg {
+    margin: 0 0 20px;
+    font-size: 13.5px;
+    color: var(--tg-color-hint);
+    text-align: center;
+    line-height: 1.55;
+}
+
+.dialog-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    margin-bottom: 20px;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--tg-color-separator);
+}
+
+/* ─── Spinner ─────────────────────────────────────────────────── */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid
+        color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+    border-top-color: var(--tg-color-link);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+/* ─── Skeleton Loading ────────────────────────────────────────── */
+.skeleton {
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: 20px;
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line {
+    height: 12px;
+    background: color-mix(
+        in srgb,
+        var(--tg-color-text) 6%,
+        var(--tg-color-bg)
+    );
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.skeleton-line--short {
+    width: 40%;
+}
+.skeleton-line--medium {
+    width: 65%;
+}
+
+/* ─── Summary Bar ─────────────────────────────────────────────── */
+.summary-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+
+.summary-text {
+    font-weight: 600;
+}
+.summary-bar--ok {
+    color: var(--tg-color-success);
+}
+.summary-bar--warn {
+    color: var(--tg-color-warning);
+}
+.summary-bar--offline {
+    color: var(--tg-color-hint);
+}
+
+.last-refreshed {
+    font-size: 12px;
+    color: var(--tg-color-hint);
+    font-weight: 400;
+}
+
+/* ─── Config Error Callout ────────────────────────────────────── */
+.config-error-callout {
+    font-size: 12.5px;
+    color: var(--tg-color-warning);
+    background: rgba(224, 168, 48, 0.08);
+    border: 1px solid rgba(224, 168, 48, 0.25);
+    border-radius: var(--border-radius-card);
+    padding: 6px 10px;
+    margin-bottom: var(--space-sm);
+    line-height: 1.5;
+}
+
+/* ─── Configure Link ──────────────────────────────────────────── */
+.configure-link {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--tg-color-link);
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    transition: color var(--transition-fast);
+}
+
+.configure-link:hover {
+    color: color-mix(in srgb, var(--tg-color-link) 85%, white);
+    text-decoration: none;
+}
+
+/* ─── Status Icon ─────────────────────────────────────────────── */
+.status-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    fill: var(--tg-color-hint);
+    margin-right: 6px;
+}
+
+/* ─── Ephemeral Banner ────────────────────────────────────────── */
+.ephemeral-banner {
+    background: color-mix(
+        in srgb,
+        var(--tg-color-link) 8%,
+        var(--tg-color-secondary-bg)
+    );
+    border: 1px solid
+        color-mix(in srgb, var(--tg-color-link) 25%, var(--tg-color-separator));
+    border-radius: var(--border-radius-card);
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    line-height: 1.5;
+}
+
+.ephemeral-banner svg {
+    flex-shrink: 0;
+    color: var(--tg-color-link);
+    margin-top: 1px;
+}
+
+/* ─── Block Code ──────────────────────────────────────────────── */
+.block-code {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--tg-color-secondary-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: 8px 12px;
+    margin: 8px 0;
+    color: var(--tg-color-text);
+    word-break: break-all;
+}

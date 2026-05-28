@@ -10,15 +10,23 @@ import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from './ConfirmDialog';
 import type { Scope, ServiceStatus } from '../types';
-import type { TabId } from './Sidebar';
+import type { SectionId } from './Sidebar';
 
 interface ServiceCardProps {
   scope: Scope;
   label: string;
   status: ServiceStatus | null;
   onRefresh: () => void;
-  onNavigate: (tab: TabId) => void;
+  onNavigate: (tab: SectionId) => void;
 }
+
+/** Map backend scope to its UI section. */
+const SCOPE_TO_SECTION: Record<Scope, SectionId> = {
+  bot: 'telegram',
+  agent: 'jenkins',
+  builds: 'jenkins',
+  file_manager: 'storage',
+};
 
 type HealthState = 'running' | 'stopped' | 'needs-config' | 'offline';
 
@@ -128,7 +136,7 @@ export default function ServiceCard({
       {state === 'needs-config' && (
         <a
           class="configure-link"
-          onClick={() => onNavigate(scope)}
+          onClick={() => onNavigate(SCOPE_TO_SECTION[scope])}
         >
           Configure →
         </a>

@@ -102,3 +102,44 @@ class TestGoogleDriveBackendCaching:
         assert result is True
         assert backend._cached_creds is None
         assert backend.token_path.exists() is False
+
+    @pytest.mark.asyncio
+    async def test_load_tokens_deletes_file_on_refresh_error(self, backend):
+        """If refresh raises a RefreshError, the token file is deleted and cache cleared."""
+        from google.auth.exceptions import RefreshError
+
+        # Setup initial token file and cache
+        backend.token_path.parent.mkdir(parents=True, exist_ok=True)
+        backend.token_path.write_text('{"token": "fake-token", "refresh_token": "fake-refresh-token"}')
+
+        # Mock credentials refresh to raise RefreshError
+        with patch("file_manager.backends.google_drive.Credentials") as mock_creds_class:
+            mock_creds = MagicMock()
+            mock_creds.valid = False
+            mock_creds.refresh_token = "fake-refresh-token"
+            mock_creds.refresh.side_effect = RefreshError("Token revoked")
+            mock_creds_class.return_value = mock_creds
+
+            creds = await backend.load_tokens()
+
+            assert creds is None
+            assert backend._cached_creds is None
+            assert backend.token_path.exists() is False
+
+    @pytest.mark.asyncio
+    async def test_upload_deletes_tokens_on_refresh_error(self, backend):
+        """If upload raises RefreshError, delete tokens and raise RuntimeError."""
+        from google.auth.exceptions import RefreshError
+
+        backend.token_path.parent.mkdir(parents=True, exist_ok=True)
+        backend.token_path.write_text('{"token": "fake-token", "refresh_token": "fake-refresh-token"}')
+
+        # Mock load_tokens to return a valid-looking credential, but _ensure_folder raises RefreshError
+        valid_creds = MagicMock()
+        with patch.object(backend, "load_tokens", return_value=valid_creds), \
+             patch.object(backend, "_ensure_folder", side_effect=RefreshError("revoked")):
+
+            with pytest.raises(RuntimeError, match="Google Drive credentials expired or revoked"):
+                await backend.upload(b"data", "test.apk")
+
+            assert backend.token_path.exists() is False

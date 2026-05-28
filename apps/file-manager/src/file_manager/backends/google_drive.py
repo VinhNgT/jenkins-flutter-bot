@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request  # type: ignore
 from google.oauth2.credentials import Credentials  # type: ignore
 from google_auth_oauthlib.flow import Flow
@@ -207,6 +208,10 @@ class GoogleDriveBackend:
         if not creds.valid and creds.refresh_token:
             try:
                 creds.refresh(Request())
+            except RefreshError:
+                logger.warning("Drive refresh token is revoked or expired. Deleting token file.")
+                self.delete_tokens()
+                return None
             except Exception:
                 logger.exception("Failed to refresh Drive token")
                 return None
@@ -362,26 +367,36 @@ class GoogleDriveBackend:
         if creds is None:
             raise RuntimeError("Google Drive not connected — no valid tokens")
 
-        folder_id = await self._ensure_folder(creds)
-
-        suffix = Path(filename).suffix
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(data)
-            tmp_path = tmp.name
-
         try:
-            return await asyncio.to_thread(
-                self._upload_file_sync, tmp_path, filename, creds, folder_id
-            )
-        finally:
-            os.unlink(tmp_path)
+            folder_id = await self._ensure_folder(creds)
+
+            suffix = Path(filename).suffix
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(data)
+                tmp_path = tmp.name
+
+            try:
+                return await asyncio.to_thread(
+                    self._upload_file_sync, tmp_path, filename, creds, folder_id
+                )
+            finally:
+                os.unlink(tmp_path)
+        except RefreshError as e:
+            logger.warning("Drive refresh token is revoked or expired during upload. Deleting token file.")
+            self.delete_tokens()
+            raise RuntimeError("Google Drive credentials expired or revoked") from e
 
     async def delete(self, file_id: str) -> None:
         """Delete a file from Google Drive."""
         creds = await self.load_tokens()
         if creds is None:
             raise RuntimeError("Google Drive not connected — no valid tokens")
-        await asyncio.to_thread(self._delete_file_sync, creds, file_id)
+        try:
+            await asyncio.to_thread(self._delete_file_sync, creds, file_id)
+        except RefreshError as e:
+            logger.warning("Drive refresh token is revoked or expired during delete. Deleting token file.")
+            self.delete_tokens()
+            raise RuntimeError("Google Drive credentials expired or revoked") from e
 
     def _list_files_sync(self, creds: Credentials, folder_id: str) -> list[dict[str, str]]:
         """List all files in the Drive folder (blocking).
@@ -422,8 +437,13 @@ class GoogleDriveBackend:
         creds = await self.load_tokens()
         if creds is None:
             raise RuntimeError("Google Drive not connected — no valid tokens")
-        folder_id = await self._ensure_folder(creds)
-        return await asyncio.to_thread(self._list_files_sync, creds, folder_id)
+        try:
+            folder_id = await self._ensure_folder(creds)
+            return await asyncio.to_thread(self._list_files_sync, creds, folder_id)
+        except RefreshError as e:
+            logger.warning("Drive refresh token is revoked or expired during list_files. Deleting token file.")
+            self.delete_tokens()
+            raise RuntimeError("Google Drive credentials expired or revoked") from e
 
     async def is_connected(self) -> bool:
         """Return True if valid Drive tokens exist."""

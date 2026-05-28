@@ -231,7 +231,7 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     building = ctx.list_building()
 
     # Fetch build status from build-manager
-    sm_status = await ctx.build_client.get_build_status()
+    _sm_status = await ctx.build_client.get_build_status()
 
     # Headline
     app_name = _escape(ctx.config.app_name)

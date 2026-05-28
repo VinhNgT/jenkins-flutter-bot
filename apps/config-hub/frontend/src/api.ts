@@ -9,6 +9,7 @@ import type {
   Schemas,
   Scope,
   ServiceStatuses,
+  VpnStatus,
 } from './types';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T | null> {
@@ -196,6 +197,58 @@ export const API = {
       return await request<ImportResult>('/api/import/tarball', {
         method: 'POST',
         body: form,
+      });
+    } catch {
+      return null;
+    }
+  },
+
+  // ─── VPN ─────────────────────────────────────────────────────
+  async vpnStatus(): Promise<VpnStatus | null> {
+    try {
+      return await request<VpnStatus>('/api/services/agent/vpn/status');
+    } catch {
+      return null;
+    }
+  },
+
+  async vpnUpload(file: File): Promise<{ status: string } | null> {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      return await request<{ status: string }>('/api/services/agent/vpn/upload', {
+        method: 'POST',
+        body: form,
+      });
+    } catch {
+      return null;
+    }
+  },
+
+  async vpnDelete(): Promise<{ status: string } | null> {
+    try {
+      return await request<{ status: string }>('/api/services/agent/vpn/upload', {
+        method: 'DELETE',
+      });
+    } catch {
+      return null;
+    }
+  },
+
+  async vpnConnect(): Promise<{ status: string } | null> {
+    try {
+      return await request<{ status: string }>('/api/services/agent/vpn/connect', {
+        method: 'POST',
+      });
+    } catch {
+      return null;
+    }
+  },
+
+  async vpnDisconnect(): Promise<{ status: string } | null> {
+    try {
+      return await request<{ status: string }>('/api/services/agent/vpn/disconnect', {
+        method: 'POST',
       });
     } catch {
       return null;

@@ -1,0 +1,354 @@
+/* ─── Interactive Key-Value Rows Editor ──────────────────────── */
+.key-value-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: 100%;
+    margin-top: 4px;
+}
+
+.kv-rows-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: 100%;
+}
+
+.kv-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    animation: kvRowFadeIn 160ms ease-out;
+}
+
+@keyframes kvRowFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.kv-input-key,
+.kv-input-value {
+    flex: 1;
+    font-family: var(--font-family);
+}
+
+.kv-arrow {
+    color: var(--tg-color-hint);
+    font-size: 14px;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.btn-trash {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    background: transparent;
+    color: var(--tg-color-hint);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.btn-trash:hover {
+    color: var(--tg-color-destructive);
+    border-color: color-mix(in srgb, var(--tg-color-destructive) 30%, var(--tg-color-separator));
+    background: rgba(255, 59, 48, 0.08);
+}
+
+.btn-trash:active {
+    transform: scale(0.95);
+}
+
+.btn-kv-add {
+    align-self: flex-start;
+    margin-top: 2px;
+}
+
+.kv-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: color-mix(in srgb, var(--tg-color-text) 1%, var(--tg-color-secondary-bg));
+    border: 1px dashed var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    gap: 8px;
+    text-align: center;
+}
+
+.kv-empty-state p {
+    color: var(--tg-color-hint);
+    font-size: 13px;
+    margin: 0;
+}
+
+.kv-validation-error {
+    color: var(--tg-color-destructive);
+    font-size: 12px;
+    margin-top: 4px;
+    font-weight: 500;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    animation: kvErrorFadeIn 160ms ease-out;
+}
+
+.save-attempted .kv-validation-error {
+    display: flex;
+}
+
+@keyframes kvErrorFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─── Interactive Chat ID List Editor ──────────────────────── */
+.chat-id-list-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    width: 100%;
+    margin-top: 6px;
+}
+
+.chat-id-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+.chat-id-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--tg-color-secondary-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    font-size: 13px;
+    transition: all var(--transition-fast);
+    animation: kvRowFadeIn 160ms ease-out;
+}
+
+.chat-id-chip:hover {
+    border-color: color-mix(in srgb, var(--tg-color-text) 10%, var(--tg-color-separator));
+    background: color-mix(in srgb, var(--tg-color-text) 2%, var(--tg-color-secondary-bg));
+}
+
+.chat-id-chip--dirty {
+    border-color: var(--tg-color-warning) !important;
+}
+
+.chat-id-chip__icon {
+    display: flex;
+    align-items: center;
+    color: var(--tg-color-hint);
+    flex-shrink: 0;
+}
+
+.chat-id-chip__icon.group {
+    color: var(--tg-color-link);
+}
+
+.chat-id-chip__icon.user {
+    color: #4cd964;
+}
+
+.chat-id-chip__value {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--tg-color-text);
+}
+
+.chat-id-chip__badge {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 4px;
+    border-radius: 3px;
+    line-height: 1;
+}
+
+.chat-id-chip__badge.group {
+    color: var(--tg-color-link);
+    background-color: color-mix(in srgb, var(--tg-color-link) 10%, transparent);
+}
+
+.chat-id-chip__badge.user {
+    color: #4cd964;
+    background-color: rgba(76, 217, 100, 0.1);
+}
+
+.chat-id-chip__actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+    border-left: 1px solid var(--tg-color-separator);
+    padding-left: 6px;
+}
+
+.btn-chip-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    color: var(--tg-color-hint);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all var(--transition-fast);
+}
+
+.btn-chip-action:hover {
+    background: var(--tg-color-bg);
+    color: var(--tg-color-text);
+}
+
+.btn-chip-action.delete:hover {
+    color: var(--tg-color-destructive);
+    background: rgba(255, 59, 48, 0.08);
+}
+
+.chat-id-add-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 480px;
+    width: 100%;
+}
+
+.chat-id-add-input {
+    flex: 1;
+    font-family: var(--font-mono);
+}
+
+.chat-id-helper-text {
+    font-size: 11.5px;
+    color: var(--tg-color-hint);
+    margin-top: -2px;
+}
+
+.chat-id-helper-text code {
+    background: var(--tg-color-secondary-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 4px;
+    padding: 1px 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--tg-color-link);
+}
+
+.chat-id-validation-error {
+    color: var(--tg-color-destructive);
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    animation: kvErrorFadeIn 160ms ease-out;
+}
+
+
+.vpn-loading,
+.vpn-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 13px;
+    color: var(--tg-color-hint);
+}
+
+.vpn-error {
+    color: var(--tg-color-destructive);
+}
+
+.spinner-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.vpn-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border-radius: var(--border-radius-card);
+    background: color-mix(in srgb, var(--tg-color-text) 2%, var(--tg-color-secondary-bg));
+    border: 1px solid var(--tg-color-separator);
+}
+
+.vpn-status-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vpn-status-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: 500;
+}
+
+.vpn-status-label--ok {
+    color: var(--tg-color-success);
+}
+
+.vpn-status-label--none {
+    color: var(--tg-color-hint);
+}
+
+.vpn-status-detail {
+    font-size: 13px;
+    color: var(--tg-color-hint);
+}
+
+.vpn-controls {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+.vpn-btn--connect {
+    border-color: rgba(224, 168, 48, 0.3);
+    color: var(--tg-color-warning);
+}
+
+.vpn-file-label {
+    cursor: pointer;
+    margin: 0;
+}
+
+.vpn-file-input {
+    display: none;
+}

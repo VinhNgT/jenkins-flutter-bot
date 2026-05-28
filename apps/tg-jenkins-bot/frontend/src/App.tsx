@@ -127,20 +127,20 @@ function AppShell() {
   }
 
   // MainScreen stays mounted to preserve state (branch selection, scroll, etc.).
-  // Hidden via CSS when viewing a build detail route.
+  // BuildDetailScreen overlays on top — MainScreen's scroll is never disturbed.
   const [isDetailRoute, detailParams] = useRoute('/build/:type/:id');
 
   return (
     <>
-      <div style={{ display: isDetailRoute ? 'none' : 'contents' }}>
-        <MainScreen config={config} />
-      </div>
+      <MainScreen config={config} />
       {isDetailRoute && detailParams && (
-        <BuildDetailScreen
-          config={config}
-          type={detailParams.type as 'active' | 'recent'}
-          id={decodeURIComponent(detailParams.id)}
-        />
+        <div class="screen-overlay">
+          <BuildDetailScreen
+            config={config}
+            type={detailParams.type as 'active' | 'recent'}
+            id={decodeURIComponent(detailParams.id)}
+          />
+        </div>
       )}
     </>
   );

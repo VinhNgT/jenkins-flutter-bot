@@ -84,7 +84,7 @@ graph TD
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
 | `tg-jenkins-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
 | `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs, OpenVPN management + control API |
-| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, build log, retention enforcement, ephemeral storage |
+| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, build log, retention enforcement, ephemeral/log_only storage |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
 | `gateway` | 80, 9000 | Yes | Caddy Ingress Gateway — secure routing perimeter for public Web App (:80) and admin UI (:9000) |
 | `cloudflared` | — | No | Cloudflare Tunnel — secure HTTPS tunnel connecting local gateway to Cloudflare |
@@ -111,6 +111,10 @@ graph TD
 16. **Drive-as-Source-of-Truth Reconciliation**: On startup, file-manager reconciles its build log against actual Google Drive contents — recovering orphan files and pruning stale records.
 17. **Inter-Service Bearer Token Auth**: Optional `SERVICE_AUTH_TOKEN` for defence-in-depth on internal `/control/*` and `/api/*` endpoints. Bypassed in dev/test mode.
 18. **Log Redaction**: Secrets registered via `register_secret()` are automatically scrubbed from all log output. Enabled at service startup via `setup_service_logging()`.
+19. **Log-Only Storage Option**: A minimal, dummy storage backend (`log_only`) logs all uploads/deletes without saving files, returning mock URLs. Useful for testing or zero-dependency dev deployments.
+20. **Custom Transform Stack Navigation**: The Telegram Web App uses a custom React/Preact hook (`useNavigator`) and CSS transitions for iOS/Telegram-style stack navigation (slide-in/out). It prevents early cleanup side effects via a delayed unmount transition. No React Router or standard browser history API routing is used.
+21. **Declarative Telegram Component Management**: Imperative SDK bindings (like `tg.MainButton` or `tg.BackButton` management) are entirely replaced by declarative hooks (`useMainButton`) that handle theme colors, loading states, and event listeners automatically, solving the singleton contention problem across multiple simultaneously mounted screens.
+22. **Telegram CloudStorage Preference Storage**: User preferences (e.g., completion notification toggles) are kept inside the Telegram client's native CloudStorage (`useCloudStorage`), ensuring persistent configuration across user devices.
 
 ---
 
@@ -132,6 +136,8 @@ graph TD
 14. **Do NOT use static/pinned versioning for asset cache-busting** in development — enforce content-hash filenames via Vite.
 15. **Do NOT log secrets in plaintext** — use `register_secret()` and `install_log_redaction()` from `config-core`.
 16. **Do NOT hand off broken code** — Always validate syntax (e.g., `npm run typecheck` for frontend, running/typechecking Python for backend) before declaring a task complete.
+17. **Do NOT use React Router or similar web-routing engines** inside the Telegram Mini App — always use state-driven transition stack components (`useNavigator`).
+18. **Do NOT handle Telegram SDK interactions imperatively** from raw component flows — always encapsulate them in native-first declarative React hooks (like `useMainButton` and `useCloudStorage`).
 
 ---
 

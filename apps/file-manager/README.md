@@ -1,12 +1,13 @@
 # file-manager
 
-Storage backend service for the Jenkins Flutter Bot. Manages build artifact storage, build completion logs, retention enforcement, and Google Drive OAuth. Supports two storage backends: Google Drive (production) and ephemeral in-memory storage (dev/mock).
+Storage backend service for the Jenkins Flutter Bot. Manages build artifact storage, build completion logs, retention enforcement, and Google Drive OAuth. Supports three storage backends: Google Drive (production), ephemeral in-memory storage (dev/mock), and log-only storage (dev/mock/minimal).
 
 ## Features
 
-- **Build Log** — tracks completed build metadata (branch, commit, result, timestamps, download URLs) with configurable retention enforcement
+- **Build Log** — tracks completed build metadata (branch, commit, result, timestamps, download URLs, and APK file sizes) with configurable retention enforcement stored in backend-specific database files (`build_log_{backend_type}.json`).
 - **Google Drive Upload** — uploads APK artifacts and returns unique, unguessable file-scoped download links
 - **Ephemeral Storage** — in-memory storage backend for dev/mock environments (no Google Drive credentials required)
+- **Log-Only Storage** — logs upload and delete operations without actually storing any data (useful for minimal setups or external storage testing)
 - **Drive Reconciliation** — on startup, cross-references the build log against actual Drive contents to recover orphan files and prune stale records
 - **Retention Enforcement** — evicts oldest build records and their backend files when the log exceeds `max_recent_builds`
 - **OAuth Flow** — supports both browser-redirect (popup) and headless code-paste authorization
@@ -24,11 +25,13 @@ The Drive folder itself stays private — links grant access only to the specifi
 
 In ephemeral mode (no Drive credentials), files are stored in memory and served via the download endpoint. No OAuth is required.
 
+In log-only mode (`STORAGE_BACKEND=log_only`), operations are logged only, returning mock URLs. No files are stored or served.
+
 ## API
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/files/builds/record` | POST | Record a completed build, optionally uploading an artifact |
+| `/api/files/builds/record` | POST | Record a completed build, optionally uploading an artifact (and specifying `file_size` in bytes) |
 | `/api/files/builds/recent` | GET | Return recent completed build records |
 | `/api/files/{file_id}` | DELETE | Delete a single file and its build log record |
 | `/api/files/cleanup` | POST | Batch delete files |

@@ -15,9 +15,9 @@ A self-hosted Telegram Web App and passive notification bot that acts as a thin 
 1. **User Opens Web App** — Taps `🚀 Build` inside the Telegram chat to launch the webview.
 2. **API Verification** — The Web App requests configuration from `GET /api/webapp/config`. The bot validates the HMAC-SHA256 signature using its token, checks `allowed_chat_ids`, and returns branch configurations and active builds.
 3. **Trigger Build** — User selects a branch and clicks Build. Web App calls `POST /api/webapp/trigger` to instruct the bot to request a build from the build-manager.
-4. **Active Build Registration** — The bot posts a `"🔨 User started a Target build"` confirmation to the chat, registers the active build in `ActiveBuildStore`, and returns success to the Web App (which closes).
-5. **Poll and Deliver** — The build-manager polls Jenkins for the build (tracked by `BUILD_REQUEST_ID`), uploads the compiled APK to Google Drive via file-manager, and forwards the results to the bot's webhook.
-6. **immutable Success Notification** — The bot consumes the `ActiveBuild` from `ActiveBuildStore` and delivers a clean notification message containing the direct APK download link.
+4. **Active Build Registration** — The bot registers the active build in `ActiveBuildStore` (along with user-specified notification options) and returns success to the Web App (which closes). No immediate startup spam messages are posted to the chat.
+5. **Poll and Deliver** — The build-manager polls Jenkins for the build (tracked by `BUILD_REQUEST_ID`), uploads the compiled APK to the file-manager, and forwards the results to the bot's webhook.
+6. **Immutable Success Notification** — If completion notifications are enabled (`notify=True`), the bot delivers a clean, send-only success/failure notification containing the direct APK download link.
 
 ## Telegram Interface
 
@@ -53,7 +53,7 @@ The bot FastAPI service mounts a static directory at `/webapp` serving `index.ht
 - `POST /api/webapp/cancel` — Cancels an active build.
 
 ### Preview Mode
-When opened directly in a browser (where `window.Telegram.WebApp` is unavailable), the Web App operates in "Preview Mode" with simulated data to enable easy local development and validation.
+When opened directly in a browser (where `window.Telegram.WebApp` is unavailable), the Web App operates in "Preview Mode" with simulated data to enable easy local development and validation. In development (on localhost), a rich desktop SDK emulator (`emulator.ts`) is automatically loaded. The emulator mimics theme parameters (light/dark auto-syncing), WebApp properties, HapticFeedback, events system (`onEvent`/`offEvent`), `showPopup` confirmation modal, and injects interactive floating controls for the `MainButton`/`BackButton` inside the desktop viewport.
 
 ## License
 

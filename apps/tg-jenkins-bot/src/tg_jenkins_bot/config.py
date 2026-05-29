@@ -34,6 +34,7 @@ class BotSettings(ServiceSettings):
         },
     )
     allowed_chat_ids: list[int] = Field(
+        default_factory=list,
         title="Allowed Chat IDs",
         description="List of chat IDs allowed to use the bot",
         json_schema_extra={

@@ -145,4 +145,14 @@ def test_allowed_chat_ids_parsing() -> None:
     )
     assert config4.allowed_chat_ids == []
 
+    # 5. Omitted (should default to [])
+    config5 = BotSettings(
+        telegram_token="123456:test-token",
+        bot_service_url="http://bot:9090",
+        build_manager_url="http://build-manager:9010",
+        file_manager_url="http://file-manager:9092",
+        webapp_url="http://localhost:9090",
+    )
+    assert config5.allowed_chat_ids == []
+
 

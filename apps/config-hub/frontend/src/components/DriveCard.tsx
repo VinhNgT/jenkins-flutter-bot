@@ -5,7 +5,7 @@
  */
 
 import { Cloud, LogOut, RotateCcw } from 'lucide-preact';
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import type { DriveStatus } from '../types';
@@ -21,6 +21,15 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const popupRef = useRef<Window | null>(null);
   const completedRef = useRef(false);
+  const pollRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+    };
+  }, []);
 
   if (!driveStatus) {
     return (
@@ -66,10 +75,17 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
 
     popupRef.current = popup;
 
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+    }
+
     // Poll for popup close
-    const poll = setInterval(() => {
+    pollRef.current = setInterval(() => {
       if (popup.closed) {
-        clearInterval(poll);
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
         if (!completedRef.current) {
           dialogRef.current?.close();
           onRefresh();
@@ -86,6 +102,16 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
       showToast('Google Drive disconnected', 'info');
       onRefresh();
     }
+  }
+
+  function handleCancel() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    popupRef.current?.close();
+    dialogRef.current?.close();
+    onRefresh();
   }
 
   // OAuth callback listener (set up once in App.tsx via window.addEventListener)
@@ -145,9 +171,7 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
         <div class="dialog-actions">
           <button
             class="btn btn-secondary"
-            onClick={() => {
-              popupRef.current?.close();
-            }}
+            onClick={handleCancel}
           >
             Cancel
           </button>

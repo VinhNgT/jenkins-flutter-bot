@@ -215,13 +215,12 @@ export default function SchemaForm({
     if (formRef.current) {
       const invalidInput = formRef.current.querySelector('input[data-invalid="true"]');
       if (invalidInput) {
-        showToast('Please resolve all validation errors in Build Options before saving.', 'error');
+        showToast('Fix validation errors before saving', 'error');
         return;
       }
 
       if (!formRef.current.checkValidity()) {
         formRef.current.reportValidity();
-        showToast('Please resolve all validation errors before saving.', 'error');
         return;
       }
     }
@@ -236,14 +235,13 @@ export default function SchemaForm({
       setSaveAttempted(false);
       onConfigReload();
     } else {
-      showToast(`Failed to save ${SCOPE_LABELS[scope]} config`, 'error');
+      showToast('Failed to save config', 'error');
     }
     setSaving(false);
   }
 
   async function handleReload() {
     onConfigReload();
-    showToast(`${SCOPE_LABELS[scope]} config reloaded`, 'info');
   }
 
   function toggleSecretEdit(key: string) {

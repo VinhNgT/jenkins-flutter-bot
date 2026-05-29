@@ -5,7 +5,7 @@
  */
 
 import type { ReadonlySignal } from '@preact/signals';
-import { Check } from 'lucide-preact';
+import { Check, X } from 'lucide-preact';
 
 interface ToastState {
   message: string;
@@ -26,12 +26,15 @@ export default function Toast({ state }: ToastProps) {
     type === 'error' ? 'toast-error' : '',
   ].filter(Boolean).join(' ');
 
+  const Icon = type === 'error' ? X : Check;
+
   return (
     <div class={classes}>
       <div class="tg-toast-icon">
-        <Check size={20} strokeWidth={2.5} />
+        <Icon size={20} strokeWidth={2.5} />
       </div>
       <span>{message}</span>
     </div>
   );
 }
+

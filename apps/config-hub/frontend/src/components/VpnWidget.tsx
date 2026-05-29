@@ -49,7 +49,7 @@ export default function VpnWidget() {
     setBusy(true);
     const result = await API.vpnUpload(file);
     if (result) {
-      showToast('OpenVPN configuration uploaded successfully', 'success');
+      showToast('Config uploaded', 'success');
       await refreshStatus();
     } else {
       showToast('Failed to upload OpenVPN configuration', 'error');
@@ -61,7 +61,7 @@ export default function VpnWidget() {
     setBusy(true);
     const result = await API.vpnConnect();
     if (result) {
-      showToast('VPN connected', 'success');
+      showToast('Connected', 'success');
       await refreshStatus();
     } else {
       showToast('Failed to connect VPN', 'error');
@@ -73,7 +73,7 @@ export default function VpnWidget() {
     setBusy(true);
     const result = await API.vpnDisconnect();
     if (result) {
-      showToast('VPN disconnected', 'info');
+      showToast('Disconnected', 'info');
       await refreshStatus();
     } else {
       showToast('Failed to disconnect VPN', 'error');
@@ -94,7 +94,7 @@ export default function VpnWidget() {
     setBusy(true);
     const result = await API.vpnDelete();
     if (result) {
-      showToast('OpenVPN configuration file removed', 'info');
+      showToast('Config removed', 'info');
       await refreshStatus();
     } else {
       showToast('Failed to delete configuration', 'error');

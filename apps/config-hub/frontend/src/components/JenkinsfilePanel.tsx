@@ -57,7 +57,6 @@ export default function JenkinsfilePanel() {
 
     if (data) {
       setResult(data);
-      showToast('Jenkinsfiles generated', 'success');
     }
   }
 

@@ -7,7 +7,6 @@
 import { Play, RotateCcw, Square } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { API } from '../api';
-import { useToast } from '../context/ToastContext';
 import { useConfirm } from './ConfirmDialog';
 import type { Scope, ServiceStatus } from '../types';
 import type { SectionId } from './Sidebar';
@@ -69,7 +68,7 @@ export default function ServiceCard({
   onRefresh,
   onNavigate,
 }: ServiceCardProps) {
-  const { showToast } = useToast();
+
   const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
 
@@ -110,8 +109,6 @@ export default function ServiceCard({
     setBusy(false);
 
     if (result) {
-      const verb = action.charAt(0).toUpperCase() + action.slice(1);
-      showToast(`${label}: ${verb} command sent`, 'info');
       onRefresh();
     }
   }

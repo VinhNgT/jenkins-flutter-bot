@@ -292,7 +292,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
     if (downloadUrl) {
       navigator.clipboard.writeText(downloadUrl);
       haptic.impact('soft');
-      showToast('Download link copied to clipboard!');
+      showToast('Copied to clipboard');
     }
   }
 

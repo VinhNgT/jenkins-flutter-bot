@@ -36,7 +36,7 @@ export default function ErrorScreen({ title, description, detail }: ErrorScreenP
     try {
       await navigator.clipboard.writeText(String(detail.chat_id));
       setCopyLabel('✅');
-      showToast('Chat ID copied successfully.');
+      showToast('Copied to clipboard');
       setTimeout(() => setCopyLabel('📋'), 2000);
     } catch (e) {
       console.error(e);

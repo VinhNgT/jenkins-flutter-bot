@@ -56,15 +56,14 @@ export default function ConfigTransfer() {
     if (result) {
       setExportData(result);
       setActiveExportTab('bot');
-      showToast('Config preview generated', 'success');
     }
   }
 
   async function handleDownload() {
     setDownloading(true);
-    const ok = await API.downloadTarball();
+    await API.downloadTarball();
     setDownloading(false);
-    if (ok) showToast('Tarball downloaded', 'success');
+
   }
 
   async function handleCopy() {

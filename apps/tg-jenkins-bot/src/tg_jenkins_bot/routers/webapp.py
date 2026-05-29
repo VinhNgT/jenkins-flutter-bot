@@ -524,12 +524,6 @@ async def cancel_webapp_build(
             detail=f"Build cancellation failed: {e}",
         )
 
-    # 3. Send Telegram notification to the group chat showing who cancelled it
-    try:
-        await ctx.on_build_cancelled(build, user.first_name)
-    except Exception:
-        logger.exception("Failed to send cancellation message to Telegram")
-
     return CancelResponse()
 
 

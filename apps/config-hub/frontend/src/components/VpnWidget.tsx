@@ -21,7 +21,7 @@ import {
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
-import { useConfirm } from './ConfirmDialog';
+import { useConfirm } from '../context/ConfirmDialog';
 import type { VpnStatus } from '../types';
 
 export default function VpnWidget() {

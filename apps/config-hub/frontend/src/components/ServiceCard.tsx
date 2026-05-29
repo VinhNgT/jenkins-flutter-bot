@@ -7,9 +7,10 @@
 import { Play, RotateCcw, Square } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { API } from '../api';
-import { useConfirm } from './ConfirmDialog';
+import { useConfirm } from '../context/ConfirmDialog';
 import type { Scope, ServiceStatus } from '../types';
 import type { SectionId } from './Sidebar';
+import { healthState, type HealthState } from '../utils';
 
 interface ServiceCardProps {
   scope: Scope;
@@ -26,15 +27,6 @@ const SCOPE_TO_SECTION: Record<Scope, SectionId> = {
   builds: 'jenkins',
   file_manager: 'storage',
 };
-
-type HealthState = 'running' | 'stopped' | 'needs-config' | 'offline';
-
-function healthState(status: ServiceStatus | null): HealthState {
-  if (!status) return 'offline';
-  if (!status.configured) return 'needs-config';
-  if (!status.running) return 'stopped';
-  return 'running';
-}
 
 const BADGE_LABELS: Record<HealthState, string> = {
   running: 'Running',

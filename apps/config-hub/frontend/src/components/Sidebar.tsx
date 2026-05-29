@@ -11,7 +11,8 @@
  */
 
 import { LayoutDashboard, Wrench } from 'lucide-preact';
-import type { Scope, ServiceStatus, ServiceStatuses } from '../types';
+import type { Scope, ServiceStatuses } from '../types';
+import { healthState } from '../utils';
 
 export type SectionId = 'services' | 'telegram' | 'jenkins' | 'storage' | 'tools';
 
@@ -20,14 +21,6 @@ interface SidebarProps {
   onTabChange: (tab: SectionId) => void;
   statuses: ServiceStatuses | null;
   dirtyScopes?: Record<Scope, boolean>;
-}
-
-/** Resolve health state from a service status object. */
-function healthState(status: ServiceStatus | null): string {
-  if (!status) return 'offline';
-  if (!status.configured) return 'needs-config';
-  if (!status.running) return 'stopped';
-  return 'running';
 }
 
 /** Aggregate multiple service statuses into a single health state. */

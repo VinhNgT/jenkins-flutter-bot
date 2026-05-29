@@ -238,6 +238,31 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
             field.is_required() and not has_pydantic_default and not env_provided
         )
 
+        # Resolve the UI input type from raw field metadata.
+        # Choices is a list of [value, label] pairs from Pydantic extras.
+        raw_choices: list[list[str]] = extra.get("choices", [])
+        raw_type: str = extra.get("field_type", "password" if is_secret else "text")
+
+        is_bool_choices = (
+            len(raw_choices) == 2
+            and any(c[0] == "true" for c in raw_choices)
+            and any(c[0] == "false" for c in raw_choices)
+        )
+
+        if is_bool_choices or raw_type == "boolean":
+            ui_type = "boolean"
+        elif raw_choices or raw_type == "select":
+            ui_type = "select"
+        elif raw_type in ("integer", "number"):
+            ui_type = "integer"
+        else:
+            ui_type = raw_type  # text, password, etc.
+
+        # Flatten choice pairs to a simple list of option values.
+        options: list[str] | None = (
+            [c[0] for c in raw_choices] if raw_choices else None
+        )
+
         field_def: dict[str, Any] = {
             "key": extra.get("json_key", name),  # Dotted key if nested, or just name
             "label": field.title or name.replace("_", " ").title(),
@@ -247,8 +272,8 @@ def get_frontend_schema(cls: Type[BaseModel], title: str, description: str) -> d
             "default": display_default,
             "secret": is_secret,
             "required": effectively_required,
-            "field_type": extra.get("field_type", "password" if is_secret else "text"),
-            "choices": extra.get("choices", []),
+            "type": ui_type,
+            "options": options,
             "order": extra.get("order", 999),
             "value_type": "str",  # Simplified, since pydantic parses everything
         }

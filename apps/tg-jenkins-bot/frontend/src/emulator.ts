@@ -14,10 +14,11 @@
 
 import './styles/emulator.css';
 
-// Setup base namespace
-window.Telegram = window.Telegram ?? {} as Window['Telegram'];
-const WebApp = {} as TelegramWebApp;
-window.Telegram!.WebApp = WebApp;
+// Setup base namespace — unconditionally assign since this is the emulator entry point
+if (!window.Telegram) {
+  window.Telegram = { WebApp: {} as TelegramWebApp };
+}
+const WebApp = window.Telegram.WebApp;
 
 // Theme presets
 const lightTheme: TelegramThemeParams = {

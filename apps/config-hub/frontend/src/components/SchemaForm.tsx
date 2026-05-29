@@ -102,7 +102,7 @@ export default function SchemaForm({
         continue;
       }
 
-      if (field.field_type === 'key_value') {
+      if (field.type === 'key_value') {
         try {
           const origObj = JSON.parse(original || '{}');
           const currObj = JSON.parse(current || '{}');

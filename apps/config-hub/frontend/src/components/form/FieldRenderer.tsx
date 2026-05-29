@@ -146,7 +146,7 @@ export default function FieldRenderer({
   );
 
   // ─── Chat ID List ────────────────────────────────────────────
-  if (field.field_type === 'chat_id_list') {
+  if (field.type === 'chat_id_list') {
     return (
       <div
         ref={containerRef}
@@ -161,7 +161,7 @@ export default function FieldRenderer({
   }
 
   // ─── Key-Value Editor ────────────────────────────────────────
-  if (field.field_type === 'key_value') {
+  if (field.type === 'key_value') {
     return (
       <div
         ref={containerRef}
@@ -290,17 +290,13 @@ export default function FieldRenderer({
             }
             return '';
           })();
-          const choices = (field as any).choices as [string, string][] | undefined;
           return (
             <select name={name} defaultValue={defaultValue} required={field.required}>
-              {field.options.map((opt) => {
-                const label = choices?.find((c) => c[0] === opt)?.[1] ?? opt;
-                return (
-                  <option key={opt} value={opt}>
-                    {label}
-                  </option>
-                );
-              })}
+              {field.options.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
             </select>
           );
         })()

@@ -13,20 +13,12 @@ import EphemeralBanner from './EphemeralBanner';
 import VpnWidget from './VpnWidget';
 import type { DriveStatus, ServiceStatuses } from '../types';
 import type { SectionId } from './Sidebar';
+import { healthState } from '../utils';
 
 interface ServicesPanelProps {
   statuses: ServiceStatuses | null;
   onStatusUpdate: (statuses: ServiceStatuses) => void;
   onNavigate: (tab: SectionId) => void;
-}
-
-type HealthState = 'running' | 'stopped' | 'needs-config' | 'offline';
-
-function healthState(status: { configured: boolean; running: boolean } | null): HealthState {
-  if (!status) return 'offline';
-  if (!status.configured) return 'needs-config';
-  if (!status.running) return 'stopped';
-  return 'running';
 }
 
 const SERVICE_LIST: { scope: 'bot' | 'builds' | 'agent' | 'file_manager'; label: string }[] = [

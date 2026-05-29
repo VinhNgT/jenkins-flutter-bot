@@ -7,7 +7,7 @@ export interface SchemaField {
   label: string;
   description: string;
   help_html?: string;
-  type: 'string' | 'integer' | 'boolean' | 'select';
+  type: 'text' | 'password' | 'integer' | 'boolean' | 'select' | 'chat_id_list' | 'key_value';
   default: string | number | boolean | null;
   required: boolean;
   secret: boolean;
@@ -15,7 +15,6 @@ export interface SchemaField {
   full_width?: boolean;
   options?: string[];
   placeholder?: string;
-  field_type?: string;
 }
 
 export interface Schema {
@@ -98,9 +97,3 @@ export interface ImportResult {
   errors: string[];
 }
 
-/* ─── SSE Events ──────────────────────────────────────────────── */
-
-export interface SSEServiceEvent {
-  type: 'status';
-  data: ServiceStatuses;
-}

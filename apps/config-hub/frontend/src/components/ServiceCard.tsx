@@ -4,13 +4,14 @@
  * Displays health state, uptime, errors, and start/stop/restart controls.
  */
 
-import { Play, RotateCcw, Square } from 'lucide-preact';
+import { Play, RotateCcw, Square, Terminal } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { API } from '../api';
 import { useConfirm } from '../context/ConfirmDialog';
 import type { Scope, ServiceStatus } from '../types';
 import type { SectionId } from './Sidebar';
 import { healthState, type HealthState } from '../utils';
+import LogViewer from './LogViewer';
 
 interface ServiceCardProps {
   scope: Scope;
@@ -63,6 +64,7 @@ export default function ServiceCard({
 
   const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
 
   const state = healthState(status);
   const canStart = state === 'stopped';
@@ -157,7 +159,19 @@ export default function ServiceCard({
           <Square class="icon" size={12} />
           Stop
         </button>
+        <button
+          class={`btn btn-sm ${showLogs ? 'btn-accent' : ''}`}
+          style={{ marginLeft: 'auto' }}
+          onClick={() => setShowLogs(!showLogs)}
+        >
+          <Terminal class="icon" size={12} />
+          Logs
+        </button>
       </div>
+
+      {showLogs && (
+        <LogViewer scope={scope} onClose={() => setShowLogs(false)} />
+      )}
     </div>
   );
 }

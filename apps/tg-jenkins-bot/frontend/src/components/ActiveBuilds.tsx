@@ -15,10 +15,26 @@ interface ActiveBuildsProps {
   onSelect: (build: ActiveBuild) => void;
 }
 
-/** Individual active build row with relative time. */
+/** Format seconds into a human-readable duration string. */
+function formatRemaining(seconds: number): string {
+  if (seconds <= 0) return 'any moment';
+  if (seconds < 60) return `~${seconds}s left`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `~${m}m ${s}s left` : `~${m}m left`;
+}
+
+/** Individual active build row with relative time and estimated remaining. */
 function ActiveBuildRow({ build, onSelect }: { build: ActiveBuild; onSelect: (build: ActiveBuild) => void }) {
   const { haptic } = useTelegram();
   const relativeTime = useRelativeTime(build.triggered_at);
+
+  // Compute estimated remaining from estimated_duration (ms) and elapsed time
+  const elapsed = Math.floor(Date.now() / 1000 - build.triggered_at);
+  const estimatedSec = build.estimated_duration > 0
+    ? Math.floor(build.estimated_duration / 1000)
+    : 0;
+  const remaining = estimatedSec > 0 ? Math.max(0, estimatedSec - elapsed) : 0;
 
   function handleClick() {
     haptic.impact('light');
@@ -37,7 +53,10 @@ function ActiveBuildRow({ build, onSelect }: { build: ActiveBuild; onSelect: (bu
           <span class="tg-list-item-title">{build.label}</span>
           <span class="tg-list-item-subtitle" style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             <span class="pulsing-dot" style={{ flexShrink: 0 }} />
-            <span>by {build.triggered_by} · {relativeTime}</span>
+            <span>
+              by {build.triggered_by} · {relativeTime}
+              {estimatedSec > 0 && ` · ${formatRemaining(remaining)}`}
+            </span>
           </span>
         </div>
       </div>

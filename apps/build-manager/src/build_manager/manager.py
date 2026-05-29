@@ -56,6 +56,14 @@ class BuildManager:
             config.jenkins_job_name,
         )
 
+        # Validate Jenkins connectivity and fetch job-level estimated duration
+        reachable, estimated_duration_ms = await jenkins.check_connection()
+        if not reachable:
+            await jenkins.close()
+            msg = f"Cannot reach Jenkins job '{config.jenkins_job_name}'"
+            self._last_error = msg
+            raise StartupError(msg)
+
         coord = BuildCoordinator(
             data_dir=config.build_data_path,
             jenkins=jenkins,
@@ -64,6 +72,7 @@ class BuildManager:
             build_timeout=config.build_timeout,
             poll_interval=config.poll_interval,
             artifact_pattern=config.artifact_pattern,
+            estimated_duration_ms=estimated_duration_ms,
             clock=self._clock,
         )
 

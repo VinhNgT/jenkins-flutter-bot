@@ -39,6 +39,7 @@ async def record_build(
     triggered_at: float = Form(...),
     completed_at: float = Form(...),
     file_size: int = Form(0),
+    build_number: int = Form(0),
     file: UploadFile | None = None,
 ) -> dict[str, Any]:
     """Record a completed build, optionally uploading an artifact.
@@ -99,6 +100,7 @@ async def record_build(
         download_url=download_url,
         file_id=file_id,
         file_size=file_size,
+        build_number=build_number,
     )
 
     # Delete backend files for evicted records (best-effort)
@@ -145,6 +147,7 @@ async def get_recent_builds(
                 "completed_at": r.completed_at,
                 "download_url": r.download_url,
                 "file_size": r.file_size,
+                "build_number": r.build_number,
             }
             for r in records
         ]

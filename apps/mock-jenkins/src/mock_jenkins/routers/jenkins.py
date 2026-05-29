@@ -46,11 +46,14 @@ async def job_api(manager: ManagerDep, job_name: str, tree: str = "") -> dict[st
     When tree contains 'name', return just the job name (connection check).
     """
     if "name" in tree and "builds" not in tree:
-        # Connection check — GET /job/{name}/api/json?tree=name
-        return {
+        # Connection check — GET /job/{name}/api/json?tree=name,estimatedDuration
+        response: dict[str, Any] = {
             "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
             "name": job_name,
         }
+        if "estimatedDuration" in tree:
+            response["estimatedDuration"] = 60000  # 60s mock estimate
+        return response
 
     # Build history query
     builds_json: list[dict[str, Any]] = []

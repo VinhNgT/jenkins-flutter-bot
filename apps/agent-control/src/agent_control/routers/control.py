@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
-from fastapi import APIRouter, Request, File, UploadFile, HTTPException
+from config_core import (
+    get_buffer_logs,
+    get_frontend_schema,
+    read_masked_config,
+    save_config_with_merge,
+)
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from ..config import AgentSettings, _DEFAULT_CONFIG_PATH
 from ..dependencies import ManagerDep
@@ -131,3 +136,8 @@ async def disconnect_vpn(manager: ManagerDep) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
     return {"status": "disconnected", "vpn": manager.vpn.status()}
 
+
+@router.get("/logs")
+async def get_logs() -> dict[str, Any]:
+    """Return recent log lines from the in-memory ring buffer."""
+    return {"lines": get_buffer_logs()}

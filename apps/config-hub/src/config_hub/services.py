@@ -141,6 +141,19 @@ class ServiceClient:
             logger.warning("Failed to save config to %s: %s", service, exc)
             return {"status": "error", "detail": f"Cannot reach {service}"}
 
+    async def logs(self, service: str) -> dict[str, Any]:
+        """Fetch recent log lines from a service's ring buffer."""
+        url = self._service_url(service)
+        if not url:
+            return {"lines": [], "detail": "service URL not configured"}
+        try:
+            response = await self._client.get(f"{url}/control/logs")
+            response.raise_for_status()
+            return response.json()
+        except Exception as exc:
+            logger.warning("Failed to fetch logs from %s: %s", service, exc)
+            return {"lines": [], "detail": f"Cannot reach {service}"}
+
     async def upload_vpn_file(self, content: bytes, filename: str) -> dict[str, Any]:
         """Proxy OpenVPN configuration file upload to agent-control."""
         url = self._service_url("agent")

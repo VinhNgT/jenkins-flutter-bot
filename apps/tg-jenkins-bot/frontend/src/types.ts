@@ -16,6 +16,7 @@ export interface ActiveBuild {
   triggered_at: number;
   triggered_by: string;
   triggered_by_id: number;
+  estimated_duration: number;
 }
 
 /** A completed build from build history. */
@@ -29,6 +30,7 @@ export interface RecentBuild {
   completed_at: number;
   download_url: string | null;
   file_size: number;
+  build_number: number;
 }
 
 /** GET /api/webapp/config response. */

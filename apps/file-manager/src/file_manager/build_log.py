@@ -33,6 +33,7 @@ class BuildRecord:
     download_url: str = ""
     file_id: str = ""
     file_size: int = 0
+    build_number: int = 0
 
 
 class BuildLog:
@@ -95,6 +96,7 @@ class BuildLog:
         download_url: str = "",
         file_id: str = "",
         file_size: int = 0,
+        build_number: int = 0,
     ) -> list[BuildRecord]:
         """Append a build record and enforce retention.
 
@@ -111,6 +113,7 @@ class BuildLog:
             download_url=download_url,
             file_id=file_id,
             file_size=file_size,
+            build_number=build_number,
         )
         self._records.append(entry)
 

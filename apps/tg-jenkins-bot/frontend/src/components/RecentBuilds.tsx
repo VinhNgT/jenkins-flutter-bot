@@ -33,8 +33,12 @@ function RecentBuildRow({ build, onSelect }: { build: RecentBuild; onSelect: (bu
     : build.result === 'failure' ? 'var(--tg-color-destructive)'
     : build.result === 'timeout' ? '#ff9500' : 'var(--tg-color-hint)';
 
-  // Subtitle: relative time + short commit hash for identification
-  const subtitle = commit ? `${relativeTime} · ${commit}` : relativeTime;
+  // Subtitle: build number + relative time + short commit hash for identification
+  const parts: string[] = [];
+  if (build.build_number > 0) parts.push(`#${build.build_number}`);
+  parts.push(relativeTime);
+  if (commit) parts.push(commit);
+  const subtitle = parts.join(' · ');
 
   function handleClick() {
     haptic.impact('light');

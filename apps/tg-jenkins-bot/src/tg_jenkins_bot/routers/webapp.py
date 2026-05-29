@@ -66,6 +66,7 @@ class ActiveBuildResponse(BaseModel):
     triggered_at: float
     triggered_by: str
     triggered_by_id: int
+    estimated_duration: int = 0
 
 
 class WebAppConfigResponse(BaseModel):
@@ -89,6 +90,7 @@ class RecentBuildItem(BaseModel):
     completed_at: float
     download_url: str | None
     file_size: int = 0
+    build_number: int = 0
 
 
 class RecentBuildsResponse(BaseModel):
@@ -334,6 +336,7 @@ async def get_webapp_config(
                 triggered_at=build.triggered_at,
                 triggered_by=build.triggered_by,
                 triggered_by_id=build.triggered_by_id,
+                estimated_duration=build.estimated_duration,
             )
         )
 
@@ -388,6 +391,7 @@ async def stream_active_builds(
                         "triggered_at": build.triggered_at,
                         "triggered_by": build.triggered_by,
                         "triggered_by_id": build.triggered_by_id,
+                        "estimated_duration": build.estimated_duration,
                     }
                 )
 
@@ -471,6 +475,7 @@ async def trigger_webapp_build(
         triggered_by=user.first_name,
         triggered_by_id=user.user_id,
         notify=req.notify,
+        estimated_duration=res.get("estimated_duration", 0),
     )
 
     return TriggerResponse(request_id=request_id)
@@ -552,6 +557,7 @@ async def get_recent_builds(
                 completed_at=b.completed_at,
                 download_url=b.download_url,
                 file_size=b.file_size,
+                build_number=b.build_number,
             )
             for b in builds
         ]

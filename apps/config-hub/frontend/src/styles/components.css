@@ -572,3 +572,131 @@
     color: var(--tg-color-text);
     word-break: break-all;
 }
+
+/* ─── Log Viewer ──────────────────────────────────────────────── */
+.log-viewer {
+    margin-top: var(--space-sm);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    overflow: hidden;
+    animation: fadeIn 0.2s ease;
+}
+
+.log-viewer__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: color-mix(in srgb, var(--tg-color-text) 4%, var(--tg-color-secondary-bg));
+    border-bottom: 1px solid var(--tg-color-separator);
+}
+
+.log-viewer__title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--tg-color-hint);
+}
+
+.log-viewer__actions {
+    display: flex;
+    gap: 2px;
+}
+
+.log-viewer__btn {
+    background: transparent;
+    border: none;
+    color: var(--tg-color-hint);
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.log-viewer__btn:hover:not(:disabled) {
+    color: var(--tg-color-text);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.log-viewer__btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.log-viewer__btn--close:hover:not(:disabled) {
+    color: var(--tg-color-destructive);
+}
+
+.log-viewer__output {
+    background: #0d1117;
+    max-height: 360px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.log-viewer__output::-webkit-scrollbar {
+    width: 6px;
+}
+
+.log-viewer__output::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.log-viewer__output::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+}
+
+.log-viewer__empty {
+    padding: 32px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--tg-color-hint);
+}
+
+.log-viewer__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.65;
+}
+
+.log-line:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.log-line__num {
+    width: 1%;
+    white-space: nowrap;
+    padding: 0 12px;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.2);
+    user-select: none;
+    vertical-align: top;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.log-line__text {
+    padding: 0 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #c9d1d9;
+}
+
+/* Log level coloring */
+.log-line--error .log-line__text {
+    color: #f85149;
+}
+
+.log-line--warning .log-line__text {
+    color: #d29922;
+}
+
+.log-line--debug .log-line__text {
+    color: #8b949e;
+}

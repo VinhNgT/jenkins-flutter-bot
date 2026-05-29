@@ -188,6 +188,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
   const triggeredBy = showingActiveUI ? (resolvedData as ActiveBuild).triggered_by : null;
   const triggeredById = showingActiveUI ? (resolvedData as ActiveBuild).triggered_by_id : null;
   const canCancel = showingActiveUI && isActiveBuild && (initData === 'preview' || (userId != null && triggeredById === userId));
+  const estimatedDurationMs = showingActiveUI ? (resolvedData as ActiveBuild).estimated_duration : 0;
 
   // Recent build fields
   const result = showingActiveUI ? null : (resolvedData as RecentBuild).result;
@@ -195,6 +196,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
   const commitHash = showingActiveUI ? null : (resolvedData as RecentBuild).commit_hash;
   const downloadUrl = showingActiveUI ? null : (resolvedData as RecentBuild).download_url;
   const fileSize = showingActiveUI ? 0 : (resolvedData as RecentBuild).file_size;
+  const buildNumber = showingActiveUI ? 0 : (resolvedData as RecentBuild).build_number;
 
   // Relative time for header subtitle
   const relativeTime = useRelativeTime(showingActiveUI ? triggeredAt : (completedAt ?? 0));
@@ -353,6 +355,12 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
               <span class="tg-kv-value">{formatFileSize(fileSize)}</span>
             </div>
           )}
+          {showingActiveUI && estimatedDurationMs > 0 && (
+            <div class="tg-kv-row">
+              <span class="tg-kv-label"><Timer size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Estimated</span>
+              <span class="tg-kv-value">{formatDuration(estimatedDurationMs / 1000)}</span>
+            </div>
+          )}
           {triggeredBy && (
             <div class="tg-kv-row">
               <span class="tg-kv-label"><User size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Triggered by</span>
@@ -399,6 +407,12 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
       <div class="tg-section">
         <div class="tg-section-header">Diagnostics</div>
         <div class="tg-list">
+          {buildNumber > 0 && (
+            <div class="tg-kv-row">
+              <span class="tg-kv-label"><Hash size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Jenkins Build</span>
+              <span class="tg-kv-value mono">#{buildNumber}</span>
+            </div>
+          )}
           <div class="tg-kv-row">
             <span class="tg-kv-label"><FileText size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Request ID</span>
             <span class="tg-kv-value mono">{requestId}</span>

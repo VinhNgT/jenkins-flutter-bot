@@ -56,6 +56,7 @@ class BuildCoordinator:
         build_timeout: int = 30,
         poll_interval: int = 10,
         artifact_pattern: str = "*.apk",
+        estimated_duration_ms: int | None = None,
         http_client: httpx.AsyncClient | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
@@ -66,6 +67,7 @@ class BuildCoordinator:
         self._build_timeout = build_timeout
         self._poll_interval = poll_interval
         self._artifact_pattern = artifact_pattern
+        self._estimated_duration_ms = estimated_duration_ms
         self._clock = clock
         self._tracker = BuildTracker(
             data_dir, clock=clock,
@@ -144,16 +146,43 @@ class BuildCoordinator:
     # Build trigger
     # ------------------------------------------------------------------
 
+    async def _estimate_duration(self, branch: str) -> int:
+        """Estimate build duration in seconds for the given branch.
+
+        Scans recent Jenkins build history for the most recent successful
+        run of the same branch and uses its actual duration.  Falls back
+        to the job-level ``estimatedDuration`` cached at startup.  Returns
+        ``0`` when no estimate is available.
+        """
+        try:
+            builds = await self._jenkins.get_builds(count=20)
+            for build in builds:
+                if (
+                    build.branch == branch
+                    and build.result == "SUCCESS"
+                    and build.duration_ms > 0
+                ):
+                    return build.duration_ms // 1000
+        except Exception:
+            logger.debug("Could not fetch build history for estimation")
+
+        if self._estimated_duration_ms and self._estimated_duration_ms > 0:
+            return self._estimated_duration_ms // 1000
+        return 0
+
     async def trigger_build(
         self, branch: str, *, frontend_callback_url: str = "", app_name: str | None = None
     ) -> dict[str, Any]:
         """Trigger a Jenkins build for the given branch.
 
-        Returns ``{request_id, status}`` on success.
+        Returns ``{request_id, status, estimated_duration}`` on success.
 
         Raises ``JenkinsTriggerError`` on failure.
         """
         request_id = BuildTracker.generate_request_id()
+
+        # Resolve branch-specific estimated duration before triggering
+        estimated_duration = await self._estimate_duration(branch)
 
         # Initiate VPN connection before triggering Jenkins build
         await self._connect_vpn()
@@ -186,7 +215,11 @@ class BuildCoordinator:
             branch,
             queue_id,
         )
-        return {"request_id": request_id, "status": "queued"}
+        return {
+            "request_id": request_id,
+            "status": "queued",
+            "estimated_duration": estimated_duration,
+        }
 
     # ------------------------------------------------------------------
     # Poll-based completion detection
@@ -332,6 +365,7 @@ class BuildCoordinator:
             completed_at=now,
             artifact=artifact_data,
             file_size=artifact_size,
+            build_number=jenkins_build.number,
         )
 
         if pending.frontend_callback_url:
@@ -344,6 +378,7 @@ class BuildCoordinator:
                 triggered_at=pending.triggered_at,
                 completed_at=now,
                 download_url=record_result.get("download_url", ""),
+                build_number=jenkins_build.number,
             )
 
         await self._disconnect_vpn_if_idle()
@@ -416,6 +451,7 @@ class BuildCoordinator:
         completed_at: float,
         artifact: tuple[str, bytes] | None = None,
         file_size: int = 0,
+        build_number: int = 0,
     ) -> dict[str, Any]:
         """Send build metadata (and optional artifact) to file-manager.
 
@@ -432,6 +468,7 @@ class BuildCoordinator:
             "triggered_at": str(triggered_at),
             "completed_at": str(completed_at),
             "file_size": str(file_size),
+            "build_number": str(build_number),
         }
 
         files = None
@@ -460,6 +497,7 @@ class BuildCoordinator:
         triggered_at: float,
         completed_at: float,
         download_url: str = "",
+        build_number: int = 0,
     ) -> None:
         """Forward a build result to the frontend's callback URL.
 
@@ -473,6 +511,7 @@ class BuildCoordinator:
             "triggered_at": triggered_at,
             "completed_at": completed_at,
             "download_url": download_url,
+            "build_number": build_number,
         }
         try:
             resp = await self._http.post(callback_url, json=payload)

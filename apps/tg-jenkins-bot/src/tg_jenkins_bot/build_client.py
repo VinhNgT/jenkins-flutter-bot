@@ -31,6 +31,7 @@ class BuildResult:
     completed_at: float
     download_url: str = ""
     file_size: int = 0
+    build_number: int = 0
 
 
 class BuildClientError(Exception):
@@ -136,6 +137,7 @@ class BuildClient:
                     completed_at=b.get("completed_at", 0),
                     download_url=b.get("download_url", ""),
                     file_size=b.get("file_size", 0),
+                    build_number=b.get("build_number", 0),
                 )
                 for b in data.get("builds", [])
             ]

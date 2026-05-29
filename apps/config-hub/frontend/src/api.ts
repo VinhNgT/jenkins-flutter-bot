@@ -87,6 +87,18 @@ export const API = {
     }
   },
 
+  async getServiceLogs(
+    service: Scope,
+  ): Promise<{ lines: string[] } | null> {
+    try {
+      return await request<{ lines: string[] }>(
+        `/api/services/${service}/logs`,
+      );
+    } catch {
+      return null;
+    }
+  },
+
   async getDriveStatus(): Promise<DriveStatus | null> {
     try {
       return await request<DriveStatus>('/api/drive/status');

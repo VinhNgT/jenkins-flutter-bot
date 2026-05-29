@@ -116,10 +116,13 @@ class BotContext:
             return
         duration = _format_duration(build.triggered_at, self._clock())
         download_url = result.get("download_url", "")
+        build_number = result.get("build_number", 0)
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
 
         lines = [f"✅ <b>{app_name} {label} is ready!</b>", ""]
+        if build_number:
+            lines.append(f"🏗 Build: <code>#{build_number}</code>")
         lines.append(f"📦 Branch: <code>{_escape(build.ref)}</code>")
         commit = result.get("commit_hash", "")
         if commit:

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from config_core import get_frontend_schema, read_masked_config, save_config_with_merge
+from config_core import (
+    get_buffer_logs,
+    get_frontend_schema,
+    read_masked_config,
+    save_config_with_merge,
+)
 from fastapi import APIRouter, Request
 
 from ..config import BotSettings, _DEFAULT_CONFIG_PATH
@@ -66,3 +71,9 @@ async def put_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
     save_config_with_merge(BotSettings, _DEFAULT_CONFIG_PATH, payload)
     return {"status": "saved"}
+
+
+@router.get("/logs")
+async def get_logs() -> dict[str, Any]:
+    """Return recent log lines from the in-memory ring buffer."""
+    return {"lines": get_buffer_logs()}

@@ -20,6 +20,7 @@ class ActiveBuild:
     triggered_by: str  # user display name
     triggered_by_id: int = 0  # user Telegram ID
     notify: bool = True  # whether to send result notification to chat
+    estimated_duration: int = 0  # seconds, from branch-specific estimation
 
 
 class ActiveBuildStore:
@@ -57,6 +58,7 @@ class ActiveBuildStore:
         triggered_by_id: int = 0,
         *,
         notify: bool = True,
+        estimated_duration: int = 0,
     ) -> ActiveBuild:
         """Register a new active build."""
         build = ActiveBuild(
@@ -68,6 +70,7 @@ class ActiveBuildStore:
             triggered_by=triggered_by,
             triggered_by_id=triggered_by_id,
             notify=notify,
+            estimated_duration=estimated_duration,
         )
         self._builds[request_id] = build
         self._notify_listeners()

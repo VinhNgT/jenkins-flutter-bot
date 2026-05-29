@@ -223,11 +223,25 @@ class JenkinsClient:
             ),
         )
 
-    async def check_connection(self) -> bool:
-        """Check if the Jenkins job is reachable."""
-        url = f"{self.job_url}/api/json?tree=name"
-        resp = await self._client.get(url)
-        return resp.status_code == 200
+    async def check_connection(self) -> tuple[bool, int | None]:
+        """Check if the Jenkins job is reachable and fetch its estimated duration.
+
+        Returns a tuple of ``(reachable, estimated_duration_ms)``.  The
+        duration is the job-level default estimate provided by Jenkins
+        (in milliseconds), or ``None`` if unavailable.
+        """
+        url = f"{self.job_url}/api/json?tree=name,estimatedDuration"
+        try:
+            resp = await self._client.get(url)
+            if resp.status_code != 200:
+                return False, None
+            data = resp.json()
+            estimated = data.get("estimatedDuration")
+            if isinstance(estimated, int) and estimated > 0:
+                return True, estimated
+            return True, None
+        except Exception:
+            return False, None
 
     async def cancel_build(self, queue_id: int) -> None:
         """Cancel a Jenkins build by queue ID.

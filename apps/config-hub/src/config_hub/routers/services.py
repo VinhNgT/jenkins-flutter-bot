@@ -40,6 +40,16 @@ async def control_service(
     return await method(service)
 
 
+@router.get("/{service}/logs")
+async def get_service_logs(
+    manager: ManagerDep, service: str
+) -> dict[str, Any]:
+    """Fetch recent log lines from a service's ring buffer."""
+    if service not in _MANAGED_SERVICES:
+        raise HTTPException(status_code=404, detail="Unknown service")
+    return await manager.services.logs(service)
+
+
 @router.post("/agent/vpn/upload")
 async def proxy_vpn_upload(manager: ManagerDep, file: UploadFile = File(...)) -> dict[str, Any]:
     """Proxy multipart .ovpn configuration file upload to agent-control."""

@@ -125,3 +125,16 @@ Secrets registered via `register_secret()` are automatically scrubbed from all l
 - `setup_service_logging()` installs the redaction filter and configures standardised logging format. Called once in each service's `cli()` entry point.
 - `register_secret(value)` registers a secret value for redaction. Called when secrets are loaded from config.
 - Part of `config-core`, not individual services.
+
+---
+
+## Config Hub Administrative Authentication
+
+Config Hub implements a robust **dual authentication** security pattern to balance ease of local testing with strict public administrative access control:
+
+- **Primary Authentication (Telegram Mini App)**: Matches the visitor's Telegram `user.id` against a whitelisted admin contact list. The webapp transmits standard Telegram SDK credentials, and the Config Hub backend validates the integrity and signature of the `X-Telegram-Init-Data` header using the bot's secret token via HMAC-SHA256.
+- **Fallback Authentication (HTTP Basic Auth)**: A fallback for native browser setups using standard `CONFIG_HUB_AUTH_USERNAME` and `CONFIG_HUB_AUTH_PASSWORD` credentials.
+- **Defence-in-Depth Security (Gateway Strip)**: To prevent brute-forcing Basic Authentication over the public internet, the Ingress Gateway Caddyfile strips the `Authorization` header on all non-LAN/non-local requests targeting `/webapp-admin*` or `/api/webapp-admin/*`. Public access is therefore only permitted if authenticated via Telegram `initData`.
+- **OAuth Callback Exemption**: The Google Drive OAuth callback endpoint (`/api/webapp-admin/drive/oauth/callback`) is completely exempted from all authentication schemes. This ensures that cross-origin redirection from accounts.google.com succeeds without credential stripping.
+
+---

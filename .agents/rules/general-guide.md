@@ -18,8 +18,12 @@ A self-hosted microservice CI/CD ecosystem: a Telegram bot triggers Flutter buil
 ## Repository Layout (uv Workspace)
 
 - **`apps/`** — Six containerized Python apps (Dockerfile, `pyproject.toml`, PyPA `src` layout).
-- **`libs/`** — One shared workspace library (`config-core`).
-- **`infra/`** — Docker Compose environments (`dev`, `prod`, `edge`, `hybrid`, `mock`), Dockerfiles, and env templates.
+- **`libs/`** — Shared workspace libraries:
+  - `config-core`: Pydantic settings base classes, secret masking, and validation utilities.
+  - `platform-core`: Preact cross-platform settings storage, primary button context/hooks.
+  - `tg-core-preact`: Telegram SDK context providers, viewport hooks, and theme synchronizers.
+  - `tg-ui-preact`: High-fidelity Telegram design-language Preact component library (`Badge`, `Button`, `Dialog`, `Scaffold`, etc.) and CSS stylesheet. **(Note: This library must remain fully independent and never depend on other workspace libraries.)**
+- **`infra/`** — Docker Compose environment configurations (`docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.hybrid.yml`, `docker-compose.mock.yml` profiles), Dockerfiles, and centralized environment templates.
 - **`scripts/`** — Developer utilities.
 
 ### Naming Conventions

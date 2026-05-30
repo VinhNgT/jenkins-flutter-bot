@@ -40,19 +40,20 @@ Do not expose bot, agent-control, file-manager, or build-manager ports to the ho
 
 ---
 
-## Per-Service Environment Files
+## Centralized Environment Configuration
 
-Services consume optional per-service `.env` files via Compose `env_file:` with `required: false` (Compose v2.24+). These live in `infra/env/`.
+All environment variables for the orchestrator services are centralized within a single environment file at the `infra/` root:
 
-Template files (`*.env.example`) are auto-generated from schemas via `scripts/gen_env_examples.py`. Regenerate after schema changes.
+- **`infra/compose.env`**: Houses all custom configuration variables and secrets overrides. Loaded automatically by the `compose.sh` runner.
+- **`infra/compose.env.example`**: A self-documenting template generated dynamically from code schemas via `scripts/gen_env_examples.py`. Run this script after config schema updates to keep the template in sync.
 
 ---
 
-## Dev vs Production Compose
+## Dev vs Production Compose Profiles
 
-All Docker Compose configurations are organized into individual directories under `infra/` representing their respective environments. The `infra/compose.sh` script acts as a runner, automatically forwarding commands to the correct subdirectory using the `-f` flag (and optionally passing an `.env` file if it exists at `infra/.env`).
+All Docker Compose configurations are organized into unified flat files directly under the `infra/` directory. The `infra/compose.sh` runner script loads environment variables from `compose.env` and automatically routes execution to the specified compose file profile using the `-f` flag.
 
-Five compose modes/directories are supported:
+Four compose environment profiles are supported:
 
 ```bash
 ./compose.sh [args]          # Dev — runs from infra/docker-compose.yml (builds images locally from source)
@@ -61,13 +62,13 @@ Five compose modes/directories are supported:
 ./compose.sh mock [args]     # Mock — runs from infra/docker-compose.mock.yml (replaces agent-control & jenkins with mock-jenkins)
 ```
 
-**Production mode** runs `infra/docker-compose.prod.yml`, which pulls images from GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
+**Production mode** (`prod`) runs `infra/docker-compose.prod.yml`, which pulls pre-compiled service images from GHCR. Pin a release version via `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
 
-**Hybrid mode** runs `infra/docker-compose.hybrid.yml`, building all five Python applications locally while pulling the heavy `agent-control` image from GHCR to save compile time.
+**Hybrid mode** (`hybrid`) runs `infra/docker-compose.hybrid.yml`, compiling Python web applications locally while pulling the heavy, multi-gigabyte `agent-control` build agent image from GHCR to save compile time.
 
-**Mock mode** runs `infra/docker-compose.mock.yml`, replacing Jenkins and Agent Control with the lightweight `mock-jenkins` service for offline development and testing.
+**Mock mode** (`mock`) runs `infra/docker-compose.mock.yml`, replacing the physical Jenkins controller and `agent-control` containers with the lightweight `mock-jenkins` simulation service. Perfect for local offline frontend/UI development without executing JVM or Flutter builds.
 
-The `jenkins` service has **no** prod configuration — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the local container.
+The local `jenkins` service has **no** production config. In production, remove it and configure `JENKINS_URL` to point to your external Jenkins controller.
 
 ---
 

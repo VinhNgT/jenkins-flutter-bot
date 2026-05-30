@@ -77,7 +77,7 @@ This starts all eight containers:
 | Service          | URL                    | Purpose                                           |
 | ---------------- | ---------------------- | ------------------------------------------------- |
 | `jenkins`        | http://localhost:8080   | Jenkins controller (web UI)                       |
-| `gateway`        | http://localhost:9000   | Ingress Gateway (proxies to config-hub)           |
+| `gateway`        | http://localhost:8880/webapp-admin | Ingress Gateway (proxies to config-hub) |
 | `config-hub`     | Internal (:9000)       | Configuration dashboard and operational hub       |
 | `tg-jenkins-bot` | Internal (:9090)       | Telegram bot + webhook receiver (publicly proxied to gateway:80) |
 | `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs, OpenVPN management + control API |
@@ -87,7 +87,7 @@ This starts all eight containers:
 > [!NOTE]
 > The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so config-hub can manage them.
 
-Open **http://localhost:9000** (proxied securely via the gateway) — you'll use this dashboard throughout the remaining steps.
+Open **http://localhost:8880/webapp-admin** (proxied securely via the gateway) — you'll use this dashboard throughout the remaining steps.
 
 ### 1b. Config Hub Security (Basic Authentication)
 
@@ -147,7 +147,7 @@ This makes cloning configurations across dev, mock, and production environments 
 
 ### 2c. Configure the Agent in Config Hub
 
-Now switch to **config-hub** at http://localhost:9000:
+Now switch to **config-hub** at http://localhost:8880/webapp-admin:
 
 1. Open the **Jenkins Agent** tab
 2. Paste the **secret token** from the previous step into the **Agent Secret** field
@@ -281,7 +281,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
 
 ### 2g. Save Jenkins Settings in Config Hub
 
-Switch to **config-hub** at http://localhost:9000:
+Switch to **config-hub** at http://localhost:8880/webapp-admin:
 
 1. Open the **Build Manager** tab
 2. Fill in the Jenkins fields:
@@ -349,7 +349,7 @@ To ensure the `flutter-agent` build container isn't overwhelmed by multiple para
 
 Now enter these values in config-hub:
 
-6. Open the **Telegram Bot** tab at http://localhost:9000
+6. Open the **Telegram Bot** tab at http://localhost:8880/webapp-admin
 7. Fill in:
 
    | Field              | Value                                   |
@@ -410,7 +410,7 @@ If you prefer to run the connector natively on your host machine:
    - **URL:** `http://localhost:9090`
 
 #### Finalizing the Setup
-Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http://localhost:9000):
+Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http://localhost:8880/webapp-admin):
 - Set **Web App URL** to `https://bot.yourdomain.com/webapp/` (make sure it ends with `/webapp/` and uses `https`).
 - Click **Save Bot Config** and restart the bot service. The bot will automatically register the `🚀 Build` MenuButtonWebApp pointing to your new Cloudflare domain!
 
@@ -436,13 +436,13 @@ Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http:/
    - Go to **APIs & Services → Credentials**
    - Click **Create Credentials → OAuth client ID**
    - Application type: **Web application**
-   - **Authorized redirect URIs:** add `http://localhost:9000/api/drive/oauth/callback`
+   - **Authorized redirect URIs:** add `http://localhost:8880/api/webapp-admin/drive/oauth/callback`
    - Click **Create**
    - Copy the **Client ID** and **Client Secret**
 
 ### 4b. Save & Connect in Config Hub
 
-1. Open the **Google Drive** tab at http://localhost:9000
+1. Open the **Google Drive** tab at http://localhost:8880/webapp-admin
 2. Paste the **Client ID** and **Client Secret** you just created
 3. Click **Save Drive Config**
 4. Click the **Connect Google Drive** button
@@ -482,6 +482,10 @@ docker compose restart
 
 1. **Jenkins:** Go to http://localhost:8080 → Nodes — the `flutter-agent` should show as **online**
 2. **Telegram:** Send `/status` to your bot — it should report service health and confirm the bot is ready
+
+> [!TIP]
+> **Local WebApp Emulator for Development:**
+> Both the `tg-jenkins-bot` webapp and the `config-hub` admin app include an integrated **Telegram WebApp Emulator** for rapid in-browser testing without relying on the physical Telegram client. When you access these apps in your browser locally (e.g. `http://localhost:8880/webapp/` or `http://localhost:8880/webapp-admin/`), the emulator provides a mock mobile UI container simulating custom theme styles, Main/Back button integration, and editable Telegram `initData` parameters.
 
 ### Run Your First Build
 
@@ -550,7 +554,7 @@ docker compose logs file-manager
 
 ### OAuth popup says "redirect_uri_mismatch"
 
-- In Google Cloud Console, ensure the redirect URI is exactly: `http://localhost:9000/api/drive/oauth/callback`
+- In Google Cloud Console, ensure the redirect URI is exactly: `http://localhost:8880/api/webapp-admin/drive/oauth/callback`
 - The URI is case-sensitive and must include the full path
 
 ### Resetting everything

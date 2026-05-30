@@ -20,13 +20,34 @@ Triggered when editing frontend TypeScript/TSX files. Covers the Preact + Vite s
 
 ---
 
+## Shared Workspace Libraries
+
+To maintain absolute styling parity, prevent code drift, and optimize component reuse, all frontend projects must consume shared Preact/TypeScript core packages located under `libs/`:
+
+- **`libs/platform-core`**: Provides unified cross-platform contexts/providers:
+  - `PlatformContext`: Determines the active environment and configuration injection.
+  - `PlatformStorageContext`: Implements a standard storage interface (Promise-based `getItem`/`setItem`) automatically mapping to Telegram `CloudStorage` (when in the Mini App) or standard `localStorage` (when in browser).
+  - `PrimaryButtonContext`: Standardizes the declarative hook `usePrimaryButton` for setting primary screen CTA buttons.
+- **`libs/tg-core-preact`**: Handles native Telegram SDK bindings:
+  - `TelegramContext`: Initializes and injects the raw `window.Telegram.WebApp` SDK.
+  - `useTheme` / `useViewport`: Reactive hooks syncing theme colors (`--tg-color-*` variables) and viewport sizes to Preact lifecycle.
+- **`libs/tg-ui-preact`**: A high-fidelity, unified Telegram UI library. 
+  - Exposes reusable Preact components designed specifically for Telegram's aesthetics: `Badge`, `Button`, `Dialog`, `ErrorBoundary`, `Input`, `List`, `ListItem`, `Navigator`, `Scaffold`, `Shimmer` (skeleton loaders), `Spinner`, `Switch`, `TextArea`, `Toast`.
+  - Imports all styling from the shared `src/styles/telegram.css` stylesheet.
+  - **Independence Constraint**: Must remain fully independent and MUST NOT import or depend on other workspace libraries (such as `platform-core` or `tg-core-preact`), keeping it a pure, lightweight, reusable component-only library.
+
+> [!IMPORTANT]
+> **Component Reusability Rule:** Developers must NEVER build duplicate UI controls (like switches, standard lists, inputs, or headers) or make raw, imperative calls to the Telegram SDK inside the webapps. All custom views must utilize the declarative components and hooks provided in the shared packages.
+
+---
+
 ## Two Frontends, One Stack
 
 Both frontends share identical dependencies, tooling, project structure, and design system:
 
 | Frontend | Location | Serves | Base Path |
 |----------|----------|--------|-----------|
-| Config Hub Dashboard | `apps/config-hub/frontend/` | Admin web dashboard | `/webapp-admin/` |
+| Config Hub Mini App | `apps/config-hub/frontend/` | Admin Telegram Mini App | `/webapp-admin/` |
 | Telegram Web App | `apps/tg-jenkins-bot/frontend/` | Telegram Mini App | `/webapp/` |
 
 Changes to shared patterns should be applied to both.
@@ -39,11 +60,11 @@ Both frontends use the same Telegram design language, `--tg-color-*` CSS variabl
 
 | | Bot Webapp | Config Hub |
 |---|-----------|------------|
-| **Audience** | End users (Telegram) | Administrators (browser) |
+| **Audience** | End users (Telegram) | Administrators (Telegram / browser) |
 | **UX priority** | Strict native Telegram feel, minimal UI | Information density, operational efficiency |
 | **Theme** | SDK-injected `--tg-theme-*` + system fallbacks (light/dark) | Same `--tg-color-*` variables with hardcoded dark fallbacks |
 | **Deviations** | None — follow Telegram conventions exactly | Minor deviations acceptable for density (e.g., inline expand controls, denser list items, more visible status info) |
-| **SDK integration** | Full (`MainButton`, `BackButton`, haptics, `CloudStorage`) | None — standalone browser app |
+| **SDK integration** | Full (`MainButton`, `BackButton`, haptics, `CloudStorage`) | Partial (`BackButton`, haptics) + Emulator support |
 
 The config-hub uses the same CSS variable naming (`--tg-color-*`) and component class names (`.tg-section`, `.tg-list`, `.tg-list-item`) as the bot webapp. This shared design system means a developer maintaining either frontend sees identical structure and naming, even where the UX density differs.
 
@@ -123,9 +144,15 @@ Telegram SDK integrations are encapsulated in native-first, declarative React ho
 
 ---
 
-## Telegram Design Language
+Both frontends follow Telegram's design patterns (per `custom-rule.md`) and share the same `--tg-color-*` CSS variable system. The bot webapp integrates with `window.Telegram.WebApp` for theming, haptic feedback, and back-button handling; config-hub uses the same variable names with hardcoded fallback values. 
 
-Both frontends follow Telegram's design patterns (per `custom-rule.md`) and share the same `--tg-color-*` CSS variable system. The bot webapp integrates with `window.Telegram.WebApp` for theming, haptic feedback, and back-button handling; config-hub uses the same variable names with hardcoded fallback values. The emulator mode (`emulator.ts`) provides a browser-based preview for development without Telegram, with fully-implemented floating controls for the `MainButton`/`BackButton` as well as light/dark auto-syncing theme params.
+### Local Telegram WebApp Emulator
+
+To facilitate rapid local development and testing outside the physical Telegram client, both frontends utilize an integrated **Telegram WebApp Emulator** framework:
+- **Mock SDK**: Simulates the standard `window.Telegram.WebApp` API interface dynamically when the app is launched in a standard browser window (dev port `8880`).
+- **Floating Controls**: Renders reactive mock overlays in the browser for Telegram singletons, including the native `MainButton` and `BackButton`.
+- **Parameter Simulation**: Allows developers to toggle between light/dark theme variables and edit test `initData` payloads on-the-fly.
+- **Implementation**: Structured cleanly in `emulator.ts` and `emulator.css` under each webapp's frontend source layout.
 
 ---
 

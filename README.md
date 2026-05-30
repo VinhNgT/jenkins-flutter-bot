@@ -37,10 +37,10 @@ graph TD
 
     TU -- Web App / HTTPS --> CF
     CF --> GW
-    GW -- Proxy :80 (/webapp) --> BOT
+    GW -- "/webapp" --> BOT
     BOT -- polling --> TU
-    BA -- Host Access :9000 --> GW
-    GW -- Proxy :9000 --> CH
+    BA -- LAN :8880 --> GW
+    GW -- "/webapp-admin" --> CH
     CH -. "configures & controls" .-> managed
 
     BOT -- trigger --> BM
@@ -55,13 +55,13 @@ graph TD
 
 | Service | Port | Exposed | Role |
 |---------|------|---------|------|
-| `config-hub` | 9000 | No | Central operational hub — config proxy, service control, web dashboard (accessed via gateway) |
+| `config-hub` | 9000 | No | Central operational hub — config proxy, service control, web dashboard (accessed via gateway at `/webapp-admin`) |
 | `jenkins` | 8080 | Yes | Standard Jenkins controller (dev/testing — can be external) |
 | `tg-jenkins-bot` | 9090 | No | Telegram polling bot + FastAPI callback/control server |
 | `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs, OpenVPN management + control API |
-| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, build log, retention enforcement |
+| `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, build log, retention enforcement, ephemeral/log_only storage |
 | `build-manager` | 9010 | No | Build orchestration — Jenkins trigger, job state tracking |
-| `gateway` | 80, 9000 | Yes | Caddy Ingress Gateway — secure routing perimeter for public Web App (:80) and admin UI (:9000) |
+| `gateway` | 80 | Yes | Caddy Ingress Gateway — unified path-based routing for `/webapp` (bot) and `/webapp-admin` (config-hub). Host maps `8880:80` in dev |
 | `cloudflared` | — | No | Cloudflare Tunnel — secure HTTPS tunnel connecting local gateway to Cloudflare |
 
 ---
@@ -74,7 +74,7 @@ cd jenkins-flutter-bot/infra
 ./compose.sh up -d --build
 ```
 
-Open **http://localhost:9000** and follow the **[Setup Guide](docs/setup-guide.md)** to configure Jenkins, Telegram, and Google Drive.
+Open **http://localhost:8880/webapp-admin** and follow the **[Setup Guide](docs/setup-guide.md)** to configure Jenkins, Telegram, and Google Drive.
 
 > **Production:** Pre-built images are on GHCR — use `./compose.sh prod up -d`. See the setup guide for details.
 

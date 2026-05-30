@@ -7,7 +7,6 @@
  */
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { ChevronRight } from 'lucide-preact';
 import { API } from '../api';
 import ServiceCard from './ServiceCard';
 import DriveCard from './DriveCard';
@@ -15,7 +14,8 @@ import StorageBanner from './StorageBanner';
 import VpnWidget from './VpnWidget';
 import type { DriveStatus, ServiceStatuses, Scope } from '../types';
 import { healthState } from '../utils';
-import type { Screen } from '../hooks/useNavigator';
+import type { Screen } from '../App';
+import { Scaffold, List, ListItem, Badge } from 'tg-ui-preact';
 
 interface HomeScreenProps {
   statuses: ServiceStatuses | null;
@@ -137,24 +137,24 @@ export default function HomeScreen({
   const isEphemeral = driveStatus?.backend === 'ephemeral';
   const isLogOnly = driveStatus?.backend === 'log_only';
 
+  const headerActions = (
+    <div class="header-right" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+      {version && <span class="version-badge loaded">v{version}</span>}
+      {githubUrl && (
+        <a class="github-link" href={githubUrl} target="_blank" rel="noopener">
+          <GithubIcon class="github-icon" size={14} />
+          GitHub
+        </a>
+      )}
+    </div>
+  );
+
   return (
-    <div class="container">
-      {/* Header */}
-      <header>
-        <div>
-          <h1>Stack Control</h1>
-          <p class="header-subtitle">Service monitoring & configuration</p>
-        </div>
-        <div class="header-right">
-          {version && <span class="version-badge loaded">v{version}</span>}
-          {githubUrl && (
-            <a class="github-link" href={githubUrl} target="_blank" rel="noopener">
-              <GithubIcon class="github-icon" size={14} />
-              GitHub
-            </a>
-          )}
-        </div>
-      </header>
+    <Scaffold
+      title="Stack Control"
+      subtitle="Service monitoring & configuration"
+      headerActions={headerActions}
+    >
 
       {/* Service Dashboard */}
       <div class="tg-section">
@@ -187,72 +187,61 @@ export default function HomeScreen({
       )}
 
       {/* Configuration Sections */}
-      <div class="tg-section">
-        <h2 class="tg-section-header">Configuration</h2>
-        <div class="tg-list">
-          {CONFIG_SECTIONS.map(({ id, label, description, scopes }) => {
-            const state = aggregateHealth(statuses, scopes);
-            const isSectionDirty = dirtyScopes ? scopes.some(s => dirtyScopes[s]) : false;
-            return (
-              <div
-                key={id}
-                class="tg-list-item"
-                onClick={() => onNavigate({ screen: 'config', id })}
-              >
-                <div class="tg-list-item-content">
-                  <span class="tg-list-item-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-                    {label}
-                    {isSectionDirty && (
-                      <span
-                        class="save-dot"
-                        style={{
-                          display: 'inline-block',
-                          opacity: 1,
-                          transform: 'scale(1)',
-                          animation: 'pulseGlow 1.8s infinite alternate',
-                          marginLeft: 0,
-                        }}
-                      />
-                    )}
-                  </span>
-                  <span class="tg-list-item-subtitle">{description}</span>
-                </div>
-                <div class="badge-group">
-                  <span class={`badge badge--${state}`}>{state === 'needs-config' ? 'Needs config' : state}</span>
-                  <ChevronRight class="tg-list-item-chevron" size={18} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <List header="Configuration">
+        {CONFIG_SECTIONS.map(({ id, label, description, scopes }) => {
+          const state = aggregateHealth(statuses, scopes);
+          const isSectionDirty = dirtyScopes ? scopes.some(s => dirtyScopes[s]) : false;
+          
+          const badgeVariant = state === 'running' ? 'success'
+            : state === 'needs-config' ? 'warning'
+            : state === 'stopped' ? 'info'
+            : 'neutral';
+
+          return (
+            <ListItem
+              key={id}
+              title={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+                  {label}
+                  {isSectionDirty && (
+                    <span
+                      className="save-dot"
+                      style={{
+                        display: 'inline-block',
+                        opacity: 1,
+                        transform: 'scale(1)',
+                        animation: 'pulseGlow 1.8s infinite alternate',
+                        marginLeft: 0,
+                      }}
+                    />
+                  )}
+                </span>
+              }
+              subtitle={description}
+              rightElement={
+                <Badge variant={badgeVariant}>
+                  {state === 'needs-config' ? 'Needs config' : state}
+                </Badge>
+              }
+              onClick={() => onNavigate({ screen: 'config', id })}
+            />
+          );
+        })}
+      </List>
 
       {/* Tools */}
-      <div class="tg-section">
-        <h2 class="tg-section-header">Tools</h2>
-        <div class="tg-list">
-          <div
-            class="tg-list-item"
-            onClick={() => onNavigate({ screen: 'jenkinsfile' })}
-          >
-            <div class="tg-list-item-content">
-              <span class="tg-list-item-title">Pipeline Generator</span>
-              <span class="tg-list-item-subtitle">Generate ready-to-use Jenkinsfile scripts</span>
-            </div>
-            <ChevronRight class="tg-list-item-chevron" size={18} />
-          </div>
-          <div
-            class="tg-list-item"
-            onClick={() => onNavigate({ screen: 'transfer' })}
-          >
-            <div class="tg-list-item-content">
-              <span class="tg-list-item-title">Config Transfer</span>
-              <span class="tg-list-item-subtitle">Backup and restore configuration files</span>
-            </div>
-            <ChevronRight class="tg-list-item-chevron" size={18} />
-          </div>
-        </div>
-      </div>
-    </div>
+      <List header="Tools">
+        <ListItem
+          title="Pipeline Generator"
+          subtitle="Generate ready-to-use Jenkinsfile scripts"
+          onClick={() => onNavigate({ screen: 'jenkinsfile' })}
+        />
+        <ListItem
+          title="Config Transfer"
+          subtitle="Backup and restore configuration files"
+          onClick={() => onNavigate({ screen: 'transfer' })}
+        />
+      </List>
+    </Scaffold>
   );
 }

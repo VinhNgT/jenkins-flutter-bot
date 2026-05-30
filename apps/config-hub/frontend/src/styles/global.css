@@ -8,464 +8,7 @@
 /* ═══════════════════════════════════════════════════════════════════
    § 1. Design Variables
    ═══════════════════════════════════════════════════════════════════ */
-:root {
-    /* Telegram SDK auto-injects --tg-theme-* CSS variables. Use them as
-       primary source with hardcoded fallbacks for non-Telegram environments
-       (browser preview). */
-    --tg-color-bg: var(--tg-theme-bg-color, #ffffff);
-    --tg-color-secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f7);
-    --tg-color-text: var(--tg-theme-text-color, #000000);
-    --tg-color-hint: var(--tg-theme-hint-color, #8e8e93);
-    --tg-color-link: var(--tg-theme-link-color, #007ee5);
-    --tg-color-button: var(--tg-theme-button-color, #2481cc);
-    --tg-color-button-text: var(--tg-theme-button-text-color, #ffffff);
-    --tg-color-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
-
-    /* API 7.0+ section-level theme params */
-    --tg-color-section-bg: var(--tg-theme-section-bg-color, var(--tg-color-bg));
-    --tg-color-section-header: var(--tg-theme-section-header-text-color, var(--tg-color-hint));
-    --tg-color-subtitle: var(--tg-theme-subtitle-text-color, var(--tg-color-hint));
-    --tg-color-header-bg: var(--tg-theme-header-bg-color, var(--tg-color-secondary-bg));
-
-    /* API 7.6: section_separator_color for list dividers */
-    --tg-color-separator: var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.08));
-    --tg-color-divider: var(--tg-color-separator);
-
-    /* API 7.10: bottom bar behind MainButton */
-    --tg-color-bottom-bar: var(--tg-theme-bottom-bar-bg-color, var(--tg-color-secondary-bg));
-
-    /* Semantic status colors */
-    --tg-color-success: #31b545;
-    --tg-color-warning: #e0a830;
-
-    /* Layout Variables */
-    --nav-transition-ms: 300;
-    --transition-speed: 0.22s;
-
-    /* Border Radius Scale */
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
-    --radius-round: 999px;
-    --border-radius-card: var(--radius-lg);
-
-    /* Spacing Scale */
-    --space-xxs: 2px;
-    --space-xs: 4px;
-    --space-sm: 8px;
-    --space-md: 16px;
-    --space-lg: 24px;
-    --space-xl: 32px;
-    --space-2xl: 40px;
-
-    /* Typography Sizes */
-    --font-size-xs: 11px;
-    --font-size-sm: 12px;
-    --font-size-md: 13px;
-    --font-size-base: 14px;
-    --font-size-lg: 16px;
-    --font-size-xl: 18px;
-    --font-size-2xl: 20px;
-
-    /* Typography Line Heights */
-    --line-height-tight: 1.25;
-    --line-height-normal: 1.4;
-    --line-height-loose: 1.55;
-
-    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-        Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono",
-        Consolas, monospace;
-
-    /* Motion */
-    --transition-fast: 120ms ease;
-    --transition: 180ms ease;
-}
-
-/* Fallback Dark Theme detection (handles previews outside Telegram) */
-@media (prefers-color-scheme: dark) {
-    :root:not(.tg-theme-loaded) {
-        --tg-color-bg: #1c242c;
-        --tg-color-secondary-bg: #0f171e;
-        --tg-color-text: #ffffff;
-        --tg-color-hint: #708499;
-        --tg-color-link: #5288c1;
-        --tg-color-button: #5288c1;
-        --tg-color-button-text: #ffffff;
-        --tg-color-destructive: #ff3b30;
-        --tg-color-separator: rgba(255, 255, 255, 0.08);
-        --tg-color-divider: var(--tg-color-separator);
-
-        --tg-color-section-bg: var(--tg-color-bg);
-        --tg-color-section-header: var(--tg-color-hint);
-        --tg-color-subtitle: var(--tg-color-hint);
-        --tg-color-header-bg: var(--tg-color-secondary-bg);
-    }
-}
-
-/* Telegram client specific class adjustments */
-body.tg-dark {
-    --tg-color-separator: rgba(255, 255, 255, 0.08);
-    --tg-color-divider: var(--tg-color-separator);
-}
-body.tg-light {
-    --tg-color-separator: rgba(0, 0, 0, 0.08);
-    --tg-color-divider: var(--tg-color-separator);
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   § 2. Reset
-   ═══════════════════════════════════════════════════════════════════ */
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    -webkit-tap-highlight-color: transparent;
-}
-
-body {
-    font-family: var(--font-family);
-    font-size: var(--font-size-base);
-    color: var(--tg-color-text);
-    background: var(--tg-color-secondary-bg);
-    line-height: var(--line-height-loose);
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-}
-
-a {
-    color: var(--tg-color-link);
-    text-decoration: none;
-}
-a:hover {
-    text-decoration: underline;
-}
-
-html {
-    scrollbar-width: none;
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-    display: none;
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   § 3. Stack Navigator — CSS transform-based screen transitions
-   ═══════════════════════════════════════════════════════════════════ */
-.nav-viewport {
-    position: fixed;
-    inset: 0;
-    overflow: hidden;
-}
-
-.nav-screen {
-    position: absolute;
-    inset: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    will-change: transform;
-    /* Telegram safe-area padding — accounts for notches, home bars,
-       and system UI on iOS/Android. */
-    padding: calc(10px + var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px)))
-             calc(18px + var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px)))
-             calc(40px + var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
-             calc(18px + var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px)));
-    scrollbar-width: none;
-}
-
-.nav-screen::-webkit-scrollbar {
-    display: none;
-}
-
-/* Main screen positioning */
-.nav-screen--main {
-    z-index: 1;
-    transform: translateX(0);
-    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
-    background-color: var(--tg-color-secondary-bg);
-}
-
-/* Detail screen positioning */
-.nav-screen--detail {
-    z-index: 10;
-    background-color: var(--tg-color-secondary-bg);
-    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* Initial mount: detail screen is offscreen right */
-.nav-pushing .nav-screen--detail {
-    transform: translateX(100%);
-}
-
-/* Pushed: detail screen is onscreen, main screen shifts left */
-.nav-pushed .nav-screen--main {
-    transform: translateX(-30%);
-}
-
-.nav-pushed .nav-screen--detail {
-    transform: translateX(0);
-}
-
-/* Popping: detail screen slides back offscreen right */
-.nav-popping .nav-screen--main {
-    transform: translateX(0);
-}
-
-.nav-popping .nav-screen--detail {
-    transform: translateX(100%);
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   § 4. Container & Content Area
-   ═══════════════════════════════════════════════════════════════════ */
-.container {
-    max-width: 540px;
-    width: 100%;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-    flex-grow: 1;
-    animation: fadeIn var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   § 5. Header
-   ═══════════════════════════════════════════════════════════════════ */
-header {
-    padding: var(--space-sm) var(--space-xs) var(--space-sm) var(--space-xs);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-header h1 {
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
-    color: var(--tg-color-text);
-    letter-spacing: -0.2px;
-}
-
-.header-subtitle {
-    font-size: var(--font-size-md);
-    color: var(--tg-color-subtitle);
-    margin-top: var(--space-xxs);
-    font-weight: 400;
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-}
-
-.version-badge {
-    display: inline-block;
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--tg-color-hint);
-    background: var(--tg-color-bg);
-    border: 1px solid var(--tg-color-separator);
-    border-radius: var(--radius-round);
-    padding: var(--space-xxs) var(--space-sm);
-    letter-spacing: 0.03em;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.version-badge.loaded {
-    opacity: 1;
-}
-
-.github-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--tg-color-hint);
-    background: var(--tg-color-bg);
-    border: 1px solid var(--tg-color-separator);
-    border-radius: var(--radius-round);
-    padding: var(--space-xs) var(--space-md);
-    text-decoration: none;
-    transition: color var(--transition-fast), background var(--transition-fast),
-        border-color var(--transition-fast);
-}
-
-.github-link:hover {
-    color: var(--tg-color-link);
-    background: color-mix(in srgb, var(--tg-color-link) 8%, var(--tg-color-bg));
-    border-color: color-mix(
-        in srgb,
-        var(--tg-color-link) 40%,
-        var(--tg-color-separator)
-    );
-    text-decoration: none;
-}
-
-.github-icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    fill: currentColor;
-}
-
-/* Detail screen back button */
-.back-button {
-    background: none;
-    border: none;
-    color: var(--tg-color-link);
-    font: inherit;
-    font-size: var(--font-size-base);
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: 0;
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   § 6. Telegram Grouped Sections
-   ═══════════════════════════════════════════════════════════════════ */
-.tg-section {
-    display: flex;
-    flex-direction: column;
-}
-
-.tg-section-header {
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    text-transform: uppercase;
-    color: var(--tg-color-section-header);
-    padding: var(--space-md) var(--space-lg) var(--space-xs) var(--space-lg);
-    margin: 0;
-    letter-spacing: 0.3px;
-}
-
-.tg-section-footer {
-    /* TGUI SectionFooter iOS: padding: 8px 16px 0 */
-    font-size: var(--font-size-md);
-    color: var(--tg-color-hint);
-    padding: var(--space-sm) var(--space-md) 0;
-    margin: 0;
-    line-height: var(--line-height-normal);
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   § 7. Telegram List (Grouped Rows)
-   ═══════════════════════════════════════════════════════════════════ */
-.tg-list {
-    background-color: var(--tg-color-section-bg);
-    border-radius: var(--border-radius-card);
-    overflow: hidden;
-    transition: background-color var(--transition-speed) ease;
-}
-
-.tg-list-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--space-lg);
-    position: relative;
-    cursor: pointer;
-    min-height: 48px;
-    background: transparent;
-    transition: background-color 0.15s ease;
-}
-
-/* Native tapped ink ripple — uses theme class instead of media query */
-.tg-list-item:active {
-    background-color: rgba(0, 0, 0, 0.05);
-}
-body.tg-dark .tg-list-item:active {
-    background-color: rgba(255, 255, 255, 0.04);
-}
-
-.tg-list-item:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: var(--space-lg);
-    right: 0;
-    height: 0.5px;
-    background-color: var(--tg-color-divider);
-    transition: background-color var(--transition-speed) ease;
-}
-
-.tg-list-item-content {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xxs);
-    flex-grow: 1;
-    padding: var(--space-md) var(--space-sm) var(--space-md) 0;
-}
-
-.tg-list-item-title {
-    font-size: var(--font-size-lg);
-    font-weight: 500;
-    color: var(--tg-color-text);
-}
-
-.tg-list-item-subtitle {
-    font-size: var(--font-size-md);
-    color: var(--tg-color-subtitle);
-}
-
-.tg-list-item-meta {
-    font-size: var(--font-size-xs);
-    color: var(--tg-color-hint);
-    font-family: monospace;
-    background-color: rgba(0, 0, 0, 0.04);
-    padding: var(--space-xxs) var(--space-xs);
-    border-radius: var(--radius-sm);
-    max-width: 100%;
-    display: inline-block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-body.tg-dark .tg-list-item-meta {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Empty state list items */
-.tg-empty-row {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-lg);
-    text-align: center;
-    color: var(--tg-color-hint);
-}
-
-.tg-empty-row svg {
-    width: 36px;
-    height: 36px;
-    margin-bottom: var(--space-sm);
-    opacity: 0.35;
-    color: var(--tg-color-text);
-}
-
-.tg-empty-row span {
-    font-size: var(--font-size-base);
-    font-weight: 400;
-}
-
-/* Chevron for navigable rows */
-.tg-list-item-chevron {
-    color: var(--tg-color-hint);
-    opacity: 0.5;
-    flex-shrink: 0;
-}
+@import 'tg-ui-preact/dist/styles/telegram.css';
 
 /* ═══════════════════════════════════════════════════════════════════
    § 8. Cards (Admin density)
@@ -595,6 +138,60 @@ body.tg-dark .tg-list-item-meta {
     align-items: center;
     gap: var(--space-sm);
     flex-shrink: 0;
+}
+
+.version-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--tg-color-link) 8%, var(--tg-color-secondary-bg));
+    border: 1px solid color-mix(in srgb, var(--tg-color-link) 15%, var(--tg-color-separator));
+    color: var(--tg-color-link);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    padding: var(--space-xxs) var(--space-sm);
+    border-radius: var(--radius-round);
+    font-family: var(--font-mono);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.15s ease;
+    user-select: none;
+    letter-spacing: 0.5px;
+    opacity: 0.85;
+}
+
+.version-badge.loaded {
+    opacity: 1;
+}
+
+.github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--tg-color-hint);
+    text-decoration: none;
+    background: color-mix(in srgb, var(--tg-color-text) 4%, var(--tg-color-secondary-bg));
+    border: 1px solid var(--tg-color-separator);
+    padding: var(--space-xxs) var(--space-sm);
+    border-radius: var(--radius-round);
+    transition: all 0.15s ease;
+}
+
+.github-link:hover {
+    color: var(--tg-color-text);
+    background: color-mix(in srgb, var(--tg-color-text) 8%, var(--tg-color-secondary-bg));
+    border-color: color-mix(in srgb, var(--tg-color-text) 15%, var(--tg-color-separator));
+    transform: translateY(-1px);
+}
+
+.github-icon {
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+
+.github-link:hover .github-icon {
+    opacity: 1;
 }
 
 /* ═══════════════════════════════════════════════════════════════════

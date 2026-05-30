@@ -18,10 +18,10 @@ import {
   GitBranch, Hash, Timer, User, Calendar, CalendarCheck,
   Copy, Download, HardDrive, FileText,
 } from 'lucide-preact';
-import { useTelegram } from '../context/TelegramContext';
+import { usePlatform, usePrimaryButton } from 'platform-core';
+import { Scaffold, List, Badge, Spinner, Button } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
-import { useMainButton } from '../hooks/useMainButton';
 import { cancelBuild as cancelBuildApi, fetchRecentBuilds } from '../api';
 import type { ActiveBuild, RecentBuild, AppConfig } from '../types';
 
@@ -80,7 +80,8 @@ function getResultVisuals(result: string) {
 }
 
 export default function BuildDetailScreen({ config, type, id, isActive, onBack }: BuildDetailScreenProps) {
-  const { isTelegram, tg, initData, userId, haptic } = useTelegram();
+  const platform = usePlatform();
+  const { initData, userId, haptic, hasNativePrimaryButton } = platform;
   const { showToast } = useToast();
   const [cancelling, setCancelling] = useState(false);
 
@@ -137,7 +138,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
   // live active→recent transitions.
   if (!resolvedData) {
     return (
-      <div class="container" style={{ display: 'flex' }}>
+      <Scaffold onBack={onBack}>
         {/* Skeleton: Hero header */}
         <div class="tg-detail-header">
           <div class="tg-skeleton" style={{ width: '56px', height: '56px', borderRadius: 'var(--radius-round)', marginBottom: 'var(--space-sm)' }} />
@@ -170,7 +171,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
             </div>
           </div>
         </div>
-      </div>
+      </Scaffold>
     );
   }
 
@@ -229,32 +230,23 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
         console.error(err);
         haptic.notification('error');
         const msg = err instanceof Error ? err.message : 'Failed to cancel build.';
-        if (isTelegram && tg) tg.showAlert(msg);
-        else showToast(msg, 'error');
+        showToast(msg, 'error');
         setCancelling(false);
       }
     };
 
-    if (isTelegram && tg) {
-      tg.showPopup({
-        title: 'Cancel Active Build',
-        message: `Are you sure you want to stop the build running on branch '${ref}'? This action cannot be undone.`,
-        buttons: [
-          { id: 'cancel_build', type: 'destructive', text: 'Yes, Stop Build' },
-          { id: 'dismiss', type: 'cancel', text: 'Keep Running' },
-        ],
-      }, async (buttonId) => {
-        if (buttonId === 'cancel_build') {
-          haptic.impact('heavy');
-          await doCancel();
-        }
-      });
-    } else {
-      if (confirm(`Are you sure you want to stop the build running on branch '${ref}'?`)) {
-        await doCancel();
-      }
+    const confirmed = await platform.showConfirm({
+      title: 'Cancel Active Build',
+      message: `Are you sure you want to stop the build running on branch '${ref}'? This action cannot be undone.`,
+      confirmLabel: 'Yes, Stop Build',
+      danger: true,
+    });
+
+    if (confirmed) {
+      haptic.impact('heavy');
+      await doCancel();
     }
-  }, [canCancel, ref, requestId, initData, isTelegram, tg, haptic, showToast, onBack]);
+  }, [canCancel, ref, requestId, initData, platform, haptic, showToast, onBack]);
 
   // Declarative MainButton — the hook manages show/hide, progress,
   // click handler registration, and cleanup automatically.
@@ -270,25 +262,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
     };
   }, [canCancel, cancelling, handleCancel]);
 
-  useMainButton(cancelButtonConfig, isActive);
-
-  // Wire tg.BackButton
-  useEffect(() => {
-    if (!isTelegram || !tg) return;
-
-    if (isActive) {
-      tg.BackButton.show();
-      tg.BackButton.onClick(handleBack);
-    } else {
-      tg.BackButton.offClick(handleBack);
-      tg.BackButton.hide();
-    }
-
-    return () => {
-      tg.BackButton.offClick(handleBack);
-      tg.BackButton.hide();
-    };
-  }, [isTelegram, tg, isActive]);
+  usePrimaryButton(cancelButtonConfig, isActive);
 
   function handleCopyLink() {
     if (downloadUrl) {
@@ -302,144 +276,130 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
     ? `Building · started ${relativeTime}`
     : `${visuals.label} · ${relativeTime}`;
 
+  const badgeVariant = result === 'success' ? 'success'
+    : result === 'failure' ? 'danger'
+    : result === 'timeout' ? 'warning'
+    : 'neutral';
+
   return (
-    <div class="container" style={{ display: 'flex' }}>
+    <Scaffold onBack={handleBack}>
       {/* Hero header */}
-      <div class="tg-detail-header">
+      <div className="tg-detail-header">
         <div
-          class="tg-detail-header-icon"
+          className="tg-detail-header-icon"
           style={{ backgroundColor: visuals.bg, color: visuals.color }}
         >
           {showingActiveUI ? (
-            <svg class="spinner-ios" style={{ width: '28px', height: '28px' }} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="var(--tg-color-divider)" stroke-width="2.5" />
-              <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-            </svg>
+            <Spinner size={28} />
           ) : (
             <visuals.Icon size={28} strokeWidth={2} />
           )}
         </div>
-        <span class="tg-detail-header-title">{label}</span>
-        <span class="tg-detail-header-subtitle">{headerSubtitle}</span>
+        <span className="tg-detail-header-title">{label}</span>
+        <span className="tg-detail-header-subtitle">{headerSubtitle}</span>
       </div>
 
       {/* Build Information section */}
-      <div class="tg-section">
-        <div class="tg-section-header">Build Information</div>
-        <div class="tg-list">
-          {result && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label">Status</span>
-              <span class={`tg-result-badge ${result}`}>{result}</span>
-            </div>
-          )}
-          <div class="tg-kv-row">
-            <span class="tg-kv-label"><GitBranch size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Branch</span>
-            <span class="tg-kv-value mono">{ref}</span>
+      <List header="Build Information">
+        {result && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label">Status</span>
+            <Badge variant={badgeVariant}>{result}</Badge>
           </div>
-          {commitHash && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label"><Hash size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Commit</span>
-              <span class="tg-kv-value mono">{commitHash.substring(0, 7)}</span>
-            </div>
-          )}
-          {duration !== null && duration > 0 && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label"><Timer size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Duration</span>
-              <span class="tg-kv-value">{formatDuration(duration)}</span>
-            </div>
-          )}
-          {fileSize > 0 && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label"><HardDrive size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />APK Size</span>
-              <span class="tg-kv-value">{formatFileSize(fileSize)}</span>
-            </div>
-          )}
-          {showingActiveUI && estimatedDurationMs > 0 && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label"><Timer size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Estimated</span>
-              <span class="tg-kv-value">{formatDuration(estimatedDurationMs / 1000)}</span>
-            </div>
-          )}
-          {triggeredBy && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label"><User size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Triggered by</span>
-              <span class="tg-kv-value">{triggeredBy}</span>
-            </div>
-          )}
-          <div class="tg-kv-row">
-            <span class="tg-kv-label"><Calendar size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Started</span>
-            <span class="tg-kv-value">{formatTimestamp(triggeredAt)}</span>
-          </div>
-          {completedAt && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label"><CalendarCheck size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Completed</span>
-              <span class="tg-kv-value">{formatTimestamp(completedAt)}</span>
-            </div>
-          )}
+        )}
+        <div className="tg-kv-row">
+          <span className="tg-kv-label"><GitBranch size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Branch</span>
+          <span className="tg-kv-value mono">{ref}</span>
         </div>
-      </div>
+        {commitHash && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label"><Hash size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Commit</span>
+            <span className="tg-kv-value mono">{commitHash.substring(0, 7)}</span>
+          </div>
+        )}
+        {duration !== null && duration > 0 && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label"><Timer size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Duration</span>
+            <span className="tg-kv-value">{formatDuration(duration)}</span>
+          </div>
+        )}
+        {fileSize > 0 && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label"><HardDrive size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />APK Size</span>
+            <span className="tg-kv-value">{formatFileSize(fileSize)}</span>
+          </div>
+        )}
+        {showingActiveUI && estimatedDurationMs > 0 && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label"><Timer size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Estimated</span>
+            <span className="tg-kv-value">{formatDuration(estimatedDurationMs / 1000)}</span>
+          </div>
+        )}
+        {triggeredBy && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label"><User size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Triggered by</span>
+            <span className="tg-kv-value">{triggeredBy}</span>
+          </div>
+        )}
+        <div className="tg-kv-row">
+          <span className="tg-kv-label"><Calendar size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Started</span>
+          <span className="tg-kv-value">{formatTimestamp(triggeredAt)}</span>
+        </div>
+        {completedAt && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label"><CalendarCheck size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Completed</span>
+            <span className="tg-kv-value">{formatTimestamp(completedAt)}</span>
+          </div>
+        )}
+      </List>
 
       {/* Actions section (success builds with download URL) */}
       {result === 'success' && downloadUrl && (
-        <div class="tg-section">
-          <div class="tg-section-header">Actions</div>
-          <div class="tg-list">
-            <button class="tg-action-row" onClick={handleCopyLink}>
-              <Copy size={20} />
-              <span>Copy Download Link</span>
-            </button>
-            <a
-              class="tg-action-row"
-              href={downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: 'none' }}
-            >
-              <Download size={20} />
-              <span>Download APK</span>
-            </a>
-          </div>
-        </div>
+        <List header="Actions">
+          <button className="tg-action-row" onClick={handleCopyLink} style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+            <Copy size={20} />
+            <span>Copy Download Link</span>
+          </button>
+          <a
+            className="tg-action-row"
+            href={downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}
+          >
+            <Download size={20} />
+            <span>Download APK</span>
+          </a>
+        </List>
       )}
 
       {/* Diagnostics section */}
-      <div class="tg-section">
-        <div class="tg-section-header">Diagnostics</div>
-        <div class="tg-list">
-          {buildNumber > 0 && (
-            <div class="tg-kv-row">
-              <span class="tg-kv-label"><Hash size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Jenkins Build</span>
-              <span class="tg-kv-value mono">#{buildNumber}</span>
-            </div>
-          )}
-          <div class="tg-kv-row">
-            <span class="tg-kv-label"><FileText size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Request ID</span>
-            <span class="tg-kv-value mono">{requestId}</span>
+      <List header="Diagnostics">
+        {buildNumber > 0 && (
+          <div className="tg-kv-row">
+            <span className="tg-kv-label"><Hash size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Jenkins Build</span>
+            <span className="tg-kv-value mono">#{buildNumber}</span>
           </div>
+        )}
+        <div className="tg-kv-row">
+          <span className="tg-kv-label"><FileText size={15} style={{ verticalAlign: '-2px', marginRight: '4px' }} />Request ID</span>
+          <span className="tg-kv-value mono">{requestId}</span>
         </div>
-      </div>
+      </List>
 
       {/* Browser fallback cancel button (hidden in Telegram — uses MainButton) */}
-      {canCancel && !isTelegram && (
+      {canCancel && !hasNativePrimaryButton && (
         <div style={{ marginTop: 'auto', paddingTop: 'var(--space-lg)', width: '100%' }}>
-          <button
-            class="tg-primary-button"
-            style={{ backgroundColor: 'var(--tg-color-destructive)' }}
+          <Button
+            variant="danger"
             disabled={cancelling}
+            loading={cancelling}
             onClick={handleCancel}
           >
-            {cancelling ? (
-              <svg class="spinner-ios" style={{ color: '#ffffff', width: '20px', height: '20px' }} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.15)" stroke-width="3" />
-                <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-              </svg>
-            ) : (
-              <span>Cancel Build</span>
-            )}
-          </button>
+            Cancel Build
+          </Button>
         </div>
       )}
-    </div>
+    </Scaffold>
   );
 }

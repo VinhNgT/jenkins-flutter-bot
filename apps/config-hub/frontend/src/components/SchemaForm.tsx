@@ -12,7 +12,7 @@ import { Save, RotateCcw } from 'lucide-preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
-import { useTelegram } from '../context/TelegramContext';
+import { usePlatform } from 'platform-core';
 import type { Schema, SchemaField, Scope, ScopeConfig } from '../types';
 import FieldRenderer from './form/FieldRenderer';
 
@@ -39,7 +39,7 @@ export default function SchemaForm({
   onDirtyChange,
 }: SchemaFormProps) {
   const { showToast } = useToast();
-  const { haptic } = useTelegram();
+  const { haptic } = usePlatform();
   const formRef = useRef<HTMLFormElement>(null);
   const [dirty, setDirty] = useState(false);
   const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());

@@ -1,11 +1,6 @@
-/**
- * Toast — Sliding notification banner.
- *
- * Rendered by ToastProvider. Uses the existing .tg-toast TGUI classes.
- */
-
 import type { ReadonlySignal } from '@preact/signals';
 import { Check, X } from 'lucide-preact';
+import { Toast as SharedToast } from 'tg-ui-preact';
 
 interface ToastState {
   message: string;
@@ -19,22 +14,15 @@ interface ToastProps {
 
 export default function Toast({ state }: ToastProps) {
   const { message, type, visible } = state.value;
-
-  const classes = [
-    'tg-toast',
-    visible ? 'active' : '',
-    type === 'error' ? 'toast-error' : '',
-  ].filter(Boolean).join(' ');
-
   const Icon = type === 'error' ? X : Check;
 
   return (
-    <div class={classes}>
-      <div class="tg-toast-icon">
-        <Icon size={20} strokeWidth={2.5} />
-      </div>
-      <span>{message}</span>
-    </div>
+    <SharedToast
+      message={message}
+      active={visible}
+      type={type}
+      icon={<Icon size={20} strokeWidth={2.5} />}
+    />
   );
 }
 

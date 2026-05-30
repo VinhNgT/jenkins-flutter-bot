@@ -5,22 +5,19 @@
  * with configurable options. Persists repo params in localStorage.
  */
 
-import { FileCode, Copy, Info, ChevronLeft } from 'lucide-preact';
+import { FileCode, Copy, Info } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import type { JenkinsfileResult } from '../types';
-import { useTelegram } from '../context/TelegramContext';
-import { useBackButton } from '../hooks/useBackButton';
+import { Scaffold } from 'tg-ui-preact';
 
 interface JenkinsfilePanelProps {
   isActive: boolean;
   onBack: () => void;
 }
 
-export default function JenkinsfilePanel({ isActive, onBack }: JenkinsfilePanelProps) {
-  const { isTelegram } = useTelegram();
-  useBackButton(isActive, onBack);
+export default function JenkinsfilePanel({ onBack }: JenkinsfilePanelProps) {
   const { showToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<JenkinsfileResult | null>(null);
@@ -87,21 +84,11 @@ export default function JenkinsfilePanel({ isActive, onBack }: JenkinsfilePanelP
   const credentialsWarning = result?.warnings?.find((w) => w.includes('Repo Credentials ID'));
 
   return (
-    <div class="container">
-      {!isTelegram && (
-        <header>
-          <button class="back-button" onClick={onBack}>
-            <ChevronLeft size={20} />
-            Back
-          </button>
-        </header>
-      )}
-
-      <h2 class="panel-title">Pipeline Generator</h2>
-      <p class="panel-desc">
-        Generate ready-to-use Jenkinsfile pipeline scripts based on your current
-        configuration. Supports both public and private repository setups.
-      </p>
+    <Scaffold
+      title="Pipeline Generator"
+      subtitle="Generate ready-to-use Jenkinsfile pipeline scripts based on your current configuration. Supports both public and private repository setups."
+      onBack={onBack}
+    >
 
       {/* Repository Settings */}
       <div class="card">
@@ -247,6 +234,6 @@ export default function JenkinsfilePanel({ isActive, onBack }: JenkinsfilePanelP
           />
         </div>
       )}
-    </div>
+    </Scaffold>
   );
 }

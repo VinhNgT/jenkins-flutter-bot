@@ -2,14 +2,12 @@
  * ConfigScreen — Detail screen for editing a configuration section.
  *
  * Renders SchemaForm components for each scope within the selected
- * section. Displayed via stack navigator push from HomeScreen.
+ * section. Wrapped in the reusable Scaffold component.
  */
 
-import { ChevronLeft } from 'lucide-preact';
 import SchemaForm from './SchemaForm';
 import type { ConfigData, Schemas, Scope } from '../types';
-import { useTelegram } from '../context/TelegramContext';
-import { useBackButton } from '../hooks/useBackButton';
+import { Scaffold } from 'tg-ui-preact';
 
 /** Section definitions — maps each UI section to backend scope(s). */
 const SECTION_SCOPES: Record<string, { scopes: Scope[]; title: string; description: string }> = {
@@ -48,12 +46,8 @@ export default function ConfigScreen({
   reloadSeq,
   onConfigReload,
   onDirtyChange,
-  isActive,
   onBack,
 }: ConfigScreenProps) {
-  const { isTelegram } = useTelegram();
-  useBackButton(isActive, onBack);
-
   const section = SECTION_SCOPES[sectionId];
   if (!section) return null;
 
@@ -64,19 +58,7 @@ export default function ConfigScreen({
     : true;
 
   return (
-    <div class="container">
-      {!isTelegram && (
-        <header>
-          <button class="back-button" onClick={onBack}>
-            <ChevronLeft size={20} />
-            Back
-          </button>
-        </header>
-      )}
-
-      <h2 class="panel-title">{title}</h2>
-      <p class="panel-desc">{description}</p>
-
+    <Scaffold title={title} subtitle={description} onBack={onBack}>
       {allEmpty ? (
         <p class="text-muted">
           No configuration fields — current storage mode has no
@@ -100,6 +82,7 @@ export default function ConfigScreen({
           );
         })
       )}
-    </div>
+    </Scaffold>
   );
 }
+

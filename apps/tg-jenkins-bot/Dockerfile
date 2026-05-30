@@ -1,12 +1,28 @@
 # Stage 1: Build frontend (Preact + Vite + TypeScript)
 FROM node:22-slim AS frontend
 
-WORKDIR /app/frontend
-COPY apps/tg-jenkins-bot/frontend/package*.json ./
-RUN npm ci
-COPY apps/tg-jenkins-bot/frontend/ ./
-RUN npm run build
-# Output: ../src/tg_jenkins_bot/webapp/ (relative to frontend dir)
+WORKDIR /app
+
+COPY package.json ./
+COPY libs/platform-core/package.json ./libs/platform-core/
+COPY libs/tg-core-preact/package.json ./libs/tg-core-preact/
+COPY libs/tg-ui-preact/package.json ./libs/tg-ui-preact/
+COPY apps/tg-jenkins-bot/frontend/package.json ./apps/tg-jenkins-bot/frontend/
+
+RUN npm install --workspace=tg-jenkins-bot-webapp --include-workspace-root
+
+COPY libs/platform-core/ ./libs/platform-core/
+RUN npm run build --workspace=platform-core
+
+COPY libs/tg-core-preact/ ./libs/tg-core-preact/
+RUN npm run build --workspace=tg-core-preact
+
+COPY libs/tg-ui-preact/ ./libs/tg-ui-preact/
+RUN npm run build --workspace=tg-ui-preact
+
+COPY apps/tg-jenkins-bot/frontend/ ./apps/tg-jenkins-bot/frontend/
+RUN npm run build --workspace=tg-jenkins-bot-webapp
+
 
 # Stage 2: Build Python
 FROM python:3.12-slim AS builder
@@ -27,7 +43,7 @@ COPY apps/tg-jenkins-bot/pyproject.toml apps/tg-jenkins-bot/
 COPY apps/tg-jenkins-bot/src apps/tg-jenkins-bot/src
 
 # Overwrite webapp/ with Vite build output from Stage 1
-COPY --from=frontend /app/src/tg_jenkins_bot/webapp apps/tg-jenkins-bot/src/tg_jenkins_bot/webapp
+COPY --from=frontend /app/apps/tg-jenkins-bot/src/tg_jenkins_bot/webapp apps/tg-jenkins-bot/src/tg_jenkins_bot/webapp
 
 RUN uv sync --frozen --no-dev --no-editable --package tg-jenkins-bot
 

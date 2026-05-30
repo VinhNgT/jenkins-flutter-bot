@@ -1,14 +1,16 @@
 /**
- * ConfirmDialog — Modal confirmation dialog.
- *
- * Uses the native <dialog> element for accessibility.
+ * Promise-based confirm dialog provider.
+ * Uses native platform dialog prompts when available (e.g. Telegram),
+ * otherwise falls back to a clean, theme-aware HTML5 modal dialog.
  * Exposes a Promise-based API via useConfirm().
  */
 
 import { createContext } from 'preact';
 import { useCallback, useContext, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { useTelegram } from './TelegramContext';
+import { usePlatform } from 'platform-core';
+import { Dialog } from 'tg-ui-preact';
+
 
 interface ConfirmOptions {
   title: string;
@@ -22,24 +24,18 @@ type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 const ConfirmContext = createContext<ConfirmFn>(async () => false);
 
 export function ConfirmProvider({ children }: { children: ComponentChildren }) {
-  const { isTelegram, tg } = useTelegram();
+  const platform = usePlatform();
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const confirm = useCallback((opts: ConfirmOptions): Promise<boolean> => {
-    if (isTelegram && tg) {
-      return new Promise<boolean>((resolve) => {
-        tg.showPopup({
-          title: opts.title,
-          message: opts.message,
-          buttons: [
-            { id: 'confirm', type: opts.danger ? 'destructive' : 'default', text: opts.confirmLabel ?? 'Confirm' },
-            { id: 'cancel', type: 'cancel', text: 'Cancel' }
-          ]
-        }, (buttonId) => {
-          resolve(buttonId === 'confirm');
-        });
+    if (platform.hasNativePopup) {
+      return platform.showConfirm({
+        title: opts.title,
+        message: opts.message,
+        confirmLabel: opts.confirmLabel,
+        danger: opts.danger,
       });
     }
 
@@ -48,7 +44,7 @@ export function ConfirmProvider({ children }: { children: ComponentChildren }) {
       resolveRef.current = resolve;
       requestAnimationFrame(() => dialogRef.current?.showModal());
     });
-  }, [isTelegram, tg]);
+  }, [platform]);
 
   function close(result: boolean) {
     dialogRef.current?.close();
@@ -60,9 +56,8 @@ export function ConfirmProvider({ children }: { children: ComponentChildren }) {
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      <dialog
-        ref={dialogRef}
-        class="confirm-dialog"
+      <Dialog
+        dialogRef={dialogRef}
         onCancel={(e) => {
           e.preventDefault();
           close(false);
@@ -85,7 +80,7 @@ export function ConfirmProvider({ children }: { children: ComponentChildren }) {
             </div>
           </>
         )}
-      </dialog>
+      </Dialog>
     </ConfirmContext.Provider>
   );
 }

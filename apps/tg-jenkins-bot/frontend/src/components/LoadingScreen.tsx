@@ -1,87 +1,57 @@
+import { Scaffold, List, ListItem, Shimmer } from 'tg-ui-preact';
+
 /**
  * LoadingScreen — Skeleton shimmer content preview.
  *
- * Mirrors the structure of MainScreen with placeholder shimmer blocks.
- * Uses the existing .tg-skeleton TGUI classes for the shimmer animation.
+ * Wraps the loading layout in a unified Scaffold and renders shimmer blocks
+ * using the shared generic Shimmer, List, and ListItem primitives.
  */
-
 export default function LoadingScreen() {
   return (
-    <div class="container" style={{ display: 'flex' }}>
-      {/* Skeleton header */}
-      <header>
-        <div>
-          <div class="tg-skeleton" style={{ width: '160px', height: '22px', borderRadius: 'var(--radius-md)' }} />
-          <div class="tg-skeleton" style={{ width: '220px', height: '13px', borderRadius: 'var(--radius-sm)', marginTop: 'var(--space-xs)' }} />
-        </div>
-      </header>
+    <Scaffold title="Loading..." subtitle="Synchronizing system environment">
+      {/* Deployment Target Options Skeleton */}
+      <List header="Deployment Target">
+        <ListItem
+          title={<Shimmer width="130px" height="16px" />}
+          subtitle={<Shimmer width="70px" height="12px" />}
+          disabled
+        />
+        <ListItem
+          title={<Shimmer width="150px" height="16px" />}
+          subtitle={<Shimmer width="90px" height="12px" />}
+          disabled
+        />
+      </List>
 
-      {/* Skeleton: Target Option section */}
-      <div class="tg-section">
-        <div class="tg-section-header">
-          <div class="tg-skeleton" style={{ width: '100px', height: '11px', borderRadius: 'var(--radius-sm)' }} />
-        </div>
-        <div class="tg-list">
-          <div class="tg-list-item" style={{ cursor: 'default' }}>
-            <div class="tg-list-item-content">
-              <div class="tg-skeleton" style={{ width: '130px', height: '16px', borderRadius: 'var(--radius-sm)' }} />
-              <div class="tg-skeleton" style={{ width: '70px', height: '12px', borderRadius: 'var(--radius-sm)', marginTop: 'var(--space-xs)' }} />
-            </div>
-          </div>
-          <div class="tg-list-item" style={{ cursor: 'default' }}>
-            <div class="tg-list-item-content">
-              <div class="tg-skeleton" style={{ width: '150px', height: '16px', borderRadius: 'var(--radius-sm)' }} />
-              <div class="tg-skeleton" style={{ width: '90px', height: '12px', borderRadius: 'var(--radius-sm)', marginTop: 'var(--space-xs)' }} />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Custom Option Skeleton */}
+      <List header="Custom Option">
+        <ListItem
+          title={<Shimmer width="100%" height="16px" />}
+          disabled
+        />
+      </List>
 
-      {/* Skeleton: Custom Branch section */}
-      <div class="tg-section">
-        <div class="tg-section-header">
-          <div class="tg-skeleton" style={{ width: '120px', height: '11px', borderRadius: 'var(--radius-sm)' }} />
+      {/* Active Deployments Skeleton */}
+      <List header="Active Deployments">
+        <div className="tg-empty-row">
+          <Shimmer width="36px" height="36px" borderRadius="var(--radius-round)" />
+          <Shimmer width="200px" height="13px" className="tg-skeleton" style={{ marginTop: 'var(--space-sm)' }} />
         </div>
-        <div class="tg-list">
-          <div class="tg-list-item" style={{ cursor: 'default' }}>
-            <div class="tg-skeleton" style={{ width: '100%', height: '16px', borderRadius: 'var(--radius-sm)' }} />
-          </div>
-        </div>
-      </div>
+      </List>
 
-      {/* Skeleton: Active Builds section */}
-      <div class="tg-section">
-        <div class="tg-section-header">
-          <div class="tg-skeleton" style={{ width: '90px', height: '11px', borderRadius: 'var(--radius-sm)' }} />
-        </div>
-        <div class="tg-list">
-          <div class="tg-empty-row">
-            <div class="tg-skeleton" style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-round)' }} />
-            <div class="tg-skeleton" style={{ width: '200px', height: '13px', borderRadius: 'var(--radius-sm)', marginTop: 'var(--space-sm)' }} />
-          </div>
-        </div>
-      </div>
-
-      {/* Skeleton: Recent Builds section */}
-      <div class="tg-section">
-        <div class="tg-section-header">
-          <div class="tg-skeleton" style={{ width: '110px', height: '11px', borderRadius: 'var(--radius-sm)' }} />
-        </div>
-        <div class="tg-list">
-          <div class="tg-list-item" style={{ cursor: 'default' }}>
-            <div class="tg-list-item-content">
-              <div class="tg-skeleton" style={{ width: '140px', height: '16px', borderRadius: 'var(--radius-sm)' }} />
-              <div class="tg-skeleton" style={{ width: '100px', height: '12px', borderRadius: 'var(--radius-sm)', marginTop: 'var(--space-xs)' }} />
-            </div>
-          </div>
-          <div class="tg-list-item" style={{ cursor: 'default' }}>
-            <div class="tg-list-item-content">
-              <div class="tg-skeleton" style={{ width: '120px', height: '16px', borderRadius: 'var(--radius-sm)' }} />
-              <div class="tg-skeleton" style={{ width: '80px', height: '12px', borderRadius: 'var(--radius-sm)', marginTop: 'var(--space-xs)' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* Recent History Skeleton */}
+      <List header="Recent Build History">
+        <ListItem
+          title={<Shimmer width="140px" height="16px" />}
+          subtitle={<Shimmer width="100px" height="12px" />}
+          disabled
+        />
+        <ListItem
+          title={<Shimmer width="120px" height="16px" />}
+          subtitle={<Shimmer width="80px" height="12px" />}
+          disabled
+        />
+      </List>
+    </Scaffold>
   );
 }

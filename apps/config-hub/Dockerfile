@@ -1,12 +1,28 @@
 # Stage 1: Build frontend (Preact + Vite + TypeScript)
 FROM node:22-slim AS frontend
 
-WORKDIR /app/frontend
-COPY apps/config-hub/frontend/package*.json ./
-RUN npm ci
-COPY apps/config-hub/frontend/ ./
-RUN npm run build
-# Output: ../src/config_hub/webapp/ (relative to frontend dir)
+WORKDIR /app
+
+COPY package.json ./
+COPY libs/platform-core/package.json ./libs/platform-core/
+COPY libs/tg-core-preact/package.json ./libs/tg-core-preact/
+COPY libs/tg-ui-preact/package.json ./libs/tg-ui-preact/
+COPY apps/config-hub/frontend/package.json ./apps/config-hub/frontend/
+
+RUN npm install --workspace=config-hub-frontend --include-workspace-root
+
+COPY libs/platform-core/ ./libs/platform-core/
+RUN npm run build --workspace=platform-core
+
+COPY libs/tg-core-preact/ ./libs/tg-core-preact/
+RUN npm run build --workspace=tg-core-preact
+
+COPY libs/tg-ui-preact/ ./libs/tg-ui-preact/
+RUN npm run build --workspace=tg-ui-preact
+
+COPY apps/config-hub/frontend/ ./apps/config-hub/frontend/
+RUN npm run build --workspace=config-hub-frontend
+
 
 # Stage 2: Build Python
 FROM python:3.12-slim AS builder
@@ -27,7 +43,7 @@ COPY apps/config-hub/pyproject.toml apps/config-hub/
 COPY apps/config-hub/src apps/config-hub/src
 
 # Overwrite webapp/ with Vite build output from Stage 1
-COPY --from=frontend /app/src/config_hub/webapp apps/config-hub/src/config_hub/webapp
+COPY --from=frontend /app/apps/config-hub/src/config_hub/webapp apps/config-hub/src/config_hub/webapp
 
 RUN uv sync --frozen --no-dev --no-editable --package config-hub
 

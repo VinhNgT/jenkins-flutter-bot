@@ -7,8 +7,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/preact';
-import { useNavigator, NAV_TRANSITION_MS } from '../../hooks/useNavigator';
-import type { Screen } from '../../hooks/useNavigator';
+import { useNavigator, NAV_TRANSITION_MS } from 'tg-ui-preact';
+
+interface Screen {
+  screen: 'build-detail';
+  type: 'active' | 'recent';
+  id: string;
+}
 
 const buildScreen: Screen = {
   screen: 'build-detail',

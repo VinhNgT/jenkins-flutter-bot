@@ -12,8 +12,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/preact';
-import { useNavigator, NAV_TRANSITION_MS } from '../../hooks/useNavigator';
-import type { Screen } from '../../hooks/useNavigator';
+import { useNavigator, NAV_TRANSITION_MS } from 'tg-ui-preact';
+
+interface Screen {
+  screen: 'config' | 'jenkinsfile' | 'transfer';
+  id?: string;
+}
 
 /** Advance enough to trigger two nested rAF callbacks + setTimeout. */
 function flushPushAnimation() {

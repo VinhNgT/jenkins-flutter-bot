@@ -1,15 +1,7 @@
-/**
- * ErrorScreen — Error/access-denied barrier view.
- *
- * Renders contextual CTAs based on the error type:
- * - private_chat_disabled → "Add Bot to Group" button
- * - group_not_authorized → Chat ID copy panel
- * - Generic errors → simple error display with BackButton retry
- */
-
 import { useState } from 'preact/hooks';
-import { AlertOctagon, Plus } from 'lucide-preact';
-import { useTelegram } from '../context/TelegramContext';
+import { AlertOctagon, Plus, Copy, Check } from 'lucide-preact';
+import { usePlatform } from 'platform-core';
+import { Scaffold, List, ListItem, Button } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
 import type { ApiErrorDetail } from '../types';
 
@@ -19,15 +11,21 @@ interface ErrorScreenProps {
   detail: ApiErrorDetail | null;
 }
 
+/**
+ * ErrorScreen — Error/access-denied barrier view.
+ *
+ * Renders contextual CTAs based on the error type inside a unified Scaffold
+ * using shared design system primitives (Scaffold, List, ListItem, Button).
+ */
 export default function ErrorScreen({ title, description, detail }: ErrorScreenProps) {
-  const { tg, haptic } = useTelegram();
+  const { haptic, openLink } = usePlatform();
   const { showToast } = useToast();
-  const [copyLabel, setCopyLabel] = useState('📋');
+  const [copied, setCopied] = useState(false);
 
   function handleAddToGroup() {
-    if (!detail?.bot_username || !tg) return;
+    if (!detail?.bot_username) return;
     haptic.impact('medium');
-    tg.openTelegramLink(`https://t.me/${detail.bot_username}?startgroup=auth`);
+    openLink(`https://t.me/${detail.bot_username}?startgroup=auth`);
   }
 
   async function handleCopyChatId() {
@@ -35,57 +33,78 @@ export default function ErrorScreen({ title, description, detail }: ErrorScreenP
     haptic.impact('light');
     try {
       await navigator.clipboard.writeText(String(detail.chat_id));
-      setCopyLabel('✅');
+      setCopied(true);
       showToast('Copied to clipboard');
-      setTimeout(() => setCopyLabel('📋'), 2000);
-    } catch (e) {
-      console.error(e);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showToast('Failed to copy. Please manually copy the ID.', 'error');
     }
   }
 
+  const isPrivateDisabled = detail?.error === 'private_chat_disabled';
+  const isGroupUnauthorized = detail?.error === 'group_not_authorized';
+
   return (
-    <div class="screen active">
-      <div class="screen-icon error">
-        <AlertOctagon size={36} strokeWidth={2.5} />
-      </div>
-      <h2 class="screen-title">{title}</h2>
-      <p class="screen-description">{description}</p>
+    <Scaffold>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--space-xl) var(--space-md)',
+        textAlign: 'center',
+        flex: 1
+      }}>
+        <div style={{ color: 'var(--tg-color-destructive)', marginBottom: 'var(--space-lg)' }}>
+          <AlertOctagon size={64} />
+        </div>
 
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {/* CTA: Add bot to group */}
-        {detail?.error === 'private_chat_disabled' && detail.bot_username && (
-          <div style={{ marginTop: 'var(--space-xl)', width: '100%', maxWidth: '280px' }}>
-            <button class="tg-primary-button" onClick={handleAddToGroup}>
-              <Plus size={18} strokeWidth={2.5} />
+        <h1 className="panel-title" style={{ fontSize: '24px', marginBottom: 'var(--space-md)' }}>
+          {title}
+        </h1>
+
+        <p className="panel-desc" style={{ fontSize: '15px', color: 'var(--tg-color-hint)', marginBottom: 'var(--space-xl)', maxWidth: '400px', lineHeight: 1.5 }}>
+          {description}
+        </p>
+
+        {isPrivateDisabled && detail.bot_username && (
+          <div style={{ width: '100%', maxWidth: '280px' }}>
+            <Button variant="primary" onClick={handleAddToGroup}>
+              <Plus size={20} />
               <span>Add Bot to Group</span>
-            </button>
+            </Button>
           </div>
         )}
 
-        {/* CTA: Copy chat ID */}
-        {detail?.error === 'group_not_authorized' && detail.chat_id && (
-          <div class="tg-action-card">
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--tg-color-subtitle)', fontWeight: 700, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              YOUR CHAT ID:
-            </div>
-            <div class="tg-copy-container">
-              <input
-                type="text"
-                readonly
-                value={String(detail.chat_id)}
-                class="tg-copy-field"
-                onClick={(e) => (e.target as HTMLInputElement).select()}
+        {isGroupUnauthorized && detail.chat_id && (
+          <div style={{ width: '100%', maxWidth: '320px', marginTop: 'var(--space-sm)' }}>
+            <List footer="Provide this ID to your bot administrator to allowlist this group.">
+              <ListItem
+                title="Current Chat ID"
+                subtitle={<span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-base)', fontWeight: 600 }}>{detail.chat_id}</span>}
+                rightElement={
+                  <button
+                    onClick={handleCopyChatId}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: copied ? 'var(--tg-color-success)' : 'var(--tg-color-link)',
+                      cursor: 'pointer',
+                      padding: 'var(--space-xs)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Copy Chat ID"
+                  >
+                    {copied ? <Check size={20} /> : <Copy size={20} />}
+                  </button>
+                }
               />
-              <button class="tg-copy-button" onClick={handleCopyChatId}>
-                {copyLabel}
-              </button>
-            </div>
-            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--tg-color-hint)', lineHeight: 1.45, textAlign: 'center', marginTop: 'var(--space-xs)' }}>
-              Share this ID with your system administrator to secure authorized access.
-            </p>
+            </List>
           </div>
         )}
       </div>
-    </div>
+    </Scaffold>
   );
 }

@@ -1,0 +1,15 @@
+{
+  "name": "jenkins-flutter-bot-workspace",
+  "private": true,
+  "workspaces": [
+    "libs/platform-core",
+    "libs/tg-ui-preact",
+    "libs/tg-core-preact",
+    "apps/tg-jenkins-bot/frontend",
+    "apps/config-hub/frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

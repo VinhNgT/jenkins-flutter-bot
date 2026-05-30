@@ -1,12 +1,6 @@
-/**
- * ActiveBuilds — Real-time active build list.
- *
- * Uses .tg-list-item, .spinner-ios, .pulsing-dot classes.
- * Tapping a row navigates to the build detail screen.
- */
-
 import { Monitor } from 'lucide-preact';
-import { useTelegram } from '../context/TelegramContext';
+import { usePlatform } from 'platform-core';
+import { List, ListItem, Spinner } from 'tg-ui-preact';
 import { useRelativeTime } from '../hooks/useRelativeTime';
 import type { ActiveBuild } from '../types';
 
@@ -26,7 +20,7 @@ function formatRemaining(seconds: number): string {
 
 /** Individual active build row with relative time and estimated remaining. */
 function ActiveBuildRow({ build, onSelect }: { build: ActiveBuild; onSelect: (build: ActiveBuild) => void }) {
-  const { haptic } = useTelegram();
+  const { haptic } = usePlatform();
   const relativeTime = useRelativeTime(build.triggered_at);
 
   // Compute estimated remaining from estimated_duration (ms) and elapsed time
@@ -42,65 +36,65 @@ function ActiveBuildRow({ build, onSelect }: { build: ActiveBuild; onSelect: (bu
   }
 
   return (
-    <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleClick}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', flexGrow: 1 }}>
-        {/* iOS-style spinner — custom SVG matching Telegram's native loading indicator */}
-        <svg class="spinner-ios" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" stroke="var(--tg-color-divider)" stroke-width="2.5" />
-          <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-        </svg>
-        <div class="tg-list-item-content" style={{ minWidth: 0 }}>
-          <span class="tg-list-item-title">{build.label}</span>
-          <span class="tg-list-item-subtitle" style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            <span class="pulsing-dot" style={{ flexShrink: 0 }} />
-            <span>
-              by {build.triggered_by} · {relativeTime}
-              {estimatedSec > 0 && ` · ${formatRemaining(remaining)}`}
-            </span>
+    <ListItem
+      title={build.label}
+      subtitle={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span className="pulsing-dot" style={{ flexShrink: 0 }} />
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            by {build.triggered_by} · {relativeTime}
+            {estimatedSec > 0 && ` · ${formatRemaining(remaining)}`}
           </span>
         </div>
-      </div>
-    </div>
+      }
+      prefix={<Spinner size={22} />}
+      onClick={handleClick}
+    />
   );
 }
 
 export default function ActiveBuilds({ builds, onSelect }: ActiveBuildsProps) {
+  const activeCountBadge = builds.length > 0 ? (
+    <span
+      id="buildsCountBadge"
+      style={{
+        background: 'var(--tg-color-link)',
+        color: 'var(--tg-color-button-text)',
+        fontSize: 'var(--font-size-xs)',
+        padding: 'var(--space-xxs) var(--space-xs)',
+        borderRadius: 'var(--radius-round)',
+        fontWeight: 'bold',
+        marginLeft: 'var(--space-xs)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      {builds.length}
+    </span>
+  ) : null;
+
   return (
-    <div class="tg-section">
-      <div class="tg-section-header" style={{ display: 'flex', alignItems: 'center' }}>
-        <span>Active Builds</span>
-        {builds.length > 0 && (
-          <span
-            id="buildsCountBadge"
-            style={{
-              background: 'var(--tg-color-link)',
-              color: 'var(--tg-color-button-text)',
-              fontSize: 'var(--font-size-xs)',
-              padding: 'var(--space-xxs) var(--space-xs)',
-              borderRadius: 'var(--radius-round)',
-              fontWeight: 'bold',
-              marginLeft: 'var(--space-xs)',
-            }}
-          >
-            {builds.length}
-          </span>
-        )}
-      </div>
-      <div class="tg-list" id="buildsList">
-        {builds.length === 0 ? (
-          <div class="tg-empty-row">
-            <Monitor size={36} strokeWidth={2} style={{ opacity: 0.35, color: 'var(--tg-color-text)' }} />
-            <span>No active build streams running.</span>
-          </div>
-        ) : (
-          builds.map((build) => (
-            <ActiveBuildRow key={build.request_id} build={build} onSelect={onSelect} />
-          ))
-        )}
-      </div>
-      <div class="tg-section-footer">
-        Build progress updates in real-time. Tap a build for details and actions.
-      </div>
-    </div>
+    <List
+      header={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span>Active Builds</span>
+          {activeCountBadge}
+        </div>
+      }
+      footer="Build progress updates in real-time. Tap a build for details and actions."
+      id="buildsList"
+    >
+      {builds.length === 0 ? (
+        <div className="tg-empty-row">
+          <Monitor size={36} strokeWidth={2} style={{ opacity: 0.35, color: 'var(--tg-color-text)' }} />
+          <span>No active build streams running.</span>
+        </div>
+      ) : (
+        builds.map((build) => (
+          <ActiveBuildRow key={build.request_id} build={build} onSelect={onSelect} />
+        ))
+      )}
+    </List>
   );
 }

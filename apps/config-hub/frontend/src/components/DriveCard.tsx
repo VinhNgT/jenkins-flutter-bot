@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import type { DriveStatus } from '../types';
+import { Dialog } from 'tg-ui-preact';
+
 
 interface DriveCardProps {
   driveStatus: DriveStatus | null;
@@ -149,9 +151,9 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
       </div>
 
       {/* OAuth pending dialog */}
-      <dialog
-        ref={dialogRef}
-        class="oauth-dialog"
+      <Dialog
+        dialogRef={dialogRef}
+        className="oauth-dialog"
         onCancel={(e) => {
           e.preventDefault();
         }}
@@ -176,7 +178,7 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
             Cancel
           </button>
         </div>
-      </dialog>
+      </Dialog>
     </>
   );
 }

@@ -1,0 +1,801 @@
+/* Telegram Native Design System & Visual Engine */
+
+/* Unified design variables with modern iOS/Android client theme fallbacks */
+:root {
+    /* Telegram SDK auto-injects --tg-theme-* CSS variables. Use them as primary
+       source with hardcoded fallbacks for non-Telegram environments. */
+    --tg-color-bg: var(--tg-theme-bg-color, #ffffff);
+    --tg-color-secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f7);
+    --tg-color-text: var(--tg-theme-text-color, #000000);
+    --tg-color-hint: var(--tg-theme-hint-color, #8e8e93);
+    --tg-color-link: var(--tg-theme-link-color, #007ee5);
+    --tg-color-button: var(--tg-theme-button-color, #2481cc);
+    --tg-color-button-text: var(--tg-theme-button-text-color, #ffffff);
+    --tg-color-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
+
+    /* API 7.0+ section-level theme params */
+    --tg-color-section-bg: var(--tg-theme-section-bg-color, var(--tg-color-bg));
+    --tg-color-section-header: var(--tg-theme-section-header-text-color, var(--tg-color-hint));
+    --tg-color-subtitle: var(--tg-theme-subtitle-text-color, var(--tg-color-hint));
+    --tg-color-header-bg: var(--tg-theme-header-bg-color, var(--tg-color-secondary-bg));
+
+    /* API 7.6: section_separator_color for list dividers */
+    --tg-color-separator: var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.08));
+    --tg-color-divider: var(--tg-color-separator);
+
+    /* API 7.10: bottom bar behind MainButton */
+    --tg-color-bottom-bar: var(--tg-theme-bottom-bar-bg-color, var(--tg-color-secondary-bg));
+
+    /* Semantic status colors */
+    --tg-color-success: #31b545;
+    --tg-color-warning: #f59e0b;
+    --tg-color-info: var(--tg-color-link);
+
+    /* Layout Variables */
+    --transition-speed: 0.22s;
+    --nav-transition-ms: 300;
+
+    /* Border Radius Scale */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-round: 999px;
+    --border-radius-card: var(--radius-lg);
+
+    /* Spacing Scale */
+    --space-xxs: 2px;
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    --space-3xl: 40px;
+
+    /* Typography Sizes */
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-md: 13px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 20px;
+    --font-size-3xl: 22px;
+
+    /* Typography Line Heights */
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.4;
+    --line-height-loose: 1.55;
+
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
+}
+
+/* Fallback Dark Theme detection */
+@media (prefers-color-scheme: dark) {
+    :root:not(.tg-theme-loaded) {
+        --tg-color-bg: #1c242c;
+        --tg-color-secondary-bg: #0f171e;
+        --tg-color-text: #ffffff;
+        --tg-color-hint: #708499;
+        --tg-color-link: #5288c1;
+        --tg-color-button: #5288c1;
+        --tg-color-button-text: #ffffff;
+        --tg-color-destructive: #ff3b30;
+        --tg-color-separator: rgba(255, 255, 255, 0.08);
+        --tg-color-divider: var(--tg-color-separator);
+
+        --tg-color-section-bg: var(--tg-color-bg);
+        --tg-color-section-header: var(--tg-color-hint);
+        --tg-color-subtitle: var(--tg-color-hint);
+        --tg-color-header-bg: var(--tg-color-secondary-bg);
+    }
+}
+
+/* Telegram client specific class adjustments */
+body.tg-dark {
+    --tg-color-separator: rgba(255, 255, 255, 0.08);
+    --tg-color-divider: var(--tg-color-separator);
+}
+body.tg-light {
+    --tg-color-separator: rgba(0, 0, 0, 0.08);
+    --tg-color-divider: var(--tg-color-separator);
+}
+
+/* Core resets and frame styling */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--tg-color-secondary-bg);
+    color: var(--tg-color-text);
+    line-height: 1.45;
+    margin: 0;
+    overflow: hidden;
+    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+html {
+    scrollbar-width: none;
+}
+
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+    display: none;
+}
+
+.container {
+    max-width: 540px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    flex-grow: 1;
+    animation: fadeIn var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Stack Navigator — CSS transform-based screen transitions ── */
+.nav-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+}
+
+.nav-screen {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    will-change: transform;
+    padding: calc(10px + var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px)))
+             calc(18px + var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px)))
+             calc(40px + var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+             calc(18px + var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px)));
+    scrollbar-width: none;
+}
+
+.nav-screen::-webkit-scrollbar {
+    display: none;
+}
+
+.nav-screen--main {
+    z-index: 1;
+    transform: translateX(0);
+    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
+    background-color: var(--tg-color-secondary-bg);
+}
+
+.nav-screen--detail {
+    z-index: 10;
+    background-color: var(--tg-color-secondary-bg);
+    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Push: slide-in from right */
+.nav-pushing .nav-screen--detail {
+    transform: translateX(100%);
+}
+
+.nav-pushed .nav-screen--main {
+    transform: translateX(-30%);
+}
+
+.nav-pushed .nav-screen--detail {
+    transform: translateX(0);
+}
+
+/* Pop: slide-out to right */
+.nav-popping .nav-screen--main {
+    transform: translateX(0);
+}
+
+.nav-popping .nav-screen--detail {
+    transform: translateX(100%);
+}
+
+/* Headers */
+header {
+    padding: var(--space-sm) var(--space-xs) var(--space-md) var(--space-xs);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+header h1 {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--tg-color-text);
+    letter-spacing: -0.2px;
+}
+
+.header-subtitle {
+    font-size: var(--font-size-md);
+    color: var(--tg-color-subtitle);
+    margin-top: var(--space-xxs);
+    font-weight: 400;
+}
+
+/* Telegram standard grouped sections */
+.tg-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.tg-section-header {
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--tg-color-section-header);
+    padding: var(--space-xl) var(--space-xl) var(--space-xs) var(--space-xl);
+    margin: 0;
+    letter-spacing: 0.3px;
+}
+
+.tg-section-footer {
+    font-size: var(--font-size-md);
+    color: var(--tg-color-hint);
+    padding: var(--space-sm) var(--space-xl) 0;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Grouped List Box */
+.tg-list {
+    background-color: var(--tg-color-section-bg);
+    border-radius: var(--border-radius-card);
+    overflow: hidden;
+    transition: background-color var(--transition-speed) ease;
+}
+
+/* List Items (Rows) */
+.tg-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-xl);
+    position: relative;
+    cursor: pointer;
+    min-height: 48px;
+    background: transparent;
+    transition: background-color 0.15s ease;
+}
+
+.tg-list-item:active {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+body.tg-dark .tg-list-item:active {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.tg-list-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: var(--space-xl);
+    right: 0;
+    height: 0.5px;
+    background-color: var(--tg-color-divider);
+    transition: background-color var(--transition-speed) ease;
+}
+
+.tg-list-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    flex-grow: 1;
+    padding: var(--space-lg) var(--space-sm) var(--space-lg) 0;
+}
+
+.tg-list-item-title {
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+    color: var(--tg-color-text);
+}
+
+.tg-list-item-subtitle {
+    font-size: var(--font-size-md);
+    color: var(--tg-color-subtitle);
+}
+
+.tg-list-item-meta {
+    font-size: var(--font-size-xs);
+    color: var(--tg-color-hint);
+    font-family: var(--font-mono);
+    background-color: rgba(0, 0, 0, 0.04);
+    padding: var(--space-xxs) var(--space-xs);
+    border-radius: var(--radius-sm);
+    max-width: 100%;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body.tg-dark .tg-list-item-meta {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Radio checkmark styling */
+.tg-radio-icon {
+    width: 20px;
+    height: 20px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tg-color-link);
+    opacity: 0;
+    transform: scale(0.7);
+    transition: transform var(--transition-speed) cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity var(--transition-speed) ease;
+}
+
+.tg-list-item.selected .tg-radio-icon {
+    opacity: 1;
+    transform: scale(1.0);
+}
+
+/* Native-style inputs inside grouped rows */
+.tg-input-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 48px;
+    position: relative;
+}
+
+.tg-input-field {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--tg-color-text);
+    font-family: var(--font-family);
+    font-size: var(--font-size-lg);
+    font-weight: 400;
+    padding: var(--space-md) 0;
+}
+
+.tg-input-field::placeholder {
+    color: var(--tg-color-hint);
+    opacity: 0.8;
+}
+
+.tg-input-clear {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.06);
+    color: var(--tg-color-hint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    margin-right: var(--space-sm);
+}
+body.tg-dark .tg-input-clear {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.tg-input-row.populated .tg-input-clear {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Destructive cancel row item */
+.tg-cancel-action {
+    color: var(--tg-color-destructive);
+    font-weight: 500;
+    font-size: var(--font-size-base);
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-md);
+    transition: background-color 0.15s ease;
+}
+
+.tg-cancel-action:hover {
+    background-color: rgba(255, 59, 48, 0.08);
+}
+
+.tg-cancel-action:active {
+    background-color: rgba(255, 59, 48, 0.14);
+}
+
+.tg-cancel-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Empty states */
+.tg-empty-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl) var(--space-xl);
+    text-align: center;
+    color: var(--tg-color-hint);
+}
+
+.tg-empty-row svg {
+    width: 36px;
+    height: 36px;
+    margin-bottom: var(--space-sm);
+    opacity: 0.35;
+    color: var(--tg-color-text);
+}
+
+.tg-empty-row span {
+    font-size: var(--font-size-base);
+    font-weight: 400;
+}
+
+/* Premium Toast Notification Banner */
+.tg-toast {
+    position: fixed;
+    top: -64px;
+    left: 16px;
+    right: 16px;
+    z-index: 9999;
+    background-color: var(--tg-color-success);
+    color: #ffffff;
+    padding: var(--space-sm) var(--space-xl);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+}
+
+.tg-toast.active {
+    transform: translateY(80px);
+}
+
+.tg-toast.toast-error {
+    background-color: var(--tg-color-destructive);
+}
+
+.tg-toast-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* Screen States */
+.screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    padding: var(--space-xl);
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.screen.active {
+    display: flex;
+}
+
+.screen-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background-color: rgba(36, 129, 204, 0.1);
+    color: var(--tg-color-link);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+.screen-icon.error {
+    background-color: rgba(255, 59, 48, 0.1);
+    color: var(--tg-color-destructive);
+}
+
+.screen-title {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--tg-color-text);
+    margin-bottom: var(--space-sm);
+}
+
+.screen-description {
+    font-size: var(--font-size-base);
+    color: var(--tg-color-hint);
+    max-width: 280px;
+    line-height: 1.45;
+}
+
+/* Action card */
+.tg-action-card {
+    width: 100%;
+    max-width: 320px;
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Fallback buttons */
+.tg-primary-button {
+    background-color: var(--tg-color-button);
+    color: var(--tg-color-button-text);
+    border: none;
+    outline: none;
+    width: 100%;
+    min-height: 46px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.tg-primary-button:active {
+    transform: scale(0.98);
+}
+
+.tg-primary-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Copy controls */
+.tg-copy-container {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.tg-copy-field {
+    flex-grow: 1;
+    background-color: var(--tg-color-section-bg);
+    border: 1px solid var(--tg-color-divider);
+    border-radius: var(--radius-md);
+    padding: var(--space-xs) var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    text-align: center;
+    color: var(--tg-color-text);
+    outline: none;
+}
+
+.tg-copy-button {
+    background-color: var(--tg-color-section-bg);
+    border: 1px solid var(--tg-color-divider);
+    color: var(--tg-color-link);
+    border-radius: var(--radius-md);
+    width: 44px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: var(--font-size-lg);
+}
+
+.tg-copy-button:active {
+    background-color: var(--tg-color-divider);
+}
+
+/* Loading animations */
+.spinner-ios {
+    width: 24px;
+    height: 24px;
+    animation: rotateSpinner 0.8s linear infinite;
+    color: var(--tg-color-link);
+}
+
+.pulsing-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--tg-color-warning);
+    box-shadow: 0 0 8px var(--tg-color-warning);
+    animation: pulse 1.6s ease-in-out infinite;
+    margin-right: calc(var(--space-xs) + var(--space-xxs));
+    flex-shrink: 0;
+}
+
+/* Animations */
+@keyframes rotateSpinner {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.85); opacity: 0.45; }
+    50% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(0.85); opacity: 0.45; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleUp {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* Shimmer Skeleton loader */
+.tg-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--tg-color-section-bg) 25%,
+        var(--tg-color-secondary-bg) 50%,
+        var(--tg-color-section-bg) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite ease-in-out;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Skeleton Container Cross-Fade Transition */
+.tg-skeleton-container {
+    position: relative;
+    width: 100%;
+}
+
+.tg-skeleton-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 250ms ease-out;
+}
+
+.tg-skeleton-content {
+    transition: opacity 250ms ease-in;
+}
+
+.tg-skeleton-fade-out {
+    opacity: 0;
+}
+
+.tg-skeleton-fade-in {
+    opacity: 1;
+}
+
+/* Badges */
+.tg-result-badge {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    padding: var(--space-xxs) var(--space-sm);
+    border-radius: var(--radius-md);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.tg-result-badge.success { background: rgba(49, 181, 69, 0.12); color: var(--tg-color-success); }
+.tg-result-badge.failure, .tg-result-badge.danger { background: rgba(255, 59, 48, 0.12); color: var(--tg-color-destructive); }
+.tg-result-badge.timeout, .tg-result-badge.warning { background: rgba(245, 158, 11, 0.12); color: var(--tg-color-warning); }
+.tg-result-badge.cancelled, .tg-result-badge.neutral { background: rgba(142, 142, 147, 0.12); color: var(--tg-color-hint); }
+.tg-result-badge.info { background: color-mix(in srgb, var(--tg-color-link) 12%, transparent); color: var(--tg-color-link); }
+
+.build-fingerprint {
+    text-align: center;
+    padding-top: var(--space-xl);
+    opacity: 0.6;
+}
+
+/* Detail view */
+.tg-detail-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--space-xl) var(--space-xl) var(--space-sm);
+    gap: var(--space-xs);
+}
+
+.tg-detail-header-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--space-sm);
+    transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+.tg-detail-header-title {
+    font-size: var(--font-size-3xl);
+    font-weight: 700;
+    color: var(--tg-color-text);
+}
+
+.tg-detail-header-subtitle {
+    font-size: var(--font-size-base);
+    color: var(--tg-color-hint);
+}
+
+/* Key-value rows */
+.tg-kv-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-xl);
+    min-height: 44px;
+    position: relative;
+    gap: var(--space-lg);
+}
+
+.tg-kv-row:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: var(--space-xl);
+    right: 0;
+    height: 0.5px;
+    background-color: var(--tg-color-divider);
+}
+
+.tg-kv-label {
+    font-size: var(--font-size-base);
+    color: var(--tg-color-text);
+    font-weight: 400;
+    flex-shrink: 0;
+}
+
+.tg-kv-value {
+    font-size: var(--font-size-base);
+    color: var(--tg-color-hint);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.tg-kv-value.mono {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
+}
+
+.tg-action-row {
+    display: flex;
+    align-items: center;
+    padding: var(--space-md) var(--space-xl);
+    min-height: 44px;
+    position: relative;
+}

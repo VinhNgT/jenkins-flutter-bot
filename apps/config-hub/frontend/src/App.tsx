@@ -12,8 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { useNavigator } from './hooks/useNavigator';
-import type { Screen } from './hooks/useNavigator';
+import { useNavigator, Navigator as NavigationContainer } from 'tg-ui-preact';
 import { API } from './api';
 import HomeScreen from './components/HomeScreen';
 import ConfigScreen from './components/ConfigScreen';
@@ -26,6 +25,13 @@ import type {
   Scope,
   ServiceStatuses,
 } from './types';
+
+export type ScreenType = 'config' | 'jenkinsfile' | 'transfer';
+
+export interface Screen {
+  screen: ScreenType;
+  id?: string;
+}
 
 const SECTION_SCOPES: Record<string, Scope[]> = {
   telegram: ['bot'],
@@ -163,16 +169,10 @@ export default function App() {
     );
   }
 
-  // The active detail screen — either the current screen or the one
-  // being animated out (delayed unmount during pop).
-  const detailScreen = navigator.current ?? navigator.exiting;
-
-  // CSS class on the viewport controls the transform animation.
-  const vpClass = `nav-viewport${navigator.phase !== 'idle' ? ` nav-${navigator.phase}` : ''}`;
-
   return (
-    <div class={vpClass}>
-      <div class="nav-screen nav-screen--main">
+    <NavigationContainer
+      phase={navigator.phase}
+      mainScreen={
         <HomeScreen
           statuses={statuses}
           onStatusUpdate={handleStatusUpdate}
@@ -181,35 +181,67 @@ export default function App() {
           githubUrl={githubUrl}
           dirtyScopes={dirtyScopes}
         />
-      </div>
-      {detailScreen && (
-        <div class="nav-screen nav-screen--detail">
-          {detailScreen.screen === 'config' && detailScreen.id && (
-            <ConfigScreen
-              sectionId={detailScreen.id}
-              schemas={schemas}
-              config={config}
-              reloadSeq={reloadSeq}
-              onConfigReload={handleConfigReload}
-              onDirtyChange={handleDirtyChange}
-              isActive={detailScreen === navigator.current}
-              onBack={handleBack}
-            />
-          )}
-          {detailScreen.screen === 'jenkinsfile' && (
-            <JenkinsfilePanel
-              isActive={detailScreen === navigator.current}
-              onBack={handleBack}
-            />
-          )}
-          {detailScreen.screen === 'transfer' && (
-            <ConfigTransfer
-              isActive={detailScreen === navigator.current}
-              onBack={handleBack}
-            />
-          )}
-        </div>
-      )}
-    </div>
+      }
+      detailScreen={
+        navigator.current ? (
+          <>
+            {navigator.current.screen === 'config' && navigator.current.id && (
+              <ConfigScreen
+                sectionId={navigator.current.id}
+                schemas={schemas}
+                config={config}
+                reloadSeq={reloadSeq}
+                onConfigReload={handleConfigReload}
+                onDirtyChange={handleDirtyChange}
+                isActive={true}
+                onBack={handleBack}
+              />
+            )}
+            {navigator.current.screen === 'jenkinsfile' && (
+              <JenkinsfilePanel
+                isActive={true}
+                onBack={handleBack}
+              />
+            )}
+            {navigator.current.screen === 'transfer' && (
+              <ConfigTransfer
+                isActive={true}
+                onBack={handleBack}
+              />
+            )}
+          </>
+        ) : null
+      }
+      exitingScreen={
+        navigator.exiting ? (
+          <>
+            {navigator.exiting.screen === 'config' && navigator.exiting.id && (
+              <ConfigScreen
+                sectionId={navigator.exiting.id}
+                schemas={schemas}
+                config={config}
+                reloadSeq={reloadSeq}
+                onConfigReload={handleConfigReload}
+                onDirtyChange={handleDirtyChange}
+                isActive={false}
+                onBack={handleBack}
+              />
+            )}
+            {navigator.exiting.screen === 'jenkinsfile' && (
+              <JenkinsfilePanel
+                isActive={false}
+                onBack={handleBack}
+              />
+            )}
+            {navigator.exiting.screen === 'transfer' && (
+              <ConfigTransfer
+                isActive={false}
+                onBack={handleBack}
+              />
+            )}
+          </>
+        ) : null
+      }
+    />
   );
 }

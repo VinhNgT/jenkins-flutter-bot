@@ -14,7 +14,10 @@
   "dependencies": {
     "@preact/signals": "^2.0.0",
     "lucide-preact": "^1.16.0",
-    "preact": "^10.25.0"
+    "preact": "^10.25.0",
+    "tg-ui-preact": "*",
+    "tg-core-preact": "*",
+    "platform-core": "*"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.0",

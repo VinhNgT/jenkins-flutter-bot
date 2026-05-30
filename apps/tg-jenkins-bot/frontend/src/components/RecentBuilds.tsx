@@ -1,13 +1,7 @@
-/**
- * RecentBuilds — Completed builds list with result badges.
- *
- * Uses .tg-result-badge classes from the TGUI stylesheet.
- * Tapping a row navigates to the build detail screen.
- */
-
 import { useEffect, useState } from 'preact/hooks';
 import { CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-preact';
-import { useTelegram } from '../context/TelegramContext';
+import { usePlatform } from 'platform-core';
+import { List, ListItem, Badge } from 'tg-ui-preact';
 import { useRelativeTime } from '../hooks/useRelativeTime';
 import { fetchRecentBuilds } from '../api';
 import type { RecentBuild } from '../types';
@@ -19,7 +13,7 @@ interface RecentBuildsProps {
 }
 
 function RecentBuildRow({ build, onSelect }: { build: RecentBuild; onSelect: (build: RecentBuild) => void }) {
-  const { haptic } = useTelegram();
+  const { haptic } = usePlatform();
   const relativeTime = useRelativeTime(build.completed_at);
 
   const title = build.label || build.branch;
@@ -45,30 +39,32 @@ function RecentBuildRow({ build, onSelect }: { build: RecentBuild; onSelect: (bu
     onSelect(build);
   }
 
+  const badgeVariant = build.result === 'success' ? 'success'
+    : build.result === 'failure' ? 'danger'
+    : build.result === 'timeout' ? 'warning'
+    : 'neutral';
+
   return (
-    <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleClick}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', flexGrow: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, flexShrink: 0 }}>
+    <ListItem
+      title={title}
+      subtitle={subtitle}
+      prefix={
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor }}>
           <Icon size={22} strokeWidth={2.5} />
         </div>
-        <div class="tg-list-item-content" style={{ minWidth: 0 }}>
-          <span class="tg-list-item-title">{title}</span>
-          <span class="tg-list-item-subtitle" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {subtitle}
-          </span>
-        </div>
-      </div>
-      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: 'var(--space-sm)' }}>
-        <span class={`tg-result-badge ${build.result ?? 'cancelled'}`}>
-          {build.result}
-        </span>
-      </div>
-    </div>
+      }
+      rightElement={
+        <Badge variant={badgeVariant}>
+          {build.result ?? 'cancelled'}
+        </Badge>
+      }
+      onClick={handleClick}
+    />
   );
 }
 
 export default function RecentBuilds({ refreshKey, onSelect }: RecentBuildsProps) {
-  const { initData } = useTelegram();
+  const { initData } = usePlatform();
   const [builds, setBuilds] = useState<RecentBuild[]>([]);
 
   useEffect(() => {
@@ -78,20 +74,20 @@ export default function RecentBuilds({ refreshKey, onSelect }: RecentBuildsProps
   }, [initData, refreshKey]);
 
   return (
-    <div class="tg-section">
-      <div class="tg-section-header">Recent Builds</div>
-      <div class="tg-list" id="recentBuildsList">
-        {builds.length === 0 ? (
-          <div class="tg-empty-row" style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--tg-color-hint)' }}>
-            <span>No recent builds yet.</span>
-          </div>
-        ) : (
-          builds.map((build) => (
-            <RecentBuildRow key={build.request_id} build={build} onSelect={onSelect} />
-          ))
-        )}
-      </div>
-      <div class="tg-section-footer">Tap a build for details, download links, and diagnostics.</div>
-    </div>
+    <List
+      header="Recent Builds"
+      footer="Tap a build for details, download links, and diagnostics."
+      id="recentBuildsList"
+    >
+      {builds.length === 0 ? (
+        <div className="tg-empty-row" style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--tg-color-hint)' }}>
+          <span>No recent builds yet.</span>
+        </div>
+      ) : (
+        builds.map((build) => (
+          <RecentBuildRow key={build.request_id} build={build} onSelect={onSelect} />
+        ))
+      )}
+    </List>
   );
 }

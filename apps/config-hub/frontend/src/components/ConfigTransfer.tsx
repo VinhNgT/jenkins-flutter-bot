@@ -5,13 +5,12 @@
  * tarball, and importing a tarball with drag-and-drop.
  */
 
-import { Download, Upload, Copy, FileCode, CheckCircle, XCircle, SkipForward, AlertTriangle, ChevronLeft } from 'lucide-preact';
+import { Download, Upload, Copy, FileCode, CheckCircle, XCircle, SkipForward, AlertTriangle } from 'lucide-preact';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import type { ExportEnvResult } from '../types';
-import { useTelegram } from '../context/TelegramContext';
-import { useBackButton } from '../hooks/useBackButton';
+import { Scaffold, Button, TextArea } from 'tg-ui-preact';
 
 interface ImportResult {
   applied?: string[];
@@ -26,9 +25,7 @@ interface ConfigTransferProps {
   onBack: () => void;
 }
 
-export default function ConfigTransfer({ isActive, onBack }: ConfigTransferProps) {
-  const { isTelegram } = useTelegram();
-  useBackButton(isActive, onBack);
+export default function ConfigTransfer({ onBack }: ConfigTransferProps) {
   const { showToast } = useToast();
 
   // Export state
@@ -102,52 +99,46 @@ export default function ConfigTransfer({ isActive, onBack }: ConfigTransferProps
   }
 
   return (
-    <div class="container">
-      {!isTelegram && (
-        <header>
-          <button class="back-button" onClick={onBack}>
-            <ChevronLeft size={20} />
-            Back
-          </button>
-        </header>
-      )}
-
-      <h2 class="panel-title">Config Transfer</h2>
-      <p class="panel-desc">
-        Export your configuration as environment files for production deployment,
-        or import a previously exported config tarball.
-      </p>
+    <Scaffold
+      title="Config Transfer"
+      subtitle="Export your configuration as environment files for production deployment, or import a previously exported config tarball."
+      onBack={onBack}
+    >
 
       {/* ── Export Card ──────────────────────────────────────────── */}
-      <div class="card">
+      <div className="card">
         <h3>Export Configuration</h3>
-        <p class="field-desc">
+        <p className="field-desc">
           Export your config parameters into a standard <code>compose.env</code> preview, or download a complete backup archive.
         </p>
-        <div class="form-actions" style={{ borderTop: 'none', marginTop: '0', paddingTop: '0' }}>
-          <button
-            class="btn btn-accent"
+        <div className="form-actions" style={{ borderTop: 'none', marginTop: '0', paddingTop: '0', gap: 'var(--space-sm)' }}>
+          <Button
+            variant="primary"
             disabled={generating}
+            loading={generating}
             onClick={handleGenerate}
+            style={{ flex: 1 }}
           >
-            <FileCode class="icon" size={14} />
+            <FileCode className="icon" size={14} />
             Preview compose.env
-          </button>
-          <button
-            class="btn btn-secondary"
+          </Button>
+          <Button
+            variant="outline"
             disabled={downloading}
+            loading={downloading}
             onClick={handleDownload}
+            style={{ flex: 1 }}
           >
-            <Download class="icon" size={14} />
+            <Download className="icon" size={14} />
             Download Tarball
-          </button>
+          </Button>
         </div>
       </div>
 
       {exportData && (
         <div style={{ marginTop: 'var(--space-md)' }}>
           {exportData.warnings?.length ? (
-            <div class="config-error-callout" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xxs)' }}>
+            <div className="config-error-callout" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xxs)' }}>
               {exportData.warnings.map((w, i) => (
                 <p key={i} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
                   <AlertTriangle size={12} style={{ flexShrink: 0 }} /> {w}
@@ -156,37 +147,45 @@ export default function ConfigTransfer({ isActive, onBack }: ConfigTransferProps
             </div>
           ) : null}
 
-          <div class="export-tabs">
+          <div className="export-tabs">
             <span style={{ fontSize: 'var(--font-size-md)', fontWeight: 500, padding: 'var(--space-xs) calc(var(--space-sm) + var(--space-xs))', color: 'var(--tg-color-text)' }}>
               compose.env
             </span>
             <button
-              class="btn btn-sm btn-secondary"
+              className="btn btn-sm btn-secondary"
               style={{ marginLeft: 'auto', marginBottom: 'var(--space-xs)' }}
               onClick={handleCopy}
             >
-              <Copy class="icon" size={12} />
+              <Copy className="icon" size={12} />
               Copy
             </button>
           </div>
 
-          <textarea
-            class="export-output"
+          <TextArea
+            className="export-output"
             value={getTabContent()}
             readOnly
+            rows={12}
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--font-size-sm)',
+              background: '#0d1117',
+              color: '#c9d1d9',
+              padding: '12px 16px',
+            }}
           />
         </div>
       )}
 
       {/* ── Import Card ─────────────────────────────────────────── */}
-      <div class="card" style={{ marginTop: 'var(--space-md)' }}>
+      <div className="card" style={{ marginTop: 'var(--space-md)' }}>
         <h3>Import Configuration</h3>
-        <p class="field-desc">
+        <p className="field-desc">
           Upload a previously generated <code>.tar.gz</code> archive to restore and apply all service configuration properties.
         </p>
 
         <div
-          class={`import-zone${dragover ? ' dragover' : ''}`}
+          className={`import-zone${dragover ? ' dragover' : ''}`}
           onDragOver={(e) => {
             e.preventDefault();
             setDragover(true);
@@ -230,15 +229,16 @@ export default function ConfigTransfer({ isActive, onBack }: ConfigTransferProps
           />
         </div>
 
-        <div class="form-actions" style={{ borderTop: 'none', marginTop: '0', paddingTop: '0' }}>
-          <button
-            class="btn btn-accent"
+        <div className="form-actions" style={{ borderTop: 'none', marginTop: '0', paddingTop: '0' }}>
+          <Button
+            variant="primary"
             disabled={importing || !selectedFile}
+            loading={importing}
             onClick={handleImport}
           >
-            <Upload class="icon" size={14} />
+            <Upload className="icon" size={14} />
             Import
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -307,6 +307,6 @@ export default function ConfigTransfer({ isActive, onBack }: ConfigTransferProps
           ) : null}
         </div>
       )}
-    </div>
+    </Scaffold>
   );
 }

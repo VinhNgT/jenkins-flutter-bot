@@ -22,13 +22,13 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmDialog';
-import { useTelegram } from '../context/TelegramContext';
+import { usePlatform } from 'platform-core';
 import type { VpnStatus } from '../types';
 
 export default function VpnWidget() {
   const { showToast } = useToast();
   const confirm = useConfirm();
-  const { haptic } = useTelegram();
+  const { haptic } = usePlatform();
   const [status, setStatus] = useState<VpnStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);

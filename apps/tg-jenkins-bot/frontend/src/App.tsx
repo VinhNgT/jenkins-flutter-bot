@@ -4,11 +4,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { useTelegram } from './context/TelegramContext';
+import { usePlatform } from 'platform-core';
+import { useNavigator, Navigator, ErrorBoundary } from 'tg-ui-preact';
 import { useSSE } from './hooks/useSSE';
-import { useNavigator } from './hooks/useNavigator';
 import { fetchConfig, fetchRecentBuilds, ApiError } from './api';
-import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import MainScreen from './components/MainScreen';
@@ -22,7 +21,8 @@ interface ErrorState {
 }
 
 function AppShell() {
-  const { initData, isTelegram } = useTelegram();
+  const platform = usePlatform();
+  const { initData } = platform;
   const navigator = useNavigator();
 
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -33,8 +33,8 @@ function AppShell() {
   const currentRef = useRef(navigator.current);
   currentRef.current = navigator.current;
 
-  // If not in Telegram and not in preview mode, block access
-  const hasTelegram = isTelegram || initData === 'preview';
+  // If not in Telegram, block access
+  const hasTelegram = platform.initData !== '';
 
   // Fetch initial config
   useEffect(() => {
@@ -123,16 +123,10 @@ function AppShell() {
     return <LoadingScreen />;
   }
 
-  // The active detail screen — either the current screen or the one
-  // being animated out (delayed unmount during pop).
-  const detailScreen = navigator.current ?? navigator.exiting;
-
-  // CSS class on the viewport controls the transform animation.
-  const vpClass = `nav-viewport${navigator.phase !== 'idle' ? ` nav-${navigator.phase}` : ''}`;
-
   return (
-    <div class={vpClass}>
-      <div class="nav-screen nav-screen--main">
+    <Navigator
+      phase={navigator.phase}
+      mainScreen={
         <MainScreen
           config={config}
           isActive={navigator.current === null && navigator.exiting === null}
@@ -140,19 +134,30 @@ function AppShell() {
             navigator.push({ screen: 'build-detail', type, id })
           }
         />
-      </div>
-      {detailScreen && (
-        <div class="nav-screen nav-screen--detail">
+      }
+      detailScreen={
+        navigator.current ? (
           <BuildDetailScreen
             config={config}
-            type={detailScreen.type}
-            id={detailScreen.id}
-            isActive={navigator.current !== null}
+            type={navigator.current.type}
+            id={navigator.current.id}
+            isActive={true}
             onBack={() => navigator.pop()}
           />
-        </div>
-      )}
-    </div>
+        ) : null
+      }
+      exitingScreen={
+        navigator.exiting ? (
+          <BuildDetailScreen
+            config={config}
+            type={navigator.exiting.type}
+            id={navigator.exiting.id}
+            isActive={false}
+            onBack={() => navigator.pop()}
+          />
+        ) : null
+      }
+    />
   );
 }
 

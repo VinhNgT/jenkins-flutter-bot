@@ -6,15 +6,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
-import { useTelegram } from '../context/TelegramContext';
+import { usePlatform, usePrimaryButton, usePlatformStorage } from 'platform-core';
+import { Scaffold, List, ListItem, Switch, Button } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
 import { triggerBuild } from '../api';
 import BranchSelector from './BranchSelector';
 import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
 import RecentBuilds from './RecentBuilds';
-import { useMainButton } from '../hooks/useMainButton';
-import { useCloudStorage } from '../hooks/useCloudStorage';
 import type { AppConfig } from '../types';
 
 interface MainScreenProps {
@@ -24,7 +23,7 @@ interface MainScreenProps {
 }
 
 export default function MainScreen({ config, isActive, onBuildSelect }: MainScreenProps) {
-  const { tg, isTelegram, initData, haptic } = useTelegram();
+  const { initData, haptic, hasNativePrimaryButton, showAlert } = usePlatform();
   const { showToast } = useToast();
 
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
@@ -32,7 +31,7 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
   const [isCustom, setIsCustom] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [recentRefreshKey, setRecentRefreshKey] = useState(0);
-  const [notifyChat, setNotifyChat, notifyLoading] = useCloudStorage('notify_completion', true);
+  const [notifyChat, setNotifyChat, notifyLoading] = usePlatformStorage('notify_completion', true);
   const notifyLoaded = !notifyLoading;
 
   // Detect when a build disappears from active → trigger recent builds refresh
@@ -47,15 +46,14 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
   }, [config.active_builds]);
 
   // Check if selected branch already has an active build.
-  // Block trigger until CloudStorage preference is loaded to avoid race conditions.
+  // Block trigger until PlatformStorage preference is loaded to avoid race conditions.
   const isDuplicate = config.active_builds.some((b) => b.ref === selectedBranch);
   const hasSelection = selectedBranch != null && selectedBranch.trim() !== '';
   const isVisible = (hasSelection && !isDuplicate && notifyLoaded) || isLoading;
   const isEnabled = isVisible && !isLoading;
 
-
-  // Hide browser fallback trigger inside Telegram
-  const showFallbackButton = !isTelegram;
+  // Hide browser fallback trigger inside native primary-button host platforms
+  const showFallbackButton = !hasNativePrimaryButton;
 
   function handlePresetSelect(ref: string) {
     setCustomInput('');
@@ -87,8 +85,7 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
     // Show duplicate alert before hitting the API
     if (isDuplicate) {
       const msg = `A build on '${selectedBranch}' is already running. Please wait or cancel it first.`;
-      if (isTelegram && tg) tg.showAlert(msg);
-      else showToast(msg, 'error');
+      showAlert(msg);
       return;
     }
 
@@ -109,14 +106,13 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
       console.error(err);
       haptic.notification('error');
       const msg = err instanceof Error ? err.message : 'Failed to trigger build. Please retry.';
-      if (isTelegram && tg) tg.showAlert(msg);
-      else showToast(msg, 'error');
+      showAlert(msg);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBranch, isDuplicate, initData, isTelegram, tg, haptic, showToast, notifyChat]);
+  }, [selectedBranch, isDuplicate, initData, haptic, showToast, notifyChat, showAlert]);
 
-  // Declarative MainButton — the hook manages show/hide, progress,
+  // Declarative PrimaryButton — the hook manages show/hide, progress,
   // click handler registration, and cleanup automatically.
   const buttonConfig = useMemo(() => {
     if (!isVisible) return null;
@@ -128,22 +124,10 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
     };
   }, [isVisible, isLoading, isEnabled, handleTrigger]);
 
-  useMainButton(buttonConfig, isActive);
-
-  // Hide BackButton on main screen
-  useEffect(() => {
-    if (!isTelegram || !tg || !isActive) return;
-    tg.BackButton.hide();
-  }, [isTelegram, tg, isActive]);
+  usePrimaryButton(buttonConfig, isActive);
 
   return (
-    <div class="container" id="mainScreen" style={{ display: 'flex' }}>
-      <header>
-        <div>
-          <h1 id="appName">{config.app_name}</h1>
-          <p class="header-subtitle">Select a target branch to deploy</p>
-        </div>
-      </header>
+    <Scaffold title={config.app_name} subtitle="Select a target branch to deploy">
 
       <BranchSelector
         branches={config.branches}
@@ -159,23 +143,21 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
       />
 
       {notifyLoaded && (
-        <div class="tg-section">
-          <div class="tg-list">
-            <div
-              class="tg-list-item"
-              id="notifyToggle"
-              onClick={() => { haptic.tap(); setNotifyChat(!notifyChat); }}
-            >
-              <div class="tg-list-item-content">
-                <span class="tg-list-item-title">Notify on completion</span>
-              </div>
-              <div class={`tg-toggle-track${notifyChat ? ' tg-toggle-on' : ''}`}>
-                <div class="tg-toggle-thumb" />
-              </div>
-            </div>
-          </div>
-          <div class="tg-section-footer">Send a chat message when the build finishes.</div>
-        </div>
+        <List footer="Send a chat message when the build finishes.">
+          <ListItem
+            id="notifyToggle"
+            title="Notify on completion"
+            rightElement={
+              <Switch
+                checked={notifyChat}
+                onChange={(checked) => {
+                  haptic.impact('light');
+                  setNotifyChat(checked);
+                }}
+              />
+            }
+          />
+        </List>
       )}
 
       <ActiveBuilds builds={config.active_builds} onSelect={(b) => onBuildSelect('active', b.request_id)} />
@@ -190,23 +172,16 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
       {/* Browser fallback trigger button (hidden in Telegram) */}
       {showFallbackButton && (
         <div id="fallbackBtnContainer" style={{ marginTop: 'auto', paddingTop: 'var(--space-lg)', width: '100%' }}>
-          <button
+          <Button
             id="fallbackTriggerBtn"
-            class="tg-primary-button"
             disabled={!isEnabled}
+            loading={isLoading}
             onClick={handleTrigger}
           >
-            {isLoading ? (
-              <svg class="spinner-ios" style={{ color: 'var(--tg-color-button-text)' }} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.15)" stroke-width="3" />
-                <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-              </svg>
-            ) : (
-              <span>Trigger Build</span>
-            )}
-          </button>
+            Trigger Build
+          </Button>
         </div>
       )}
-    </div>
+    </Scaffold>
   );
 }

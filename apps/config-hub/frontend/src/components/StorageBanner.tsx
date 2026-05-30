@@ -12,7 +12,7 @@ export default function StorageBanner({ mode }: { mode: 'ephemeral' | 'log_only'
       {isLogOnly ? <FileText size={20} /> : <HardDriveDownload size={20} />}
       <div>
         <strong>{isLogOnly ? 'Log-Only Storage Mode' : 'Ephemeral Storage Mode'}</strong>
-        <p style={{ marginTop: '4px' }}>
+        <p style={{ marginTop: 'var(--space-xs)' }}>
           {isLogOnly ? (
             <>
               File storage is running in <strong>log-only mode</strong> — builds are logged

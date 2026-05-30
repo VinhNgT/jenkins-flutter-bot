@@ -97,7 +97,7 @@ export default function FieldRenderer({
   };
 
   // ─── Label with optional help button ─────────────────────────
-  const LabelRow = ({ inline = false }: { inline?: boolean }) => (
+  const labelRow = (
     <>
       {field.help_html ? (
         <div class="label-row">
@@ -119,31 +119,29 @@ export default function FieldRenderer({
           </button>
         </div>
       ) : (
-        !inline && (
-          <label>
-            {field.label}
-            {field.required && <span class="required-marker"> *</span>}
-            {isDirty && <span class="field-dirty-label"> (unsaved)</span>}
-          </label>
-        )
+        <label>
+          {field.label}
+          {field.required && <span class="required-marker"> *</span>}
+          {isDirty && <span class="field-dirty-label"> (unsaved)</span>}
+        </label>
       )}
     </>
   );
 
-  const HelpPopover = () => (
-    <>
-      {field.help_html && helpOpen && (
+  const helpPopover = field.help_html ? (
+    <div class={`field-help-popover-wrapper${helpOpen ? ' visible' : ''}`}>
+      <div class="field-help-popover-content">
         <div
-          class="field-help-popover visible"
+          class="field-help-popover"
           dangerouslySetInnerHTML={{ __html: field.help_html }}
         />
-      )}
-    </>
-  );
+      </div>
+    </div>
+  ) : null;
 
-  const Description = () => (
-    <>{field.description && <p class="field-desc">{field.description}</p>}</>
-  );
+  const descriptionElement = field.description ? (
+    <p class="field-desc">{field.description}</p>
+  ) : null;
 
   // ─── Chat ID List ────────────────────────────────────────────
   if (field.type === 'chat_id_list') {
@@ -152,9 +150,9 @@ export default function FieldRenderer({
         ref={containerRef}
         class={`field field--chat-id-list field--full${isDirty ? ' field--dirty' : ''}`}
       >
-        <LabelRow />
-        <HelpPopover />
-        <Description />
+        {labelRow}
+        {helpPopover}
+        {descriptionElement}
         <ChatIdListEditor name={name} value={value} />
       </div>
     );
@@ -167,9 +165,9 @@ export default function FieldRenderer({
         ref={containerRef}
         class={`field field--key-value field--full${isDirty ? ' field--dirty' : ''}`}
       >
-        <LabelRow />
-        <HelpPopover />
-        <Description />
+        {labelRow}
+        {helpPopover}
+        {descriptionElement}
         <KeyValueEditor name={name} value={value} />
       </div>
     );
@@ -216,12 +214,12 @@ export default function FieldRenderer({
                 </button>
               )}
             </div>
-            <HelpPopover />
-            <Description />
+            {helpPopover}
+            {descriptionElement}
           </div>
 
-          <div class={`switch-toggle${checked ? ' checked' : ''}`}>
-            <span class="switch-slider" />
+          <div class={`tg-toggle-track${checked ? ' tg-toggle-on' : ''}`}>
+            <div class="tg-toggle-thumb" />
           </div>
           <input
             ref={hiddenInputRef}
@@ -240,15 +238,16 @@ export default function FieldRenderer({
       ref={containerRef}
       class={`field${field.secret ? ' field--secret' : ''}${field.full_width ? ' field--full' : ''}${isDirty ? ' field--dirty' : ''}`}
     >
-      <LabelRow />
-      <HelpPopover />
-      <Description />
+      {labelRow}
+      {helpPopover}
+      {descriptionElement}
 
       {/* Input */}
       {field.secret ? (
         <div class="secret-row">
           <input
             type="password"
+            class="form-input secret"
             name={name}
             autocomplete="off"
             disabled={isSecretLocked}
@@ -291,7 +290,7 @@ export default function FieldRenderer({
             return '';
           })();
           return (
-            <select name={name} defaultValue={defaultValue} required={field.required}>
+            <select class="form-select" name={name} defaultValue={defaultValue} required={field.required}>
               {field.options.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
@@ -302,6 +301,7 @@ export default function FieldRenderer({
         })()
       ) : (
         <input
+          class="form-input"
           name={name}
           type={field.type === 'integer' ? 'number' : 'text'}
           min={field.type === 'integer' ? '0' : undefined}

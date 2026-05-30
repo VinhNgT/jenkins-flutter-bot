@@ -189,7 +189,7 @@ export default function MainScreen({ config, isActive, onBuildSelect }: MainScre
 
       {/* Browser fallback trigger button (hidden in Telegram) */}
       {showFallbackButton && (
-        <div id="fallbackBtnContainer" style={{ marginTop: 'auto', paddingTop: '16px', width: '100%' }}>
+        <div id="fallbackBtnContainer" style={{ marginTop: 'auto', paddingTop: 'var(--space-lg)', width: '100%' }}>
           <button
             id="fallbackTriggerBtn"
             class="tg-primary-button"

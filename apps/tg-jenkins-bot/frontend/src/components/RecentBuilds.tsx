@@ -29,9 +29,9 @@ function RecentBuildRow({ build, onSelect }: { build: RecentBuild; onSelect: (bu
     : build.result === 'failure' ? XCircle
     : build.result === 'timeout' ? Clock : AlertCircle;
 
-  const iconColor = build.result === 'success' ? 'var(--tg-color-button)'
+  const iconColor = build.result === 'success' ? 'var(--tg-color-success)'
     : build.result === 'failure' ? 'var(--tg-color-destructive)'
-    : build.result === 'timeout' ? '#ff9500' : 'var(--tg-color-hint)';
+    : build.result === 'timeout' ? 'var(--tg-color-warning)' : 'var(--tg-color-hint)';
 
   // Subtitle: build number + relative time + short commit hash for identification
   const parts: string[] = [];
@@ -47,7 +47,7 @@ function RecentBuildRow({ build, onSelect }: { build: RecentBuild; onSelect: (bu
 
   return (
     <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleClick}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', flexGrow: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, flexShrink: 0 }}>
           <Icon size={22} strokeWidth={2.5} />
         </div>
@@ -58,7 +58,7 @@ function RecentBuildRow({ build, onSelect }: { build: RecentBuild; onSelect: (bu
           </span>
         </div>
       </div>
-      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: '8px' }}>
+      <div class="tg-list-item-right" style={{ flexShrink: 0, paddingLeft: 'var(--space-sm)' }}>
         <span class={`tg-result-badge ${build.result ?? 'cancelled'}`}>
           {build.result}
         </span>
@@ -82,7 +82,7 @@ export default function RecentBuilds({ refreshKey, onSelect }: RecentBuildsProps
       <div class="tg-section-header">Recent Builds</div>
       <div class="tg-list" id="recentBuildsList">
         {builds.length === 0 ? (
-          <div class="tg-empty-row" style={{ padding: '16px', textAlign: 'center', color: 'var(--tg-color-hint)' }}>
+          <div class="tg-empty-row" style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--tg-color-hint)' }}>
             <span>No recent builds yet.</span>
           </div>
         ) : (

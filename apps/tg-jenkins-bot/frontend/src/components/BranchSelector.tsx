@@ -35,7 +35,7 @@ export default function BranchSelector({ branches, selectedBranch, onSelect }: B
           >
             <div class="tg-list-item-content" style={{ minWidth: 0 }}>
               <span class="tg-list-item-title">{branch.label}</span>
-              <div style={{ marginTop: '2px', display: 'flex' }}>
+              <div style={{ marginTop: 'var(--space-xxs)', display: 'flex' }}>
                 <span class="tg-list-item-meta">{branch.ref}</span>
               </div>
             </div>

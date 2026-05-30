@@ -125,7 +125,7 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
           {statusClass ? <span class={statusClass}>{statusText}</span> : statusText}
           {connected && driveStatus.token_path && ` — Token: ${driveStatus.token_path}`}
         </p>
-        <div class="form-actions" style={{ borderTop: 'none', paddingTop: '8px' }}>
+        <div class="form-actions" style={{ borderTop: 'none', paddingTop: 'var(--space-sm)' }}>
           <button
             class="btn btn-accent btn-sm"
             disabled={busy || !configured}

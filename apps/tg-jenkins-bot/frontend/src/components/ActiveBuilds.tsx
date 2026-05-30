@@ -43,7 +43,7 @@ function ActiveBuildRow({ build, onSelect }: { build: ActiveBuild; onSelect: (bu
 
   return (
     <div class="tg-list-item" style={{ cursor: 'pointer' }} onClick={handleClick}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', flexGrow: 1 }}>
         {/* iOS-style spinner — custom SVG matching Telegram's native loading indicator */}
         <svg class="spinner-ios" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" stroke="var(--tg-color-divider)" stroke-width="2.5" />
@@ -75,11 +75,11 @@ export default function ActiveBuilds({ builds, onSelect }: ActiveBuildsProps) {
             style={{
               background: 'var(--tg-color-link)',
               color: 'var(--tg-color-button-text)',
-              fontSize: '11px',
-              padding: '2px 6px',
-              borderRadius: '10px',
+              fontSize: 'var(--font-size-xs)',
+              padding: 'var(--space-xxs) var(--space-xs)',
+              borderRadius: 'var(--radius-round)',
               fontWeight: 'bold',
-              marginLeft: '6px',
+              marginLeft: 'var(--space-xs)',
             }}
           >
             {builds.length}

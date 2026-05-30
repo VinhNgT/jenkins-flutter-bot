@@ -128,7 +128,7 @@ export default function ChatIdListEditor({ name, value }: ChatIdListEditorProps)
   return (
     <div class="chat-id-list-editor">
       {items.length === 0 ? (
-        <div class="kv-empty-state" style={{ marginBottom: '8px' }}>
+        <div class="kv-empty-state" style={{ marginBottom: 'var(--space-sm)' }}>
           <p>No Allowed Chat IDs configured. The bot will reject all interactions.</p>
         </div>
       ) : (
@@ -160,7 +160,7 @@ export default function ChatIdListEditor({ name, value }: ChatIdListEditorProps)
                     onClick={() => handleCopy(item.id, item.value)}
                     title="Copy Chat ID"
                   >
-                    {isCopied ? <Check size={11} style={{ color: '#4cd964' }} /> : <Copy size={11} />}
+                    {isCopied ? <Check size={11} style={{ color: 'var(--tg-color-success)' }} /> : <Copy size={11} />}
                   </button>
                   <button
                     type="button"
@@ -180,7 +180,7 @@ export default function ChatIdListEditor({ name, value }: ChatIdListEditorProps)
       <div class="chat-id-add-form">
         <input
           type="text"
-          class="chat-id-add-input"
+          class="form-input chat-id-add-input"
           placeholder="Enter Chat ID (e.g. -100123456)"
           value={newValue}
           onInput={handleInputChange}

@@ -54,7 +54,7 @@ export default function ErrorScreen({ title, description, detail }: ErrorScreenP
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* CTA: Add bot to group */}
         {detail?.error === 'private_chat_disabled' && detail.bot_username && (
-          <div style={{ marginTop: '24px', width: '100%', maxWidth: '280px' }}>
+          <div style={{ marginTop: 'var(--space-xl)', width: '100%', maxWidth: '280px' }}>
             <button class="tg-primary-button" onClick={handleAddToGroup}>
               <Plus size={18} strokeWidth={2.5} />
               <span>Add Bot to Group</span>
@@ -65,7 +65,7 @@ export default function ErrorScreen({ title, description, detail }: ErrorScreenP
         {/* CTA: Copy chat ID */}
         {detail?.error === 'group_not_authorized' && detail.chat_id && (
           <div class="tg-action-card">
-            <div style={{ fontSize: '11px', color: 'var(--tg-color-subtitle)', fontWeight: 700, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--tg-color-subtitle)', fontWeight: 700, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               YOUR CHAT ID:
             </div>
             <div class="tg-copy-container">
@@ -80,7 +80,7 @@ export default function ErrorScreen({ title, description, detail }: ErrorScreenP
                 {copyLabel}
               </button>
             </div>
-            <p style={{ fontSize: '12px', color: 'var(--tg-color-hint)', lineHeight: 1.45, textAlign: 'center', marginTop: '6px' }}>
+            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--tg-color-hint)', lineHeight: 1.45, textAlign: 'center', marginTop: 'var(--space-xs)' }}>
               Share this ID with your system administrator to secure authorized access.
             </p>
           </div>

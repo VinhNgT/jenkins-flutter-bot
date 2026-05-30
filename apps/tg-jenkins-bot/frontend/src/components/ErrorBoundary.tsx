@@ -42,7 +42,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p class="screen-description">
             An unexpected error occurred. Please try again.
           </p>
-          <div style={{ marginTop: '24px', width: '100%', maxWidth: '280px' }}>
+          <div style={{ marginTop: 'var(--space-xl)', width: '100%', maxWidth: '280px' }}>
             <button class="tg-primary-button" onClick={this.handleRetry}>
               <span>Try Again</span>
             </button>

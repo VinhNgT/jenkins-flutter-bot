@@ -67,11 +67,11 @@ function formatTimestamp(ts: number): string {
 function getResultVisuals(result: string) {
   switch (result) {
     case 'success':
-      return { Icon: CheckCircle2, color: '#31b545', bg: 'rgba(49, 181, 69, 0.1)', label: 'Success' };
+      return { Icon: CheckCircle2, color: 'var(--tg-color-success)', bg: 'rgba(49, 181, 69, 0.1)', label: 'Success' };
     case 'failure':
       return { Icon: XCircle, color: 'var(--tg-color-destructive)', bg: 'rgba(255, 59, 48, 0.1)', label: 'Failed' };
     case 'timeout':
-      return { Icon: Clock, color: '#ff9500', bg: 'rgba(255, 149, 0, 0.1)', label: 'Timed Out' };
+      return { Icon: Clock, color: 'var(--tg-color-warning)', bg: 'rgba(255, 149, 0, 0.1)', label: 'Timed Out' };
     case 'cancelled':
       return { Icon: AlertCircle, color: 'var(--tg-color-hint)', bg: 'rgba(142, 142, 147, 0.1)', label: 'Cancelled' };
     default:
@@ -140,20 +140,20 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
       <div class="container" style={{ display: 'flex' }}>
         {/* Skeleton: Hero header */}
         <div class="tg-detail-header">
-          <div class="tg-skeleton" style={{ width: '56px', height: '56px', borderRadius: '50%', marginBottom: '8px' }} />
-          <div class="tg-skeleton" style={{ width: '140px', height: '20px', borderRadius: '6px' }} />
-          <div class="tg-skeleton" style={{ width: '100px', height: '14px', borderRadius: '4px', marginTop: '4px' }} />
+          <div class="tg-skeleton" style={{ width: '56px', height: '56px', borderRadius: 'var(--radius-round)', marginBottom: 'var(--space-sm)' }} />
+          <div class="tg-skeleton" style={{ width: '140px', height: '20px', borderRadius: 'var(--radius-md)' }} />
+          <div class="tg-skeleton" style={{ width: '100px', height: '14px', borderRadius: 'var(--radius-sm)', marginTop: 'var(--space-xs)' }} />
         </div>
         {/* Skeleton: Build Information section */}
         <div class="tg-section">
           <div class="tg-section-header">
-            <div class="tg-skeleton" style={{ width: '120px', height: '12px', borderRadius: '4px' }} />
+            <div class="tg-skeleton" style={{ width: '120px', height: '12px', borderRadius: 'var(--radius-sm)' }} />
           </div>
           <div class="tg-list">
             {[1, 2, 3, 4].map((i) => (
               <div class="tg-kv-row" key={i}>
-                <div class="tg-skeleton" style={{ width: '80px', height: '14px', borderRadius: '4px' }} />
-                <div class="tg-skeleton" style={{ width: '100px', height: '14px', borderRadius: '4px' }} />
+                <div class="tg-skeleton" style={{ width: '80px', height: '14px', borderRadius: 'var(--radius-sm)' }} />
+                <div class="tg-skeleton" style={{ width: '100px', height: '14px', borderRadius: 'var(--radius-sm)' }} />
               </div>
             ))}
           </div>
@@ -161,12 +161,12 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
         {/* Skeleton: Diagnostics section */}
         <div class="tg-section">
           <div class="tg-section-header">
-            <div class="tg-skeleton" style={{ width: '90px', height: '12px', borderRadius: '4px' }} />
+            <div class="tg-skeleton" style={{ width: '90px', height: '12px', borderRadius: 'var(--radius-sm)' }} />
           </div>
           <div class="tg-list">
             <div class="tg-kv-row">
-              <div class="tg-skeleton" style={{ width: '80px', height: '14px', borderRadius: '4px' }} />
-              <div class="tg-skeleton" style={{ width: '140px', height: '14px', borderRadius: '4px' }} />
+              <div class="tg-skeleton" style={{ width: '80px', height: '14px', borderRadius: 'var(--radius-sm)' }} />
+              <div class="tg-skeleton" style={{ width: '140px', height: '14px', borderRadius: 'var(--radius-sm)' }} />
             </div>
           </div>
         </div>
@@ -203,7 +203,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
 
   // Visuals for header icon
   const visuals = showingActiveUI
-    ? { Icon: Timer, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', label: 'Building' }
+    ? { Icon: Timer, color: 'var(--tg-color-warning)', bg: 'rgba(245, 158, 11, 0.1)', label: 'Building' }
     : getResultVisuals(result ?? '');
 
   // Duration (only for completed builds)
@@ -262,7 +262,7 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
     if (!canCancel) return null;
     return {
       text: 'CANCEL BUILD',
-      color: '#ff3b30',
+      color: 'var(--tg-color-destructive)',
       textColor: '#ffffff',
       loading: cancelling,
       disabled: cancelling,
@@ -422,10 +422,10 @@ export default function BuildDetailScreen({ config, type, id, isActive, onBack }
 
       {/* Browser fallback cancel button (hidden in Telegram — uses MainButton) */}
       {canCancel && !isTelegram && (
-        <div style={{ marginTop: 'auto', paddingTop: '16px', width: '100%' }}>
+        <div style={{ marginTop: 'auto', paddingTop: 'var(--space-lg)', width: '100%' }}>
           <button
             class="tg-primary-button"
-            style={{ backgroundColor: '#ff3b30' }}
+            style={{ backgroundColor: 'var(--tg-color-destructive)' }}
             disabled={cancelling}
             onClick={handleCancel}
           >

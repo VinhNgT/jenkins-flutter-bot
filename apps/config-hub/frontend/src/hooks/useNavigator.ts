@@ -19,7 +19,7 @@ import { useCallback, useRef, useState } from 'preact/hooks';
 export const NAV_TRANSITION_MS = 300;
 
 /** Config-hub screen types. */
-export type ScreenType = 'config' | 'tools';
+export type ScreenType = 'config' | 'jenkinsfile' | 'transfer';
 
 /** A screen pushed onto the navigation stack. */
 export interface Screen {

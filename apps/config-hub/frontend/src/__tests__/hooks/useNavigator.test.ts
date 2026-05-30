@@ -126,7 +126,7 @@ describe('useNavigator', () => {
   it('blocks concurrent push during animation', () => {
     const { result } = renderHook(() => useNavigator());
     const screen1: Screen = { screen: 'config', id: 'telegram' };
-    const screen2: Screen = { screen: 'tools' };
+    const screen2: Screen = { screen: 'jenkinsfile' };
 
     act(() => {
       result.current.push(screen1);

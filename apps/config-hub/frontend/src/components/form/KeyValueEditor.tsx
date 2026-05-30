@@ -141,7 +141,7 @@ export default function KeyValueEditor({ name, value }: KeyValueEditorProps) {
               <div class="kv-row" key={row.id}>
                 <input
                   type="text"
-                  class={`kv-input-key${isKeyDirty ? ' kv-input--dirty' : ''}`}
+                  class={`form-input kv-input-key${isKeyDirty ? ' kv-input--dirty' : ''}`}
                   placeholder="Display Label (e.g. Stable Release)"
                   value={row.key}
                   onInput={(e) => updateRow(row.id, 'key', (e.target as HTMLInputElement).value)}
@@ -149,7 +149,7 @@ export default function KeyValueEditor({ name, value }: KeyValueEditorProps) {
                 <span class="kv-arrow">➔</span>
                 <input
                   type="text"
-                  class={`kv-input-value${isValueDirty ? ' kv-input--dirty' : ''}`}
+                  class={`form-input kv-input-value${isValueDirty ? ' kv-input--dirty' : ''}`}
                   placeholder="Git Branch (e.g. main)"
                   value={row.value}
                   onInput={(e) => updateRow(row.id, 'value', (e.target as HTMLInputElement).value)}

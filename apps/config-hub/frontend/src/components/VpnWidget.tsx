@@ -22,11 +22,13 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmDialog';
+import { useTelegram } from '../context/TelegramContext';
 import type { VpnStatus } from '../types';
 
 export default function VpnWidget() {
   const { showToast } = useToast();
   const confirm = useConfirm();
+  const { haptic } = useTelegram();
   const [status, setStatus] = useState<VpnStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -43,9 +45,11 @@ export default function VpnWidget() {
 
   async function handleFileSelect(file: File) {
     if (!file.name.endsWith('.ovpn')) {
+      haptic.notification('error');
       showToast('Please upload a valid .ovpn file', 'error');
       return;
     }
+    haptic.impact('medium');
     setBusy(true);
     const result = await API.vpnUpload(file);
     if (result) {
@@ -58,6 +62,7 @@ export default function VpnWidget() {
   }
 
   async function handleConnect() {
+    haptic.impact('medium');
     setBusy(true);
     const result = await API.vpnConnect();
     if (result) {
@@ -70,6 +75,7 @@ export default function VpnWidget() {
   }
 
   async function handleDisconnect() {
+    haptic.impact('medium');
     setBusy(true);
     const result = await API.vpnDisconnect();
     if (result) {
@@ -90,6 +96,7 @@ export default function VpnWidget() {
       danger: true,
     });
     if (!confirmed) return;
+    haptic.impact('heavy');
 
     setBusy(true);
     const result = await API.vpnDelete();
@@ -144,7 +151,7 @@ export default function VpnWidget() {
               {status.connected ? 'Connected' : 'Disconnected'}
             </span>
             {status.connected && (
-              <span class="badge badge--running" style={{ marginLeft: '8px' }}>Active Connection</span>
+              <span class="badge badge--running" style={{ marginLeft: 'var(--space-sm)' }}>Active Connection</span>
             )}
             {` — File uploaded (${(status.size / 1024).toFixed(2)} KB)`}
           </>
@@ -153,7 +160,7 @@ export default function VpnWidget() {
         )}
       </p>
 
-      <div class="form-actions" style={{ borderTop: 'none', paddingTop: '8px' }}>
+      <div class="form-actions" style={{ borderTop: 'none', paddingTop: 'var(--space-sm)' }}>
         {status.uploaded ? (
           <>
             {status.connected ? (
@@ -182,6 +189,7 @@ export default function VpnWidget() {
                 type="file"
                 accept=".ovpn"
                 class="vpn-file-input"
+                style={{ display: 'none' }}
                 onChange={(e) => {
                   const file = (e.target as HTMLInputElement).files?.[0];
                   if (file) handleFileSelect(file);
@@ -205,6 +213,7 @@ export default function VpnWidget() {
               type="file"
               accept=".ovpn"
               class="vpn-file-input"
+              style={{ display: 'none' }}
               onChange={(e) => {
                 const file = (e.target as HTMLInputElement).files?.[0];
                 if (file) handleFileSelect(file);

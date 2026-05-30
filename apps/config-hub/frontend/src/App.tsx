@@ -17,7 +17,9 @@ import type { Screen } from './hooks/useNavigator';
 import { API } from './api';
 import HomeScreen from './components/HomeScreen';
 import ConfigScreen from './components/ConfigScreen';
-import ToolScreen from './components/ToolScreen';
+import JenkinsfilePanel from './components/JenkinsfilePanel';
+import ConfigTransfer from './components/ConfigTransfer';
+import { useConfirm } from './context/ConfirmDialog';
 import type {
   ConfigData,
   Schemas,
@@ -25,8 +27,15 @@ import type {
   ServiceStatuses,
 } from './types';
 
+const SECTION_SCOPES: Record<string, Scope[]> = {
+  telegram: ['bot'],
+  jenkins: ['agent', 'builds'],
+  storage: ['file_manager'],
+};
+
 export default function App() {
   const navigator = useNavigator();
+  const confirm = useConfirm();
   const [schemas, setSchemas] = useState<Schemas | null>(null);
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [statuses, setStatuses] = useState<ServiceStatuses | null>(null);
@@ -34,7 +43,7 @@ export default function App() {
   const [githubUrl, setGithubUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadSeq, setReloadSeq] = useState(0);
-  const [, setDirtyScopes] = useState<Record<Scope, boolean>>({
+  const [dirtyScopes, setDirtyScopes] = useState<Record<Scope, boolean>>({
     bot: false,
     agent: false,
     file_manager: false,
@@ -47,6 +56,24 @@ export default function App() {
       return { ...prev, [scope]: isDirty };
     });
   }, []);
+
+  const handleBack = useCallback(async () => {
+    const activeScreen = navigator.current;
+    if (activeScreen?.screen === 'config' && activeScreen.id) {
+      const scopes = SECTION_SCOPES[activeScreen.id] || [];
+      const hasUnsavedChanges = scopes.some((s) => dirtyScopes[s]);
+      if (hasUnsavedChanges) {
+        const confirmed = await confirm({
+          title: 'Discard unsaved changes?',
+          message: 'You have unsaved changes in this section. If you go back, these changes will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!confirmed) return;
+      }
+    }
+    navigator.pop();
+  }, [navigator, dirtyScopes, confirm]);
 
   // Initial data load
   useEffect(() => {
@@ -152,6 +179,7 @@ export default function App() {
           onNavigate={handleNavigate}
           version={version}
           githubUrl={githubUrl}
+          dirtyScopes={dirtyScopes}
         />
       </div>
       {detailScreen && (
@@ -164,11 +192,21 @@ export default function App() {
               reloadSeq={reloadSeq}
               onConfigReload={handleConfigReload}
               onDirtyChange={handleDirtyChange}
-              onBack={() => navigator.pop()}
+              isActive={detailScreen === navigator.current}
+              onBack={handleBack}
             />
           )}
-          {detailScreen.screen === 'tools' && (
-            <ToolScreen onBack={() => navigator.pop()} />
+          {detailScreen.screen === 'jenkinsfile' && (
+            <JenkinsfilePanel
+              isActive={detailScreen === navigator.current}
+              onBack={handleBack}
+            />
+          )}
+          {detailScreen.screen === 'transfer' && (
+            <ConfigTransfer
+              isActive={detailScreen === navigator.current}
+              onBack={handleBack}
+            />
           )}
         </div>
       )}

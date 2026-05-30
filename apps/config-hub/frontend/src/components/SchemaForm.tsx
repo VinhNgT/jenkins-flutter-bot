@@ -12,6 +12,7 @@ import { Save, RotateCcw } from 'lucide-preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
+import { useTelegram } from '../context/TelegramContext';
 import type { Schema, SchemaField, Scope, ScopeConfig } from '../types';
 import FieldRenderer from './form/FieldRenderer';
 
@@ -38,6 +39,7 @@ export default function SchemaForm({
   onDirtyChange,
 }: SchemaFormProps) {
   const { showToast } = useToast();
+  const { haptic } = useTelegram();
   const formRef = useRef<HTMLFormElement>(null);
   const [dirty, setDirty] = useState(false);
   const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());
@@ -187,13 +189,15 @@ export default function SchemaForm({
 
     const formData = new FormData(formRef.current);
     const payload: Record<string, unknown> = {};
+    const secretKeys = new Set(schema.fields.filter(f => f.secret).map(f => f.key));
 
     for (const [name, value] of formData.entries()) {
       const [, key] = name.split(':', 2);
       if (!key) continue;
 
       const strValue = String(value).trim();
-      if (strValue === '') continue; // Skip empty — preserves existing via deep_merge
+      // Skip empty only for secret fields to avoid overwriting them
+      if (strValue === '' && secretKeys.has(key)) continue;
 
       // Build nested structure from dotted key
       const parts = key.split('.');
@@ -207,7 +211,7 @@ export default function SchemaForm({
     }
 
     return payload;
-  }, []);
+  }, [schema]);
 
   async function handleSave() {
     setSaveAttempted(true);
@@ -215,6 +219,7 @@ export default function SchemaForm({
     if (formRef.current) {
       const invalidInput = formRef.current.querySelector('input[data-invalid="true"]');
       if (invalidInput) {
+        haptic.notification('error');
         showToast('Fix validation errors before saving', 'error');
         return;
       }
@@ -230,11 +235,13 @@ export default function SchemaForm({
     const result = await API.saveScope(scope, payload);
 
     if (result) {
+      haptic.notification('success');
       showToast(`${SCOPE_LABELS[scope]} config saved`, 'success');
       setDirty(false);
       setSaveAttempted(false);
       onConfigReload();
     } else {
+      haptic.notification('error');
       showToast('Failed to save config', 'error');
     }
     setSaving(false);
@@ -290,7 +297,7 @@ export default function SchemaForm({
         }}
       >
         {[...groups.entries()].map(([groupName, fields]) => (
-          <div class="card" key={groupName} style={{ marginBottom: '10px' }}>
+          <div class="card" key={groupName}>
             <h3>{groupName}</h3>
             <div class="form-grid" data-scope={scope}>
               {fields.map((field) => (

@@ -27,10 +27,50 @@
     /* API 7.10: bottom bar behind MainButton */
     --tg-color-bottom-bar: var(--tg-theme-bottom-bar-bg-color, var(--tg-color-secondary-bg));
 
-    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    /* Semantic status colors */
+    --tg-color-success: #31b545;
+    --tg-color-warning: #f59e0b;
+    --tg-color-info: var(--tg-color-link);
+
+    /* Layout Variables */
     --transition-speed: 0.22s;
     --nav-transition-ms: 300;
-    --border-radius-card: 12px;
+
+    /* Border Radius Scale */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-round: 999px;
+    --border-radius-card: var(--radius-lg);
+
+    /* Spacing Scale */
+    --space-xxs: 2px;
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px; /* Container gap & list gap fallback */
+    --space-lg: 16px; /* Row item heights & padding */
+    --space-xl: 24px; /* Grouped margins & paddings */
+    --space-2xl: 32px;
+    --space-3xl: 40px;
+
+    /* Typography Sizes */
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-md: 13px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 20px;
+    --font-size-3xl: 22px;
+
+    /* Typography Line Heights */
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.4;
+    --line-height-loose: 1.55;
+
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 
 /* Fallback Dark Theme detection (handles previews outside Telegram beautifully) */
@@ -96,7 +136,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-md);
     flex-grow: 1;
     animation: fadeIn var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -182,23 +222,23 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 /* Native Header layout */
 header {
-    padding: 8px 6px 12px 6px;
+    padding: var(--space-sm) var(--space-xs) var(--space-md) var(--space-xs);
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
 header h1 {
-    font-size: 20px;
+    font-size: var(--font-size-2xl);
     font-weight: 700;
     color: var(--tg-color-text);
     letter-spacing: -0.2px;
 }
 
 .header-subtitle {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     color: var(--tg-color-subtitle);
-    margin-top: 2px;
+    margin-top: var(--space-xxs);
     font-weight: 400;
 }
 
@@ -212,20 +252,20 @@ header h1 {
 .tg-section-header {
     /* TGUI SectionHeader: padding: 20px 24px 4px 22px (left 22px for slight
        indent vs Cell's 24px — matches native iOS Settings header pattern) */
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 500;
     text-transform: uppercase;
     color: var(--tg-color-section-header);
-    padding: 20px 24px 4px 22px;
+    padding: var(--space-xl) var(--space-xl) var(--space-xs) var(--space-xl);
     margin: 0;
     letter-spacing: 0.3px;
 }
 
 .tg-section-footer {
     /* TGUI SectionFooter iOS: padding: 8px 16px 0 */
-    font-size: 13px;
+    font-size: var(--font-size-md);
     color: var(--tg-color-hint);
-    padding: 8px 16px 0;
+    padding: var(--space-sm) var(--space-xl) 0;
     margin: 0;
     line-height: 1.4;
 }
@@ -243,7 +283,7 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 24px;
+    padding: 0 var(--space-xl);
     position: relative;
     cursor: pointer;
     min-height: 48px;
@@ -264,7 +304,7 @@ body.tg-dark .tg-list-item:active {
     content: '';
     position: absolute;
     bottom: 0;
-    left: 24px;
+    left: var(--space-xl);
     right: 0;
     height: 0.5px;
     background-color: var(--tg-color-divider);
@@ -274,29 +314,29 @@ body.tg-dark .tg-list-item:active {
 .tg-list-item-content {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-xxs);
     flex-grow: 1;
-    padding: 16px 8px 16px 0;
+    padding: var(--space-lg) var(--space-sm) var(--space-lg) 0;
 }
 
 .tg-list-item-title {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     font-weight: 500;
     color: var(--tg-color-text);
 }
 
 .tg-list-item-subtitle {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     color: var(--tg-color-subtitle);
 }
 
 .tg-list-item-meta {
-    font-size: 11px;
+    font-size: var(--font-size-xs);
     color: var(--tg-color-hint);
-    font-family: monospace;
+    font-family: var(--font-mono);
     background-color: rgba(0, 0, 0, 0.04);
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: var(--space-xxs) var(--space-xs);
+    border-radius: var(--radius-sm);
     max-width: 100%;
     display: inline-block;
     white-space: nowrap;
@@ -342,9 +382,9 @@ body.tg-dark .tg-list-item-meta {
     background: transparent;
     color: var(--tg-color-text);
     font-family: var(--font-family);
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     font-weight: 400;
-    padding: 12px 0;
+    padding: var(--space-md) 0;
 }
 
 .tg-input-field::placeholder {
@@ -368,7 +408,7 @@ body.tg-dark .tg-list-item-meta {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.15s ease, visibility 0.15s ease;
-    margin-right: 8px;
+    margin-right: var(--space-sm);
 }
 body.tg-dark .tg-input-clear {
     background-color: rgba(255, 255, 255, 0.08);
@@ -383,15 +423,15 @@ body.tg-dark .tg-input-clear {
 .tg-cancel-action {
     color: var(--tg-color-destructive);
     font-weight: 500;
-    font-size: 15px;
+    font-size: var(--font-size-base);
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-xs);
     cursor: pointer;
     border: none;
     background: transparent;
-    padding: 6px 12px;
-    border-radius: 8px;
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-md);
     transition: background-color 0.15s ease;
 }
 
@@ -414,7 +454,7 @@ body.tg-dark .tg-input-clear {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 24px 24px;
+    padding: var(--space-xl) var(--space-xl);
     text-align: center;
     color: var(--tg-color-hint);
 }
@@ -422,13 +462,13 @@ body.tg-dark .tg-input-clear {
 .tg-empty-row svg {
     width: 36px;
     height: 36px;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-sm);
     opacity: 0.35;
     color: var(--tg-color-text);
 }
 
 .tg-empty-row span {
-    font-size: 14px;
+    font-size: var(--font-size-base);
     font-weight: 400;
 }
 
@@ -439,15 +479,15 @@ body.tg-dark .tg-input-clear {
     left: 16px;
     right: 16px;
     z-index: 9999;
-    background-color: #31b545; /* Native green success toast */
+    background-color: var(--tg-color-success); /* Native green success toast */
     color: #ffffff;
-    padding: 12px 16px;
-    border-radius: 12px;
+    padding: var(--space-sm) var(--space-xl);
+    border-radius: var(--radius-lg);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 14px;
+    gap: var(--space-md);
+    font-size: var(--font-size-base);
     font-weight: 500;
     transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15);
 }
@@ -476,7 +516,7 @@ body.tg-dark .tg-input-clear {
     align-items: center;
     justify-content: center;
     min-height: 70vh;
-    padding: 24px;
+    padding: var(--space-xl);
     text-align: center;
     animation: fadeIn 0.3s ease;
 }
@@ -504,14 +544,14 @@ body.tg-dark .tg-input-clear {
 }
 
 .screen-title {
-    font-size: 20px;
+    font-size: var(--font-size-2xl);
     font-weight: 700;
     color: var(--tg-color-text);
-    margin-bottom: 8px;
+    margin-bottom: var(--space-sm);
 }
 
 .screen-description {
-    font-size: 14px;
+    font-size: var(--font-size-base);
     color: var(--tg-color-hint);
     max-width: 280px;
     line-height: 1.45;
@@ -535,8 +575,8 @@ body.tg-dark .tg-input-clear {
     outline: none;
     width: 100%;
     min-height: 46px;
-    border-radius: 10px;
-    font-size: 15px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -568,10 +608,10 @@ body.tg-dark .tg-input-clear {
     flex-grow: 1;
     background-color: var(--tg-color-section-bg);
     border: 1px solid var(--tg-color-divider);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-family: monospace;
-    font-size: 14px;
+    border-radius: var(--radius-md);
+    padding: var(--space-xs) var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
     font-weight: 700;
     text-align: center;
     color: var(--tg-color-text);
@@ -582,14 +622,14 @@ body.tg-dark .tg-input-clear {
     background-color: var(--tg-color-section-bg);
     border: 1px solid var(--tg-color-divider);
     color: var(--tg-color-link);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     width: 44px;
     height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
 }
 
 .tg-copy-button:active {
@@ -609,10 +649,10 @@ body.tg-dark .tg-input-clear {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: #f59e0b; /* Amber */
-    box-shadow: 0 0 8px #f59e0b;
+    background-color: var(--tg-color-warning); /* Amber */
+    box-shadow: 0 0 8px var(--tg-color-warning);
     animation: pulse 1.6s ease-in-out infinite;
-    margin-right: 6px;
+    margin-right: calc(var(--space-xs) + var(--space-xxs));
     flex-shrink: 0;
 }
 
@@ -657,22 +697,22 @@ body.tg-dark .tg-input-clear {
 
 /* Build result status badges */
 .tg-result-badge {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 6px;
+    padding: var(--space-xxs) var(--space-sm);
+    border-radius: var(--radius-md);
     text-transform: uppercase;
     letter-spacing: 0.3px;
 }
-.tg-result-badge.success { background: rgba(49, 181, 69, 0.12); color: #31b545; }
+.tg-result-badge.success { background: rgba(49, 181, 69, 0.12); color: var(--tg-color-success); }
 .tg-result-badge.failure { background: rgba(255, 59, 48, 0.12); color: var(--tg-color-destructive); }
-.tg-result-badge.timeout { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.tg-result-badge.timeout { background: rgba(245, 158, 11, 0.12); color: var(--tg-color-warning); }
 .tg-result-badge.cancelled { background: rgba(142, 142, 147, 0.12); color: var(--tg-color-hint); }
 
 /* Diagnostic build fingerprint — de-emphasized footer hint */
 .build-fingerprint {
     text-align: center;
-    padding-top: 24px;
+    padding-top: var(--space-xl);
     opacity: 0.6;
 }
 
@@ -682,8 +722,8 @@ body.tg-dark .tg-input-clear {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 20px 24px 8px;
-    gap: 4px;
+    padding: var(--space-xl) var(--space-xl) var(--space-sm);
+    gap: var(--space-xs);
 }
 
 .tg-detail-header-icon {
@@ -693,18 +733,18 @@ body.tg-dark .tg-input-clear {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-sm);
     transition: background-color 0.35s ease, color 0.35s ease;
 }
 
 .tg-detail-header-title {
-    font-size: 22px;
+    font-size: var(--font-size-3xl);
     font-weight: 700;
     color: var(--tg-color-text);
 }
 
 .tg-detail-header-subtitle {
-    font-size: 14px;
+    font-size: var(--font-size-base);
     color: var(--tg-color-hint);
 }
 
@@ -713,31 +753,31 @@ body.tg-dark .tg-input-clear {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 24px;
+    padding: var(--space-md) var(--space-xl);
     min-height: 44px;
     position: relative;
-    gap: 16px;
+    gap: var(--space-lg);
 }
 
 .tg-kv-row:not(:last-child)::after {
     content: '';
     position: absolute;
     bottom: 0;
-    left: 24px;
+    left: var(--space-xl);
     right: 0;
     height: 0.5px;
     background-color: var(--tg-color-divider);
 }
 
 .tg-kv-label {
-    font-size: 15px;
+    font-size: var(--font-size-base);
     color: var(--tg-color-text);
     font-weight: 400;
     flex-shrink: 0;
 }
 
 .tg-kv-value {
-    font-size: 15px;
+    font-size: var(--font-size-base);
     color: var(--tg-color-hint);
     text-align: right;
     white-space: nowrap;
@@ -747,21 +787,21 @@ body.tg-dark .tg-input-clear {
 }
 
 .tg-kv-value.mono {
-    font-family: monospace;
-    font-size: 14px;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
 }
 
 /* Tappable action rows inside grouped sections */
 .tg-action-row {
     display: flex;
     align-items: center;
-    padding: 12px 24px;
+    padding: var(--space-md) var(--space-xl);
     min-height: 44px;
     position: relative;
     cursor: pointer;
-    gap: 12px;
+    gap: var(--space-md);
     color: var(--tg-color-link);
-    font-size: 15px;
+    font-size: var(--font-size-base);
     font-weight: 400;
     background: transparent;
     border: none;
@@ -782,7 +822,7 @@ body.tg-dark .tg-action-row:active {
     content: '';
     position: absolute;
     bottom: 0;
-    left: 60px;
+    left: calc(var(--space-xl) + var(--space-2xl));
     right: 0;
     height: 0.5px;
     background-color: var(--tg-color-divider);

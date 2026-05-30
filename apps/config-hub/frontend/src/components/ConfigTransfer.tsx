@@ -5,11 +5,13 @@
  * tarball, and importing a tarball with drag-and-drop.
  */
 
-import { Download, Upload, Copy, FileCode, CheckCircle, XCircle, SkipForward, AlertTriangle } from 'lucide-preact';
+import { Download, Upload, Copy, FileCode, CheckCircle, XCircle, SkipForward, AlertTriangle, ChevronLeft } from 'lucide-preact';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { API } from '../api';
 import { useToast } from '../context/ToastContext';
 import type { ExportEnvResult } from '../types';
+import { useTelegram } from '../context/TelegramContext';
+import { useBackButton } from '../hooks/useBackButton';
 
 interface ImportResult {
   applied?: string[];
@@ -19,7 +21,14 @@ interface ImportResult {
   warnings?: string[];
 }
 
-export default function ConfigTransfer() {
+interface ConfigTransferProps {
+  isActive: boolean;
+  onBack: () => void;
+}
+
+export default function ConfigTransfer({ isActive, onBack }: ConfigTransferProps) {
+  const { isTelegram } = useTelegram();
+  useBackButton(isActive, onBack);
   const { showToast } = useToast();
 
   // Export state
@@ -92,55 +101,68 @@ export default function ConfigTransfer() {
     }
   }
 
-
-
   return (
-    <div>
+    <div class="container">
+      {!isTelegram && (
+        <header>
+          <button class="back-button" onClick={onBack}>
+            <ChevronLeft size={20} />
+            Back
+          </button>
+        </header>
+      )}
+
       <h2 class="panel-title">Config Transfer</h2>
       <p class="panel-desc">
         Export your configuration as environment files for production deployment,
         or import a previously exported config tarball.
       </p>
 
-      {/* ── Export Section ──────────────────────────────────────────── */}
-      <h3 class="panel-subtitle">Export</h3>
-
-      <div class="export-actions">
-        <button
-          class="btn btn-accent"
-          disabled={generating}
-          onClick={handleGenerate}
-        >
-          <FileCode class="icon" size={14} />
-          Preview compose.env
-        </button>
-        <button
-          class="btn btn-secondary"
-          disabled={downloading}
-          onClick={handleDownload}
-        >
-          <Download class="icon" size={14} />
-          Download Tarball
-        </button>
+      {/* ── Export Card ──────────────────────────────────────────── */}
+      <div class="card">
+        <h3>Export Configuration</h3>
+        <p class="field-desc">
+          Export your config parameters into a standard <code>compose.env</code> preview, or download a complete backup archive.
+        </p>
+        <div class="form-actions" style={{ borderTop: 'none', marginTop: '0', paddingTop: '0' }}>
+          <button
+            class="btn btn-accent"
+            disabled={generating}
+            onClick={handleGenerate}
+          >
+            <FileCode class="icon" size={14} />
+            Preview compose.env
+          </button>
+          <button
+            class="btn btn-secondary"
+            disabled={downloading}
+            onClick={handleDownload}
+          >
+            <Download class="icon" size={14} />
+            Download Tarball
+          </button>
+        </div>
       </div>
 
       {exportData && (
-        <>
+        <div style={{ marginTop: 'var(--space-md)' }}>
           {exportData.warnings?.length ? (
-            <div class="export-warnings">
+            <div class="config-error-callout" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xxs)' }}>
               {exportData.warnings.map((w, i) => (
-                <p key={i}><AlertTriangle class="icon" size={12} /> {w}</p>
+                <p key={i} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+                  <AlertTriangle size={12} style={{ flexShrink: 0 }} /> {w}
+                </p>
               ))}
             </div>
           ) : null}
 
           <div class="export-tabs">
-            <span style={{ fontSize: '13px', fontWeight: 500, padding: '4px 12px', color: 'var(--tg-color-text)' }}>
+            <span style={{ fontSize: 'var(--font-size-md)', fontWeight: 500, padding: 'var(--space-xs) calc(var(--space-sm) + var(--space-xs))', color: 'var(--tg-color-text)' }}>
               compose.env
             </span>
             <button
               class="btn btn-sm btn-secondary"
-              style={{ marginLeft: 'auto', marginBottom: '4px' }}
+              style={{ marginLeft: 'auto', marginBottom: 'var(--space-xs)' }}
               onClick={handleCopy}
             >
               <Copy class="icon" size={12} />
@@ -153,120 +175,135 @@ export default function ConfigTransfer() {
             value={getTabContent()}
             readOnly
           />
-        </>
+        </div>
       )}
 
-      {/* ── Import Section ─────────────────────────────────────────── */}
-      <h3 class="panel-subtitle">Import</h3>
+      {/* ── Import Card ─────────────────────────────────────────── */}
+      <div class="card" style={{ marginTop: 'var(--space-md)' }}>
+        <h3>Import Configuration</h3>
+        <p class="field-desc">
+          Upload a previously generated <code>.tar.gz</code> archive to restore and apply all service configuration properties.
+        </p>
 
-      <div
-        class={`import-zone${dragover ? ' dragover' : ''}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragover(true);
-        }}
-        onDragLeave={() => setDragover(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragover(false);
-          const file = e.dataTransfer?.files[0];
-          if (file) handleFileSelect(file);
-        }}
-      >
-        <p>
-          <Upload size={24} style={{ opacity: 0.5 }} />
-        </p>
-        <p>
-          Drag and drop a <code>.tar.gz</code> config archive here, or{' '}
-          <a
-            onClick={(e) => {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }}
-          >
-            browse
-          </a>
-        </p>
-        {selectedFile && (
-          <p style={{ fontWeight: 600, color: 'var(--tg-color-text)' }}>
-            {selectedFile.name}
-          </p>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".tar.gz,.tgz"
-          hidden
-          onChange={(e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
+        <div
+          class={`import-zone${dragover ? ' dragover' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragover(true);
+          }}
+          onDragLeave={() => setDragover(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragover(false);
+            const file = e.dataTransfer?.files[0];
             if (file) handleFileSelect(file);
           }}
-        />
-      </div>
-
-      <div class="form-actions" style={{ borderTop: 'none' }}>
-        <button
-          class="btn btn-accent"
-          disabled={importing || !selectedFile}
-          onClick={handleImport}
         >
-          <Upload class="icon" size={14} />
-          Import
-        </button>
+          <p>
+            <Upload size={24} style={{ opacity: 0.5 }} />
+          </p>
+          <p>
+            Drag and drop a <code>.tar.gz</code> config archive here, or{' '}
+            <a
+              onClick={(e) => {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }}
+            >
+              browse
+            </a>
+          </p>
+          {selectedFile && (
+            <p style={{ fontWeight: 600, color: 'var(--tg-color-text)' }}>
+              {selectedFile.name}
+            </p>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".tar.gz,.tgz"
+            hidden
+            onChange={(e) => {
+              const file = (e.target as HTMLInputElement).files?.[0];
+              if (file) handleFileSelect(file);
+            }}
+          />
+        </div>
+
+        <div class="form-actions" style={{ borderTop: 'none', marginTop: '0', paddingTop: '0' }}>
+          <button
+            class="btn btn-accent"
+            disabled={importing || !selectedFile}
+            onClick={handleImport}
+          >
+            <Upload class="icon" size={14} />
+            Import
+          </button>
+        </div>
       </div>
 
       {/* Import results */}
       {importResults && (
-        <div class="import-results">
+        <div class="import-results" style={{ marginTop: 'var(--space-md)' }}>
           {importResults.applied?.length ? (
-            <>
-              <h4><CheckCircle class="icon" size={14} /> Applied ({importResults.applied.length})</h4>
-              <ul>
+            <div class="config-error-callout" style={{ color: 'var(--tg-color-success)', background: 'rgba(49, 181, 69, 0.08)', border: '1px solid rgba(49, 181, 69, 0.25)' }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', margin: '0 0 var(--space-xs)', fontSize: 'var(--font-size-md)' }}>
+                <CheckCircle size={14} /> Applied ({importResults.applied.length})
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
                 {importResults.applied.map((s) => (
                   <li key={s}>{s}</li>
                 ))}
               </ul>
-            </>
+            </div>
           ) : null}
           {importResults.skipped_empty?.length ? (
-            <>
-              <h4><SkipForward class="icon" size={14} /> Skipped ({importResults.skipped_empty.length})</h4>
-              <ul>
+            <div class="config-error-callout" style={{ color: 'var(--tg-color-hint)', background: 'rgba(128, 128, 128, 0.08)', border: '1px solid rgba(128, 128, 128, 0.25)', marginTop: 'var(--space-sm)' }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', margin: '0 0 var(--space-xs)', fontSize: 'var(--font-size-md)' }}>
+                <SkipForward size={14} /> Skipped ({importResults.skipped_empty.length})
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
                 {importResults.skipped_empty.map((s) => (
                   <li key={s}>{s}</li>
                 ))}
               </ul>
-            </>
+            </div>
           ) : null}
           {importResults.unrecognized?.length ? (
-            <>
-              <h4>❓ Unrecognized ({importResults.unrecognized.length})</h4>
-              <ul>
+            <div class="config-error-callout" style={{ marginTop: 'var(--space-sm)' }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', margin: '0 0 var(--space-xs)', fontSize: 'var(--font-size-md)' }}>
+                ❓ Unrecognized ({importResults.unrecognized.length})
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
                 {importResults.unrecognized.map((s) => (
                   <li key={s}>{s}</li>
                 ))}
               </ul>
-            </>
+            </div>
           ) : null}
           {importResults.parse_errors?.length ? (
-            <>
-              <h4><XCircle class="icon" size={14} /> Errors ({importResults.parse_errors.length})</h4>
-              <ul>
+            <div class="config-error-callout" style={{ color: 'var(--tg-color-destructive)', background: 'rgba(255, 59, 48, 0.08)', border: '1px solid rgba(255, 59, 48, 0.25)', marginTop: 'var(--space-sm)' }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', margin: '0 0 var(--space-xs)', fontSize: 'var(--font-size-md)' }}>
+                <XCircle size={14} /> Errors ({importResults.parse_errors.length})
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
                 {importResults.parse_errors.map((s) => (
                   <li key={s}>{s}</li>
                 ))}
               </ul>
-            </>
+            </div>
           ) : null}
           {importResults.warnings?.length ? (
-            <>
-              <h4><AlertTriangle class="icon" size={14} /> Warnings ({importResults.warnings.length})</h4>
-              <ul>
+            <div class="config-error-callout" style={{ marginTop: 'var(--space-sm)' }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', margin: '0 0 var(--space-xs)', fontSize: 'var(--font-size-md)' }}>
+                <AlertTriangle size={14} /> Warnings ({importResults.warnings.length})
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
                 {importResults.warnings.map((s) => (
                   <li key={s}>{s}</li>
                 ))}
               </ul>
-            </>
+            </div>
           ) : null}
         </div>
       )}

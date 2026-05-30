@@ -8,6 +8,8 @@
 import { ChevronLeft } from 'lucide-preact';
 import SchemaForm from './SchemaForm';
 import type { ConfigData, Schemas, Scope } from '../types';
+import { useTelegram } from '../context/TelegramContext';
+import { useBackButton } from '../hooks/useBackButton';
 
 /** Section definitions — maps each UI section to backend scope(s). */
 const SECTION_SCOPES: Record<string, { scopes: Scope[]; title: string; description: string }> = {
@@ -35,6 +37,7 @@ interface ConfigScreenProps {
   reloadSeq: number;
   onConfigReload: () => Promise<void>;
   onDirtyChange: (scope: Scope, isDirty: boolean) => void;
+  isActive: boolean;
   onBack: () => void;
 }
 
@@ -45,8 +48,12 @@ export default function ConfigScreen({
   reloadSeq,
   onConfigReload,
   onDirtyChange,
+  isActive,
   onBack,
 }: ConfigScreenProps) {
+  const { isTelegram } = useTelegram();
+  useBackButton(isActive, onBack);
+
   const section = SECTION_SCOPES[sectionId];
   if (!section) return null;
 
@@ -58,12 +65,14 @@ export default function ConfigScreen({
 
   return (
     <div class="container">
-      <header>
-        <button class="back-button" onClick={onBack}>
-          <ChevronLeft size={20} />
-          Back
-        </button>
-      </header>
+      {!isTelegram && (
+        <header>
+          <button class="back-button" onClick={onBack}>
+            <ChevronLeft size={20} />
+            Back
+          </button>
+        </header>
+      )}
 
       <h2 class="panel-title">{title}</h2>
       <p class="panel-desc">{description}</p>

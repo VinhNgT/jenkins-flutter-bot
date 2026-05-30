@@ -23,6 +23,7 @@ interface HomeScreenProps {
   onNavigate: (screen: Screen) => void;
   version: string | null;
   githubUrl: string | null;
+  dirtyScopes?: Record<Scope, boolean>;
 }
 
 /** Inline GitHub SVG — Lucide 1.x removed brand icons for legal reasons. */
@@ -63,6 +64,7 @@ export default function HomeScreen({
   onNavigate,
   version,
   githubUrl,
+  dirtyScopes,
 }: HomeScreenProps) {
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
 
@@ -190,6 +192,7 @@ export default function HomeScreen({
         <div class="tg-list">
           {CONFIG_SECTIONS.map(({ id, label, description, scopes }) => {
             const state = aggregateHealth(statuses, scopes);
+            const isSectionDirty = dirtyScopes ? scopes.some(s => dirtyScopes[s]) : false;
             return (
               <div
                 key={id}
@@ -197,7 +200,21 @@ export default function HomeScreen({
                 onClick={() => onNavigate({ screen: 'config', id })}
               >
                 <div class="tg-list-item-content">
-                  <span class="tg-list-item-title">{label}</span>
+                  <span class="tg-list-item-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+                    {label}
+                    {isSectionDirty && (
+                      <span
+                        class="save-dot"
+                        style={{
+                          display: 'inline-block',
+                          opacity: 1,
+                          transform: 'scale(1)',
+                          animation: 'pulseGlow 1.8s infinite alternate',
+                          marginLeft: 0,
+                        }}
+                      />
+                    )}
+                  </span>
                   <span class="tg-list-item-subtitle">{description}</span>
                 </div>
                 <div class="badge-group">
@@ -216,11 +233,21 @@ export default function HomeScreen({
         <div class="tg-list">
           <div
             class="tg-list-item"
-            onClick={() => onNavigate({ screen: 'tools' })}
+            onClick={() => onNavigate({ screen: 'jenkinsfile' })}
           >
             <div class="tg-list-item-content">
-              <span class="tg-list-item-title">Pipeline & Transfer</span>
-              <span class="tg-list-item-subtitle">Jenkinsfile preview, config export/import</span>
+              <span class="tg-list-item-title">Pipeline Generator</span>
+              <span class="tg-list-item-subtitle">Generate ready-to-use Jenkinsfile scripts</span>
+            </div>
+            <ChevronRight class="tg-list-item-chevron" size={18} />
+          </div>
+          <div
+            class="tg-list-item"
+            onClick={() => onNavigate({ screen: 'transfer' })}
+          >
+            <div class="tg-list-item-content">
+              <span class="tg-list-item-title">Config Transfer</span>
+              <span class="tg-list-item-subtitle">Backup and restore configuration files</span>
             </div>
             <ChevronRight class="tg-list-item-chevron" size={18} />
           </div>

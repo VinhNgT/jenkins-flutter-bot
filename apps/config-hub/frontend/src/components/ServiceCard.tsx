@@ -8,6 +8,7 @@ import { Play, RotateCcw, Square, Terminal } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { API } from '../api';
 import { useConfirm } from '../context/ConfirmDialog';
+import { useTelegram } from '../context/TelegramContext';
 import type { Scope, ServiceStatus } from '../types';
 import { healthState, type HealthState } from '../utils';
 import LogViewer from './LogViewer';
@@ -53,6 +54,7 @@ export default function ServiceCard({
 }: ServiceCardProps) {
 
   const confirm = useConfirm();
+  const { haptic } = useTelegram();
   const [busy, setBusy] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
 
@@ -86,6 +88,9 @@ export default function ServiceCard({
         danger: true,
       });
       if (!confirmed) return;
+      haptic.impact('heavy');
+    } else {
+      haptic.impact('medium');
     }
 
     setBusy(true);

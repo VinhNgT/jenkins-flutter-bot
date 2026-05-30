@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
 
 from ..dependencies import ManagerDep
 
@@ -223,10 +223,8 @@ async def download_file(manager: ManagerDep, file_id: str) -> Response:
     if stored is None:
         raise HTTPException(status_code=404, detail="File not found")
 
-    return Response(
-        content=stored.data,
+    return FileResponse(
+        path=stored.file_path,
         media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f'attachment; filename="{stored.filename}"',
-        },
+        filename=stored.filename,
     )

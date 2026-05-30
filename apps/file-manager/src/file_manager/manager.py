@@ -135,10 +135,20 @@ class StorageManager:
                 folder_name=self._config.drive_folder_name,
             )
 
+        # Wipe the ephemeral build log metadata on startup so it starts fresh
+        if self._backend_type == "ephemeral":
+            log_path = resolve_config_path(_DEFAULT_CONFIG_PATH).parent / "build_log_ephemeral.json"
+            if log_path.exists():
+                try:
+                    log_path.unlink()
+                    logger.info("Wiped existing ephemeral build log metadata: %s", log_path)
+                except Exception:
+                    logger.warning("Failed to delete ephemeral build log on startup: %s", log_path)
+
         self._build_log = BuildLog(
             data_dir=resolve_config_path(_DEFAULT_CONFIG_PATH).parent,
             max_records=self._config.max_recent_builds,
-            persistent=(self._backend_type != "ephemeral"),
+            persistent=True,
             filename=f"build_log_{self._backend_type}.json",
         )
 
@@ -155,6 +165,11 @@ class StorageManager:
 
     async def stop(self) -> None:
         """Shut down the storage backend."""
+        if self._backend and hasattr(self._backend, "cleanup"):
+            try:
+                await self._backend.cleanup()
+            except Exception:
+                logger.exception("Failed to clean up storage backend on stop")
         self._backend = None
         self._build_log = None
         self._config = None

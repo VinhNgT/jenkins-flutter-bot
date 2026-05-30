@@ -544,6 +544,7 @@
     border: 1px solid
         color-mix(in srgb, var(--tg-color-link) 25%, var(--tg-color-separator));
     border-radius: var(--border-radius-card);
+    margin-top: 10px;
     padding: 14px 18px;
     display: flex;
     align-items: flex-start;

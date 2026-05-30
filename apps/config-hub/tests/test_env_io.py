@@ -1,10 +1,9 @@
 """Tests for env_io — export/import, tarball, env parsing edge cases."""
 
+from __future__ import annotations
+
 import io
-import json
 import tarfile
-
-
 
 from config_hub.env_io import (
     _needs_quoting,
@@ -12,7 +11,7 @@ from config_hub.env_io import (
     _build_env_lines,
     _parse_env_content,
     build_export_tarball,
-    generate_env_files,
+    generate_compose_env,
     import_tarball,
 )
 
@@ -133,7 +132,7 @@ class TestParseEnvContent:
     def test_basic_parsing(self):
         """Verify env content is correctly parsed into the returned dict."""
         content = "BOT_TOKEN=abc123"
-        bp, ap, fmp, applied, skipped, unrec, errors = _parse_env_content(
+        bp, ap, fmp, bu_p, applied, skipped, unrec, errors = _parse_env_content(
             content, self._lookup(), {}, {}
         )
         assert "telegram" in bp
@@ -143,7 +142,7 @@ class TestParseEnvContent:
 
     def test_quoted_value(self):
         content = 'BOT_TOKEN="value with spaces"'
-        bp, _, _, applied, *_ = _parse_env_content(
+        bp, *_ = _parse_env_content(
             content, self._lookup(), {}, {}
         )
         assert bp["telegram"]["bot_token"] == "value with spaces"
@@ -167,7 +166,7 @@ class TestParseEnvContent:
 
     def test_empty_value_skipped(self):
         content = "BOT_TOKEN="
-        _, _, _, applied, skipped, *_ = _parse_env_content(
+        _, _, _, _, applied, skipped, *_ = _parse_env_content(
             content, self._lookup(), {}, {}
         )
         assert len(skipped) == 1
@@ -186,30 +185,39 @@ class TestParseEnvContent:
 
 class TestTarball:
     def test_build_export_tarball(self):
-        env_files = {"bot.env": "BOT_TOKEN=abc\n", "agent.env": "AGENT=xyz\n"}
-        data = build_export_tarball(env_files)
+        compose_env = "BOT_TOKEN=abc\nAGENT=xyz\n"
+        json_configs = {"bot": {"telegram": {"bot_token": "abc"}}}
+        data = build_export_tarball(compose_env, json_configs)
         assert len(data) > 0
 
         # Verify tarball contents
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
             names = tar.getnames()
-            assert "env/bot.env" in names
-            assert "env/agent.env" in names
+            assert "compose.env" in names
+            assert "data/bot.json" in names
 
-    def test_build_export_tarball_with_oauth(self, tmp_path):
-        oauth_path = tmp_path / "oauth.json"
-        oauth_path.write_text('{"token": "xyz"}')
-
-        data = build_export_tarball({"bot.env": "TOKEN=abc\n"}, oauth_token_path=oauth_path)
+    def test_build_export_tarball_with_oauth(self):
+        oauth_token = {"access_token": "xyz"}
+        data = build_export_tarball(
+            "TOKEN=abc\n",
+            {"bot": {"telegram": {"bot_token": "abc"}}},
+            oauth_token=oauth_token
+        )
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
-            assert "env/oauth.json" in tar.getnames()
+            names = tar.getnames()
+            assert "data/oauth.json" in names
 
     def test_build_export_tarball_no_oauth(self):
-        data = build_export_tarball({"bot.env": "TOKEN=abc\n"}, oauth_token_path=None)
+        data = build_export_tarball(
+            "TOKEN=abc\n",
+            {"bot": {"telegram": {"bot_token": "abc"}}},
+            oauth_token=None
+        )
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
-            assert "env/oauth.json" not in tar.getnames()
+            names = tar.getnames()
+            assert "data/oauth.json" not in names
 
-    def test_tarball_roundtrip(self, tmp_path):
+    def test_tarball_roundtrip(self):
         """Export → import → config files written with correct values."""
         bot_schema = _schema(
             _field_def("telegram.bot_token", "TELEGRAM_BOT_TOKEN"),
@@ -218,85 +226,63 @@ class TestTarball:
             _field_def("agent.name", "AGENT_NAME"),
         )
 
-        # Create env files
-        env_files = {
-            "bot.env": "TELEGRAM_BOT_TOKEN=secret_token\n",
-            "agent.env": "AGENT_NAME=my-agent\n",
-        }
-        tarball = build_export_tarball(env_files)
-
-        # Create config paths
-        bot_path = tmp_path / "bot.json"
-        agent_path = tmp_path / "agent.json"
+        compose_env = "TELEGRAM_BOT_TOKEN=secret_token\nAGENT_NAME=my-agent\n"
+        json_configs = {"bot": {}, "agent": {}}
+        tarball = build_export_tarball(compose_env, json_configs)
 
         result = import_tarball(
             tarball,
             bot_schema=bot_schema,
             agent_schema=agent_schema,
-            bot_config_path=bot_path,
-            agent_config_path=agent_path,
         )
 
         assert len(result.applied) == 2
         assert result.parse_errors == []
 
-        # Verify config files were actually written
-        bot_config = json.loads(bot_path.read_text())
-        assert bot_config["telegram"]["bot_token"] == "secret_token"
+        assert result.configs["bot"]["telegram"]["bot_token"] == "secret_token"
+        assert result.configs["agent"]["agent"]["name"] == "my-agent"
 
-        agent_config = json.loads(agent_path.read_text())
-        assert agent_config["agent"]["name"] == "my-agent"
-
-    def test_import_invalid_tarball(self, tmp_path):
+    def test_import_invalid_tarball(self):
         result = import_tarball(
             b"this is not a tarball",
             bot_schema=None,
             agent_schema=None,
-            bot_config_path=tmp_path / "bot.json",
-            agent_config_path=tmp_path / "agent.json",
         )
         assert len(result.parse_errors) == 1
         assert "tarball" in result.parse_errors[0].lower()
 
-    def test_import_oauth_json(self, tmp_path):
+    def test_import_oauth_json(self):
         # Build tarball with oauth.json
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as tar:
             oauth = b'{"access_token": "xyz"}'
-            info = tarfile.TarInfo(name="env/oauth.json")
+            info = tarfile.TarInfo(name="data/oauth.json")
             info.size = len(oauth)
             tar.addfile(info, io.BytesIO(oauth))
 
-        oauth_dest = tmp_path / "oauth.json"
         result = import_tarball(
             buf.getvalue(),
             bot_schema=None,
             agent_schema=None,
-            bot_config_path=None,
-            agent_config_path=None,
-            oauth_dest_path=oauth_dest,
         )
         assert result.oauth_imported is True
-        assert oauth_dest.exists()
-        assert json.loads(oauth_dest.read_text())["access_token"] == "xyz"
 
 
 # ---------------------------------------------------------------------------
-# generate_env_files
+# generate_compose_env
 # ---------------------------------------------------------------------------
 
 
-class TestGenerateEnvFiles:
-    def test_generates_all_files(self):
+class TestGenerateComposeEnv:
+    def test_generates_compose_env(self):
         bot_schema = _schema(_field_def("token", "BOT_TOKEN"))
         agent_schema = _schema(_field_def("name", "AGENT_NAME"))
-        files, warnings = generate_env_files(
+        compose_env_str, warnings = generate_compose_env(
             bot_config={"token": "abc"},
             agent_config={"name": "my-agent"},
             bot_schema=bot_schema,
             agent_schema=agent_schema,
         )
-        assert "bot.env" in files
-        assert "agent.env" in files
-        assert "BOT_TOKEN=abc" in files["bot.env"]
-        assert "AGENT_NAME=my-agent" in files["agent.env"]
+        assert "BOT_TOKEN=abc" in compose_env_str
+        assert "AGENT_NAME=my-agent" in compose_env_str
+        assert warnings == []

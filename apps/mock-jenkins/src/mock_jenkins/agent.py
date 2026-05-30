@@ -20,7 +20,7 @@ import uvicorn
 from agent_control.config import AgentSettings, _DEFAULT_CONFIG_PATH
 from config_core import format_validation_error, get_frontend_schema, read_masked_config, save_config_with_merge, setup_service_logging
 from config_core.schema import resolve_config_path
-from fastapi import FastAPI, Request, File, UploadFile, HTTPException
+from fastapi import FastAPI, Request, File, UploadFile, HTTPException, Response
 from pydantic import ValidationError
 from starlette.responses import JSONResponse
 
@@ -222,7 +222,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
         return {"status": "uploaded", "size": len(content)}
 
-    from fastapi.responses import Response
+
 
     @app.get("/control/vpn/download")
     async def mock_download_vpn(request: Request) -> Response:
@@ -265,8 +265,7 @@ def create_app() -> FastAPI:
         # Check settings
         config = AgentSettings.load()
         if not config.vpn_enabled:
-            logger.warning("VPN not enabled in mock settings.")
-            return {"status": "disabled", "vpn": manager.status()["vpn"]}
+            raise HTTPException(status_code=400, detail="VPN is not enabled in settings.")
             
         if not manager.OVPN_PATH.exists():
             raise HTTPException(status_code=400, detail="VPN is enabled but no .ovpn file has been uploaded.")

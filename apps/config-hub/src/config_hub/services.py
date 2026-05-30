@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from config_core import get_service_auth_headers
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -203,40 +204,40 @@ class ServiceClient:
         """Proxy VPN file deletion to agent-control."""
         url = self._service_url("agent")
         if not url:
-            return {"status": "error", "detail": "Agent service not configured"}
+            raise HTTPException(status_code=503, detail="Agent service not configured")
         try:
             resp = await self._client.delete(f"{url}/control/vpn/upload")
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
             logger.warning("Failed to proxy VPN deletion to agent: %s", exc)
-            return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
+            raise HTTPException(status_code=500, detail=f"Cannot reach agent: {exc}")
 
     async def vpn_connect(self) -> dict[str, Any]:
         """Proxy VPN connect to agent-control."""
         url = self._service_url("agent")
         if not url:
-            return {"status": "error", "detail": "Agent service not configured"}
+            raise HTTPException(status_code=503, detail="Agent service not configured")
         try:
             resp = await self._client.post(f"{url}/control/vpn/connect")
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
             logger.warning("Failed to proxy VPN connect to agent: %s", exc)
-            return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
+            raise HTTPException(status_code=500, detail=f"Cannot reach agent: {exc}")
 
     async def vpn_disconnect(self) -> dict[str, Any]:
         """Proxy VPN disconnect to agent-control."""
         url = self._service_url("agent")
         if not url:
-            return {"status": "error", "detail": "Agent service not configured"}
+            raise HTTPException(status_code=503, detail="Agent service not configured")
         try:
             resp = await self._client.post(f"{url}/control/vpn/disconnect")
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
             logger.warning("Failed to proxy VPN disconnect to agent: %s", exc)
-            return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
+            raise HTTPException(status_code=500, detail=f"Cannot reach agent: {exc}")
 
     async def download_vpn_file(self) -> bytes | None:
         """Fetch the client.ovpn config file from agent-control."""

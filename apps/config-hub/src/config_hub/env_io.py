@@ -13,7 +13,6 @@ from typing import Any
 
 from config_core import ConfigDocument
 
-from .config_store import load_json, write_json
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +249,6 @@ def build_export_tarball(
         data/client.ovpn    (if available)
     """
     buf = io.BytesIO()
-    import json
 
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         # Add compose.env
@@ -348,7 +346,9 @@ def _parse_env_content(
     bot_lookup: dict[str, dict[str, Any]],
     agent_lookup: dict[str, dict[str, Any]],
     file_manager_lookup: dict[str, dict[str, Any]] | None = None,
+    builds_lookup: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[
+    dict[str, Any],
     dict[str, Any],
     dict[str, Any],
     dict[str, Any],
@@ -452,6 +452,7 @@ def import_tarball(
     all_unrecognized: list[str] = []
     all_parse_errors: list[str] = []
     all_warnings: list[str] = []
+    oauth_imported: bool = False
 
     configs: dict[str, dict[str, Any]] = {
         "bot": {},
@@ -468,6 +469,10 @@ def import_tarball(
 
                 name = member.name
                 basename = Path(name).name
+
+                if basename == "oauth.json":
+                    oauth_imported = True
+                    continue
 
                 # Process JSON configs first (if any logic depends on order, JSON is base)
                 if basename in ("bot.json", "agent.json", "storage.json", "builds.json"):
@@ -505,10 +510,21 @@ def import_tarball(
                     bp, ap, fmp, bu_p, applied, skipped, unrec, errors = _parse_env_content(
                         content, bot_lookup, agent_lookup, file_manager_lookup, builds_lookup
                     )
-                    configs["bot"] = ConfigDocument(configs["bot"]).merge(bp).data
-                    configs["agent"] = ConfigDocument(configs["agent"]).merge(ap).data
-                    configs["file_manager"] = ConfigDocument(configs["file_manager"]).merge(fmp).data
-                    configs["builds"] = ConfigDocument(configs["builds"]).merge(bu_p).data
+                    doc_bot = ConfigDocument(configs["bot"])
+                    doc_bot.merge(bp)
+                    configs["bot"] = doc_bot.data
+
+                    doc_agent = ConfigDocument(configs["agent"])
+                    doc_agent.merge(ap)
+                    configs["agent"] = doc_agent.data
+
+                    doc_fm = ConfigDocument(configs["file_manager"])
+                    doc_fm.merge(fmp)
+                    configs["file_manager"] = doc_fm.data
+
+                    doc_bu = ConfigDocument(configs["builds"])
+                    doc_bu.merge(bu_p)
+                    configs["builds"] = doc_bu.data
                     
                     all_applied.extend(applied)
                     all_skipped.extend(skipped)
@@ -522,45 +538,6 @@ def import_tarball(
             parse_errors=["Failed to extract tarball — is it a valid .tar.gz?"]
         )
 
-    # Write patches to config files using deep merge
-    if bot_patch and bot_config_path:
-        existing = load_json(bot_config_path)
-        doc = ConfigDocument(existing)
-        doc.merge(bot_patch)
-        write_json(bot_config_path, doc.data)
-
-    if agent_patch and agent_config_path:
-        existing = load_json(agent_config_path)
-        doc = ConfigDocument(existing)
-        doc.merge(agent_patch)
-        write_json(agent_config_path, doc.data)
-
-    if file_manager_patch and file_manager_config_path:
-        existing = load_json(file_manager_config_path)
-        doc = ConfigDocument(existing)
-        doc.merge(file_manager_patch)
-        write_json(file_manager_config_path, doc.data)
-
-    # Warn about required fields still missing after import
-    for lookup, config_path, scope in [
-        (bot_lookup, bot_config_path, "bot"),
-        (agent_lookup, agent_config_path, "agent"),
-        (file_manager_lookup, file_manager_config_path, "file_manager"),
-    ]:
-        if not config_path:
-            continue
-        current = load_json(config_path)
-        for env_var, field_def in lookup.items():
-            if not field_def.get("required"):
-                continue
-            doc = ConfigDocument(current)
-            val = doc.get(field_def["key"])
-            if val in (None, "", []):
-                label = field_def.get("label", field_def["key"])
-                all_warnings.append(
-                    f"Required field '{label}' ({env_var}) still missing"
-                )
-
     return ImportResult(
         applied=all_applied,
         skipped_empty=all_skipped,
@@ -568,9 +545,5 @@ def import_tarball(
         parse_errors=all_parse_errors,
         warnings=all_warnings,
         oauth_imported=oauth_imported,
-        configs={
-            "bot": bot_patch,
-            "agent": agent_patch,
-            "file_manager": file_manager_patch,
-        },
+        configs=configs,
     )

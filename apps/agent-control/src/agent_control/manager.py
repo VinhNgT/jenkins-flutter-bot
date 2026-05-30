@@ -126,8 +126,7 @@ class AgentManager:
         """Connect the VPN, if enabled and configured."""
         config = AgentSettings.load()
         if not config.vpn_enabled:
-            logger.warning("VPN connection requested but VPN is not enabled in settings.")
-            return
+            raise ValueError("VPN connection requested but VPN is not enabled in settings.")
         if not self.vpn.OVPN_PATH.exists():
             raise FileNotFoundError("VPN is enabled but no .ovpn file has been uploaded.")
         self.vpn.set_max_connected_minutes(config.vpn_max_connected_minutes)

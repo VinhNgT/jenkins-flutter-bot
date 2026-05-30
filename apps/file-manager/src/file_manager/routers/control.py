@@ -57,13 +57,18 @@ async def get_schema(manager: ManagerDep) -> dict[str, Any]:
     since Drive configuration is irrelevant. In Google Drive mode,
     returns the full schema with OAuth credential fields.
     """
-    if manager.backend_type == "ephemeral":
+    if manager.backend_type in ("ephemeral", "log_only"):
+        desc = (
+            "Storage is running in <strong>ephemeral mode</strong> — files are"
+            " stored in memory and will be lost when the service restarts."
+            if manager.backend_type == "ephemeral"
+            else "Storage is running in <strong>log-only mode</strong> — builds are"
+            " logged but no files are saved."
+        )
         return {
             "title": "File Storage Configuration",
             "description": (
-                "Storage is running in <strong>ephemeral mode</strong> — files are"
-                " stored in memory and will be lost when the service restarts."
-                " This is intended for development and testing."
+                f"{desc} This is intended for development and testing."
                 " To use persistent storage, set"
                 " <code>STORAGE_BACKEND=google_drive</code>."
             ),

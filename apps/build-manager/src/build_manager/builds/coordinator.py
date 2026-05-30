@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -330,7 +331,6 @@ class BuildCoordinator:
                     suffix = Path(original_name).suffix  # .apk
                     dt = datetime.fromtimestamp(now, tz=timezone.utc)
                     if pending.app_name:
-                        import re
                         cleaned = pending.app_name.replace(" ", "-")
                         cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", cleaned).lower()
                         base_name = cleaned or self._jenkins.job_name

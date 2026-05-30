@@ -9,7 +9,7 @@ from fastapi.responses import Response
 
 from ..dependencies import ManagerDep
 
-router = APIRouter(prefix="/api", tags=["config-transfer"])
+router = APIRouter(prefix="/api/webapp-admin", tags=["config-transfer"])
 
 # Maximum import tarball size: 5 MB (config files are tiny).
 MAX_IMPORT_SIZE = 5 * 1024 * 1024

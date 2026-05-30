@@ -4,15 +4,15 @@ import preact from '@preact/preset-vite';
 
 export default defineConfig({
   plugins: [preact()],
-  base: '/static/',
+  base: '/webapp-admin/',
   build: {
-    outDir: '../src/config_hub/static',
+    outDir: '../src/config_hub/webapp',
     emptyOutDir: true,
   },
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:9000',
+      '/api/webapp-admin': {
+        target: 'http://localhost:8880',
         changeOrigin: true,
       },
     },

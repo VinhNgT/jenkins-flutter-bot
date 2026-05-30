@@ -13,8 +13,7 @@ Triggered when editing frontend TypeScript/TSX files. Covers the Preact + Vite s
 ## Frontend Stack
 
 - **Preact 10** — lightweight React alternative. No React — this is a pure Preact codebase.
-- **`@preact/signals`** — reactive state management (used in Config Hub).
-- **Hooks & Context** — state management patterns (used in Bot Webapp).
+- **Hooks & Context** — state management for both frontends.
 - **Vite 6** — build tool and dev server with HMR.
 - **TypeScript** — type safety for all frontend code.
 - **`lucide-preact`** — icon library.
@@ -23,14 +22,30 @@ Triggered when editing frontend TypeScript/TSX files. Covers the Preact + Vite s
 
 ## Two Frontends, One Stack
 
-Both frontends share identical dependencies, tooling, and project structure:
+Both frontends share identical dependencies, tooling, project structure, and design system:
 
 | Frontend | Location | Serves | Base Path |
 |----------|----------|--------|-----------|
-| Config Hub Dashboard | `apps/config-hub/frontend/` | Admin web dashboard | `/static/` |
+| Config Hub Dashboard | `apps/config-hub/frontend/` | Admin web dashboard | `/webapp-admin/` |
 | Telegram Web App | `apps/tg-jenkins-bot/frontend/` | Telegram Mini App | `/webapp/` |
 
 Changes to shared patterns should be applied to both.
+
+---
+
+## Frontend Design Philosophy
+
+Both frontends use the same Telegram design language, `--tg-color-*` CSS variable system, and component patterns — but serve different audiences with different UX priorities:
+
+| | Bot Webapp | Config Hub |
+|---|-----------|------------|
+| **Audience** | End users (Telegram) | Administrators (browser) |
+| **UX priority** | Strict native Telegram feel, minimal UI | Information density, operational efficiency |
+| **Theme** | SDK-injected `--tg-theme-*` + system fallbacks (light/dark) | Same `--tg-color-*` variables with hardcoded dark fallbacks |
+| **Deviations** | None — follow Telegram conventions exactly | Minor deviations acceptable for density (e.g., inline expand controls, denser list items, more visible status info) |
+| **SDK integration** | Full (`MainButton`, `BackButton`, haptics, `CloudStorage`) | None — standalone browser app |
+
+The config-hub uses the same CSS variable naming (`--tg-color-*`) and component class names (`.tg-section`, `.tg-list`, `.tg-list-item`) as the bot webapp. This shared design system means a developer maintaining either frontend sees identical structure and naming, even where the UX density differs.
 
 ---
 
@@ -63,7 +78,7 @@ The bot webapp additionally has `emulator.ts` for browser-based Telegram WebApp 
 
 Vite builds directly into the Python service's static directory (`outDir` in `vite.config.ts`):
 
-- **Config Hub** → `src/config_hub/static/` (served at `/static/`)
+- **Config Hub** → `src/config_hub/webapp/` (served at `/webapp-admin/`)
 - **Bot Webapp** → `src/tg_jenkins_bot/webapp/` (served at `/webapp/`)
 
 The Python FastAPI service mounts these as `StaticFiles`. No separate static file server. Content-hashed filenames provide cache-busting; the entry HTML revalidates (`no-cache`), sub-resources are cached aggressively.
@@ -74,10 +89,10 @@ Build command: `npm run build` (runs `tsc --noEmit && vite build`).
 
 ## Dev Proxy
 
-Each Vite dev server proxies API calls to the local Python service:
+Both Vite dev servers proxy API calls to the local gateway:
 
-- Config Hub: `/api` → `http://localhost:9000`
-- Bot Webapp: `/api/webapp` → `http://localhost:9090`
+- Config Hub: `/api/webapp-admin` → `http://localhost:8880`
+- Bot Webapp: `/api/webapp` → `http://localhost:8880`
 
 ---
 
@@ -89,12 +104,11 @@ Real-time data uses custom `useSSE()` hooks that manage `EventSource` lifecycle,
 
 ## Stack-Based Navigation (SPA)
 
-The Telegram Web App is a Single Page Application that avoids standard client-side router packages (like React Router) to prevent conflicts with Telegram's native view dynamics (such as `MainButton` overlays and keyboard height adjustments).
+Both frontends use a custom CSS-transform-based stack navigator managed via `useNavigator()`, avoiding standard router packages. In the bot webapp this prevents conflicts with Telegram's native view dynamics; in config-hub it provides consistent navigation with the same animations and patterns.
 
-It uses a custom CSS-transform-based stack navigator managed via `useNavigator()`:
 - **Push**: Renders the new screen offscreen and slides it in from the right (`translateX(100%) -> translateX(0)`), matching native iOS/Telegram aesthetics.
 - **Pop**: Slides the active screen out to the right, using a **delayed unmount** pattern. The exiting screen remains in the DOM until the `300ms` slide-out transition finishes. This prevents cleanup triggers (like physical `BackButton.hide()` or `MainButton.hide()`) from firing prematurely mid-animation.
-- **Unified Screens**: Detail pages (like `BuildDetailScreen.tsx`) handle multiple build states (active building, success, failure) within a single component. On build completion, they transition in-place without loading flashes by retaining the last-known active state until the final result is fetched.
+- **Unified Screens**: Detail pages handle multiple states within a single component, transitioning in-place without loading flashes by retaining the last-known state until the final result is fetched.
 
 ---
 
@@ -111,7 +125,7 @@ Telegram SDK integrations are encapsulated in native-first, declarative React ho
 
 ## Telegram Design Language
 
-Both frontends follow Telegram's design patterns (per `custom-rule.md`). The bot webapp integrates with `window.Telegram.WebApp` for theming, haptic feedback, and back-button handling. The emulator mode (`emulator.ts`) provides a browser-based preview for development without Telegram. It features fully-implemented floating controls for the `MainButton`/`BackButton` as well as light/dark auto-syncing theme params.
+Both frontends follow Telegram's design patterns (per `custom-rule.md`) and share the same `--tg-color-*` CSS variable system. The bot webapp integrates with `window.Telegram.WebApp` for theming, haptic feedback, and back-button handling; config-hub uses the same variable names with hardcoded fallback values. The emulator mode (`emulator.ts`) provides a browser-based preview for development without Telegram, with fully-implemented floating controls for the `MainButton`/`BackButton` as well as light/dark auto-syncing theme params.
 
 ---
 

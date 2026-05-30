@@ -9,7 +9,6 @@ import { useState } from 'preact/hooks';
 import { API } from '../api';
 import { useConfirm } from '../context/ConfirmDialog';
 import type { Scope, ServiceStatus } from '../types';
-import type { SectionId } from './Sidebar';
 import { healthState, type HealthState } from '../utils';
 import LogViewer from './LogViewer';
 
@@ -18,16 +17,8 @@ interface ServiceCardProps {
   label: string;
   status: ServiceStatus | null;
   onRefresh: () => void;
-  onNavigate: (tab: SectionId) => void;
 }
 
-/** Map backend scope to its UI section. */
-const SCOPE_TO_SECTION: Record<Scope, SectionId> = {
-  bot: 'telegram',
-  agent: 'jenkins',
-  builds: 'jenkins',
-  file_manager: 'storage',
-};
 
 const BADGE_LABELS: Record<HealthState, string> = {
   running: 'Running',
@@ -59,7 +50,6 @@ export default function ServiceCard({
   label,
   status,
   onRefresh,
-  onNavigate,
 }: ServiceCardProps) {
 
   const confirm = useConfirm();
@@ -123,15 +113,6 @@ export default function ServiceCard({
       )}
 
       {errorText && <div class="config-error-callout">{errorText}</div>}
-
-      {state === 'needs-config' && (
-        <a
-          class="configure-link"
-          onClick={() => onNavigate(SCOPE_TO_SECTION[scope])}
-        >
-          Configure →
-        </a>
-      )}
 
       <div class="status-controls">
         <button

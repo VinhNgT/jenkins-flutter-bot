@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..dependencies import ManagerDep
 
-router = APIRouter(prefix="/api/config", tags=["config"])
+router = APIRouter(prefix="/api/webapp-admin/config", tags=["config"])
 
 
 @router.get("/schema")

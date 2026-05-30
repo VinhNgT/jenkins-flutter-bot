@@ -61,6 +61,8 @@ services:
       AGENT_CONTROL_URL: ${AGENT_CONTROL_URL:-http://agent-control:9091}
       FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
       BUILD_MANAGER_URL: ${BUILD_MANAGER_URL:-http://build-manager:9010}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
       JFB_DEV_MODE: "true"
     depends_on:
       - tg-jenkins-bot
@@ -143,11 +145,9 @@ services:
     container_name: gateway
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "8880:80"
     volumes:
       - ./gateway/Caddyfile:/etc/caddy/Caddyfile
-    expose:
-      - "80"
     networks:
       - jenkins
 

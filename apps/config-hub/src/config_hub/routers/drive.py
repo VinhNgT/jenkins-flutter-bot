@@ -13,7 +13,7 @@ from ..dependencies import ManagerDep, TemplatesDep
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/drive", tags=["drive"])
+router = APIRouter(prefix="/api/webapp-admin/drive", tags=["drive"])
 
 
 @router.get("/status")

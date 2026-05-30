@@ -19,9 +19,17 @@ class HubBootstrap(BootstrapSettings):
     build_manager_url: str | None = Field(None)
     auth_username: str | None = Field(
         None,
-        description="Username for Web UI Basic Authentication",
+        description="Username for Web UI Basic Authentication (local network only)",
     )
     auth_password: str | None = Field(
         None,
-        description="Password for Web UI Basic Authentication",
+        description="Password for Web UI Basic Authentication (local network only)",
+    )
+    telegram_bot_token: str | None = Field(
+        None,
+        description="Bot token for validating Telegram initData signatures",
+    )
+    admin_telegram_user_ids: list[int] = Field(
+        default_factory=list,
+        description="Telegram user IDs authorized for admin access",
     )

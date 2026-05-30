@@ -13,23 +13,32 @@
     }
 }
 
-# ── tg-jenkins-bot (public, via Cloudflare tunnel) ────────────────
+# ── Unified ingress (single port) ─────────────────────────────────
+# All traffic enters through :80. Cloudflared connects here for public
+# access; the host maps an unprivileged port (e.g. 8880:80) for local
+# development. Path-based routing separates the two web apps:
+#
+#   /webapp*              → tg-jenkins-bot (user-facing Telegram Mini App)
+#   /webapp-admin*        → config-hub (admin dashboard)
+#   /api/webapp/*         → tg-jenkins-bot API
+#   /api/webapp-admin/*   → config-hub API
+#
 :80 {
-    @bot_static {
-        path /webapp/*.css /webapp/*.js
+    # ── Basic Auth network restriction ────────────────────────────
+    # Strip the Authorization header from non-local requests to admin
+    # endpoints. This prevents Basic Auth from working over the public
+    # internet (via Cloudflare tunnel) while preserving it for
+    # same-network access. Telegram initData auth uses a different
+    # header (X-Telegram-Init-Data) and is unaffected.
+    @admin_not_local {
+        path /webapp-admin* /api/webapp-admin/*
+        not remote_ip 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 ::1
     }
-    @bot_html {
-        path /webapp /webapp/
-    }
-    @bot_api {
-        path /api/webapp/*
-    }
-    @bot_routes {
-        path /webapp* /api/webapp*
-    }
+    request_header @admin_not_local -Authorization
 
     # ── Rate limiting ─────────────────────────────────────────────
-    # Mutating endpoints (build trigger/cancel) — strict limit
+
+    # Bot webapp: mutating endpoints — strict limit
     @webapp_mutate {
         path /api/webapp/trigger /api/webapp/cancel
     }
@@ -41,7 +50,7 @@
         }
     }
 
-    # Read endpoints — higher limit for normal polling
+    # Bot webapp: read endpoints — higher limit for normal polling
     @webapp_read {
         path /api/webapp/config /api/webapp/recent
     }
@@ -53,40 +62,11 @@
         }
     }
 
-    # SSE streams are NOT rate-limited — they are long-lived
-    # connections, not repeated requests.
-
-    # ── Handlers ──────────────────────────────────────────────────
-    # Stream endpoints require immediate flushing
-    handle /api/webapp/stream {
-        header Cache-Control "no-store"
-        reverse_proxy tg-jenkins-bot:9090 {
-            flush_interval -1
-        }
+    # Config-hub admin: brute-force protection
+    @admin_api {
+        path /api/webapp-admin/*
     }
-
-    handle @bot_routes {
-        # Tier 2: Versioned static assets — cache forever (?v=hash invalidates)
-        header @bot_static Cache-Control "public, max-age=31536000, immutable"
-
-        # Tier 1: HTML entry point — always revalidate to pick up new ?v= hashes
-        header @bot_html Cache-Control "no-cache"
-
-        # Tier 3: API responses — never cache operational data
-        header @bot_api Cache-Control "no-store"
-
-        reverse_proxy tg-jenkins-bot:9090
-    }
-
-    handle {
-        respond "Not Found" 404
-    }
-}
-
-# ── config-hub (admin dashboard, host-local only) ─────────────────
-:9000 {
-    # Brute-force protection — 30 req/min per client IP
-    rate_limit {
+    rate_limit @admin_api {
         zone hub_admin {
             key    {remote_host}
             events 30
@@ -94,33 +74,80 @@
         }
     }
 
-    @hub_static {
-        path /static/*
-    }
-    @hub_html {
-        path / /index.html
-    }
-    @hub_api {
-        path /api/*
-    }
+    # SSE streams are NOT rate-limited — they are long-lived
+    # connections, not repeated requests.
 
-    # Unversioned static assets — always revalidate (ETag/304)
-    header @hub_static Cache-Control "no-cache"
+    # ── Config-hub admin handlers (declared first — /webapp-admin* ─
+    # ── is a superstring of /webapp*, so must match before bot)  ──
 
-    # HTML entry point — always revalidate to pick up changes
-    header @hub_html Cache-Control "no-cache"
-
-    # API responses — never cache config values, secrets, Drive status
-    header @hub_api Cache-Control "no-store"
-
-    # Stream endpoints require immediate flushing
-    handle /api/services/stream {
+    # Admin SSE stream — requires immediate flushing
+    handle /api/webapp-admin/services/stream {
+        header Cache-Control "no-store"
         reverse_proxy config-hub:9000 {
             flush_interval -1
         }
     }
 
-    handle {
+    # Admin static assets — content-hashed filenames, cache forever
+    @admin_static {
+        path /webapp-admin/*.css /webapp-admin/*.js
+    }
+    handle @admin_static {
+        header Cache-Control "public, max-age=31536000, immutable"
         reverse_proxy config-hub:9000
+    }
+
+    # Admin HTML entry point — always revalidate
+    @admin_html {
+        path /webapp-admin /webapp-admin/
+    }
+    handle @admin_html {
+        header Cache-Control "no-cache"
+        reverse_proxy config-hub:9000
+    }
+
+    # Admin API — never cache
+    handle /api/webapp-admin/* {
+        header Cache-Control "no-store"
+        reverse_proxy config-hub:9000
+    }
+
+    # ── Bot webapp handlers ───────────────────────────────────────
+
+    # Bot SSE stream — requires immediate flushing
+    handle /api/webapp/stream {
+        header Cache-Control "no-store"
+        reverse_proxy tg-jenkins-bot:9090 {
+            flush_interval -1
+        }
+    }
+
+    # Bot static assets — content-hashed filenames, cache forever
+    @bot_static {
+        path /webapp/*.css /webapp/*.js
+    }
+    handle @bot_static {
+        header Cache-Control "public, max-age=31536000, immutable"
+        reverse_proxy tg-jenkins-bot:9090
+    }
+
+    # Bot HTML entry point — always revalidate
+    @bot_html {
+        path /webapp /webapp/
+    }
+    handle @bot_html {
+        header Cache-Control "no-cache"
+        reverse_proxy tg-jenkins-bot:9090
+    }
+
+    # Bot API — never cache
+    handle /api/webapp/* {
+        header Cache-Control "no-store"
+        reverse_proxy tg-jenkins-bot:9090
+    }
+
+    # ── Catch-all ─────────────────────────────────────────────────
+    handle {
+        respond "Not Found" 404
     }
 }

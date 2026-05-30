@@ -58,6 +58,8 @@ class ConfigHubManager:
         self.file_manager_url: str | None = resolved.file_manager_url
         self.auth_username: str | None = resolved.auth_username
         self.auth_password: str | None = resolved.auth_password
+        self.telegram_bot_token: str | None = resolved.telegram_bot_token
+        self.admin_telegram_user_ids: list[int] = resolved.admin_telegram_user_ids
         self.services = service_client or ServiceClient(
             bot_url=resolved.bot_control_url,
             agent_url=resolved.agent_control_url,
@@ -83,6 +85,8 @@ class ConfigHubManager:
         self.file_manager_url = resolved.file_manager_url
         self.auth_username = resolved.auth_username
         self.auth_password = resolved.auth_password
+        self.telegram_bot_token = resolved.telegram_bot_token
+        self.admin_telegram_user_ids = resolved.admin_telegram_user_ids
         self.services = ServiceClient(
             bot_url=resolved.bot_control_url,
             agent_url=resolved.agent_control_url,

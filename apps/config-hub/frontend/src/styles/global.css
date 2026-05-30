@@ -1,0 +1,1235 @@
+/* Config Hub — Unified Design System
+ *
+ * Shares the Telegram design language (--tg-color-* variables, .tg-section,
+ * .tg-list, stack navigator) with the bot webapp. Config-hub is dark-only,
+ * admin-facing, and optimized for information density in a desktop browser.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 1. Design Variables
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+    /* Telegram dark palette — hardcoded (no SDK injection in browser) */
+    --tg-color-bg: #1c242c;
+    --tg-color-secondary-bg: #0f171e;
+    --tg-color-text: #ffffff;
+    --tg-color-hint: #708499;
+    --tg-color-link: #5288c1;
+    --tg-color-button: #5288c1;
+    --tg-color-button-text: #ffffff;
+    --tg-color-destructive: #ff3b30;
+
+    --tg-color-section-bg: var(--tg-color-bg);
+    --tg-color-section-header: var(--tg-color-hint);
+    --tg-color-subtitle: var(--tg-color-hint);
+    --tg-color-header-bg: var(--tg-color-secondary-bg);
+    --tg-color-separator: rgba(255, 255, 255, 0.08);
+    --tg-color-divider: var(--tg-color-separator);
+
+    /* Semantic status colors */
+    --tg-color-success: #31b545;
+    --tg-color-warning: #e0a830;
+
+    /* Layout */
+    --border-radius-card: 12px;
+    --nav-transition-ms: 300;
+    --transition-speed: 0.22s;
+
+    /* Spacing scale */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+
+    /* Typography */
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono",
+        Consolas, monospace;
+
+    /* Motion */
+    --transition-fast: 120ms ease;
+    --transition: 180ms ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 2. Reset
+   ═══════════════════════════════════════════════════════════════════ */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: 14px;
+    color: var(--tg-color-text);
+    background: var(--tg-color-secondary-bg);
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+a {
+    color: var(--tg-color-link);
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
+
+html {
+    scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 3. Stack Navigator — CSS transform-based screen transitions
+   ═══════════════════════════════════════════════════════════════════ */
+.nav-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+}
+
+.nav-screen {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    will-change: transform;
+    padding: 20px 28px 48px;
+    scrollbar-width: none;
+}
+
+.nav-screen::-webkit-scrollbar {
+    display: none;
+}
+
+/* Main screen positioning */
+.nav-screen--main {
+    z-index: 1;
+    transform: translateX(0);
+    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
+    background-color: var(--tg-color-secondary-bg);
+}
+
+/* Detail screen positioning */
+.nav-screen--detail {
+    z-index: 10;
+    background-color: var(--tg-color-secondary-bg);
+    transition: transform calc(var(--nav-transition-ms, 300) * 1ms) cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Initial mount: detail screen is offscreen right */
+.nav-pushing .nav-screen--detail {
+    transform: translateX(100%);
+}
+
+/* Pushed: detail screen is onscreen, main screen shifts left */
+.nav-pushed .nav-screen--main {
+    transform: translateX(-30%);
+}
+
+.nav-pushed .nav-screen--detail {
+    transform: translateX(0);
+}
+
+/* Popping: detail screen slides back offscreen right */
+.nav-popping .nav-screen--main {
+    transform: translateX(0);
+}
+
+.nav-popping .nav-screen--detail {
+    transform: translateX(100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 4. Container & Content Area
+   ═══════════════════════════════════════════════════════════════════ */
+.container {
+    max-width: 680px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-grow: 1;
+    animation: fadeIn var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 5. Header
+   ═══════════════════════════════════════════════════════════════════ */
+header {
+    padding: 8px 6px 12px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--tg-color-text);
+    letter-spacing: -0.2px;
+}
+
+.header-subtitle {
+    font-size: 13px;
+    color: var(--tg-color-subtitle);
+    margin-top: 2px;
+    font-weight: 400;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.version-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--tg-color-hint);
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 999px;
+    padding: 2px 8px;
+    letter-spacing: 0.03em;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.version-badge.loaded {
+    opacity: 1;
+}
+
+.github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--tg-color-hint);
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 999px;
+    padding: 4px 12px;
+    text-decoration: none;
+    transition: color var(--transition-fast), background var(--transition-fast),
+        border-color var(--transition-fast);
+}
+
+.github-link:hover {
+    color: var(--tg-color-link);
+    background: color-mix(in srgb, var(--tg-color-link) 8%, var(--tg-color-bg));
+    border-color: color-mix(
+        in srgb,
+        var(--tg-color-link) 40%,
+        var(--tg-color-separator)
+    );
+    text-decoration: none;
+}
+
+.github-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    fill: currentColor;
+}
+
+/* Detail screen back button */
+.back-button {
+    background: none;
+    border: none;
+    color: var(--tg-color-link);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 6. Telegram Grouped Sections
+   ═══════════════════════════════════════════════════════════════════ */
+.tg-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.tg-section-header {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--tg-color-section-header);
+    padding: 20px 24px 4px 22px;
+    margin: 0;
+    letter-spacing: 0.3px;
+}
+
+.tg-section-footer {
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    padding: var(--space-sm) var(--space-md) 0;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 7. Telegram List (Grouped Rows)
+   ═══════════════════════════════════════════════════════════════════ */
+.tg-list {
+    background-color: var(--tg-color-section-bg);
+    border-radius: var(--border-radius-card);
+    overflow: hidden;
+    transition: background-color var(--transition-speed) ease;
+}
+
+.tg-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: relative;
+    cursor: pointer;
+    min-height: 48px;
+    background: transparent;
+    transition: background-color 0.15s ease;
+}
+
+.tg-list-item:active {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.tg-list-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 0;
+    height: 0.5px;
+    background-color: var(--tg-color-divider);
+    transition: background-color var(--transition-speed) ease;
+}
+
+.tg-list-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-grow: 1;
+    padding: 16px 8px 16px 0;
+}
+
+.tg-list-item-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--tg-color-text);
+}
+
+.tg-list-item-subtitle {
+    font-size: 13px;
+    color: var(--tg-color-subtitle);
+}
+
+/* Chevron for navigable rows */
+.tg-list-item-chevron {
+    color: var(--tg-color-hint);
+    opacity: 0.5;
+    flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 8. Cards (Admin density)
+   ═══════════════════════════════════════════════════════════════════ */
+.card {
+    background: var(--tg-color-section-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: var(--space-md) 18px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: box-shadow var(--transition);
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.card + .card {
+    margin-top: 10px;
+}
+
+.card h2,
+.card h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--tg-color-hint);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 9. Status Grid (Dashboard)
+   ═══════════════════════════════════════════════════════════════════ */
+.status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.status-grid > .card + .card {
+    margin-top: 0;
+}
+
+.status-card {
+    display: flex;
+    flex-direction: column;
+    border-left: 4px solid transparent;
+    transition: border-left-color 0.2s ease;
+}
+
+.status-card--running { border-left-color: var(--tg-color-success); }
+.status-card--stopped { border-left-color: var(--tg-color-link); }
+.status-card--needs-config { border-left-color: var(--tg-color-warning); }
+.status-card--offline { border-left-color: var(--tg-color-hint); }
+
+.status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+}
+
+.status-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--tg-color-text);
+}
+
+.status-details {
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    margin-bottom: 10px;
+    font-family: var(--font-mono);
+    line-height: 1.7;
+}
+
+.status-details p {
+    margin: 0;
+}
+
+.status-controls {
+    display: flex;
+    gap: var(--space-xs);
+    margin-top: auto;
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--tg-color-separator);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 10. Badges
+   ═══════════════════════════════════════════════════════════════════ */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+.badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.badge--running { color: var(--tg-color-success); }
+.badge--running::before { background: var(--tg-color-success); }
+.badge--awaiting { color: var(--tg-color-warning); }
+.badge--awaiting::before { background: var(--tg-color-warning); }
+.badge--stopped { color: var(--tg-color-link); }
+.badge--stopped::before { background: var(--tg-color-link); }
+.badge--offline { color: var(--tg-color-hint); }
+.badge--offline::before { background: var(--tg-color-hint); }
+.badge--connected { color: var(--tg-color-success); }
+.badge--connected::before { background: var(--tg-color-success); }
+.badge--disconnected { color: var(--tg-color-warning); }
+.badge--disconnected::before { background: var(--tg-color-warning); }
+
+.badge-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 11. Buttons
+   ═══════════════════════════════════════════════════════════════════ */
+.btn {
+    font: inherit;
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--tg-color-bg);
+    color: var(--tg-color-text);
+    transition: background var(--transition-fast),
+        border-color var(--transition-fast), transform 80ms ease;
+}
+
+.btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--tg-color-text) 8%, var(--tg-color-bg));
+}
+
+.btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-accent {
+    background: var(--tg-color-link);
+    border-color: var(--tg-color-link);
+    color: #fff;
+}
+
+.btn-accent:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--tg-color-link) 85%, white);
+    border-color: color-mix(in srgb, var(--tg-color-link) 85%, white);
+}
+
+.btn-secondary {
+    background: var(--tg-color-bg);
+    color: var(--tg-color-text);
+    border-color: color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+}
+
+.btn-danger {
+    background: transparent;
+    color: var(--tg-color-destructive);
+    border-color: color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: rgba(255, 59, 48, 0.1);
+}
+
+.btn-sm {
+    font-size: 12px;
+    padding: 4px 10px;
+}
+
+.btn svg.icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+    margin-right: 4px;
+}
+
+.btn-sm svg.icon {
+    width: 12px;
+    height: 12px;
+    vertical-align: -2px;
+    margin-right: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 12. Panel Titles & Descriptions
+   ═══════════════════════════════════════════════════════════════════ */
+.panel-title {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.panel-desc {
+    margin: 0 0 var(--space-md);
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    line-height: 1.6;
+    max-width: 620px;
+}
+
+.panel-desc code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 3px;
+    padding: 1px 4px;
+}
+
+.panel-subtitle {
+    margin: var(--space-lg) 0 var(--space-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--tg-color-text);
+}
+
+.panel-subtitle:first-of-type {
+    margin-top: 0;
+}
+
+/* Spacing between sequential schema forms */
+.schema-form-container + .schema-form-container {
+    margin-top: var(--space-xl);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 13. Summary Bar
+   ═══════════════════════════════════════════════════════════════════ */
+.summary-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+
+.summary-text { font-weight: 600; }
+.summary-bar--ok { color: var(--tg-color-success); }
+.summary-bar--warn { color: var(--tg-color-warning); }
+.summary-bar--offline { color: var(--tg-color-hint); }
+
+.last-refreshed {
+    font-size: 12px;
+    color: var(--tg-color-hint);
+    font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 14. Toast Notifications
+   ═══════════════════════════════════════════════════════════════════ */
+.toast-container {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    padding: 8px 14px;
+    border-radius: var(--border-radius-card);
+    font-size: 13px;
+    font-weight: 500;
+    max-width: 360px;
+    word-break: break-word;
+    background: var(--tg-color-bg);
+    border: 1px solid
+        color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+    color: var(--tg-color-text);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.toast.visible { opacity: 1; transform: translateY(0); }
+.toast--success { border-left: 3px solid var(--tg-color-success); }
+.toast--error { border-left: 3px solid var(--tg-color-destructive); }
+.toast--info { border-left: 3px solid var(--tg-color-link); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 15. Dialogs
+   ═══════════════════════════════════════════════════════════════════ */
+.confirm-dialog,
+.oauth-dialog {
+    background: var(--tg-color-bg);
+    border: 1px solid
+        color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+    border-radius: var(--border-radius-card);
+    padding: 28px 28px 22px;
+    min-width: 320px;
+    max-width: 420px;
+    color: var(--tg-color-text);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    margin: auto;
+}
+
+.confirm-dialog::backdrop,
+.oauth-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+}
+
+.dialog-icon { display: flex; justify-content: center; margin-bottom: 14px; }
+.dialog-icon svg { width: 40px; height: 40px; color: var(--tg-color-link); }
+.dialog-title { margin: 0 0 8px; font-size: 16px; font-weight: 700; text-align: center; }
+.dialog-msg { margin: 0 0 20px; font-size: 13.5px; color: var(--tg-color-hint); text-align: center; line-height: 1.55; }
+.dialog-status { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--tg-color-hint); margin-bottom: 20px; }
+.dialog-actions { display: flex; justify-content: center; gap: 10px; padding-top: 16px; border-top: 1px solid var(--tg-color-separator); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 16. Spinner & Skeleton
+   ═══════════════════════════════════════════════════════════════════ */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid
+        color-mix(in srgb, var(--tg-color-text) 12%, var(--tg-color-separator));
+    border-top-color: var(--tg-color-link);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+.skeleton {
+    background: var(--tg-color-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: 20px;
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line {
+    height: 12px;
+    background: color-mix(in srgb, var(--tg-color-text) 6%, var(--tg-color-bg));
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.skeleton-line--short { width: 40%; }
+.skeleton-line--medium { width: 65%; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 17. Forms
+   ═══════════════════════════════════════════════════════════════════ */
+.form-section {
+    margin-bottom: var(--space-lg);
+}
+
+.form-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--tg-color-hint);
+    margin-bottom: 10px;
+    padding-left: 2px;
+}
+
+.form-field {
+    margin-bottom: 14px;
+}
+
+.form-label {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--tg-color-text);
+}
+
+.form-label .required-mark {
+    color: var(--tg-color-destructive);
+    font-weight: 600;
+}
+
+.form-label .field-type {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--tg-color-hint);
+    background: color-mix(in srgb, var(--tg-color-text) 6%, var(--tg-color-bg));
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+}
+
+.form-hint {
+    font-size: 12px;
+    color: var(--tg-color-hint);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* Inputs */
+.form-input,
+.form-textarea,
+.form-select {
+    width: 100%;
+    background: var(--tg-color-secondary-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--tg-color-text);
+    font: inherit;
+    font-size: 13.5px;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--tg-color-link) 60%, var(--tg-color-separator));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tg-color-link) 15%, transparent);
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+    color: var(--tg-color-hint);
+    opacity: 0.6;
+}
+
+.form-input.secret {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.5px;
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 72px;
+    line-height: 1.6;
+}
+
+.form-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23708499'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+}
+
+.form-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.form-toggle-label {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--tg-color-text);
+}
+
+/* Toggle switch (iOS-style) */
+.tg-toggle-track {
+    width: 51px;
+    height: 31px;
+    border-radius: 15.5px;
+    background-color: rgba(120, 120, 128, 0.32);
+    position: relative;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background-color 0.25s ease;
+}
+
+.tg-toggle-track.tg-toggle-on {
+    background-color: var(--tg-color-button);
+}
+
+.tg-toggle-thumb {
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.tg-toggle-on .tg-toggle-thumb {
+    transform: translateX(20px);
+}
+
+/* Form action buttons */
+.form-actions {
+    display: flex;
+    gap: var(--space-sm);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--tg-color-separator);
+    margin-top: var(--space-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 18. Editors (ChatID, KeyValue)
+   ═══════════════════════════════════════════════════════════════════ */
+.editor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.editor-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.editor-row .form-input {
+    flex: 1;
+}
+
+.editor-remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--tg-color-hint);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.editor-remove-btn:hover {
+    color: var(--tg-color-destructive);
+    background: rgba(255, 59, 48, 0.08);
+}
+
+.editor-add-btn {
+    background: transparent;
+    border: 1px dashed var(--tg-color-separator);
+    border-radius: 8px;
+    color: var(--tg-color-link);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.editor-add-btn:hover {
+    border-color: var(--tg-color-link);
+    background: color-mix(in srgb, var(--tg-color-link) 6%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 19. Callouts & Banners
+   ═══════════════════════════════════════════════════════════════════ */
+.config-error-callout {
+    font-size: 12.5px;
+    color: var(--tg-color-warning);
+    background: rgba(224, 168, 48, 0.08);
+    border: 1px solid rgba(224, 168, 48, 0.25);
+    border-radius: var(--border-radius-card);
+    padding: 6px 10px;
+    margin-bottom: var(--space-sm);
+    line-height: 1.5;
+}
+
+.configure-link {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--tg-color-link);
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    transition: color var(--transition-fast);
+}
+
+.configure-link:hover {
+    color: color-mix(in srgb, var(--tg-color-link) 85%, white);
+    text-decoration: none;
+}
+
+.ephemeral-banner {
+    background: color-mix(in srgb, var(--tg-color-link) 8%, var(--tg-color-secondary-bg));
+    border: 1px solid
+        color-mix(in srgb, var(--tg-color-link) 25%, var(--tg-color-separator));
+    border-radius: var(--border-radius-card);
+    margin-top: 10px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--tg-color-hint);
+    line-height: 1.5;
+}
+
+.ephemeral-banner svg {
+    flex-shrink: 0;
+    color: var(--tg-color-link);
+    margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 20. Log Viewer
+   ═══════════════════════════════════════════════════════════════════ */
+.log-viewer {
+    margin-top: var(--space-sm);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    overflow: hidden;
+    animation: fadeIn 0.2s ease;
+}
+
+.log-viewer__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: color-mix(in srgb, var(--tg-color-text) 4%, var(--tg-color-secondary-bg));
+    border-bottom: 1px solid var(--tg-color-separator);
+}
+
+.log-viewer__title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--tg-color-hint);
+}
+
+.log-viewer__actions { display: flex; gap: 2px; }
+
+.log-viewer__btn {
+    background: transparent;
+    border: none;
+    color: var(--tg-color-hint);
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.log-viewer__btn:hover:not(:disabled) {
+    color: var(--tg-color-text);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.log-viewer__btn:disabled { opacity: 0.3; cursor: default; }
+.log-viewer__btn--close:hover:not(:disabled) { color: var(--tg-color-destructive); }
+
+.log-viewer__output {
+    background: #0d1117;
+    max-height: 360px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.log-viewer__output::-webkit-scrollbar { width: 6px; }
+.log-viewer__output::-webkit-scrollbar-track { background: transparent; }
+.log-viewer__output::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
+
+.log-viewer__empty { padding: 32px; text-align: center; font-size: 13px; color: var(--tg-color-hint); }
+
+.log-viewer__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.65;
+}
+
+.log-line:hover { background: rgba(255, 255, 255, 0.03); }
+
+.log-line__num {
+    width: 1%;
+    white-space: nowrap;
+    padding: 0 12px;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.2);
+    user-select: none;
+    vertical-align: top;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.log-line__text {
+    padding: 0 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #c9d1d9;
+}
+
+.log-line--error .log-line__text { color: #f85149; }
+.log-line--warning .log-line__text { color: #d29922; }
+.log-line--debug .log-line__text { color: #8b949e; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 21. Tools (Jenkinsfile, Config Transfer)
+   ═══════════════════════════════════════════════════════════════════ */
+.tool-card {
+    background: var(--tg-color-section-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: 20px;
+}
+
+.tool-card + .tool-card {
+    margin-top: var(--space-md);
+}
+
+.tool-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: var(--space-md);
+}
+
+.tool-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--tg-color-link) 12%, var(--tg-color-bg));
+    color: var(--tg-color-link);
+    flex-shrink: 0;
+}
+
+.tool-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--tg-color-text);
+}
+
+.tool-desc {
+    font-size: 12.5px;
+    color: var(--tg-color-hint);
+    margin-top: 2px;
+}
+
+.tool-output {
+    background: var(--tg-color-secondary-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--tg-color-text);
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.tool-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.tool-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.tool-row .form-input {
+    flex: 1;
+}
+
+.tool-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+/* Block code */
+.block-code {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--tg-color-secondary-bg);
+    border: 1px solid var(--tg-color-separator);
+    border-radius: var(--border-radius-card);
+    padding: 8px 12px;
+    margin: 8px 0;
+    color: var(--tg-color-text);
+    word-break: break-all;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 22. VPN Widget
+   ═══════════════════════════════════════════════════════════════════ */
+.vpn-controls {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 23. Text Utilities
+   ═══════════════════════════════════════════════════════════════════ */
+.text-muted { color: var(--tg-color-hint); font-size: 13px; margin: 0; }
+.text-success { color: var(--tg-color-success); }
+.text-error { color: var(--tg-color-destructive); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 24. Animations
+   ═══════════════════════════════════════════════════════════════════ */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes skeletonPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   § 25. Responsive (Mobile Adaptations)
+   ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+    .nav-screen {
+        padding: 12px 16px 32px;
+    }
+
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .container {
+        gap: 8px;
+    }
+}

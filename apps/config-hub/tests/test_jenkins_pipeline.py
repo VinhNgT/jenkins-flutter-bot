@@ -100,7 +100,7 @@ async def test_manager_get_jenkinsfile_explicit_params():
 async def test_router_get_jenkinsfile_api(client):
     """Verify /api/jenkinsfile endpoint handles custom query parameters and passes them through."""
     response = await client.get(
-        "/api/jenkinsfile",
+        "/api/webapp-admin/jenkinsfile",
         params={
             "repo_url": "https://github.com/test-user/test-project.git",
             "credentials_id": "test-creds-id",

@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import hmac
 import importlib.metadata
 import json
 import logging
 import os
 import re
-import time
-import urllib.parse
 from typing import Annotated
 
+from config_core import verify_init_data
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
@@ -112,64 +110,7 @@ class CancelResponse(BaseModel):
     ok: bool = True
 
 
-def _verify_telegram_init_data(init_data: str, token: str) -> dict:
-    """Verify Telegram initData signature and return parsed data.
 
-    Raises ValueError if signature is invalid.
-    """
-    # Parse query parameters
-    params = urllib.parse.parse_qsl(init_data, keep_blank_values=True)
-    params_dict = dict(params)
-
-    if "hash" not in params_dict:
-        raise ValueError("Missing hash parameter")
-
-    received_hash = params_dict.pop("hash")
-
-    # Sort key-value pairs alphabetically
-    sorted_params = sorted(params_dict.items())
-    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted_params)
-
-    # Calculate secret key: HMAC-SHA256 of token with constant key "WebAppData"
-    secret_key = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
-
-    # Calculate HMAC-SHA256 of data_check_string using secret_key
-    computed_hash = hmac.new(
-        secret_key,
-        data_check_string.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    if not hmac.compare_digest(computed_hash, received_hash):
-        raise ValueError("Invalid hash signature")
-
-    # Replay protection: reject initData older than 1 hour.
-    # The HMAC proves authenticity but never expires. Without this check,
-    # a captured initData (from browser history, DevTools, or SSE query
-    # parameter) could be replayed indefinitely. Telegram's own documentation
-    # recommends checking auth_date. The 1-hour window balances security
-    # against clock skew and normal user session lengths.
-    _INIT_DATA_TTL = 3600  # 1 hour
-    auth_date_str = params_dict.get("auth_date")
-    if auth_date_str:
-        try:
-            auth_date = int(auth_date_str)
-            if time.time() - auth_date > _INIT_DATA_TTL:
-                raise ValueError("initData expired (auth_date too old)")
-        except ValueError:
-            raise
-        except (TypeError, OverflowError):
-            pass
-
-    # Parse nested JSON structures
-    result = {}
-    for k, v in params_dict.items():
-        try:
-            result[k] = json.loads(v)
-        except json.JSONDecodeError:
-            result[k] = v
-
-    return result
 
 
 async def validate_webapp_request(
@@ -220,7 +161,7 @@ async def validate_webapp_request(
         )
 
     try:
-        data = _verify_telegram_init_data(init_data_str, ctx.config.telegram_token)
+        data = verify_init_data(init_data_str, ctx.config.telegram_token)
     except ValueError as e:
         logger.warning("Invalid webapp initData: %s", e)
         raise HTTPException(

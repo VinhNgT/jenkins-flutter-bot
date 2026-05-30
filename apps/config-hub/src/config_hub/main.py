@@ -15,14 +15,14 @@ from fastapi.templating import Jinja2Templates
 
 from config_core import setup_service_logging
 
-from .dependencies import verify_basic_auth
+from .dependencies import verify_admin_auth
 from .manager import ConfigHubManager
 from .routers import config, drive, export, jenkinsfile, pages, services, version
 
 logger = logging.getLogger(__name__)
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-STATIC_DIR = PACKAGE_DIR / "static"
+WEBAPP_DIR = PACKAGE_DIR / "webapp"
 TEMPLATE_DIR = PACKAGE_DIR / "templates"
 
 
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     # Only expose Swagger docs in dev mode — hidden in production.
-    docs_url = "/api/docs" if os.environ.get("JFB_DEV_MODE") else None
+    docs_url = "/api/webapp-admin/docs" if os.environ.get("JFB_DEV_MODE") else None
 
     app = FastAPI(title="config-hub", docs_url=docs_url, lifespan=lifespan)
 
@@ -52,7 +52,7 @@ def create_app() -> FastAPI:
     app.state.templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
     # --- API routers ---
-    auth_deps = [Depends(verify_basic_auth)]
+    auth_deps = [Depends(verify_admin_auth)]
     app.include_router(config.router, dependencies=auth_deps)
     app.include_router(services.router, dependencies=auth_deps)
     app.include_router(export.router, dependencies=auth_deps)
@@ -61,7 +61,11 @@ def create_app() -> FastAPI:
     app.include_router(version.router, dependencies=auth_deps)
 
     # --- Static files & SPA shell (must be after API routers) ---
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.mount(
+        "/webapp-admin",
+        StaticFiles(directory=str(WEBAPP_DIR)),
+        name="webapp-admin",
+    )
     app.include_router(pages.router, dependencies=auth_deps)
 
     return app

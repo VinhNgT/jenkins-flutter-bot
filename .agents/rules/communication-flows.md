@@ -47,7 +47,7 @@ Client → GET /control/schema → target service
 Client → GET/PUT /control/config → target service (read/write config)
 ```
 
-The real-time status of all services is streamed to the config-hub frontend via a Server-Sent Events (SSE) stream at `/api/services/stream`. The backend polls all managed service clients, serializes the aggregated status as a canonical JSON string, and hashes it using MD5. It only yields a new `ServerSentEvent` to the client if the resulting hash differs from the previously sent update, preventing redundant rendering and saving network bandwidth.
+The real-time status of all services is streamed to the config-hub frontend via a Server-Sent Events (SSE) stream at `/api/webapp-admin/services/stream`. The backend polls all managed service clients, serializes the aggregated status as a canonical JSON string, and hashes it using MD5. It only yields a new `ServerSentEvent` to the client if the resulting hash differs from the previously sent update, preventing redundant rendering and saving network bandwidth.
 
 The `/control/status` response carries five fields:
 
@@ -80,15 +80,15 @@ Do not move or duplicate this mapping. Do not rename `file-manager` internals to
 
 ## Google Drive OAuth
 
-OAuth is handled by `file-manager` (`/api/auth/*`) via two mechanisms, both proxied through config-hub (`/api/drive/*`):
+OAuth is handled by `file-manager` (`/api/auth/*`) via two mechanisms, both proxied through config-hub (`/api/webapp-admin/drive/*`):
 
-1. **Browser-redirect flow** — used by the web dashboard (popup callback at `http://<host>:9000/api/drive/oauth/callback`)
+1. **Browser-redirect flow** — used by the web dashboard (popup callback at `/api/webapp-admin/drive/oauth/callback`)
 2. **Headless code-paste flow** — exchange manually-pasted auth code for tokens (manual fallback option)
 
 Both flows produce the same stored token in file-manager's data volume. The bot never initiates OAuth — it only uploads files after a successful build.
 
-### Basic Auth Exemption for OAuth Callback
-To support browser-redirect flow under optional Config Hub Basic Authentication, the Google Drive OAuth callback endpoint (`/api/drive/oauth/callback`) is explicitly exempted from credentials check. This is required because modern browsers strip cached Basic Auth headers on cross-origin redirects (i.e. when accounts.google.com redirects the user back to the config-hub). This exemption is completely safe as the endpoint only serves a static HTML shell that triggers parent window callback events, and carries out no administrative or write operations.
+### Auth Exemption for OAuth Callback
+The Google Drive OAuth callback endpoint (`/api/webapp-admin/drive/oauth/callback`) is explicitly exempted from authentication. This is required because cross-origin redirects from accounts.google.com cannot carry authentication headers or initData. The exemption is safe as the endpoint only serves a static HTML shell that triggers parent window callback events, and carries out no administrative or write operations.
 
 ### Key Design Decisions
 

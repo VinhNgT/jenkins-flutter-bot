@@ -7,12 +7,12 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+WEBAPP_DIR = Path(__file__).resolve().parent.parent / "webapp"
 
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("/webapp-admin")
 async def index() -> FileResponse:
-    """Serve the main dashboard page."""
-    return FileResponse(STATIC_DIR / "index.html")
+    """Serve the admin dashboard SPA shell."""
+    return FileResponse(WEBAPP_DIR / "index.html")

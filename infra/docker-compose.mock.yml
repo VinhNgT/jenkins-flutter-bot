@@ -55,15 +55,6 @@ services:
     environment:
       STORAGE_BACKEND: log_only
 
-  # Expose bot port for local browser testing of the Telegram Mini App.
-  # Injects JFB_DEV_MODE to enable the backend's preview authentication
-  # bypass, allowing the tg-emulator.js frontend shim to authenticate
-  # with initData="preview" without a real Telegram client.
-  tg-jenkins-bot:
-    ports:
-      - "9090:9090"
-    environment:
-      JFB_DEV_MODE: "true"
 
 volumes:
   mock-agent-data:

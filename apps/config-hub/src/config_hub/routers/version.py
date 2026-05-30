@@ -7,7 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/api", tags=["meta"])
+router = APIRouter(prefix="/api/webapp-admin", tags=["meta"])
 
 
 @router.get("/version")

@@ -36,7 +36,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T | null> {
 export const API = {
   async getConfig(): Promise<ConfigData | null> {
     try {
-      return await request<ConfigData>('/api/config');
+      return await request<ConfigData>('/api/webapp-admin/config');
     } catch {
       return null;
     }
@@ -44,7 +44,7 @@ export const API = {
 
   async getSchema(): Promise<Schemas | null> {
     try {
-      return await request<Schemas>('/api/config/schema');
+      return await request<Schemas>('/api/webapp-admin/config/schema');
     } catch {
       return null;
     }
@@ -55,7 +55,7 @@ export const API = {
     data: Record<string, unknown>,
   ): Promise<{ status: string } | null> {
     try {
-      return await request<{ status: string }>(`/api/config/${scope}`, {
+      return await request<{ status: string }>(`/api/webapp-admin/config/${scope}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -67,7 +67,7 @@ export const API = {
 
   async getServiceStatus(): Promise<ServiceStatuses | null> {
     try {
-      return await request<ServiceStatuses>('/api/services/status');
+      return await request<ServiceStatuses>('/api/webapp-admin/services/status');
     } catch {
       return null;
     }
@@ -79,7 +79,7 @@ export const API = {
   ): Promise<{ status: string } | null> {
     try {
       return await request<{ status: string }>(
-        `/api/services/${service}/${action}`,
+        `/api/webapp-admin/services/${service}/${action}`,
         { method: 'POST' },
       );
     } catch {
@@ -92,7 +92,7 @@ export const API = {
   ): Promise<{ lines: string[] } | null> {
     try {
       return await request<{ lines: string[] }>(
-        `/api/services/${service}/logs`,
+        `/api/webapp-admin/services/${service}/logs`,
       );
     } catch {
       return null;
@@ -101,7 +101,7 @@ export const API = {
 
   async getDriveStatus(): Promise<DriveStatus | null> {
     try {
-      return await request<DriveStatus>('/api/drive/status');
+      return await request<DriveStatus>('/api/webapp-admin/drive/status');
     } catch {
       return null;
     }
@@ -109,7 +109,7 @@ export const API = {
 
   async startDriveConnect(): Promise<{ auth_url: string } | null> {
     try {
-      return await request<{ auth_url: string }>('/api/drive/connect/start', {
+      return await request<{ auth_url: string }>('/api/webapp-admin/drive/connect/start', {
         method: 'POST',
       });
     } catch {
@@ -119,7 +119,7 @@ export const API = {
 
   async disconnectDrive(): Promise<{ status: string } | null> {
     try {
-      return await request<{ status: string }>('/api/drive/token', {
+      return await request<{ status: string }>('/api/webapp-admin/drive/token', {
         method: 'DELETE',
       });
     } catch {
@@ -132,7 +132,7 @@ export const API = {
   ): Promise<JenkinsfileResult | null> {
     try {
       const params = new URLSearchParams(opts).toString();
-      const url = params ? `/api/jenkinsfile?${params}` : '/api/jenkinsfile';
+      const url = params ? `/api/webapp-admin/jenkinsfile?${params}` : '/api/webapp-admin/jenkinsfile';
       return await request<JenkinsfileResult>(url);
     } catch {
       return null;
@@ -141,7 +141,7 @@ export const API = {
 
   async getExportEnv(): Promise<ExportEnvResult | null> {
     try {
-      return await request<ExportEnvResult>('/api/export/env');
+      return await request<ExportEnvResult>('/api/webapp-admin/export/env');
     } catch {
       return null;
     }
@@ -149,7 +149,7 @@ export const API = {
 
   async downloadTarball(): Promise<boolean> {
     try {
-      const res = await fetch('/api/export/tarball');
+      const res = await fetch('/api/webapp-admin/export/tarball');
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(
@@ -175,7 +175,7 @@ export const API = {
     try {
       const form = new FormData();
       form.append('file', file);
-      return await request<ImportResult>('/api/import/tarball', {
+      return await request<ImportResult>('/api/webapp-admin/import/tarball', {
         method: 'POST',
         body: form,
       });
@@ -187,7 +187,7 @@ export const API = {
   // ─── VPN ─────────────────────────────────────────────────────
   async vpnStatus(): Promise<VpnStatus | null> {
     try {
-      return await request<VpnStatus>('/api/services/agent/vpn/status');
+      return await request<VpnStatus>('/api/webapp-admin/services/agent/vpn/status');
     } catch {
       return null;
     }
@@ -197,7 +197,7 @@ export const API = {
     try {
       const form = new FormData();
       form.append('file', file);
-      return await request<{ status: string }>('/api/services/agent/vpn/upload', {
+      return await request<{ status: string }>('/api/webapp-admin/services/agent/vpn/upload', {
         method: 'POST',
         body: form,
       });
@@ -208,7 +208,7 @@ export const API = {
 
   async vpnDelete(): Promise<{ status: string } | null> {
     try {
-      return await request<{ status: string }>('/api/services/agent/vpn/upload', {
+      return await request<{ status: string }>('/api/webapp-admin/services/agent/vpn/upload', {
         method: 'DELETE',
       });
     } catch {
@@ -218,7 +218,7 @@ export const API = {
 
   async vpnConnect(): Promise<{ status: string } | null> {
     try {
-      return await request<{ status: string }>('/api/services/agent/vpn/connect', {
+      return await request<{ status: string }>('/api/webapp-admin/services/agent/vpn/connect', {
         method: 'POST',
       });
     } catch {
@@ -228,7 +228,7 @@ export const API = {
 
   async vpnDisconnect(): Promise<{ status: string } | null> {
     try {
-      return await request<{ status: string }>('/api/services/agent/vpn/disconnect', {
+      return await request<{ status: string }>('/api/webapp-admin/services/agent/vpn/disconnect', {
         method: 'POST',
       });
     } catch {

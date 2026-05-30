@@ -12,7 +12,7 @@ from ..dependencies import ManagerDep
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/services", tags=["services"])
+router = APIRouter(prefix="/api/webapp-admin/services", tags=["services"])
 
 _MANAGED_SERVICES = {"bot", "agent", "file_manager", "builds"}
 

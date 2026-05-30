@@ -8,7 +8,7 @@ from fastapi import APIRouter
 
 from ..dependencies import ManagerDep
 
-router = APIRouter(prefix="/api", tags=["jenkinsfile"])
+router = APIRouter(prefix="/api/webapp-admin", tags=["jenkinsfile"])
 
 
 @router.get("/jenkinsfile")

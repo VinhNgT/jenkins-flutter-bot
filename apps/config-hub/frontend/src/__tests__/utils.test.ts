@@ -14,19 +14,19 @@ describe('healthState', () => {
   });
 
   it('returns "needs-config" when not configured', () => {
-    expect(healthState({ configured: false, running: false })).toBe('needs-config');
+    expect(healthState({ configured: false, running: false, last_error: 'none', config_error: null })).toBe('needs-config');
   });
 
   it('returns "needs-config" when configured=false even if running=true', () => {
     // Edge case: shouldn't happen in practice, but configured takes priority
-    expect(healthState({ configured: false, running: true })).toBe('needs-config');
+    expect(healthState({ configured: false, running: true, last_error: 'none', config_error: null })).toBe('needs-config');
   });
 
   it('returns "stopped" when configured but not running', () => {
-    expect(healthState({ configured: true, running: false })).toBe('stopped');
+    expect(healthState({ configured: true, running: false, last_error: 'none', config_error: null })).toBe('stopped');
   });
 
   it('returns "running" when configured and running', () => {
-    expect(healthState({ configured: true, running: true })).toBe('running');
+    expect(healthState({ configured: true, running: true, last_error: 'none', config_error: null })).toBe('running');
   });
 });

@@ -30,11 +30,11 @@ For the authoritative volume list, see `docker-compose.yml`. Key design decision
 All services share a single Docker bridge network. Only two ports are exposed to the host:
 
 - **`jenkins:8080`** — Jenkins web UI (for local development)
-- **`gateway:9000`** — Caddy Ingress Gateway's local proxy port, which routes traffic securely to `config-hub:9000`
+- **`gateway:80`** — Caddy Ingress Gateway (mapped to `8880:80` in dev since port 80 requires root)
 
-Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), build-manager (`9010`), and config-hub (`9000`) ports are internal only. Config-hub is never exposed to the host directly.
+Bot (`tg-jenkins-bot` on `9090`), agent control (`agent-control` on `9091`), file-manager (`9092`), build-manager (`9010`), and config-hub (`9000`) ports are internal only. No service is exposed to the host directly except through the gateway.
 
-Additionally, the **Caddy Ingress Gateway** (`gateway` service) acts as the secure routing perimeter for **both** local administrative traffic (via `:9000` on the host) and public Web App traffic (via internal port `:80`). It proxies public Telegram Web App paths (`/webapp*` and `/api/webapp*`) to `tg-jenkins-bot:9090` while blocking all other public traffic. Rate-limiting is applied to public endpoints to prevent abuse. A **Cloudflare Tunnel** (`cloudflared` service) interfaces directly with `gateway:80` to safely expose the Web App endpoints over HTTPS.
+The **Caddy Ingress Gateway** (`gateway` service) provides a unified routing perimeter on a single port. Path-based routing separates the two web apps: `/webapp*` routes to the bot, `/webapp-admin*` routes to config-hub. The gateway strips `Authorization` headers from non-LAN IPs on admin paths, preventing Basic Auth from working over the public internet while preserving Telegram `initData` auth (which uses a different header). Rate-limiting is applied to public endpoints. A **Cloudflare Tunnel** (`cloudflared` service) interfaces directly with `gateway:80` to expose endpoints over HTTPS.
 
 Do not expose bot, agent-control, file-manager, or build-manager ports to the host.
 

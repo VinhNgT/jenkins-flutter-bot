@@ -347,7 +347,7 @@ Now enter these values in config-hub:
    | Field              | Value                                   |
    | ------------------ | --------------------------------------- |
    | Telegram Bot Token | The token from BotFather                |
-   | Allowed Chat IDs   | Your chat ID(s), comma-separated        |
+   | Allowed Chat IDs   | Your chat ID(s), comma-separated (optional, defaults to empty/unrestricted) |
    | Web App URL        | The public HTTPS URL where your bot service is accessible (e.g., `https://your-domain/webapp/`) |
 
    You can also set these optional fields:
@@ -443,6 +443,14 @@ Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http:/
 7. The popup auto-closes on success and the dashboard shows "Connected"
 
 > **Note:** Each APK upload gets its own unique, unguessable download link. The Drive folder itself stays private — the shared link only grants access to the specific file, not the entire build history.
+
+> [!TIP]
+> **Alternative Storage Backends (Dev/Testing):**
+> If you do not want to set up Google Cloud/Google Drive OAuth credentials for local development or rapid testing, the file-manager service supports two alternative backends:
+> - **`ephemeral`**: An in-memory storage backend. Uploaded APKs are stored in the service's memory and are served via an internal download endpoint. No external accounts or configurations are required.
+> - **`log_only`**: A minimal dummy backend that logs upload and delete operations to the console and returns mock URLs without storing any files. Extremely useful for lightweight local testing or offline development.
+>
+> To use these, set the `STORAGE_BACKEND` environment variable in `infra/env/file-manager.env` to either `ephemeral` or `log_only` and restart the file-manager service.
 
 ---
 

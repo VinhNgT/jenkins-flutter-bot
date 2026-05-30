@@ -1,7 +1,7 @@
 # mock-jenkins
 
 Development-only mock that replaces the real Jenkins controller and flutter-agent
-in the `docker-compose.mock.yml` overlay.
+in the `infra/mock/docker-compose.yml` overlay.
 
 ## What It Does
 

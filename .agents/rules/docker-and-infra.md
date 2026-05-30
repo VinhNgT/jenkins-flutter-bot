@@ -116,7 +116,7 @@ A single container running two FastAPI servers:
 
 The mock agent-control server uses the **real** `AgentSettings` schema from `agent-control` (not a hardcoded copy), so the schema served to config-hub is always in sync. Config is persisted to the `mock-agent-data` volume. Start/restart validate the config and fail if the agent secret is missing — matching real agent-control behaviour.
 
-Exists only in `docker-compose.mock.yml`. Never appears in prod or dev compose files.
+Exists only in `infra/mock/docker-compose.yml`. Never appears in prod or dev compose files.
 
 ---
 

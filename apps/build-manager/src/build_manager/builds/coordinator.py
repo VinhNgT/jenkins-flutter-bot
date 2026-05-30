@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -24,7 +23,7 @@ import httpx
 
 from config_core import get_service_auth_headers
 
-from .jenkins_client import JenkinsBuild, JenkinsClient, JenkinsTriggerError
+from .jenkins_client import JenkinsBuild, JenkinsClient
 from .state import BuildTracker
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,6 @@ class BuildCoordinator:
         artifact_pattern: str = "*.apk",
         estimated_duration_ms: int | None = None,
         http_client: httpx.AsyncClient | None = None,
-        clock: Callable[[], float] = time.time,
     ) -> None:
         self._data_dir = data_dir
         self._jenkins = jenkins
@@ -68,9 +66,8 @@ class BuildCoordinator:
         self._poll_interval = poll_interval
         self._artifact_pattern = artifact_pattern
         self._estimated_duration_ms = estimated_duration_ms
-        self._clock = clock
         self._tracker = BuildTracker(
-            data_dir, clock=clock,
+            data_dir,
         )
         self._http = http_client or httpx.AsyncClient(
             timeout=30.0, headers=get_service_auth_headers()
@@ -251,13 +248,13 @@ class BuildCoordinator:
         5. If Jenkins is unreachable → logs warning and retries next interval
         """
         timeout_seconds = self._build_timeout * 60
-        start_time = self._clock()
+        start_time = time.time()
 
         try:
             while True:
                 await asyncio.sleep(self._poll_interval)
 
-                elapsed = self._clock() - start_time
+                elapsed = time.time() - start_time
 
                 # Check timeout
                 if timeout_seconds > 0 and elapsed >= timeout_seconds:
@@ -310,7 +307,7 @@ class BuildCoordinator:
         if pending is None:
             return  # Already consumed by cancellation
 
-        now = self._clock()
+        now = time.time()
         artifact_data: tuple[str, bytes] | None = None
 
         # Jenkins uses uppercase (SUCCESS/FAILURE/ABORTED), we use lowercase
@@ -403,7 +400,7 @@ class BuildCoordinator:
         if pending is None:
             return  # Already consumed by a webhook or cancellation
 
-        now = self._clock()
+        now = time.time()
         logger.warning(
             "Build timed out: request_id=%s branch=%s (%.0fs elapsed)",
             request_id,

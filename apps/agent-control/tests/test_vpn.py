@@ -78,9 +78,9 @@ async def test_vpn_manager_disconnect():
     assert vpn._auto_disconnect_task is None
 
 
-def test_vpn_endpoints(client):
+async def test_vpn_endpoints(client):
     # 1. Check status initially (not uploaded)
-    resp = client.get("/control/vpn/status")
+    resp = await client.get("/control/vpn/status")
     assert resp.status_code == 200
     data = resp.json()
     assert data["uploaded"] is False
@@ -88,7 +88,7 @@ def test_vpn_endpoints(client):
 
     # 2. Upload file
     file_content = b"client-config-data"
-    resp = client.post(
+    resp = await client.post(
         "/control/vpn/upload",
         files={"file": ("client.ovpn", file_content, "application/x-openvpn")},
     )
@@ -96,7 +96,7 @@ def test_vpn_endpoints(client):
     assert resp.json()["status"] == "uploaded"
 
     # 3. Check status again (should be uploaded)
-    resp = client.get("/control/vpn/status")
+    resp = await client.get("/control/vpn/status")
     assert resp.status_code == 200
     data = resp.json()
     assert data["uploaded"] is True
@@ -104,17 +104,17 @@ def test_vpn_endpoints(client):
 
     # 4. Connect (fails with 500 or 400 because openvpn is not installed in local test environment,
     # but we can verify it reaches start connection logic)
-    resp = client.post("/control/vpn/connect")
+    resp = await client.post("/control/vpn/connect")
     # File exists but openvpn binary missing/fails on dev machine -> 500 or RuntimeError
     assert resp.status_code in (400, 500)
 
     # 5. Delete file
-    resp = client.delete("/control/vpn/upload")
+    resp = await client.delete("/control/vpn/upload")
     assert resp.status_code == 200
     assert resp.json()["status"] == "deleted"
 
     # 6. Check status again (should be False)
-    resp = client.get("/control/vpn/status")
+    resp = await client.get("/control/vpn/status")
     assert resp.status_code == 200
     assert resp.json()["uploaded"] is False
 

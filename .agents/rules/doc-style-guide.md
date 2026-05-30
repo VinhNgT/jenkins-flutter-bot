@@ -84,6 +84,7 @@ Each rule file covers a single concern domain:
 | `web-conventions.md` | Frontend stack, project structure, build pipeline, state management |
 | `config-and-secrets.md` | Schema system, precedence chain, secret masking, inter-service auth |
 | `docker-and-infra.md` | Containers, volumes, networking, CI/CD pipeline |
+| `testing-conventions.md` | Unified testing methodology for backend (pytest) and frontend (Vitest) |
 | `communication-flows.md` | Service-to-service protocols, OAuth, build flow |
 | `doc-style-guide.md` | Meta-guide — how to write and maintain rule files |
 
@@ -151,5 +152,6 @@ When making significant architectural changes, review rule files for staleness:
 4. **Config scopes** — did you rename or add a config scope? Update `config-and-secrets.md`.
 5. **Communication patterns** — did you add a new service-to-service flow? Update `communication-flows.md`.
 6. **Hard constraints** — did you establish a new boundary? Add it to `general-guide.md`.
+7. **Testing patterns** — did you change test infrastructure, fixtures, or methodology? Update `testing-conventions.md`.
 
 The rule files are the **last thing updated** in an architectural change — after the code is working and verified.

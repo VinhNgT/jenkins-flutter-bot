@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import time_machine
+
 from tg_jenkins_bot.bot.store import ActiveBuildStore
 
 
+@time_machine.travel(1000.0, tick=False)
 def test_active_build_store_flow() -> None:
     """Test standard register, list, lookup, and consume flow."""
-    clock_val = 1000.0
-    store = ActiveBuildStore(clock=lambda: clock_val)
+    store = ActiveBuildStore()
 
     # 1. Initially empty
     assert len(store.list_active()) == 0

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -30,10 +29,8 @@ def make_mock_bot() -> AsyncMock:
 
 
 @pytest.fixture(autouse=True)
-def isolate_config(tmp_path):
-    os.environ["JFB_DATA_DIR"] = str(tmp_path)
-    yield tmp_path
-    os.environ.pop("JFB_DATA_DIR", None)
+def isolate_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("JFB_DATA_DIR", str(tmp_path))
 
 
 def _make_config():
@@ -54,7 +51,6 @@ def _make_ctx(bot=None):
         config=_make_config(),
         build_client=AsyncMock(),
         bot=bot,
-        clock=lambda: 1_700_000_000.0,
     )
     return ctx
 

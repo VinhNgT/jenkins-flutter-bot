@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 
 
@@ -30,9 +29,8 @@ class ActiveBuildStore:
     Just register when a build starts, consume when it ends.
     """
 
-    def __init__(self, *, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self) -> None:
         self._builds: dict[str, ActiveBuild] = {}
-        self._clock = clock
         self._listeners: set[asyncio.Event] = set()
 
     def add_listener(self, event: asyncio.Event) -> None:
@@ -66,7 +64,7 @@ class ActiveBuildStore:
             ref=ref,
             label=label,
             request_id=request_id,
-            triggered_at=self._clock(),
+            triggered_at=time.time(),
             triggered_by=triggered_by,
             triggered_by_id=triggered_by_id,
             notify=notify,

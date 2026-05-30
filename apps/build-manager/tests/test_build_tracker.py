@@ -1,8 +1,11 @@
 """Tests for BuildTracker — pending builds, persistence, and edge cases."""
 
+from __future__ import annotations
+
 import json
 
 import pytest
+import time_machine
 
 from build_manager.builds.state import BuildTracker, PendingBuild
 
@@ -10,17 +13,14 @@ from build_manager.builds.state import BuildTracker, PendingBuild
 @pytest.fixture
 def tracker(tmp_path):
     """Create a fresh BuildTracker."""
-    return BuildTracker(tmp_path, clock=lambda: 1_700_000_000.0)
+    return BuildTracker(tmp_path)
 
 
 @pytest.fixture
 def tracker_factory(tmp_path):
     """Factory to create trackers sharing the same data directory."""
-    def _make(clock=None):
-        return BuildTracker(
-            tmp_path,
-            clock=clock or (lambda: 1_700_000_000.0),
-        )
+    def _make():
+        return BuildTracker(tmp_path)
     return _make
 
 
@@ -133,9 +133,9 @@ class TestMisc:
         assert d["pending_count"] == 1
         assert "req1" in d["pending"]
 
-    def test_clock_injection(self, tmp_path):
-        """Verify the injected clock is used for triggered_at."""
-        clock = lambda: 999.0  # noqa: E731
-        tracker = BuildTracker(tmp_path, clock=clock)
+    @time_machine.travel(999.0, tick=False)
+    def test_time_machine_controls_triggered_at(self, tmp_path):
+        """Verify time-machine freezes time.time() used for triggered_at."""
+        tracker = BuildTracker(tmp_path)
         pending = tracker.add_pending("req1", "main")
         assert pending.triggered_at == 999.0

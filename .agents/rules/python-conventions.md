@@ -128,21 +128,6 @@ Bot Telegram API handlers, Drive OAuth flows, and Jenkins client calls are **ter
 
 ---
 
-## Testing Conventions
+## Testing
 
-The repository uses **pytest** for both unit and integration tests across all workspace packages, configured globally in the root `pyproject.toml`.
-
-### Shared Testing Infrastructure (`conftest.py`)
-
-A centralized, root-level `conftest.py` provides shared testing utilities:
-
-1. **Domain Object Factories** — Plain helper functions (not fixtures) to quickly instantiate mock data with realistic defaults. Use them inline with overrides:
-   - `pending_build_factory(**overrides)` for build-manager builds
-   - `completed_build_factory(**overrides)` for completed builds
-   - `jenkins_build_factory(**overrides)` for Jenkins client responses
-2. **HTTP Mocking** — The `mock_http_client` fixture registers custom transports to mock HTTP calls to external APIs without leaving the process boundary.
-3. **Telegram Test Helpers** — Full-stack mock fixtures to test Telegram polling dispatch loops safely:
-   - `make_mock_bot()` generates an `AsyncMock` pre-configured with the required attributes of `telegram.Bot` to satisfy PTB internals.
-   - `make_telegram_update(...)` and `make_callback_update(...)` construct realistic, bot-attributed `telegram.Update` payloads so command and button callbacks can be integration-tested natively.
-   - `make_handler_context(...)` mocks standard context objects to test standalone callback handlers in isolation.
-   - `make_test_application(...)` builds fully-wired `Application` instances bound to a mock bot to allow end-to-end integration testing via `await app.process_update()`.
+For the full testing methodology — pytest patterns, Vitest setup, shared infrastructure, and hard constraints — see `testing-conventions.md`.

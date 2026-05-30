@@ -15,6 +15,22 @@ from typing import Any
 import httpx
 import pytest
 
+from config_core.redact import _redactor
+
+
+# ── Global Cleanup Fixtures ─────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _reset_redactor():
+    """Reset the process-global secret redactor between tests.
+
+    Prevents secret values registered in one test from leaking into
+    subsequent tests and causing false-positive redaction.
+    """
+    yield
+    _redactor.clear()
+
 
 # ── Domain Object Factories ─────────────────────────────────────────
 
@@ -34,22 +50,6 @@ def pending_build_factory(**overrides: Any) -> Any:
     return PendingBuild(**defaults)
 
 
-def completed_build_factory(**overrides: Any) -> Any:
-    """Create a ``CompletedBuild`` with sensible defaults."""
-    from build_manager.builds.state import CompletedBuild
-
-    defaults: dict[str, Any] = {
-        "request_id": "abc123def456",
-        "branch": "main",
-        "commit_hash": "a" * 40,
-        "result": "success",
-        "triggered_at": 1_700_000_000.0,
-        "completed_at": 1_700_000_120.0,
-        "download_url": "https://example.com/build.apk",
-        "file_id": "drive_file_id_123",
-    }
-    defaults.update(overrides)
-    return CompletedBuild(**defaults)
 
 
 def jenkins_build_factory(**overrides: Any) -> Any:
@@ -90,7 +90,7 @@ def tracked_message_factory(**overrides: Any) -> Any:
 
 
 @pytest.fixture
-def mock_http_client():
+async def mock_http_client():
     """Create an ``httpx.AsyncClient`` backed by ``MockTransport``.
 
     Usage::
@@ -110,13 +110,8 @@ def mock_http_client():
 
     yield _factory
 
-    import asyncio
-
     for c in clients:
-        try:
-            asyncio.get_event_loop().run_until_complete(c.aclose())
-        except Exception:
-            pass
+        await c.aclose()
 
 
 # ── Telegram Test Helpers ────────────────────────────────────────────
@@ -267,8 +262,6 @@ async def make_test_application(bot_context: Any, *, bot: Any = None) -> Any:
         bot_context.config,
         bot_context.build_client,
         bot,
-        clock=bot_context._clock,
     )
     await application.initialize()
     return application
-

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
 from typing import Any
 
 from config_core import format_validation_error
@@ -28,11 +27,10 @@ class StartupError(Exception):
 class BuildManager:
     """Manages the build coordinator lifecycle and configuration."""
 
-    def __init__(self, *, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self) -> None:
         self._coordinator: BuildCoordinator | None = None
         self._last_error: str | None = None
         self._started_at: float | None = None
-        self._clock = clock
 
     @property
     def coordinator(self) -> BuildCoordinator:
@@ -73,12 +71,11 @@ class BuildManager:
             poll_interval=config.poll_interval,
             artifact_pattern=config.artifact_pattern,
             estimated_duration_ms=estimated_duration_ms,
-            clock=self._clock,
         )
 
         self._coordinator = coord
         self._last_error = None
-        self._started_at = self._clock()
+        self._started_at = time.time()
         logger.info("Build manager started")
 
     async def stop(self) -> None:

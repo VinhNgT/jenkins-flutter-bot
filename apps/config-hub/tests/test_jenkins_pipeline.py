@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
+from config_hub.config import HubBootstrap
 from config_hub.jenkins_pipeline import generate_jenkinsfile
+from config_hub.manager import ConfigHubManager
 
 
 def test_generate_jenkinsfile_default_optimizations():
@@ -70,12 +70,8 @@ def test_generate_jenkinsfile_private_repo_shallow_clone():
     assert "CloneOption" not in jenkinsfile_without
 
 
-@pytest.mark.asyncio
 async def test_manager_get_jenkinsfile_explicit_params():
     """Verify ConfigHubManager.get_jenkinsfile works with explicit params and has no warnings."""
-    from config_hub.manager import ConfigHubManager
-    from config_hub.config import HubBootstrap
-
     config = HubBootstrap(
         bot_control_url=None,
         agent_control_url=None,
@@ -101,10 +97,9 @@ async def test_manager_get_jenkinsfile_explicit_params():
     assert not res["warnings"]  # should be empty
 
 
-def test_router_get_jenkinsfile_api(client):
+async def test_router_get_jenkinsfile_api(client):
     """Verify /api/jenkinsfile endpoint handles custom query parameters and passes them through."""
-    # When we pass explicit parameters through the client:
-    response = client.get(
+    response = await client.get(
         "/api/jenkinsfile",
         params={
             "repo_url": "https://github.com/test-user/test-project.git",
@@ -121,4 +116,3 @@ def test_router_get_jenkinsfile_api(client):
     assert "test-creds-id" in data["script_private"]
     assert "cleanWs()" not in data["script_public"]
     assert not data["warnings"]
-

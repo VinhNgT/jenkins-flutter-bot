@@ -321,7 +321,21 @@ class TestCheckConnection:
             return httpx.Response(200, json={"name": "test"})
 
         client = _jenkins_client(handler)
-        assert await client.check_connection() is True
+        reachable, duration = await client.check_connection()
+        assert reachable is True
+        assert duration is None
+        await client.close()
+
+    async def test_ok_with_estimated_duration(self):
+        def handler(request: httpx.Request):
+            return httpx.Response(200, json={
+                "name": "test", "estimatedDuration": 120_000,
+            })
+
+        client = _jenkins_client(handler)
+        reachable, duration = await client.check_connection()
+        assert reachable is True
+        assert duration == 120_000
         await client.close()
 
     async def test_failure(self):
@@ -329,5 +343,17 @@ class TestCheckConnection:
             return httpx.Response(403, text="Forbidden")
 
         client = _jenkins_client(handler)
-        assert await client.check_connection() is False
+        reachable, duration = await client.check_connection()
+        assert reachable is False
+        assert duration is None
+        await client.close()
+
+    async def test_network_error(self):
+        def handler(request: httpx.Request):
+            raise httpx.ConnectError("Connection refused")
+
+        client = _jenkins_client(handler)
+        reachable, duration = await client.check_connection()
+        assert reachable is False
+        assert duration is None
         await client.close()

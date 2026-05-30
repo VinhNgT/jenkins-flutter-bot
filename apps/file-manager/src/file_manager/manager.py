@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +62,6 @@ class StorageManager:
         self,
         *,
         backend: StorageBackend | None = None,
-        clock: Callable[[], float] = time.time,
     ) -> None:
         self._config: StorageSettings | None = None
         self._backend: StorageBackend | None = backend
@@ -71,7 +69,6 @@ class StorageManager:
         self._build_log: BuildLog | None = None
         self._last_error: str | None = None
         self._started_at: float | None = None
-        self._clock = clock
         self._backend_type = _resolve_backend_type()
 
     @property
@@ -153,7 +150,7 @@ class StorageManager:
             await self._reconcile_drive_index(self._backend, self._build_log)
 
         self._last_error = None
-        self._started_at = self._clock()
+        self._started_at = time.time()
         logger.info("StorageManager started (backend=%s)", self._backend_type)
 
     async def stop(self) -> None:

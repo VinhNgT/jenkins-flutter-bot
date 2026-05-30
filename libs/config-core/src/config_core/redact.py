@@ -41,6 +41,15 @@ class SecretRedactor:
         self._secrets: set[str] = set()
         self._pattern: re.Pattern[str] | None = None
 
+    def clear(self) -> None:
+        """Reset all registered secrets and the compiled pattern.
+
+        Used by test fixtures to prevent secret accumulation across tests
+        in the process-global singleton.
+        """
+        self._secrets.clear()
+        self._pattern = None
+
     def register(self, value: str) -> None:
         """Add a secret value to the redaction set.
 

@@ -1,7 +1,11 @@
 """Tests for BotContext — active builds, build results, consume_building."""
 
+from __future__ import annotations
+
 from unittest.mock import AsyncMock
+
 import pytest
+import time_machine
 
 from telegram import Bot
 
@@ -55,15 +59,11 @@ def bot():
 
 @pytest.fixture
 def ctx(bot):
-    clock_time = [1_700_000_000.0]
-    context = BotContext(
+    return BotContext(
         config=_make_config(),
         build_client=_make_build_client(),
         bot=bot,
-        clock=lambda: clock_time[0],
     )
-    context._clock_ref = clock_time
-    return context
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +72,7 @@ def ctx(bot):
 
 
 class TestBuildQueries:
+    @time_machine.travel(1_700_000_000.0, tick=False)
     def test_find_building_for_branch(self, ctx):
         ctx.store.register(
             request_id="req-123",
@@ -83,6 +84,7 @@ class TestBuildQueries:
         assert ctx.store.find_by_branch("main") is not None
         assert ctx.store.find_by_branch("dev") is None
 
+    @time_machine.travel(1_700_000_000.0, tick=False)
     def test_list_building(self, ctx):
         ctx.store.register(
             request_id="req-1",
@@ -107,6 +109,7 @@ class TestBuildQueries:
 
 
 class TestConsumeBuilding:
+    @time_machine.travel(1_700_000_000.0, tick=False)
     def test_first_consumer_gets_it(self, ctx):
         ctx.store.register(
             request_id="abc123",
@@ -119,6 +122,7 @@ class TestConsumeBuilding:
         assert result is not None
         assert result.request_id == "abc123"
 
+    @time_machine.travel(1_700_000_000.0, tick=False)
     def test_second_consumer_gets_none(self, ctx):
         ctx.store.register(
             request_id="abc123",
@@ -130,6 +134,7 @@ class TestConsumeBuilding:
         ctx.consume_building("abc123")
         assert ctx.consume_building("abc123") is None
 
+    @time_machine.travel(1_700_000_000.0, tick=False)
     def test_unknown_request_id_returns_none(self, ctx):
         assert ctx.consume_building("nonexistent") is None
 
@@ -140,6 +145,7 @@ class TestConsumeBuilding:
 
 
 class TestBuildResults:
+    @time_machine.travel(1_700_000_120.0, tick=False)
     async def test_on_build_success_sends_notification(self, ctx, bot):
         build = ActiveBuild(
             chat_id=100,
@@ -150,7 +156,6 @@ class TestBuildResults:
             triggered_by="Alice",
             triggered_by_id=67890,
         )
-        ctx._clock_ref[0] = 1_700_000_120.0  # 2 minutes later
         await ctx.on_build_success(
             build,
             {
@@ -174,6 +179,7 @@ class TestBuildResults:
         reply_markup = call_args.kwargs.get("reply_markup")
         assert reply_markup is not None
 
+    @time_machine.travel(1_700_000_000.0, tick=False)
     async def test_on_build_success_no_download_url(self, ctx, bot):
         build = ActiveBuild(
             chat_id=100,
@@ -189,6 +195,7 @@ class TestBuildResults:
         call_args = bot.send_message.call_args
         assert call_args.kwargs.get("reply_markup") is None
 
+    @time_machine.travel(1_700_000_060.0, tick=False)
     async def test_on_build_failure_sends_notification(self, ctx, bot):
         build = ActiveBuild(
             chat_id=100,
@@ -199,7 +206,6 @@ class TestBuildResults:
             triggered_by="Alice",
             triggered_by_id=67890,
         )
-        ctx._clock_ref[0] = 1_700_000_060.0  # 1 minute later
         await ctx.on_build_failure(build, {"commit_hash": "abcdef123"})
 
         bot.send_message.assert_awaited_once()
@@ -213,6 +219,7 @@ class TestBuildResults:
         assert "Triggered by: Alice" in text
         assert "Contact your admin" in text
 
+    @time_machine.travel(1_700_000_120.0, tick=False)
     async def test_on_build_timeout_sends_notification(self, ctx, bot):
         build = ActiveBuild(
             chat_id=100,
@@ -223,7 +230,6 @@ class TestBuildResults:
             triggered_by="Alice",
             triggered_by_id=67890,
         )
-        ctx._clock_ref[0] = 1_700_000_120.0  # 2 minutes later
         await ctx.on_build_timeout(build, {})
 
         bot.send_message.assert_awaited_once()
@@ -293,17 +299,16 @@ class TestBuildResults:
 
 
 class TestFormatElapsed:
+    @time_machine.travel(1_700_000_030.0, tick=False)
     def test_just_now(self, ctx):
-        ctx._clock_ref[0] = 1_700_000_030.0
-        msg_time = 1_700_000_000.0
-        assert ctx.format_elapsed(msg_time) == "just now"
+        assert ctx.format_elapsed(1_700_000_000.0) == "just now"
 
+    @time_machine.travel(1_700_000_060.0, tick=False)
     def test_one_minute(self, ctx):
-        ctx._clock_ref[0] = 1_700_000_060.0
         assert ctx.format_elapsed(1_700_000_000.0) == "1 min ago"
 
+    @time_machine.travel(1_700_000_120.0, tick=False)
     def test_multiple_minutes(self, ctx):
-        ctx._clock_ref[0] = 1_700_000_120.0
         assert ctx.format_elapsed(1_700_000_000.0) == "2 min ago"
 
 

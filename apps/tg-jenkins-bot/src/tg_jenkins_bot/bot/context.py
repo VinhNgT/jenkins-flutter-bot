@@ -9,7 +9,6 @@ from __future__ import annotations
 import html
 import logging
 import time
-from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -60,14 +59,11 @@ class BotContext:
         config: BotSettings,
         build_client: BuildClient,
         bot: BotLike | None,
-        *,
-        clock: Callable[[], float] = time.time,
     ) -> None:
         self.config = config
         self.build_client = build_client
         self.bot = bot
-        self._clock = clock
-        self.store = ActiveBuildStore(clock=clock)
+        self.store = ActiveBuildStore()
 
     # ------------------------------------------------------------------
     # Time formatting
@@ -75,7 +71,7 @@ class BotContext:
 
     def format_elapsed(self, ts: float) -> str:
         """Format elapsed time since *ts* as a human-readable string."""
-        delta = int(self._clock() - ts)
+        delta = int(time.time() - ts)
         if delta < 60:
             return "just now"
         minutes = delta // 60
@@ -114,7 +110,7 @@ class BotContext:
         """Handle successful build — notify user with download link."""
         if not self.bot or not build.notify:
             return
-        duration = _format_duration(build.triggered_at, self._clock())
+        duration = _format_duration(build.triggered_at, time.time())
         download_url = result.get("download_url", "")
         build_number = result.get("build_number", 0)
         app_name = _escape(self.config.app_name)
@@ -154,7 +150,7 @@ class BotContext:
             return
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
-        duration = _format_duration(build.triggered_at, self._clock())
+        duration = _format_duration(build.triggered_at, time.time())
 
         lines = [f"❌ <b>{app_name} {label} build failed</b>", ""]
         lines.append(f"📦 Branch: <code>{_escape(build.ref)}</code>")
@@ -176,7 +172,7 @@ class BotContext:
         app_name = _escape(self.config.app_name)
         label = _escape(build.label)
 
-        duration = _format_duration(build.triggered_at, self._clock())
+        duration = _format_duration(build.triggered_at, time.time())
         lines = [f"⏰ <b>{app_name} {label} build timed out</b>", ""]
         lines.append(f"📦 Branch: <code>{_escape(build.ref)}</code>")
         lines.append(f"⏱ Waited: {duration}")

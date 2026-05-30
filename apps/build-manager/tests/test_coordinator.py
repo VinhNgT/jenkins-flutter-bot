@@ -63,7 +63,6 @@ def coordinator(tmp_path):
     jenkins = _mock_jenkins()
     transport = httpx.MockTransport(_file_manager_handler)
     http = httpx.AsyncClient(transport=transport)
-    clock_time = [1_700_000_000.0]
 
     coord = BuildCoordinator(
         data_dir=tmp_path,
@@ -72,9 +71,7 @@ def coordinator(tmp_path):
         build_timeout=30,
         poll_interval=1,
         http_client=http,
-        clock=lambda: clock_time[0],
     )
-    coord._clock_ref = clock_time  # expose for test manipulation
     return coord
 
 

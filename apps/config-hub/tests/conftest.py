@@ -1,16 +1,17 @@
 """Config-hub test fixtures."""
 
-import os
+from __future__ import annotations
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from config_hub.config import HubBootstrap
+from config_hub.main import create_app
 from config_hub.manager import ConfigHubManager
 
 
 @pytest.fixture(autouse=True)
-def isolate_config(tmp_path):
+def isolate_config(tmp_path, monkeypatch):
     """Redirect all config I/O to a temp directory.
 
     Also sets JFB_DEV_MODE=true so the default no-auth-configured path
@@ -18,11 +19,8 @@ def isolate_config(tmp_path):
     503.  Individual tests that need production behaviour should override
     or unset JFB_DEV_MODE themselves.
     """
-    os.environ["JFB_DATA_DIR"] = str(tmp_path)
-    os.environ["JFB_DEV_MODE"] = "true"
-    yield
-    os.environ.pop("JFB_DATA_DIR", None)
-    os.environ.pop("JFB_DEV_MODE", None)
+    monkeypatch.setenv("JFB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("JFB_DEV_MODE", "true")
 
 
 @pytest.fixture
@@ -33,8 +31,6 @@ def app():
     with no real service URLs — all service calls will return
     'service URL not configured'.
     """
-    from config_hub.main import create_app
-
     test_config = HubBootstrap(
         bot_control_url=None,
         agent_control_url=None,
@@ -42,11 +38,14 @@ def app():
         build_manager_url=None,
     )
     test_app = create_app()
-    # Replace the manager with one using injected config
     test_app.state.manager = ConfigHubManager(config=test_config)
     return test_app
 
 
 @pytest.fixture
-def client(app):
-    return TestClient(app)
+async def client(app):
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as c:
+        yield c

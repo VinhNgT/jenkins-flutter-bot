@@ -122,3 +122,9 @@ Whenever interacting with the user or OS inside a Telegram Mini App, you MUST pr
 - **Storage**: Never use `localStorage` for cross-device persistence. Use `tg.CloudStorage` or `tg.DeviceStorage`.
 - **Buttons**: Use `tg.MainButton` and `tg.SecondaryButton` for primary actions instead of sticky HTML footers.
 - **Iconography**: Avoid text emojis (`✅`, `❌`). Use clean, monocolor vector icons (`lucide-preact`) to match Telegram's native aesthetic.
+
+---
+
+## Testing
+
+For the frontend testing methodology — Vitest setup, component testing, Telegram SDK mocking, and hook testing patterns — see `testing-conventions.md`.

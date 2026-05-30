@@ -23,8 +23,10 @@ import secrets
 
 from fastapi import HTTPException, Request, status
 
-# Read once at import time — the token never changes during a process lifetime.
-_TOKEN = os.environ.get("SERVICE_AUTH_TOKEN", "")
+
+def _get_token() -> str:
+    """Read the service auth token from the environment at call time."""
+    return os.environ.get("SERVICE_AUTH_TOKEN", "")
 
 
 async def verify_service_token(request: Request) -> None:
@@ -37,7 +39,8 @@ async def verify_service_token(request: Request) -> None:
       - Token configured, valid header → pass through
       - Token configured, missing/invalid → 401/403
     """
-    if not _TOKEN:
+    token = _get_token()
+    if not token:
         return  # Not configured — dev/test mode
 
     auth = request.headers.get("Authorization", "")
@@ -47,7 +50,7 @@ async def verify_service_token(request: Request) -> None:
             detail="Missing service token",
         )
 
-    if not secrets.compare_digest(auth[7:], _TOKEN):
+    if not secrets.compare_digest(auth[7:], token):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid service token",
@@ -61,6 +64,8 @@ def get_service_auth_headers() -> dict[str, str]:
     to authenticate when calling other services.  Returns an empty
     dict when no token is configured (dev/test mode).
     """
-    if not _TOKEN:
+    token = _get_token()
+    if not token:
         return {}
-    return {"Authorization": f"Bearer {_TOKEN}"}
+    return {"Authorization": f"Bearer {token}"}
+

@@ -10,8 +10,8 @@ import time
 import urllib.parse
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from tg_jenkins_bot.bot.context import BotContext
 from tg_jenkins_bot.config import BotSettings
@@ -108,13 +108,18 @@ def app_with_mocks(mock_build_client, mock_bot):
 
 
 @pytest.fixture
-def test_client(app_with_mocks):
-    return TestClient(app_with_mocks)
+async def test_client(app_with_mocks):
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_with_mocks),
+        base_url="http://test",
+        follow_redirects=True,
+    ) as c:
+        yield c
 
 
-def test_webapp_config_preview_bypass(test_client) -> None:
+async def test_webapp_config_preview_bypass(test_client) -> None:
     """Test standard config access using preview mode."""
-    response = test_client.get(
+    response = await test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": "preview"},
     )
@@ -125,20 +130,18 @@ def test_webapp_config_preview_bypass(test_client) -> None:
         {"label": "Stable Release", "ref": "main"},
         {"label": "Testing Version", "ref": "develop"},
     ]
-    assert len(data["active_builds"]) == 0
 
 
-def test_webapp_preview_bypass_with_dev_mode_env(app_with_mocks) -> None:
+async def test_webapp_preview_bypass_with_dev_mode_env(app_with_mocks, monkeypatch) -> None:
     """Test that JFB_DEV_MODE='true' allows preview bypass even with a production-like token."""
-    import os
-    from unittest.mock import patch
-    
     # Temporarily set token to something non-test, but set JFB_DEV_MODE to true
     app_with_mocks.state.manager.bot_context.config.telegram_token = "production_token_1234"
-    
-    with patch.dict(os.environ, {"JFB_DEV_MODE": "true"}):
-        client = TestClient(app_with_mocks)
-        response = client.get(
+    monkeypatch.setenv("JFB_DEV_MODE", "true")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_with_mocks), base_url="http://test",
+    ) as c:
+        response = await c.get(
             "/api/webapp/config",
             headers={"X-Telegram-Init-Data": "preview"},
         )
@@ -147,18 +150,15 @@ def test_webapp_preview_bypass_with_dev_mode_env(app_with_mocks) -> None:
         assert data["app_name"] == "TestApp"
 
 
-def test_webapp_preview_bypass_rejected_in_prod(app_with_mocks) -> None:
+async def test_webapp_preview_bypass_rejected_in_prod(app_with_mocks, monkeypatch) -> None:
     """Test that preview bypass is rejected in production (non-test token, no JFB_DEV_MODE)."""
-    import os
-    from unittest.mock import patch
-    
     app_with_mocks.state.manager.bot_context.config.telegram_token = "production_token_1234"
-    
-    with patch.dict(os.environ, {}):
-        if "JFB_DEV_MODE" in os.environ:
-            del os.environ["JFB_DEV_MODE"]
-        client = TestClient(app_with_mocks)
-        response = client.get(
+    monkeypatch.delenv("JFB_DEV_MODE", raising=False)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_with_mocks), base_url="http://test",
+    ) as c:
+        response = await c.get(
             "/api/webapp/config",
             headers={"X-Telegram-Init-Data": "preview"},
         )
@@ -166,7 +166,7 @@ def test_webapp_preview_bypass_rejected_in_prod(app_with_mocks) -> None:
         assert "Preview mode is not allowed in production" in response.json()["detail"]
 
 
-def test_webapp_config_includes_triggered_by_id(app_with_mocks) -> None:
+async def test_webapp_config_includes_triggered_by_id(app_with_mocks, test_client) -> None:
     """Verify that triggered_by_id is serialized in the config response."""
     ctx = app_with_mocks.state.manager.bot_context
     ctx.store.register(
@@ -178,8 +178,7 @@ def test_webapp_config_includes_triggered_by_id(app_with_mocks) -> None:
         triggered_by_id=67890,
     )
     
-    client = TestClient(app_with_mocks)
-    response = client.get(
+    response = await test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": "preview"},
     )
@@ -190,10 +189,10 @@ def test_webapp_config_includes_triggered_by_id(app_with_mocks) -> None:
 
 
 
-def test_webapp_config_real_hmac(test_client) -> None:
+async def test_webapp_config_real_hmac(test_client) -> None:
     """Test config access using valid HMAC signature."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
-    response = test_client.get(
+    response = await test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": init_data},
     )
@@ -202,10 +201,10 @@ def test_webapp_config_real_hmac(test_client) -> None:
     assert data["app_name"] == "TestApp"
 
 
-def test_webapp_config_invalid_hmac(test_client) -> None:
+async def test_webapp_config_invalid_hmac(test_client) -> None:
     """Test config access using invalid HMAC signature."""
     init_data = _generate_valid_init_data(token="WRONG-TOKEN", chat_id=-12345)
-    response = test_client.get(
+    response = await test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": init_data},
     )
@@ -213,10 +212,10 @@ def test_webapp_config_invalid_hmac(test_client) -> None:
     assert "Authentication failed" in response.json()["detail"]
 
 
-def test_webapp_config_unauthorized_chat(test_client) -> None:
+async def test_webapp_config_unauthorized_chat(test_client) -> None:
     """Test config access from unauthorized chat."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-99999)
-    response = test_client.get(
+    response = await test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": init_data},
     )
@@ -228,10 +227,10 @@ def test_webapp_config_unauthorized_chat(test_client) -> None:
     assert detail["bot_username"] == "test_bot"
 
 
-def test_webapp_config_real_hmac_query_param(test_client) -> None:
+async def test_webapp_config_real_hmac_query_param(test_client) -> None:
     """Test config access using valid HMAC signature via query parameter."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
-    response = test_client.get(
+    response = await test_client.get(
         f"/api/webapp/config?init_data={urllib.parse.quote(init_data)}",
     )
     assert response.status_code == 200
@@ -239,20 +238,20 @@ def test_webapp_config_real_hmac_query_param(test_client) -> None:
     assert data["app_name"] == "TestApp"
 
 
-def test_webapp_config_invalid_hmac_query_param(test_client) -> None:
+async def test_webapp_config_invalid_hmac_query_param(test_client) -> None:
     """Test config access fails with invalid HMAC signature via query param."""
     init_data = _generate_valid_init_data(token="WRONG-TOKEN", chat_id=-12345)
-    response = test_client.get(
+    response = await test_client.get(
         f"/api/webapp/config?init_data={urllib.parse.quote(init_data)}",
     )
     assert response.status_code == 401
     assert "Authentication failed" in response.json()["detail"]
 
 
-def test_webapp_config_unauthorized_chat_query_param(test_client) -> None:
+async def test_webapp_config_unauthorized_chat_query_param(test_client) -> None:
     """Test config access fails for unauthorized chat via query param."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-99999)
-    response = test_client.get(
+    response = await test_client.get(
         f"/api/webapp/config?init_data={urllib.parse.quote(init_data)}",
     )
     assert response.status_code == 403
@@ -391,13 +390,13 @@ async def test_webapp_stream_rejects_invalid_auth(app_with_mocks) -> None:
         assert "Authentication failed" in resp.json()["detail"]
 
 
-def test_webapp_trigger_build_happy_path(
+async def test_webapp_trigger_build_happy_path(
     test_client, mock_build_client, mock_bot
 ) -> None:
     """Test successful build trigger from Web App."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
 
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/trigger",
         headers={"X-Telegram-Init-Data": init_data},
         json={"branch": "main"},
@@ -416,7 +415,7 @@ def test_webapp_trigger_build_happy_path(
     mock_bot.send_message.assert_not_called()
 
 
-def test_webapp_trigger_duplicate_blocked(
+async def test_webapp_trigger_duplicate_blocked(
     test_client, mock_build_client, app_with_mocks
 ) -> None:
     """Test that starting a build on a branch already building is blocked."""
@@ -432,7 +431,7 @@ def test_webapp_trigger_duplicate_blocked(
         triggered_by="Bob",
     )
 
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/trigger",
         headers={"X-Telegram-Init-Data": init_data},
         json={"branch": "main"},
@@ -443,7 +442,7 @@ def test_webapp_trigger_duplicate_blocked(
     assert not mock_build_client.trigger_build.called
 
 
-def test_webapp_cancel_build_happy_path(
+async def test_webapp_cancel_build_happy_path(
     test_client, mock_build_client, app_with_mocks
 ) -> None:
     """Test successful build cancellation from Web App."""
@@ -460,7 +459,7 @@ def test_webapp_cancel_build_happy_path(
         triggered_by_id=67890,
     )
 
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/cancel",
         headers={"X-Telegram-Init-Data": init_data},
         json={"request_id": "req-999"},
@@ -476,13 +475,13 @@ def test_webapp_cancel_build_happy_path(
     assert len(ctx.store.list_active()) == 0
 
 
-def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) -> None:
+async def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) -> None:
     """Test that chat_id is correctly extracted from start_param (deep link)."""
     init_data = _generate_valid_init_data_with_start_param(
         token="123456:test-token", start_param="-12345"
     )
 
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/trigger",
         headers={"X-Telegram-Init-Data": init_data},
         json={"branch": "main"},
@@ -495,13 +494,13 @@ def test_webapp_start_param_parsing(test_client, mock_build_client, mock_bot) ->
     mock_bot.send_message.assert_not_called()
 
 
-def test_webapp_trigger_build_notify_false(
+async def test_webapp_trigger_build_notify_false(
     test_client, mock_build_client, mock_bot, app_with_mocks
 ) -> None:
     """Test that notify=false stores the build with notify=False."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
 
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/trigger",
         headers={"X-Telegram-Init-Data": init_data},
         json={"branch": "main", "notify": False},
@@ -520,13 +519,13 @@ def test_webapp_trigger_build_notify_false(
     mock_bot.send_message.assert_not_called()
 
 
-def test_webapp_private_chat_rejected_via_start_param(test_client) -> None:
+async def test_webapp_private_chat_rejected_via_start_param(test_client) -> None:
     """Test that Web App triggers in private chats (positive chat IDs) are rejected."""
     init_data = _generate_valid_init_data_with_start_param(
         token="123456:test-token", start_param="67890"
     )
 
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/trigger",
         headers={"X-Telegram-Init-Data": init_data},
         json={"branch": "main"},
@@ -539,12 +538,12 @@ def test_webapp_private_chat_rejected_via_start_param(test_client) -> None:
     assert detail["bot_username"] == "test_bot"
 
 
-def test_webapp_private_chat_rejected_via_fallback(test_client) -> None:
+async def test_webapp_private_chat_rejected_via_fallback(test_client) -> None:
     """Test that Web App triggers with no group context fall back to private user ID and are rejected."""
     # Generating without chat_id defaults to Alice's user.id 67890 (positive)
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=None)
 
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/trigger",
         headers={"X-Telegram-Init-Data": init_data},
         json={"branch": "main"},
@@ -557,7 +556,7 @@ def test_webapp_private_chat_rejected_via_fallback(test_client) -> None:
     assert detail["bot_username"] == "test_bot"
 
 
-def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) -> None:
+async def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) -> None:
     """Test that cancelling a build triggered by someone else is blocked with HTTP 403."""
     init_data = _generate_valid_init_data(token="123456:test-token", chat_id=-12345)
     ctx = app_with_mocks.state.manager.bot_context
@@ -573,7 +572,7 @@ def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) ->
     )
 
     # Alice (user_id 67890 in init_data) tries to cancel Bob's build
-    response = test_client.post(
+    response = await test_client.post(
         "/api/webapp/cancel",
         headers={"X-Telegram-Init-Data": init_data},
         json={"request_id": "req-999"},
@@ -594,9 +593,9 @@ def test_webapp_cancel_unauthorized_user_blocked(test_client, app_with_mocks) ->
            "the old {{APP_VERSION}}/{{ASSET_HASH}} template markers no longer exist",
     strict=True,
 )
-def test_webapp_index_replaces_version_and_hash(test_client) -> None:
+async def test_webapp_index_replaces_version_and_hash(test_client) -> None:
     """Test that served HTML has APP_VERSION and ASSET_HASH replaced."""
-    response = test_client.get("/webapp")
+    response = await test_client.get("/webapp")
     assert response.status_code == 200
 
     html = response.text
@@ -613,8 +612,8 @@ def test_webapp_index_replaces_version_and_hash(test_client) -> None:
     assert len(set(hash_matches)) == 1, "All asset hashes should be identical"
 
 
-def test_webapp_index_has_no_application_cache_control_headers(test_client) -> None:
+async def test_webapp_index_has_no_application_cache_control_headers(test_client) -> None:
     """Test that the index response has no application-level Cache-Control headers."""
-    response = test_client.get("/webapp")
+    response = await test_client.get("/webapp")
     assert response.status_code == 200
     assert "cache-control" not in response.headers

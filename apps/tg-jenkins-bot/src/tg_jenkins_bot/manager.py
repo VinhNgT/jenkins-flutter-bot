@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable
 from typing import Any
 
 from config_core import format_validation_error
@@ -42,8 +41,6 @@ def _build_application(
     config: BotSettings,
     build_client: BuildClient,
     bot: Bot,
-    *,
-    clock: Callable[[], float] = time.time,
 ) -> tuple[Application, BotContext]:
     """Create a Telegram Application wired with the passive handler architecture."""
     application = ApplicationBuilder().bot(bot).build()
@@ -52,7 +49,6 @@ def _build_application(
         config=config,
         build_client=build_client,
         bot=bot,
-        clock=clock,
     )
     application.bot_data["bot_context"] = bot_context
 
@@ -67,7 +63,7 @@ def _build_application(
 class BotManager:
     """Manage Telegram bot startup, shutdown, and status."""
 
-    def __init__(self, *, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self) -> None:
         self._lock = asyncio.Lock()
         self._application: Application | None = None
         self._bot_context: BotContext | None = None
@@ -75,7 +71,6 @@ class BotManager:
         self._build_client: BuildClient | None = None
         self._last_error: str | None = None
         self._started_at: float | None = None
-        self._clock = clock
 
     @property
     def bot_context(self) -> BotContext | None:
@@ -106,7 +101,6 @@ class BotManager:
                     config,
                     build_client,
                     bot,
-                    clock=self._clock,
                 )
 
                 await application.initialize()
@@ -136,7 +130,7 @@ class BotManager:
                 self._config = config
                 self._build_client = build_client
                 self._last_error = None
-                self._started_at = self._clock()
+                self._started_at = time.time()
                 logger.info("Telegram bot started (Web App mode)")
             except Exception as exc:
                 self._last_error = str(exc)

@@ -1,13 +1,12 @@
 """Config-core test fixtures."""
 
-import os
+from __future__ import annotations
 
 import pytest
 
 
 @pytest.fixture(autouse=True)
-def isolate_config(tmp_path):
+def isolate_config(tmp_path, monkeypatch):
     """Redirect all config I/O to a temp directory."""
-    os.environ["JFB_DATA_DIR"] = str(tmp_path)
-    yield
-    os.environ.pop("JFB_DATA_DIR", None)
+    monkeypatch.setenv("JFB_DATA_DIR", str(tmp_path))
+    return tmp_path

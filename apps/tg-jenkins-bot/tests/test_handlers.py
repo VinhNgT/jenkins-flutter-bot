@@ -115,7 +115,6 @@ def ctx(bot):
         config=_make_config(),
         build_client=_make_build_client(),
         bot=bot,
-        clock=lambda: 1_700_000_200.0,
     )
 
 

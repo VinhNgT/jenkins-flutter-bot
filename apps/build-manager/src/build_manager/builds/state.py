@@ -11,7 +11,6 @@ import json
 import logging
 import time
 import uuid
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,11 +40,8 @@ class BuildTracker:
     def __init__(
         self,
         data_dir: Path,
-        *,
-        clock: Callable[[], float] = time.time,
     ) -> None:
         self._data_dir = data_dir
-        self._clock = clock
         self._pending_path = data_dir / "pending_builds.json"
         self._pending: dict[str, PendingBuild] = self._load_pending()
 
@@ -123,7 +119,7 @@ class BuildTracker:
         pending = PendingBuild(
             request_id=request_id,
             branch=branch,
-            triggered_at=self._clock(),
+            triggered_at=time.time(),
             queue_id=queue_id,
             frontend_callback_url=frontend_callback_url,
             app_name=app_name,

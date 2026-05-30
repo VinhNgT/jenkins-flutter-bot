@@ -1,12 +1,12 @@
 # file-manager
 
-Storage backend service for the Jenkins Flutter Bot. Manages build artifact storage, build completion logs, retention enforcement, and Google Drive OAuth. Supports three storage backends: Google Drive (production), ephemeral in-memory storage (dev/mock), and log-only storage (dev/mock/minimal).
+Storage backend service for the Jenkins Flutter Bot. Manages build artifact storage, build completion logs, retention enforcement, and Google Drive OAuth. Supports three storage backends: Google Drive (production), ephemeral local disk storage (dev/mock), and log-only storage (dev/mock/minimal).
 
 ## Features
 
 - **Build Log** — tracks completed build metadata (branch, commit, result, timestamps, download URLs, and APK file sizes) with configurable retention enforcement stored in backend-specific database files (`build_log_{backend_type}.json`).
 - **Google Drive Upload** — uploads APK artifacts and returns unique, unguessable file-scoped download links
-- **Ephemeral Storage** — in-memory storage backend for dev/mock environments (no Google Drive credentials required)
+- **Ephemeral Storage** — local disk-persisted temporary directory storage backend for dev/mock environments (no Google Drive credentials required, automatically wiped on service startup)
 - **Log-Only Storage** — logs upload and delete operations without actually storing any data (useful for minimal setups or external storage testing)
 - **Drive Reconciliation** — on startup, cross-references the build log against actual Drive contents to recover orphan files and prune stale records
 - **Retention Enforcement** — evicts oldest build records and their backend files when the log exceeds `max_recent_builds`
@@ -23,7 +23,7 @@ Storage backend service for the Jenkins Flutter Bot. Manages build artifact stor
 
 The Drive folder itself stays private — links grant access only to the specific file.
 
-In ephemeral mode (no Drive credentials), files are stored in memory and served via the download endpoint. No OAuth is required.
+In ephemeral mode (no Drive credentials), files are stored in a temporary directory on the local disk and served via the download endpoint. This folder is cleared on startup to prevent bloating. No OAuth is required.
 
 In log-only mode (`STORAGE_BACKEND=log_only`), operations are logged only, returning mock URLs. No files are stored or served.
 

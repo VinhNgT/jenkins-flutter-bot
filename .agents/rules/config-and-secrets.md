@@ -1,7 +1,7 @@
 ---
 trigger: glob
 description: Pydantic configuration system, secret masking, deep merge, config transfer, and dynamic UI rendering.
-globs: "**/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/SchemaForm.tsx, **/env_io.py, **/config_store.py"
+globs: **/config*.py, **/app.py, **/.env*, **/docker-compose.yml, **/*.json, **/SchemaForm.tsx, **/env_io.py, **/config_store.py
 ---
 
 # Configuration & Secrets
@@ -77,7 +77,7 @@ Each service stores its own config in a dedicated volume. Config paths are **har
 
 No service mounts another service's volume. All config I/O crosses service boundaries via HTTP (`/control/config`).
 
-OAuth tokens are stored separately by file-manager in its own data volume and are **not** part of config exports.
+OAuth tokens are stored separately by file-manager in its own data volume, but can optionally be packaged as part of config exports (along with OpenVPN profiles) to streamline rapid multi-environment deployment.
 
 ---
 

@@ -108,6 +108,14 @@ Once configured, the web UI and APIs will prompt for standard HTTP Basic Authent
 > [!NOTE]
 > The Google Drive OAuth callback endpoint (`/api/drive/oauth/callback`) is automatically exempted from Basic Auth. This prevents modern browsers from stripping authentication credentials on the redirect back from Google Accounts.
 
+### 1c. Configuration Portability (Export & Import)
+
+Config Hub provides symmetric configuration transfer under the **Export / Import** sidebar:
+- **Export**: Generates a self-documenting unified `compose.env` file along with the JSON configurations of all running services packaged into a portable `.tar.gz` archive. The export routine can optionally package your active Google Drive OAuth tokens (`oauth.json`) and your current OpenVPN configuration (`client.ovpn`) if they exist.
+- **Import**: Allows you to upload the `.tar.gz` package to fully restore the state of all services. Config Hub extracts the package, applies the Pydantic configurations to each service, writes the certificates, and automatically triggers service restarts.
+
+This makes cloning configurations across dev, mock, and production environments exceptionally clean and fast.
+
 ---
 
 ## Step 2 — Set Up Jenkins
@@ -447,7 +455,7 @@ Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http:/
 > [!TIP]
 > **Alternative Storage Backends (Dev/Testing):**
 > If you do not want to set up Google Cloud/Google Drive OAuth credentials for local development or rapid testing, the file-manager service supports two alternative backends:
-> - **`ephemeral`**: An in-memory storage backend. Uploaded APKs are stored in the service's memory and are served via an internal download endpoint. No external accounts or configurations are required.
+> - **`ephemeral`**: A local disk-persisted temporary directory storage backend. Uploaded APKs are stored in a temporary directory on the local filesystem and are served via an internal download endpoint. This temporary directory is completely wiped clean on every startup of the service to prevent memory or disk bloat. No external accounts or configurations are required.
 > - **`log_only`**: A minimal dummy backend that logs upload and delete operations to the console and returns mock URLs without storing any files. Extremely useful for lightweight local testing or offline development.
 >
 > To use these, set the `STORAGE_BACKEND` environment variable in `infra/env/file-manager.env` to either `ephemeral` or `log_only` and restart the file-manager service.

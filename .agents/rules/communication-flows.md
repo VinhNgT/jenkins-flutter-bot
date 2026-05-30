@@ -21,7 +21,7 @@ The bot acts as a passive frontend and notification layer. All interactive build
 6. **Register Active Build** — The bot registers the active build in the in-memory `ActiveBuildStore` (saving the user-configured `notify` option) and returns success to the Web App. To prevent group chat spam, no immediate starting build confirmation message is sent.
 7. **Initiate VPN & Trigger Jenkins** — Build-manager initiates an OpenVPN connection via `agent-control`, triggers Jenkins (`POST /job/{name}/buildWithParameters`) with `BRANCH` and `BUILD_REQUEST_ID`, and registers the pending build.
 8. **Jenkins Run** — Jenkins pipeline runs on the agent managed by `agent-control` and archives the resulting APK on success — **no outbound HTTP from the agent**.
-9. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, and sends build metadata + artifact to file-manager via `POST /api/files/builds/record`. File-manager uploads to the storage backend (Google Drive or ephemeral), records the build in its build log, enforces retention, and returns the download URL. Build-manager forwards the result to the bot's webhook (`POST /callback/build-result`).
+9. **Poll & Forward** — Build-manager's poll worker detects build completion, downloads the artifact, and sends build metadata + artifact to file-manager via `POST /api/files/builds/record`. File-manager uploads to the storage backend: Google Drive or the local disk-persisted `ephemeral` storage (which persists files to a temporary directory on the local filesystem and wipes it completely on service startup). It then records the build in its build log, enforces retention, and returns the download URL. Build-manager forwards the result to the bot's webhook (`POST /callback/build-result`).
 10. **Notify Chat** — If completion notifications are enabled (`notify=True` on the `ActiveBuild`), the bot delivers a success, failure, timeout, or cancellation notification containing the direct APK download link to the group chat. Messages are strictly **immutable** (send-only, fire-and-forget). The bot **never** edits or deletes its messages.
 11. **Disconnect VPN** — Build-manager checks if the pending build queue is empty; if so, it triggers VPN disconnection via `agent-control`.
 12. **Retrieve History** — Users can browse past successful builds on demand inside the Web App interface, which calls the `GET /api/webapp/recent` endpoint. The bot queries file-manager directly (`GET /api/files/builds/recent`) for completed build history (the Telegram chat remains clean of historical spam). Each build record contains `request_id`, custom branch `label`, `file_size`, and direct download URLs.
@@ -107,7 +107,7 @@ To support browser-redirect flow under optional Config Hub Basic Authentication,
 
 Only `.tar.gz` imports are accepted — this prevents partial or inconsistent config states.
 
-OAuth tokens are **not** included in config exports — they are environment-specific and must be re-authorized after import.
+OAuth tokens (`oauth.json`) and active OpenVPN client profiles (`client.ovpn`) can optionally be included in the config export/import `.tar.gz` packages to facilitate seamless migration and zero-manual-intervention environment setup, although by default OAuth tokens are environment-specific.
 
 ---
 

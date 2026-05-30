@@ -13,6 +13,7 @@ router = APIRouter()
 
 
 @router.get("/webapp-admin")
+@router.get("/webapp-admin/")
 async def index() -> FileResponse:
     """Serve the admin dashboard SPA shell."""
     return FileResponse(WEBAPP_DIR / "index.html")

@@ -135,7 +135,9 @@ class ServiceClient:
         if not url:
             return None
         try:
-            response = await self._client.get(f"{url}/control/config", params={"masked": "false"})
+            response = await self._client.get(
+                f"{url}/control/config", params={"masked": "false"}
+            )
             response.raise_for_status()
             return response.json()
         except Exception as exc:
@@ -189,7 +191,12 @@ class ServiceClient:
         """Proxy VPN status check to agent-control."""
         url = self._service_url("agent")
         if not url:
-            return {"uploaded": False, "size": 0, "connected": False, "available": False}
+            return {
+                "uploaded": False,
+                "size": 0,
+                "connected": False,
+                "available": False,
+            }
         try:
             resp = await self._client.get(f"{url}/control/vpn/status")
             resp.raise_for_status()
@@ -198,7 +205,13 @@ class ServiceClient:
             return data
         except Exception as exc:
             logger.warning("Failed to proxy VPN status to agent: %s", exc)
-            return {"uploaded": False, "size": 0, "connected": False, "available": False, "detail": str(exc)}
+            return {
+                "uploaded": False,
+                "size": 0,
+                "connected": False,
+                "available": False,
+                "detail": str(exc),
+            }
 
     async def delete_vpn_file(self) -> dict[str, Any]:
         """Proxy VPN file deletion to agent-control."""
@@ -274,4 +287,3 @@ class ServiceClient:
         except Exception as exc:
             logger.warning("Failed to fetch oauth token from file_manager: %s", exc)
             return None
-

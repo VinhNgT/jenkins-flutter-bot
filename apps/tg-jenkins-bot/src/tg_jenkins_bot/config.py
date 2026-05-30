@@ -18,7 +18,7 @@ class BotSettings(ServiceSettings):
     config_path: ClassVar[Path] = _DEFAULT_CONFIG_PATH
 
     # Telegram
-    telegram_token: str = Field(
+    telegram_bot_token: str = Field(
         title="Bot Token",
         description="Token from @BotFather",
         json_schema_extra={

@@ -61,12 +61,12 @@ def create_app() -> FastAPI:
     app.include_router(version.router, dependencies=auth_deps)
 
     # --- Static files & SPA shell (must be after API routers) ---
+    app.include_router(pages.router, dependencies=auth_deps)
     app.mount(
         "/webapp-admin",
         StaticFiles(directory=str(WEBAPP_DIR)),
         name="webapp-admin",
     )
-    app.include_router(pages.router, dependencies=auth_deps)
 
     return app
 

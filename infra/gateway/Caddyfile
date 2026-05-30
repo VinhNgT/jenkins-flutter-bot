@@ -88,15 +88,6 @@
         }
     }
 
-    # Admin static assets — content-hashed filenames, cache forever
-    @admin_static {
-        path /webapp-admin/*.css /webapp-admin/*.js
-    }
-    handle @admin_static {
-        header Cache-Control "public, max-age=31536000, immutable"
-        reverse_proxy config-hub:9000
-    }
-
     # Admin HTML entry point — always revalidate
     @admin_html {
         path /webapp-admin /webapp-admin/
@@ -112,6 +103,12 @@
         reverse_proxy config-hub:9000
     }
 
+    # Admin sub-resources (JS, CSS, assets) — content-hashed, cache forever
+    handle /webapp-admin/* {
+        header Cache-Control "public, max-age=31536000, immutable"
+        reverse_proxy config-hub:9000
+    }
+
     # ── Bot webapp handlers ───────────────────────────────────────
 
     # Bot SSE stream — requires immediate flushing
@@ -120,15 +117,6 @@
         reverse_proxy tg-jenkins-bot:9090 {
             flush_interval -1
         }
-    }
-
-    # Bot static assets — content-hashed filenames, cache forever
-    @bot_static {
-        path /webapp/*.css /webapp/*.js
-    }
-    handle @bot_static {
-        header Cache-Control "public, max-age=31536000, immutable"
-        reverse_proxy tg-jenkins-bot:9090
     }
 
     # Bot HTML entry point — always revalidate
@@ -143,6 +131,12 @@
     # Bot API — never cache
     handle /api/webapp/* {
         header Cache-Control "no-store"
+        reverse_proxy tg-jenkins-bot:9090
+    }
+
+    # Bot sub-resources (JS, CSS, assets) — content-hashed, cache forever
+    handle /webapp/* {
+        header Cache-Control "public, max-age=31536000, immutable"
         reverse_proxy tg-jenkins-bot:9090
     }
 

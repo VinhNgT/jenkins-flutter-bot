@@ -75,6 +75,7 @@ class TestStatus:
 
     async def test_service_error_response(self):
         """Service responds but with non-success status."""
+
         def handler(request: httpx.Request):
             return httpx.Response(400, json={"running": False, "detail": "bad config"})
 
@@ -179,6 +180,7 @@ class TestConfigOps:
 
         def handler(request: httpx.Request):
             import json
+
             received.update(json.loads(request.content))
             return httpx.Response(200, json={"status": "ok"})
 

@@ -14,7 +14,6 @@ import time
 import urllib.parse
 
 import httpx
-import pytest
 import time_machine
 
 from config_hub.config import HubBootstrap
@@ -45,9 +44,7 @@ def _build_init_data(
     sorted_params = sorted(params.items())
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted_params)
 
-    secret_key = hmac.new(
-        b"WebAppData", bot_token.encode(), hashlib.sha256
-    ).digest()
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
     computed_hash = hmac.new(
         secret_key, data_check_string.encode(), hashlib.sha256
     ).hexdigest()
@@ -94,7 +91,8 @@ class TestTelegramAuth:
             admin_user_ids=[_ADMIN_USER_ID],
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             init_data = _build_init_data(user_id=_ADMIN_USER_ID)
             resp = await client.get(
@@ -112,7 +110,8 @@ class TestTelegramAuth:
             admin_user_ids=[_ADMIN_USER_ID],
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             init_data = _build_init_data(user_id=_NON_ADMIN_USER_ID)
             resp = await client.get(
@@ -131,7 +130,8 @@ class TestTelegramAuth:
             admin_user_ids=[],  # empty list = no restriction
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             init_data = _build_init_data(user_id=_NON_ADMIN_USER_ID)
             resp = await client.get(
@@ -148,7 +148,8 @@ class TestTelegramAuth:
             admin_user_ids=[_ADMIN_USER_ID],
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             init_data = _build_init_data(user_id=_ADMIN_USER_ID)
             # Tamper: replace hash with garbage
@@ -170,7 +171,8 @@ class TestTelegramAuth:
             admin_user_ids=[_ADMIN_USER_ID],
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             # Build with auth_date 2 hours ago
             old_date = int(time.time()) - 7200
@@ -187,7 +189,8 @@ class TestTelegramAuth:
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
         app = _make_app(telegram_bot_token=None)
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(
                 _AUTH_ENDPOINT,
@@ -201,7 +204,8 @@ class TestTelegramAuth:
         monkeypatch.setenv("JFB_DEV_MODE", "true")
         app = _make_app(telegram_bot_token=_TEST_TOKEN)
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(
                 _AUTH_ENDPOINT,
@@ -217,10 +221,12 @@ class TestBasicAuth:
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
         app = _make_app(auth_username="admin", auth_password="s3cret!")
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(
-                _AUTH_ENDPOINT, auth=("admin", "s3cret!"),
+                _AUTH_ENDPOINT,
+                auth=("admin", "s3cret!"),
             )
             assert resp.status_code == 200
 
@@ -228,10 +234,12 @@ class TestBasicAuth:
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
         app = _make_app(auth_username="admin", auth_password="s3cret!")
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(
-                _AUTH_ENDPOINT, auth=("admin", "wrongpass"),
+                _AUTH_ENDPOINT,
+                auth=("admin", "wrongpass"),
             )
             assert resp.status_code == 401
             assert resp.headers["www-authenticate"] == "Basic"
@@ -240,10 +248,12 @@ class TestBasicAuth:
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
         app = _make_app(auth_username="admin", auth_password="s3cret!")
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(
-                _AUTH_ENDPOINT, auth=("hacker", "s3cret!"),
+                _AUTH_ENDPOINT,
+                auth=("hacker", "s3cret!"),
             )
             assert resp.status_code == 401
 
@@ -253,7 +263,8 @@ class TestAuthPrecedence:
 
     @time_machine.travel("2025-06-01 12:00:00", tick=False)
     async def test_telegram_header_takes_priority_over_basic_auth(
-        self, monkeypatch,
+        self,
+        monkeypatch,
     ) -> None:
         """When both headers are present, Telegram auth is used."""
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
@@ -264,7 +275,8 @@ class TestAuthPrecedence:
             auth_password="s3cret!",
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             init_data = _build_init_data(user_id=_ADMIN_USER_ID)
             resp = await client.get(
@@ -283,32 +295,37 @@ class TestDevModeBypass:
         monkeypatch.setenv("JFB_DEV_MODE", "true")
         app = _make_app()
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(_AUTH_ENDPOINT)
             assert resp.status_code == 200
 
     async def test_dev_mode_disabled_rejects_unauthenticated(
-        self, monkeypatch,
+        self,
+        monkeypatch,
     ) -> None:
         """Empty JFB_DEV_MODE (production) → fail-closed."""
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
         app = _make_app()  # No auth configured at all
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(_AUTH_ENDPOINT)
             assert resp.status_code == 401
             assert "Authentication required" in resp.json()["detail"]
 
     async def test_production_with_basic_auth_prompts_www_authenticate(
-        self, monkeypatch,
+        self,
+        monkeypatch,
     ) -> None:
         """In production with Basic Auth configured but no creds → 401 + WWW-Authenticate."""
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
         app = _make_app(auth_username="admin", auth_password="s3cret!")
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             resp = await client.get(_AUTH_ENDPOINT)
             assert resp.status_code == 401
@@ -319,12 +336,14 @@ class TestOAuthCallbackExemption:
     """Drive OAuth callback must bypass all auth."""
 
     async def test_oauth_callback_accessible_without_auth(
-        self, monkeypatch,
+        self,
+        monkeypatch,
     ) -> None:
         monkeypatch.delenv("JFB_DEV_MODE", raising=False)
         app = _make_app(auth_username="admin", auth_password="s3cret!")
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
         ) as client:
             # The callback with an error param returns 400, not 401
             resp = await client.get(

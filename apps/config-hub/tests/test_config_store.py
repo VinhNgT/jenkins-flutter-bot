@@ -127,9 +127,24 @@ class TestSchemaExtractors:
     def _schema(self):
         return {
             "fields": [
-                {"key": "telegram.bot_token", "secret": True, "required": True, "default": ""},
-                {"key": "telegram.app_name", "secret": False, "required": False, "default": "MyApp"},
-                {"key": "jenkins.url", "secret": False, "required": True, "default": ""},
+                {
+                    "key": "telegram.bot_token",
+                    "secret": True,
+                    "required": True,
+                    "default": "",
+                },
+                {
+                    "key": "telegram.app_name",
+                    "secret": False,
+                    "required": False,
+                    "default": "MyApp",
+                },
+                {
+                    "key": "jenkins.url",
+                    "secret": False,
+                    "required": True,
+                    "default": "",
+                },
             ]
         }
 

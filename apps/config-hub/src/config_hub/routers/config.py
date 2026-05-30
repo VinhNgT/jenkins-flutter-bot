@@ -24,7 +24,9 @@ async def get_config(manager: ManagerDep) -> dict[str, Any]:
 
 
 @router.put("/{scope}")
-async def save_config(scope: str, manager: ManagerDep, request: Request) -> dict[str, Any]:
+async def save_config(
+    scope: str, manager: ManagerDep, request: Request
+) -> dict[str, Any]:
     """Save config for a scope using deep merge to preserve unmodified keys."""
     incoming: dict[str, Any] = await request.json()
     try:

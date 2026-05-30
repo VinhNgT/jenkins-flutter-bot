@@ -475,7 +475,12 @@ def import_tarball(
                     continue
 
                 # Process JSON configs first (if any logic depends on order, JSON is base)
-                if basename in ("bot.json", "agent.json", "storage.json", "builds.json"):
+                if basename in (
+                    "bot.json",
+                    "agent.json",
+                    "storage.json",
+                    "builds.json",
+                ):
                     f = tar.extractfile(member)
                     if f is None:
                         continue
@@ -485,7 +490,7 @@ def import_tarball(
                     except Exception as e:
                         all_parse_errors.append(f"Failed to parse {basename}: {e}")
                         continue
-                    
+
                     scope_map = {
                         "bot.json": "bot",
                         "agent.json": "agent",
@@ -493,13 +498,13 @@ def import_tarball(
                         "builds.json": "builds",
                     }
                     scope = scope_map[basename]
-                    
+
                     # Merge JSON data over current configs dict
                     doc = ConfigDocument(configs[scope])
                     doc.merge(data)
                     configs[scope] = doc.data
                     all_applied.append(f"Imported full config from {basename}")
-                
+
                 # Process compose.env
                 elif basename == "compose.env" and name.endswith("compose.env"):
                     f = tar.extractfile(member)
@@ -507,8 +512,14 @@ def import_tarball(
                         continue
                     content = f.read().decode("utf-8", errors="replace")
 
-                    bp, ap, fmp, bu_p, applied, skipped, unrec, errors = _parse_env_content(
-                        content, bot_lookup, agent_lookup, file_manager_lookup, builds_lookup
+                    bp, ap, fmp, bu_p, applied, skipped, unrec, errors = (
+                        _parse_env_content(
+                            content,
+                            bot_lookup,
+                            agent_lookup,
+                            file_manager_lookup,
+                            builds_lookup,
+                        )
                     )
                     doc_bot = ConfigDocument(configs["bot"])
                     doc_bot.merge(bp)
@@ -525,12 +536,11 @@ def import_tarball(
                     doc_bu = ConfigDocument(configs["builds"])
                     doc_bu.merge(bu_p)
                     configs["builds"] = doc_bu.data
-                    
+
                     all_applied.extend(applied)
                     all_skipped.extend(skipped)
                     all_unrecognized.extend(unrec)
                     all_parse_errors.extend(errors)
-
 
     except tarfile.TarError:
         logger.exception("Failed to extract config tarball")

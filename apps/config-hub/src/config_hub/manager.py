@@ -177,8 +177,8 @@ class ConfigHubManager:
 
         fetched = await asyncio.gather(*schema_calls, *config_calls)
 
-        fetched_schemas = fetched[:len(services)]
-        fetched_configs = fetched[len(services):]
+        fetched_schemas = fetched[: len(services)]
+        fetched_configs = fetched[len(services) :]
 
         schemas = dict(zip(scopes, fetched_schemas))
         configs = {
@@ -211,11 +211,11 @@ class ConfigHubManager:
             *schema_calls,
             *config_calls,
             self.services.download_vpn_file(),
-            self.services.get_oauth_token()
+            self.services.get_oauth_token(),
         )
 
-        fetched_schemas = fetched[:len(services)]
-        fetched_configs = fetched[len(services):len(services)*2]
+        fetched_schemas = fetched[: len(services)]
+        fetched_configs = fetched[len(services) : len(services) * 2]
         vpn_file = fetched[-2]
         oauth_token = fetched[-1]
 
@@ -248,7 +248,12 @@ class ConfigHubManager:
         Parses the tarball, extracts env values, converts to JSON config,
         and saves via PUT /control/config to each owning service.
         """
-        bot_schema, agent_schema, file_manager_schema, builds_schema = await asyncio.gather(
+        (
+            bot_schema,
+            agent_schema,
+            file_manager_schema,
+            builds_schema,
+        ) = await asyncio.gather(
             self.services.schema("bot"),
             self.services.schema("agent"),
             self.services.schema("file_manager"),
@@ -308,8 +313,7 @@ class ConfigHubManager:
         if not repo_url:
             repo_url = "<YOUR_REPO_URL>"
             warnings.append(
-                "Repository URL not configured — update it in"
-                " the settings above."
+                "Repository URL not configured — update it in the settings above."
             )
 
         effective_credentials_id = credentials_id or "<YOUR_CREDENTIALS_ID>"

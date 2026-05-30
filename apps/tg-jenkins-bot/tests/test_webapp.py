@@ -83,7 +83,7 @@ def app_with_mocks(mock_build_client, mock_bot):
     app = create_app()
 
     config = BotSettings(
-        telegram_token="123456:test-token",
+        telegram_bot_token="123456:test-token",
         allowed_chat_ids=[-12345, -67890],
         app_name="TestApp",
         branches={"Stable Release": "main", "Testing Version": "develop"},
@@ -135,7 +135,7 @@ async def test_webapp_config_preview_bypass(test_client) -> None:
 async def test_webapp_preview_bypass_with_dev_mode_env(app_with_mocks, monkeypatch) -> None:
     """Test that JFB_DEV_MODE='true' allows preview bypass even with a production-like token."""
     # Temporarily set token to something non-test, but set JFB_DEV_MODE to true
-    app_with_mocks.state.manager.bot_context.config.telegram_token = "production_token_1234"
+    app_with_mocks.state.manager.bot_context.config.telegram_bot_token = "production_token_1234"
     monkeypatch.setenv("JFB_DEV_MODE", "true")
 
     async with httpx.AsyncClient(
@@ -152,7 +152,7 @@ async def test_webapp_preview_bypass_with_dev_mode_env(app_with_mocks, monkeypat
 
 async def test_webapp_preview_bypass_rejected_in_prod(app_with_mocks, monkeypatch) -> None:
     """Test that preview bypass is rejected in production (non-test token, no JFB_DEV_MODE)."""
-    app_with_mocks.state.manager.bot_context.config.telegram_token = "production_token_1234"
+    app_with_mocks.state.manager.bot_context.config.telegram_bot_token = "production_token_1234"
     monkeypatch.delenv("JFB_DEV_MODE", raising=False)
 
     async with httpx.AsyncClient(

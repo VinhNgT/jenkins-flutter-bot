@@ -142,9 +142,7 @@ class TestParseEnvContent:
 
     def test_quoted_value(self):
         content = 'BOT_TOKEN="value with spaces"'
-        bp, *_ = _parse_env_content(
-            content, self._lookup(), {}, {}
-        )
+        bp, *_ = _parse_env_content(content, self._lookup(), {}, {})
         assert bp["telegram"]["bot_token"] == "value with spaces"
 
     def test_comments_skipped(self):
@@ -201,7 +199,7 @@ class TestTarball:
         data = build_export_tarball(
             "TOKEN=abc\n",
             {"bot": {"telegram": {"bot_token": "abc"}}},
-            oauth_token=oauth_token
+            oauth_token=oauth_token,
         )
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
             names = tar.getnames()
@@ -209,9 +207,7 @@ class TestTarball:
 
     def test_build_export_tarball_no_oauth(self):
         data = build_export_tarball(
-            "TOKEN=abc\n",
-            {"bot": {"telegram": {"bot_token": "abc"}}},
-            oauth_token=None
+            "TOKEN=abc\n", {"bot": {"telegram": {"bot_token": "abc"}}}, oauth_token=None
         )
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
             names = tar.getnames()

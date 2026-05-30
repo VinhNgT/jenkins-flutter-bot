@@ -25,7 +25,9 @@ def test_generate_jenkinsfile_default_optimizations():
 
 def test_generate_jenkinsfile_clean_workspace():
     """Verify that explicitly enabling clean_workspace includes cleanWs() in the output."""
-    jenkinsfile = generate_jenkinsfile("https://github.com/user/repo.git", "", clean_workspace=True)
+    jenkinsfile = generate_jenkinsfile(
+        "https://github.com/user/repo.git", "", clean_workspace=True
+    )
     assert "cleanWs()" in jenkinsfile
 
 
@@ -107,7 +109,7 @@ async def test_router_get_jenkinsfile_api(client):
             "discard_builds": "true",
             "clean_workspace": "false",
             "shallow_clone": "true",
-        }
+        },
     )
     assert response.status_code == 200
     data = response.json()

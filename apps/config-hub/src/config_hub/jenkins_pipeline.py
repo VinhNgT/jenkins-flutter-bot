@@ -22,15 +22,29 @@ def _load_templates() -> tuple[dict[str, Template], dict[str, str]]:
     """Load and cache Groovy templates and snippet strings on first use."""
     return (
         {
-            "pipeline": Template((_TEMPLATE_DIR / "pipeline.groovy").read_text(encoding="utf-8")),
-            "checkout_private": Template((_TEMPLATE_DIR / "checkout_private.groovy").read_text(encoding="utf-8")),
-            "checkout_public": Template((_TEMPLATE_DIR / "checkout_public.groovy").read_text(encoding="utf-8")),
+            "pipeline": Template(
+                (_TEMPLATE_DIR / "pipeline.groovy").read_text(encoding="utf-8")
+            ),
+            "checkout_private": Template(
+                (_TEMPLATE_DIR / "checkout_private.groovy").read_text(encoding="utf-8")
+            ),
+            "checkout_public": Template(
+                (_TEMPLATE_DIR / "checkout_public.groovy").read_text(encoding="utf-8")
+            ),
         },
         {
-            "properties": (_TEMPLATE_DIR / "properties.groovy").read_text(encoding="utf-8"),
-            "post_actions": (_TEMPLATE_DIR / "post_actions.groovy").read_text(encoding="utf-8"),
-            "extensions": (_TEMPLATE_DIR / "extensions.groovy").read_text(encoding="utf-8"),
-            "clone_opts": (_TEMPLATE_DIR / "clone_opts.groovy").read_text(encoding="utf-8"),
+            "properties": (_TEMPLATE_DIR / "properties.groovy").read_text(
+                encoding="utf-8"
+            ),
+            "post_actions": (_TEMPLATE_DIR / "post_actions.groovy").read_text(
+                encoding="utf-8"
+            ),
+            "extensions": (_TEMPLATE_DIR / "extensions.groovy").read_text(
+                encoding="utf-8"
+            ),
+            "clone_opts": (_TEMPLATE_DIR / "clone_opts.groovy").read_text(
+                encoding="utf-8"
+            ),
         },
     )
 
@@ -85,10 +99,10 @@ def generate_jenkinsfile(
             repo_url=repo_url, credentials_id=credentials_id, extensions=extensions_val
         )
     else:
-        checkout = public_tpl.safe_substitute(repo_url=repo_url, clone_opts=clone_opts_val)
+        checkout = public_tpl.safe_substitute(
+            repo_url=repo_url, clone_opts=clone_opts_val
+        )
 
     return pipeline_tpl.safe_substitute(
         properties=properties_val, checkout=checkout, post_actions=post_actions_val
     )
-
-

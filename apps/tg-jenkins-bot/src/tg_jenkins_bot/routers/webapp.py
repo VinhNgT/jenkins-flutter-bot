@@ -138,7 +138,7 @@ async def validate_webapp_request(
     if init_data_str == "preview":
         is_dev = os.environ.get(
             "JFB_DEV_MODE"
-        ) == "true" or ctx.config.telegram_token in (
+        ) == "true" or ctx.config.telegram_bot_token in (
             "123456:test-token",
             "fake:token",
             "",
@@ -161,7 +161,7 @@ async def validate_webapp_request(
         )
 
     try:
-        data = verify_init_data(init_data_str, ctx.config.telegram_token)
+        data = verify_init_data(init_data_str, ctx.config.telegram_bot_token)
     except ValueError as e:
         logger.warning("Invalid webapp initData: %s", e)
         raise HTTPException(

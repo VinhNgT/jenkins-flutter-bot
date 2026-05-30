@@ -7,6 +7,7 @@ import logging
 import re
 import tarfile
 from dataclasses import dataclass, field
+import json
 from pathlib import Path
 from typing import Any
 
@@ -180,42 +181,41 @@ def _build_env_lines(
     return lines, warnings
 
 
-def generate_env_files(
+def generate_compose_env(
     bot_config: dict[str, Any],
     agent_config: dict[str, Any],
     bot_schema: dict[str, Any] | None,
     agent_schema: dict[str, Any] | None,
     file_manager_config: dict[str, Any] | None = None,
     file_manager_schema: dict[str, Any] | None = None,
-) -> tuple[dict[str, str], list[str]]:
-    """Generate per-service env file contents.
-
-    Returns ``({"bot.env": "...", "agent.env": "...", "file_manager.env": "..."}, warnings)``.
-    """
-    files: dict[str, str] = {}
+    builds_config: dict[str, Any] | None = None,
+    builds_schema: dict[str, Any] | None = None,
+) -> tuple[str, list[str]]:
+    """Generate a single compose.env file containing all service configurations."""
+    lines: list[str] = [
+        "# ══════════════════════════════════════════════════",
+        "# Jenkins Flutter Bot — Exported Configuration",
+        "# ══════════════════════════════════════════════════",
+        "# This file contains the portable environment variables.",
+        "",
+    ]
     all_warnings: list[str] = []
 
-    # Bot env file
-    bot_lines, bot_warnings = _build_env_lines(bot_schema, bot_config, "Telegram Bot")
-    files["bot.env"] = "\n".join(bot_lines)
-    all_warnings.extend(bot_warnings)
+    configs = [
+        (bot_schema, bot_config, "Telegram Bot"),
+        (agent_schema, agent_config, "Jenkins Agent"),
+        (file_manager_schema, file_manager_config, "File Manager"),
+        (builds_schema, builds_config, "Build Manager"),
+    ]
 
-    # Agent env file
-    agent_lines, agent_warnings = _build_env_lines(
-        agent_schema, agent_config, "Jenkins Agent"
-    )
-    files["agent.env"] = "\n".join(agent_lines)
-    all_warnings.extend(agent_warnings)
+    for schema, config, label in configs:
+        if schema and config is not None:
+            section_lines, warnings = _build_env_lines(schema, config, label)
+            if section_lines:
+                lines.extend(section_lines)
+            all_warnings.extend(warnings)
 
-    # File manager env file (currently Google Drive OAuth credentials)
-    if file_manager_schema and file_manager_config is not None:
-        fm_lines, fm_warnings = _build_env_lines(
-            file_manager_schema, file_manager_config, "Google Drive"
-        )
-        files["file_manager.env"] = "\n".join(fm_lines)
-        all_warnings.extend(fm_warnings)
-
-    return files, all_warnings
+    return "\n".join(lines), all_warnings
 
 
 # ---------------------------------------------------------------------------
@@ -223,46 +223,7 @@ def generate_env_files(
 # ---------------------------------------------------------------------------
 
 
-def generate_compose_vars(
-    config_data: dict[str, Any],
-    schema: dict[str, Any] | None,
-    section_label: str,
-) -> str:
-    """Generate compose-compatible environment block for one service.
-
-    Returns lines suitable for pasting into a ``docker-compose.yml``
-    ``environment:`` block::
-
-        TELEGRAM_BOT_TOKEN: "your-token"
-        ALLOWED_CHAT_IDS: "123,456"
-    """
-    if not schema or "fields" not in schema:
-        return f"# {section_label} schema not available\n"
-
-    lines: list[str] = [f"# {section_label}"]
-    for field_def in schema["fields"]:
-        env_var = field_def.get("env_var", "")
-        if not env_var:
-            continue
-
-        key = field_def["key"]
-        value_type = field_def.get("value_type", "str")
-        doc = ConfigDocument(config_data)
-        raw = doc.get(key)
-
-        if raw not in (None, "", []):
-            value = _serialize_value(raw, value_type)
-            lines.append(f'{env_var}: "{value}"')
-        elif field_def.get("required"):
-            lines.append(f'{env_var}: ""  # required')
-        else:
-            default = field_def.get("default", "")
-            if default:
-                lines.append(f'# {env_var}: "{default}"')
-            else:
-                lines.append(f'# {env_var}: ""')
-
-    return "\n".join(lines) + "\n"
+# Removed generate_compose_vars as it's no longer needed
 
 
 # ---------------------------------------------------------------------------
@@ -271,27 +232,63 @@ def generate_compose_vars(
 
 
 def build_export_tarball(
-    env_files: dict[str, str],
-    oauth_token_path: Path | None = None,
+    compose_env: str,
+    json_configs: dict[str, dict[str, Any]],
+    oauth_token: dict[str, Any] | None = None,
+    vpn_file: bytes | None = None,
 ) -> bytes:
-    """Build a ``.tar.gz`` containing env files and oauth.json (if present).
+    """Build a ``.tar.gz`` containing the full infrastructure state.
 
     Tarball structure::
 
-        env/bot.env
-        env/agent.env
-        env/oauth.json  (if oauth_token_path exists)
+        compose.env
+        data/bot.json
+        data/agent.json
+        data/storage.json
+        data/builds.json
+        data/oauth.json     (if available)
+        data/client.ovpn    (if available)
     """
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        for filename, content in env_files.items():
-            data = content.encode("utf-8")
-            info = tarfile.TarInfo(name=f"env/{filename}")
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
+    import json
 
-        if oauth_token_path and oauth_token_path.exists():
-            tar.add(str(oauth_token_path), arcname="env/oauth.json")
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        # Add compose.env
+        env_data = compose_env.encode("utf-8")
+        info = tarfile.TarInfo(name="compose.env")
+        info.size = len(env_data)
+        tar.addfile(info, io.BytesIO(env_data))
+
+        # Map scopes to JSON filenames
+        filename_map = {
+            "bot": "bot.json",
+            "agent": "agent.json",
+            "file_manager": "storage.json",
+            "builds": "builds.json",
+        }
+
+        # Add data/*.json files
+        for scope, config_data in json_configs.items():
+            if not config_data:
+                continue
+            fname = filename_map.get(scope, f"{scope}.json")
+            json_str = json.dumps(config_data, indent=2).encode("utf-8")
+            info = tarfile.TarInfo(name=f"data/{fname}")
+            info.size = len(json_str)
+            tar.addfile(info, io.BytesIO(json_str))
+
+        # Add data/oauth.json
+        if oauth_token:
+            oauth_str = json.dumps(oauth_token, indent=2).encode("utf-8")
+            info = tarfile.TarInfo(name="data/oauth.json")
+            info.size = len(oauth_str)
+            tar.addfile(info, io.BytesIO(oauth_str))
+
+        # Add data/client.ovpn
+        if vpn_file:
+            info = tarfile.TarInfo(name="data/client.ovpn")
+            info.size = len(vpn_file)
+            tar.addfile(info, io.BytesIO(vpn_file))
 
     return buf.getvalue()
 
@@ -360,11 +357,7 @@ def _parse_env_content(
     list[str],
     list[str],
 ]:
-    """Parse env file content and route values to bot/agent/file_manager patches.
-
-    Returns (bot_patch, agent_patch, file_manager_patch, applied, skipped_empty,
-             unrecognized, parse_errors).
-    """
+    """Parse env file content and route values to bot/agent/file_manager/builds patches."""
     applied: list[str] = []
     skipped_empty: list[str] = []
     unrecognized: list[str] = []
@@ -372,8 +365,10 @@ def _parse_env_content(
     bot_patch: dict[str, Any] = {}
     agent_patch: dict[str, Any] = {}
     file_manager_patch: dict[str, Any] = {}
+    builds_patch: dict[str, Any] = {}
 
     _file_manager_lookup = file_manager_lookup or {}
+    _builds_lookup = builds_lookup or {}
 
     for line_num, raw_line in enumerate(content.splitlines(), start=1):
         line = raw_line.strip()
@@ -391,7 +386,7 @@ def _parse_env_content(
         # Resolve the value from whichever capture group matched
         value = match.group(2) or match.group(3) or match.group(4) or ""
 
-        # Look up in bot schema, then agent schema, then file_manager schema
+        # Look up in schemas
         if env_var in bot_lookup:
             field_def = bot_lookup[env_var]
             target_patch = bot_patch
@@ -404,6 +399,10 @@ def _parse_env_content(
             field_def = _file_manager_lookup[env_var]
             target_patch = file_manager_patch
             scope = "file_manager"
+        elif env_var in _builds_lookup:
+            field_def = _builds_lookup[env_var]
+            target_patch = builds_patch
+            scope = "builds"
         else:
             unrecognized.append(f"{env_var} (not in any schema, ignored)")
             continue
@@ -423,6 +422,7 @@ def _parse_env_content(
         bot_patch,
         agent_patch,
         file_manager_patch,
+        builds_patch,
         applied,
         skipped_empty,
         unrecognized,
@@ -432,34 +432,33 @@ def _parse_env_content(
 
 def import_tarball(
     tarball_bytes: bytes,
-    bot_schema: dict[str, Any] | None,
-    agent_schema: dict[str, Any] | None,
-    bot_config_path: Path | None,
-    agent_config_path: Path | None,
-    oauth_dest_path: Path | None = None,
+    bot_schema: dict[str, Any] | None = None,
+    agent_schema: dict[str, Any] | None = None,
     file_manager_schema: dict[str, Any] | None = None,
-    file_manager_config_path: Path | None = None,
+    builds_schema: dict[str, Any] | None = None,
 ) -> ImportResult:
-    """Extract a config tarball and import env files + oauth.json.
+    """Extract a config tarball and merge contents into service configs.
 
-    Extracts in-memory → finds ``*.env`` files → parses each line →
-    routes to correct schema → writes to JSON configs.
-    If ``oauth.json`` found, copies to *oauth_dest_path*.
+    Parses JSON config files if present. If compose.env is present,
+    merges those environment variables using schema lookups.
     """
     bot_lookup = _build_env_lookup(bot_schema)
     agent_lookup = _build_env_lookup(agent_schema)
     file_manager_lookup = _build_env_lookup(file_manager_schema)
+    builds_lookup = _build_env_lookup(builds_schema)
 
     all_applied: list[str] = []
     all_skipped: list[str] = []
     all_unrecognized: list[str] = []
     all_parse_errors: list[str] = []
     all_warnings: list[str] = []
-    oauth_imported = False
 
-    bot_patch: dict[str, Any] = {}
-    agent_patch: dict[str, Any] = {}
-    file_manager_patch: dict[str, Any] = {}
+    configs: dict[str, dict[str, Any]] = {
+        "bot": {},
+        "agent": {},
+        "file_manager": {},
+        "builds": {},
+    }
 
     try:
         with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
@@ -468,44 +467,54 @@ def import_tarball(
                     continue
 
                 name = member.name
-                # Strip leading directory components for matching
                 basename = Path(name).name
 
-                # Process .env files
-                if basename.endswith(".env"):
+                # Process JSON configs first (if any logic depends on order, JSON is base)
+                if basename in ("bot.json", "agent.json", "storage.json", "builds.json"):
+                    f = tar.extractfile(member)
+                    if f is None:
+                        continue
+                    content = f.read().decode("utf-8", errors="replace")
+                    try:
+                        data = json.loads(content)
+                    except Exception as e:
+                        all_parse_errors.append(f"Failed to parse {basename}: {e}")
+                        continue
+                    
+                    scope_map = {
+                        "bot.json": "bot",
+                        "agent.json": "agent",
+                        "storage.json": "file_manager",
+                        "builds.json": "builds",
+                    }
+                    scope = scope_map[basename]
+                    
+                    # Merge JSON data over current configs dict
+                    doc = ConfigDocument(configs[scope])
+                    doc.merge(data)
+                    configs[scope] = doc.data
+                    all_applied.append(f"Imported full config from {basename}")
+                
+                # Process compose.env
+                elif basename == "compose.env" and name.endswith("compose.env"):
                     f = tar.extractfile(member)
                     if f is None:
                         continue
                     content = f.read().decode("utf-8", errors="replace")
 
-                    bp, ap, fmp, applied, skipped, unrec, errors = _parse_env_content(
-                        content, bot_lookup, agent_lookup, file_manager_lookup
+                    bp, ap, fmp, bu_p, applied, skipped, unrec, errors = _parse_env_content(
+                        content, bot_lookup, agent_lookup, file_manager_lookup, builds_lookup
                     )
-                    bot_doc = ConfigDocument(bot_patch)
-                    bot_doc.merge(bp)
-                    bot_patch = bot_doc.data
-
-                    agent_doc = ConfigDocument(agent_patch)
-                    agent_doc.merge(ap)
-                    agent_patch = agent_doc.data
-
-                    fm_doc = ConfigDocument(file_manager_patch)
-                    fm_doc.merge(fmp)
-                    file_manager_patch = fm_doc.data
+                    configs["bot"] = ConfigDocument(configs["bot"]).merge(bp).data
+                    configs["agent"] = ConfigDocument(configs["agent"]).merge(ap).data
+                    configs["file_manager"] = ConfigDocument(configs["file_manager"]).merge(fmp).data
+                    configs["builds"] = ConfigDocument(configs["builds"]).merge(bu_p).data
+                    
                     all_applied.extend(applied)
                     all_skipped.extend(skipped)
                     all_unrecognized.extend(unrec)
                     all_parse_errors.extend(errors)
 
-                # Process oauth.json
-                elif basename == "oauth.json" and oauth_dest_path:
-                    f = tar.extractfile(member)
-                    if f is None:
-                        continue
-                    oauth_dest_path.parent.mkdir(parents=True, exist_ok=True)
-                    oauth_dest_path.write_bytes(f.read())
-                    oauth_imported = True
-                    all_applied.append(f"oauth.json → {oauth_dest_path}")
 
     except tarfile.TarError:
         logger.exception("Failed to extract config tarball")

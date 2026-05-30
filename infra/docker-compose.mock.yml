@@ -8,7 +8,7 @@ name: jfb
 #   MOCK_FAILURE_RATE — probability of failure, 0.0–1.0 (default: 0)
 
 include:
-  - ../dev/docker-compose.yml
+  - docker-compose.yml
 
 services:
   # Replace real Jenkins with mock
@@ -17,7 +17,7 @@ services:
     # real jenkins service (which shares the 'jenkins' service name).
     image: jfb-jenkins-mock
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/mock-jenkins/Dockerfile
     container_name: jenkins
     restart: unless-stopped
@@ -35,7 +35,7 @@ services:
     image: jfb-agent-control-mock
     platform: !reset ""
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/mock-jenkins/Dockerfile
     container_name: agent-control
     restart: unless-stopped

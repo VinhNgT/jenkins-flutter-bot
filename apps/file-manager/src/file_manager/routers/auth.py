@@ -144,3 +144,29 @@ async def disconnect(manager: ManagerDep) -> dict[str, Any]:
         return {"disconnected": False, "detail": "Not using Google Drive backend"}
     deleted = drive.delete_tokens()
     return {"disconnected": deleted}
+
+
+@router.get("/token")
+async def get_token(manager: ManagerDep) -> dict[str, Any]:
+    """Return the raw OAuth tokens.
+
+    Only functional with the Google Drive backend. Used for config export.
+    """
+    drive = manager.google_drive_backend
+    if drive is None:
+        raise HTTPException(
+            status_code=404,
+            detail="OAuth is not available with the current storage backend",
+        )
+    
+    # We read the file directly since the manager loads it into memory as a Google Credentials object
+    import json
+    token_path = drive.CREDENTIALS_PATH
+    if not token_path.exists():
+        raise HTTPException(status_code=404, detail="OAuth token not found")
+        
+    try:
+        content = token_path.read_text()
+        return json.loads(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read token: {e}")

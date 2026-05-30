@@ -4,7 +4,7 @@
 name: jfb
 
 include:
-  - ../dev/docker-compose.yml
+  - docker-compose.yml
 
 services:
   agent-control:

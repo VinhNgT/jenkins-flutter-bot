@@ -2,9 +2,8 @@ __pycache__/
 *.pyc
 
 # Env files contain secrets — only examples are committed
-.env
-env/*.env
-!env/*.env.example
+compose.env
+!compose.env.example
 
 # Gateway secrets and certificates
 gateway/secrets/

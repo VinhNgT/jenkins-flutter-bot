@@ -62,9 +62,20 @@ async def get_schema() -> dict[str, Any]:
 
 
 @router.get("/config")
-async def get_config() -> dict[str, Any]:
-    """Return current config values with secrets masked."""
-    return read_masked_config(AgentSettings, _DEFAULT_CONFIG_PATH)
+async def get_config(masked: bool = True) -> dict[str, Any]:
+    """Return current config values.
+
+    If masked=True, secrets are replaced with placeholders.
+    If masked=False, raw values are returned (requires service auth).
+    """
+    if masked:
+        return read_masked_config(AgentSettings, _DEFAULT_CONFIG_PATH)
+    try:
+        raw = AgentSettings.load(_DEFAULT_CONFIG_PATH)
+        return raw.model_dump()
+    except Exception:
+        # Fallback to an empty dump if not configured yet
+        return AgentSettings.model_construct().model_dump()
 
 
 @router.put("/config")
@@ -96,6 +107,21 @@ async def upload_vpn_file(manager: ManagerDep, file: UploadFile = File(...)) -> 
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
     return {"status": "uploaded", "size": len(content)}
+
+
+from fastapi.responses import Response
+
+@router.get("/vpn/download")
+async def download_vpn_file(manager: ManagerDep) -> Response:
+    """Download client.ovpn config file."""
+    if not manager.vpn.OVPN_PATH.exists():
+        raise HTTPException(status_code=404, detail="VPN config not found")
+    
+    try:
+        content = manager.vpn.OVPN_PATH.read_bytes()
+        return Response(content, media_type="application/x-openvpn-profile")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
 
 @router.get("/vpn/status")

@@ -190,10 +190,16 @@ def create_app() -> FastAPI:
         return request.app.state.manager.status()
 
     @app.get("/control/config")
-    async def agent_get_config() -> dict[str, Any]:
-        """Return current config values with secrets masked."""
+    async def agent_get_config(masked: bool = True) -> dict[str, Any]:
+        """Return current config values."""
         logger.info("GET /control/config")
-        return read_masked_config(AgentSettings, _DEFAULT_CONFIG_PATH)
+        if masked:
+            return read_masked_config(AgentSettings, _DEFAULT_CONFIG_PATH)
+        try:
+            raw = AgentSettings.load(_DEFAULT_CONFIG_PATH)
+            return raw.model_dump()
+        except Exception:
+            return AgentSettings.model_construct().model_dump()
 
     @app.put("/control/config")
     async def agent_put_config(request: Request) -> dict[str, Any]:
@@ -215,6 +221,22 @@ def create_app() -> FastAPI:
         except OSError as e:
             raise HTTPException(status_code=500, detail=str(e))
         return {"status": "uploaded", "size": len(content)}
+
+    from fastapi.responses import Response
+
+    @app.get("/control/vpn/download")
+    async def mock_download_vpn(request: Request) -> Response:
+        """Mock VPN file download."""
+        logger.info("GET /control/vpn/download")
+        manager = request.app.state.manager
+        if not manager.OVPN_PATH.exists():
+            raise HTTPException(status_code=404, detail="VPN config not found")
+        
+        try:
+            content = manager.OVPN_PATH.read_bytes()
+            return Response(content, media_type="application/x-openvpn-profile")
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
     @app.get("/control/vpn/status")
     async def mock_vpn_status(request: Request) -> dict[str, Any]:

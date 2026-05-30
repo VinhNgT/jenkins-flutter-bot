@@ -128,6 +128,19 @@ class ServiceClient:
             logger.warning("Failed to fetch config from %s: %s", service, exc)
             return None
 
+    async def get_config_unmasked(self, service: str) -> dict[str, Any] | None:
+        """Fetch the unmasked config values from a service."""
+        url = self._service_url(service)
+        if not url:
+            return None
+        try:
+            response = await self._client.get(f"{url}/control/config", params={"masked": "false"})
+            response.raise_for_status()
+            return response.json()
+        except Exception as exc:
+            logger.warning("Failed to fetch unmasked config from %s: %s", service, exc)
+            return None
+
     async def put_config(self, service: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Save config values to a service."""
         url = self._service_url(service)
@@ -224,4 +237,40 @@ class ServiceClient:
         except Exception as exc:
             logger.warning("Failed to proxy VPN disconnect to agent: %s", exc)
             return {"status": "error", "detail": f"Cannot reach agent: {exc}"}
+
+    async def download_vpn_file(self) -> bytes | None:
+        """Fetch the client.ovpn config file from agent-control."""
+        url = self._service_url("agent")
+        if not url:
+            return None
+        try:
+            response = await self._client.get(f"{url}/control/vpn/download")
+            response.raise_for_status()
+            return response.content
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            logger.warning("Failed to fetch vpn file from agent: %s", e)
+            return None
+        except Exception as exc:
+            logger.warning("Failed to fetch vpn file from agent: %s", exc)
+            return None
+
+    async def get_oauth_token(self) -> dict[str, Any] | None:
+        """Fetch the OAuth tokens from file-manager."""
+        url = self._service_url("file_manager")
+        if not url:
+            return None
+        try:
+            response = await self._client.get(f"{url}/api/auth/token")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            logger.warning("Failed to fetch oauth token from file_manager: %s", e)
+            return None
+        except Exception as exc:
+            logger.warning("Failed to fetch oauth token from file_manager: %s", exc)
+            return None
 

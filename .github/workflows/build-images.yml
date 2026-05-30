@@ -39,7 +39,7 @@ jobs:
           # builds on Linux ARM64.
           - name: agent-control
             context: .
-            dockerfile: infra/docker/Dockerfile.flutter-agent
+            dockerfile: infra/agent/Dockerfile
             platforms: linux/amd64
 
           - name: file-manager

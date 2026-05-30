@@ -86,8 +86,7 @@ export interface JenkinsfileResult {
 /* ─── Config Transfer ─────────────────────────────────────────── */
 
 export interface ExportEnvResult {
-  files: Record<string, string>;
-  compose_vars: Record<string, string>;
+  compose_env: string;
   warnings: string[];
 }
 

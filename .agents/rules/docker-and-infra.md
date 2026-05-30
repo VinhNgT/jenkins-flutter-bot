@@ -55,20 +55,17 @@ All Docker Compose configurations are organized into individual directories unde
 Five compose modes/directories are supported:
 
 ```bash
-./compose.sh [args]          # Dev — runs from infra/dev/docker-compose.yml (builds images locally from source)
-./compose.sh prod [args]     # Prod — runs from infra/prod/docker-compose.yml (pulls stable images from GHCR)
-./compose.sh edge [args]     # Edge — runs from infra/edge/docker-compose.yml (pulls latest development edge images from GHCR)
-./compose.sh hybrid [args]   # Hybrid — runs from infra/hybrid/docker-compose.yml (builds apps locally, pulls agent-control from GHCR)
-./compose.sh mock [args]     # Mock — runs from infra/mock/docker-compose.yml (replaces agent-control & jenkins with mock-jenkins)
+./compose.sh [args]          # Dev — runs from infra/docker-compose.yml (builds images locally from source)
+./compose.sh prod [args]     # Prod — runs from infra/docker-compose.prod.yml (pulls stable images from GHCR)
+./compose.sh hybrid [args]   # Hybrid — runs from infra/docker-compose.hybrid.yml (builds apps locally, pulls agent-control from GHCR)
+./compose.sh mock [args]     # Mock — runs from infra/docker-compose.mock.yml (replaces agent-control & jenkins with mock-jenkins)
 ```
 
-**Production mode** runs `infra/prod/docker-compose.yml`, which pulls images from GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
+**Production mode** runs `infra/docker-compose.prod.yml`, which pulls images from GHCR. Pin a release with `IMAGE_TAG=v1.2.3 ./compose.sh prod up -d`.
 
-**Edge mode** runs `infra/edge/docker-compose.yml`, pulling `edge` tagged snapshots from GHCR.
+**Hybrid mode** runs `infra/docker-compose.hybrid.yml`, building all five Python applications locally while pulling the heavy `agent-control` image from GHCR to save compile time.
 
-**Hybrid mode** runs `infra/hybrid/docker-compose.yml`, building all five Python applications locally while pulling the heavy `agent-control` image from GHCR to save compile time.
-
-**Mock mode** runs `infra/mock/docker-compose.yml`, replacing Jenkins and Agent Control with the lightweight `mock-jenkins` service for offline development and testing.
+**Mock mode** runs `infra/docker-compose.mock.yml`, replacing Jenkins and Agent Control with the lightweight `mock-jenkins` service for offline development and testing.
 
 The `jenkins` service has **no** prod configuration — it's a dev/testing convenience only. In production, point `JENKINS_URL` to an external Jenkins and remove the local container.
 
@@ -78,7 +75,7 @@ The `jenkins` service has **no** prod configuration — it's a dev/testing conve
 
 Defined in `.github/workflows/build-images.yml`. Triggers on `v*.*.*` tags.
 
-All apps are built and pushed to GHCR with both the exact version tag and `latest`. The `agent-control` (under `infra/docker/Dockerfile.flutter-agent`) is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
+All apps are built and pushed to GHCR with both the exact version tag and `latest`. The `agent-control` (under `infra/agent/Dockerfile`) is `linux/amd64` only — Flutter does not support Android release builds on Linux ARM64.
 
 **To release:** `git tag v1.2.3 && git push origin v1.2.3`.
 
@@ -97,7 +94,7 @@ All follow a **two-stage pattern**: uv builder → slim runtime. Key conventions
 
 ### agent-control (Exception)
 
-Two-stage build with fundamentally different concerns (using `infra/docker/Dockerfile.flutter-agent` context): Stage 1 downloads multi-GB Android/Flutter SDKs; Stage 2 copies them into the runtime image.
+Two-stage build with fundamentally different concerns (using `infra/agent/Dockerfile` context): Stage 1 downloads multi-GB Android/Flutter SDKs; Stage 2 copies them into the runtime image.
 
 Key conventions and the *why*:
 
@@ -116,7 +113,7 @@ A single container running two FastAPI servers:
 
 The mock agent-control server uses the **real** `AgentSettings` schema from `agent-control` (not a hardcoded copy), so the schema served to config-hub is always in sync. Config is persisted to the `mock-agent-data` volume. Start/restart validate the config and fail if the agent secret is missing — matching real agent-control behaviour.
 
-Exists only in `infra/mock/docker-compose.yml`. Never appears in prod or dev compose files.
+Exists only in `infra/docker-compose.mock.yml`. Never appears in prod or dev compose files.
 
 ---
 

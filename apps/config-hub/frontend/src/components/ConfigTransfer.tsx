@@ -24,7 +24,6 @@ export default function ConfigTransfer() {
 
   // Export state
   const [exportData, setExportData] = useState<ExportEnvResult | null>(null);
-  const [activeExportTab, setActiveExportTab] = useState('bot');
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -36,14 +35,9 @@ export default function ConfigTransfer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getTabContent = useCallback(
-    (tab: string) => {
+    () => {
       if (!exportData) return '';
-      if (tab === 'compose') {
-        const bot = exportData.compose_vars?.bot ?? '';
-        const agent = exportData.compose_vars?.agent ?? '';
-        return bot + '\n' + agent;
-      }
-      return exportData.files?.[`${tab}.env`] ?? '';
+      return exportData.compose_env ?? '';
     },
     [exportData],
   );
@@ -55,7 +49,6 @@ export default function ConfigTransfer() {
 
     if (result) {
       setExportData(result);
-      setActiveExportTab('bot');
     }
   }
 
@@ -67,7 +60,7 @@ export default function ConfigTransfer() {
   }
 
   async function handleCopy() {
-    const text = getTabContent(activeExportTab);
+    const text = getTabContent();
     try {
       await navigator.clipboard.writeText(text);
       showToast('Copied to clipboard', 'success');
@@ -99,12 +92,7 @@ export default function ConfigTransfer() {
     }
   }
 
-  const EXPORT_TABS = [
-    { id: 'bot', label: 'bot.env' },
-    { id: 'agent', label: 'agent.env' },
-    { id: 'file_manager', label: 'file_manager.env' },
-    { id: 'compose', label: 'compose vars' },
-  ];
+
 
   return (
     <div>
@@ -124,7 +112,7 @@ export default function ConfigTransfer() {
           onClick={handleGenerate}
         >
           <FileCode class="icon" size={14} />
-          Preview .env Files
+          Preview compose.env
         </button>
         <button
           class="btn btn-secondary"
@@ -147,15 +135,9 @@ export default function ConfigTransfer() {
           ) : null}
 
           <div class="export-tabs">
-            {EXPORT_TABS.map(({ id, label }) => (
-              <button
-                key={id}
-                class={`export-tab${activeExportTab === id ? ' active' : ''}`}
-                onClick={() => setActiveExportTab(id)}
-              >
-                {label}
-              </button>
-            ))}
+            <span style={{ fontSize: '13px', fontWeight: 500, padding: '4px 12px', color: 'var(--tg-color-text)' }}>
+              compose.env
+            </span>
             <button
               class="btn btn-sm btn-secondary"
               style={{ marginLeft: 'auto', marginBottom: '4px' }}
@@ -168,7 +150,7 @@ export default function ConfigTransfer() {
 
           <textarea
             class="export-output"
-            value={getTabContent(activeExportTab)}
+            value={getTabContent()}
             readOnly
           />
         </>

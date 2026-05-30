@@ -37,10 +37,10 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 | Telegram account  | —               | To create a bot via BotFather                |
 | Google account    | —               | For Drive API OAuth credentials              |
 
-> **First-time build warning:** The `agent-control` image (using `infra/docker/Dockerfile.flutter-agent`) downloads Flutter SDK, Android SDK, and pre-caches artifacts during build. Expect the **first `docker compose build`** to take **15–30 minutes** depending on your internet speed. Subsequent builds use Docker layer caching.
+> **First-time build warning:** The `agent-control` image (using `infra/agent/Dockerfile`) downloads Flutter SDK, Android SDK, and pre-caches artifacts during build. Expect the **first `docker compose build`** to take **15–30 minutes** depending on your internet speed. Subsequent builds use Docker layer caching.
 
 > [!WARNING]
-> **Apple Silicon (ARM64) users:** Flutter does not support building Android release APKs on Linux ARM64 hosts ([flutter#177936](https://github.com/flutter/flutter/issues/177936)). The `agent-control` service in `infra/dev/docker-compose.yml` is set to `platform: linux/amd64` to force x86_64 emulation. Builds will be slower under emulation — for production CI/CD, use a native x86_64 server.
+> **Apple Silicon (ARM64) users:** Flutter does not support building Android release APKs on Linux ARM64 hosts ([flutter#177936](https://github.com/flutter/flutter/issues/177936)). The `agent-control` service in `infra/docker-compose.yml` is set to `platform: linux/amd64` to force x86_64 emulation. Builds will be slower under emulation — for production CI/CD, use a native x86_64 server.
 
 ---
 
@@ -368,7 +368,7 @@ Telegram Web Apps require a public **HTTPS** URL. An exceptionally secure, fast,
 #### Method A — Running Cloudflared via Docker Compose (Recommended)
 
 
-The `cloudflared` tunnel and a pre-configured **Caddy Ingress Gateway** are already integrated into `infra/dev/docker-compose.yml`. The Ingress Gateway acts as a secure routing perimeter, exposing **only** the public Web App (`/webapp`) and its APIs (`/api/webapp`), while keeping all administrative and webhook paths completely isolated and closed to the public.
+The `cloudflared` tunnel and a pre-configured **Caddy Ingress Gateway** are already integrated into `infra/docker-compose.yml`. The Ingress Gateway acts as a secure routing perimeter, exposing **only** the public Web App (`/webapp`) and its APIs (`/api/webapp`), while keeping all administrative and webhook paths completely isolated and closed to the public.
 
 1. Open your Cloudflare Zero Trust Dashboard and go to **Networks → Tunnels**.
 2. Click **Create a Tunnel**, choose **Cloudflared**, name it (e.g., `jenkins-flutter-bot`), and click **Save**.

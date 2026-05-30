@@ -19,8 +19,7 @@ from config_core import get_service_auth_headers
 from .config import HubBootstrap
 from .env_io import (
     build_export_tarball,
-    generate_compose_vars,
-    generate_env_files,
+    generate_compose_env,
     import_tarball,
 )
 from .jenkins_pipeline import generate_jenkinsfile
@@ -161,17 +160,16 @@ class ConfigHubManager:
     # ------------------------------------------------------------------
 
     async def export_env(self) -> dict[str, Any]:
-        """Generate per-service env file contents for preview.
+        """Generate compose.env file contents for preview.
 
         Fetches config and schemas from all services concurrently via HTTP, then
-        generates env file content for each service.
+        generates the compose.env content.
         """
         scopes = list(_SCOPE_TO_SERVICE.keys())
         services = list(_SCOPE_TO_SERVICE.values())
 
-        # Parallel fetch of all schemas and configs (8 total calls)
         schema_calls = [self.services.schema(s) for s in services]
-        config_calls = [self.services.get_config(s) for s in services]
+        config_calls = [self.services.get_config_unmasked(s) for s in services]
 
         fetched = await asyncio.gather(*schema_calls, *config_calls)
 
@@ -180,57 +178,65 @@ class ConfigHubManager:
 
         schemas = dict(zip(scopes, fetched_schemas))
         configs = {
-            scope: (config.get("values", {}) if config else {})
+            scope: (config if config else {})
             for scope, config in zip(scopes, fetched_configs)
         }
 
-        files, warnings = generate_env_files(
+        compose_env_str, warnings = generate_compose_env(
             bot_config=configs.get("bot", {}),
             agent_config=configs.get("agent", {}),
             bot_schema=schemas.get("bot"),
             agent_schema=schemas.get("agent"),
             file_manager_config=configs.get("file_manager", {}),
             file_manager_schema=schemas.get("file_manager"),
+            builds_config=configs.get("builds", {}),
+            builds_schema=schemas.get("builds"),
         )
-        compose_vars = {
-            "bot": generate_compose_vars(
-                configs.get("bot", {}), schemas.get("bot"), "Telegram Bot"
-            ),
-            "agent": generate_compose_vars(
-                configs.get("agent", {}), schemas.get("agent"), "Jenkins Agent"
-            ),
-        }
-        return {"files": files, "compose_vars": compose_vars, "warnings": warnings}
+        return {"compose_env": compose_env_str, "warnings": warnings}
 
     async def export_tarball(self) -> bytes:
-        """Build a .tar.gz containing all config as env files."""
+        """Build a .tar.gz containing compose.env and all json/ovpn data."""
         scopes = list(_SCOPE_TO_SERVICE.keys())
         services = list(_SCOPE_TO_SERVICE.values())
 
-        # Parallel fetch of all schemas and configs (8 total calls)
+        # Parallel fetch of all schemas, unmasked configs, and files
         schema_calls = [self.services.schema(s) for s in services]
-        config_calls = [self.services.get_config(s) for s in services]
+        config_calls = [self.services.get_config_unmasked(s) for s in services]
 
-        fetched = await asyncio.gather(*schema_calls, *config_calls)
+        fetched = await asyncio.gather(
+            *schema_calls,
+            *config_calls,
+            self.services.download_vpn_file(),
+            self.services.get_oauth_token()
+        )
 
         fetched_schemas = fetched[:len(services)]
-        fetched_configs = fetched[len(services):]
+        fetched_configs = fetched[len(services):len(services)*2]
+        vpn_file = fetched[-2]
+        oauth_token = fetched[-1]
 
         schemas = dict(zip(scopes, fetched_schemas))
         configs = {
-            scope: (config.get("values", {}) if config else {})
+            scope: (config if config else {})
             for scope, config in zip(scopes, fetched_configs)
         }
 
-        files, _ = generate_env_files(
+        compose_env_str, _ = generate_compose_env(
             bot_config=configs.get("bot", {}),
             agent_config=configs.get("agent", {}),
             bot_schema=schemas.get("bot"),
             agent_schema=schemas.get("agent"),
             file_manager_config=configs.get("file_manager", {}),
             file_manager_schema=schemas.get("file_manager"),
+            builds_config=configs.get("builds", {}),
+            builds_schema=schemas.get("builds"),
         )
-        return build_export_tarball(files)
+        return build_export_tarball(
+            compose_env=compose_env_str,
+            json_configs=configs,
+            oauth_token=oauth_token,
+            vpn_file=vpn_file,
+        )
 
     async def import_tarball(self, raw: bytes) -> dict[str, Any]:
         """Import a config tarball, apply changes, and restart services.
@@ -238,20 +244,19 @@ class ConfigHubManager:
         Parses the tarball, extracts env values, converts to JSON config,
         and saves via PUT /control/config to each owning service.
         """
-        bot_schema, agent_schema, file_manager_schema = await asyncio.gather(
+        bot_schema, agent_schema, file_manager_schema, builds_schema = await asyncio.gather(
             self.services.schema("bot"),
             self.services.schema("agent"),
             self.services.schema("file_manager"),
+            self.services.schema("builds"),
         )
 
         parsed = import_tarball(
             tarball_bytes=raw,
             bot_schema=bot_schema,
             agent_schema=agent_schema,
-            bot_config_path=None,
-            agent_config_path=None,
             file_manager_schema=file_manager_schema,
-            file_manager_config_path=None,
+            builds_schema=builds_schema,
         )
 
         # Save each scope's config to the owning service

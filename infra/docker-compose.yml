@@ -11,8 +11,8 @@ services:
     image: jfb-jenkins-local
     pull_policy: build
     build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.jenkins
+      context: ..
+      dockerfile: infra/jenkins/Dockerfile
     container_name: jenkins
     restart: unless-stopped
     ports:
@@ -24,18 +24,17 @@ services:
 
   build-manager:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/build-manager/Dockerfile
     container_name: build-manager
     restart: unless-stopped
     env_file:
-      - path: ../env/build-manager.env
+      - path: compose.env
         required: false
     environment:
-      FILE_MANAGER_URL: http://file-manager:9092
-      JENKINS_URL: http://jenkins:8080
-      AGENT_CONTROL_URL: http://agent-control:9091
-      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
+      JENKINS_URL: ${JENKINS_URL:-http://jenkins:8080}
+      AGENT_CONTROL_URL: ${AGENT_CONTROL_URL:-http://agent-control:9091}
       JFB_DEV_MODE: "true"
     expose:
       - "9010"
@@ -48,21 +47,20 @@ services:
 
   config-hub:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/config-hub/Dockerfile
     container_name: config-hub
     restart: unless-stopped
     env_file:
-      - path: ../env/config-hub.env
+      - path: compose.env
         required: false
     expose:
       - "9000"
     environment:
-      BOT_CONTROL_URL: http://tg-jenkins-bot:9090
-      AGENT_CONTROL_URL: http://agent-control:9091
-      FILE_MANAGER_URL: http://file-manager:9092
-      BUILD_MANAGER_URL: http://build-manager:9010
-      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      BOT_CONTROL_URL: ${BOT_CONTROL_URL:-http://tg-jenkins-bot:9090}
+      AGENT_CONTROL_URL: ${AGENT_CONTROL_URL:-http://agent-control:9091}
+      FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
+      BUILD_MANAGER_URL: ${BUILD_MANAGER_URL:-http://build-manager:9010}
       JFB_DEV_MODE: "true"
     depends_on:
       - tg-jenkins-bot
@@ -74,18 +72,17 @@ services:
 
   tg-jenkins-bot:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/tg-jenkins-bot/Dockerfile
     container_name: tg-jenkins-bot
     restart: unless-stopped
     env_file:
-      - path: ../env/tg-jenkins-bot.env
+      - path: compose.env
         required: false
     environment:
-      BOT_SERVICE_URL: "http://tg-jenkins-bot:9090"
-      BUILD_MANAGER_URL: "http://build-manager:9010"
-      FILE_MANAGER_URL: "http://file-manager:9092"
-      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      BOT_SERVICE_URL: ${BOT_SERVICE_URL:-http://tg-jenkins-bot:9090}
+      BUILD_MANAGER_URL: ${BUILD_MANAGER_URL:-http://build-manager:9010}
+      FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
       JFB_DEV_MODE: "true"
     expose:
       - "9090"
@@ -99,8 +96,8 @@ services:
   agent-control:
     platform: linux/amd64
     build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.flutter-agent
+      context: ..
+      dockerfile: infra/agent/Dockerfile
     container_name: agent-control
     restart: unless-stopped
     cap_add:
@@ -108,11 +105,10 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     env_file:
-      - path: ../env/agent-control.env
+      - path: compose.env
         required: false
     environment:
-      JENKINS_URL: http://jenkins:8080
-      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
+      JENKINS_URL: ${JENKINS_URL:-http://jenkins:8080}
       JFB_DEV_MODE: "true"
     expose:
       - "9091"
@@ -124,12 +120,12 @@ services:
 
   file-manager:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/file-manager/Dockerfile
     container_name: file-manager
     restart: unless-stopped
     env_file:
-      - path: ../env/file-manager.env
+      - path: compose.env
         required: false
     expose:
       - "9092"
@@ -143,13 +139,13 @@ services:
 
 
   gateway:
-    build: ../gateway
+    build: ./gateway
     container_name: gateway
     restart: unless-stopped
     ports:
       - "9000:9000"
     volumes:
-      - ../gateway/Caddyfile:/etc/caddy/Caddyfile
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile
     expose:
       - "80"
     networks:

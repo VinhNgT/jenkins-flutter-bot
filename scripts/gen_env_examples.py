@@ -22,16 +22,11 @@ from file_manager.config import StorageSettings
 from tg_jenkins_bot.config import BotSettings
 
 
-def _generate_example(cls: Type[BaseSettings], title: str) -> str:
-    """Generate a self-documenting .env.example from Pydantic models."""
+def _generate_example(cls: type[BaseSettings], title: str) -> list[str]:
+    """Generate documentation lines for a Pydantic model."""
     lines: list[str] = [
-        f"# {'─' * 50}",
-        f"# {title}",
-        f"# {'─' * 50}",
-        "#",
-        "# This example is generated from the schema definitions.",
-        "# To use:  cp <name>.env.example <name>.env  (then fill in values)",
-        "# To regenerate:  uv run python scripts/gen_env_examples.py",
+        "",
+        f"# ── {title} ──"
     ]
 
     # Group fields by UI group
@@ -44,8 +39,9 @@ def _generate_example(cls: Type[BaseSettings], title: str) -> str:
         groups.setdefault(group, []).append((name, field))
 
     for group_name, group_fields in groups.items():
-        lines.append("")
-        lines.append(f"# ── {group_name} ──")
+        if group_name != "General":
+            lines.append("")
+            lines.append(f"# {group_name}")
 
         for name, field in group_fields:
             lines.append("")
@@ -66,26 +62,48 @@ def _generate_example(cls: Type[BaseSettings], title: str) -> str:
                 default_val = field.default if field.default is not PydanticUndefined else ""
                 lines.append(f"# {env_var}={default_val}")
 
-    lines.append("")
-    return "\n".join(lines)
+    return lines
 
 
 def main() -> None:
-    env_dir = Path(__file__).resolve().parent.parent / "infra" / "env"
-    env_dir.mkdir(parents=True, exist_ok=True)
-
-    examples: list[tuple[Path, type[BaseSettings], str]] = [
-        (env_dir / "tg-jenkins-bot.env.example", BotSettings, "Telegram Bot Config"),
-        (env_dir / "agent-control.env.example", AgentSettings, "Agent Control Config"),
-        (env_dir / "file-manager.env.example", StorageSettings, "File Manager Config"),
-        (env_dir / "build-manager.env.example", BuildSettings, "Build Manager Config"),
-        (env_dir / "config-hub.env.example", HubBootstrap, "Config Hub Infra"),
+    env_path = Path(__file__).resolve().parent.parent / "infra" / "compose.env.example"
+    
+    lines: list[str] = [
+        "# ══════════════════════════════════════════════════",
+        "# Jenkins Flutter Bot — Configuration",
+        "# ══════════════════════════════════════════════════",
+        "# Edit this file, then run:  ./compose.sh prod up -d",
+        "# To regenerate template:    uv run python scripts/gen_env_examples.py",
+        "",
+        "# ── Global Infrastructure ──",
+        "",
+        "# Service Auth Token",
+        "# Optional token for inter-service HTTP security (generate: python -c \"import secrets; print(secrets.token_urlsafe(32))\")",
+        "# SERVICE_AUTH_TOKEN=",
+        "",
+        "# Cloudflare Tunnel Token",
+        "# Used by cloudflared to expose the gateway to the internet",
+        "# CLOUDFLARE_TUNNEL_TOKEN=",
+        "",
+        "# Image Tag",
+        "# Tag used when pulling images from GHCR (prod/edge modes)",
+        "# IMAGE_TAG=latest",
     ]
 
-    for path, cls, title in examples:
-        path.write_text(_generate_example(cls, title))
-        print(f"✓ Generated {path.relative_to(Path.cwd())}")
+    examples: list[tuple[type[BaseSettings], str]] = [
+        (HubBootstrap, "Config Hub (Infra)"),
+        (BotSettings, "Telegram Bot"),
+        (AgentSettings, "Agent Control"),
+        (StorageSettings, "File Manager"),
+        (BuildSettings, "Build Manager"),
+    ]
 
+    for cls, title in examples:
+        lines.extend(_generate_example(cls, title))
+
+    lines.append("")
+    env_path.write_text("\n".join(lines))
+    print(f"✓ Generated {env_path.relative_to(Path.cwd())}")
 
 if __name__ == "__main__":
     main()

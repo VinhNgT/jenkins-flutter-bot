@@ -227,7 +227,7 @@ export default function App() {
                   <h2 class="panel-title">{title}</h2>
                   <p class="panel-desc">{description}</p>
                   <p class="text-muted">
-                    No configuration fields — ephemeral storage mode has no
+                    No configuration fields — current storage mode has no
                     configurable settings.
                   </p>
                 </div>

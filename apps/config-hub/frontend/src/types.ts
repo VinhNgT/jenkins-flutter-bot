@@ -59,7 +59,7 @@ export type ServiceStatuses = Record<Scope, ServiceStatus | null>;
 /* ─── Drive / Storage ─────────────────────────────────────────── */
 
 export interface DriveStatus {
-  backend: 'google_drive' | 'ephemeral';
+  backend: 'google_drive' | 'ephemeral' | 'log_only';
   connected: boolean;
   configured: boolean;
   token_path?: string;

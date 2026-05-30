@@ -9,7 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { API } from '../api';
 import ServiceCard from './ServiceCard';
 import DriveCard from './DriveCard';
-import EphemeralBanner from './EphemeralBanner';
+import StorageBanner from './StorageBanner';
 import VpnWidget from './VpnWidget';
 import type { DriveStatus, ServiceStatuses } from '../types';
 import type { SectionId } from './Sidebar';
@@ -112,6 +112,7 @@ export default function ServicesPanel({
   }, [statuses]);
 
   const isEphemeral = driveStatus?.backend === 'ephemeral';
+  const isLogOnly = driveStatus?.backend === 'log_only';
 
   return (
     <div>
@@ -144,8 +145,8 @@ export default function ServicesPanel({
       <VpnWidget />
 
       {/* Storage backend UI */}
-      {isEphemeral ? (
-        <EphemeralBanner />
+      {isEphemeral || isLogOnly ? (
+        <StorageBanner mode={isLogOnly ? 'log_only' : 'ephemeral'} />
       ) : (
         <DriveCard driveStatus={driveStatus} onRefresh={refreshDrive} />
       )}

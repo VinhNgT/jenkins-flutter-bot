@@ -1,37 +1,17 @@
-"""Build service API clients.
+"""Build service API client.
 
-Provides typed async interfaces to both the build-manager and
-file-manager services. The bot delegates build lifecycle operations
-to build-manager (trigger, cancel, status) and queries file-manager
-directly for completed build history.
+Provides typed async interfaces to the build-manager service. The bot
+delegates build lifecycle operations and history queries to build-manager.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
-
-
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class BuildResult:
-    """A completed build returned by the file-manager build log."""
-
-    request_id: str
-    branch: str
-    commit_hash: str
-    result: str  # "success" | "failure" | "timeout" | "cancelled"
-    triggered_at: float
-    completed_at: float
-    download_url: str = ""
-    file_size: int = 0
-    build_number: int = 0
 
 
 class BuildClientError(Exception):
@@ -46,21 +26,19 @@ class BuildClientError(Exception):
 
 
 class BuildClient:
-    """Async HTTP client for build-manager and file-manager APIs.
+    """Async HTTP client for build-manager APIs.
 
-    Build lifecycle (trigger, cancel, status) goes to build-manager.
-    Completed build history goes to file-manager.
+    Handles triggering, cancellation, active status tracking, and completed
+    build log history.
     """
 
     def __init__(
         self,
         build_manager_url: str,
-        file_manager_url: str,
         *,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._build_url = build_manager_url.rstrip("/")
-        self._file_url = file_manager_url.rstrip("/")
         self._client = client or httpx.AsyncClient(timeout=30.0)
 
     async def close(self) -> None:
@@ -137,29 +115,16 @@ class BuildClient:
         url = f"{self._build_url}/api/builds/stream"
         return self._client.stream("GET", url, timeout=None)
 
-    async def get_recent_builds(self, count: int = 5) -> list[BuildResult]:
-        """Fetch recent completed builds from file-manager."""
-        url = f"{self._file_url}/api/files/builds/recent"
+    async def get_recent_builds(self, count: int = 5) -> list[dict[str, Any]]:
+        """Fetch recent completed builds from build-manager."""
+        url = f"{self._build_url}/api/builds/recent"
         try:
             resp = await self._client.get(url, params={"count": count})
             if resp.status_code != 200:
                 logger.error("Failed to fetch recent builds: %d", resp.status_code)
                 return []
             data = resp.json()
-            return [
-                BuildResult(
-                    request_id=b.get("request_id", ""),
-                    branch=b.get("branch", ""),
-                    commit_hash=b.get("commit_hash", ""),
-                    result=b.get("result", ""),
-                    triggered_at=b.get("triggered_at", 0),
-                    completed_at=b.get("completed_at", 0),
-                    download_url=b.get("download_url", ""),
-                    file_size=b.get("file_size", 0),
-                    build_number=b.get("build_number", 0),
-                )
-                for b in data.get("builds", [])
-            ]
+            return data.get("builds", [])
         except Exception:
             logger.exception("Failed to fetch recent builds")
             return []

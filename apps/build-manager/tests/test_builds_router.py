@@ -135,6 +135,48 @@ async def test_build_status_response(client, mock_coordinator):
 
 
 # ---------------------------------------------------------------------------
+# GET /api/builds/recent
+# ---------------------------------------------------------------------------
+
+
+async def test_recent_builds_success(client, mock_coordinator):
+    mock_coordinator._file_manager_url = "http://file-manager"
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"builds": [{"branch": "main", "result": "success"}]}
+    mock_coordinator._http = AsyncMock()
+    mock_coordinator._http.get.return_value = mock_response
+
+    resp = await client.get("/api/builds/recent?count=5")
+    assert resp.status_code == 200
+    assert resp.json() == {"builds": [{"branch": "main", "result": "success"}]}
+    mock_coordinator._http.get.assert_called_with("http://file-manager/api/files/builds/recent?count=5")
+
+
+async def test_recent_builds_file_manager_error(client, mock_coordinator):
+    mock_coordinator._file_manager_url = "http://file-manager"
+    mock_response = MagicMock()
+    mock_response.status_code = 500
+    mock_response.text = "Internal Server Error"
+    mock_coordinator._http = AsyncMock()
+    mock_coordinator._http.get.return_value = mock_response
+
+    resp = await client.get("/api/builds/recent")
+    assert resp.status_code == 500
+    assert "Failed to fetch recent builds from file-manager" in resp.json()["detail"]
+
+
+async def test_recent_builds_file_manager_unreachable(client, mock_coordinator):
+    mock_coordinator._file_manager_url = "http://file-manager"
+    mock_coordinator._http = AsyncMock()
+    mock_coordinator._http.get.side_effect = httpx.ConnectError("Connection refused")
+
+    resp = await client.get("/api/builds/recent")
+    assert resp.status_code == 502
+    assert "file-manager is unreachable" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
 # GET /api/builds/stream
 # ---------------------------------------------------------------------------
 

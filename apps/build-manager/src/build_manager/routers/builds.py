@@ -17,6 +17,7 @@ import logging
 import asyncio
 import hashlib
 import json
+import httpx
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -104,6 +105,26 @@ async def cancel_build(coord: CoordinatorDep, request_id: str) -> dict[str, str]
 async def build_status(coord: CoordinatorDep) -> dict[str, Any]:
     """Return a summary of the build manager state."""
     return coord.tracker.to_dict()
+
+
+@router.get("/recent")
+async def recent_builds(coord: CoordinatorDep, count: int = 5) -> dict[str, Any]:
+    """Fetch completed build history from file-manager."""
+    try:
+        url = f"{coord._file_manager_url}/api/files/builds/recent?count={count}"
+        resp = await coord._http.get(url)
+        if resp.status_code == 200:
+            return resp.json()
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"Failed to fetch recent builds from file-manager: {resp.text}",
+        )
+    except httpx.HTTPError as exc:
+        logger.exception("Failed to connect to file-manager")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Bad Gateway: file-manager is unreachable: {exc}",
+        )
 
 
 @router.get("/stream", response_class=EventSourceResponse)

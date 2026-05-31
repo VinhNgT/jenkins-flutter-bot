@@ -261,13 +261,17 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     recent = await ctx.build_client.get_recent_builds(count=1)
     if recent:
         last = recent[0]
-        result_emoji = "✅" if last.result == "success" else "❌" if last.result == "failure" else "⏰" if last.result == "timeout" else "🛑"
-        short_hash = last.commit_hash[:7] if last.commit_hash else "unknown"
-        date_str = _format_date(last.completed_at) if last.completed_at else "unknown"
+        result = last.get("result", "")
+        result_emoji = "✅" if result == "success" else "❌" if result == "failure" else "⏰" if result == "timeout" else "🛑"
+        commit_hash = last.get("commit_hash", "")
+        short_hash = commit_hash[:7] if commit_hash else "unknown"
+        completed_at = last.get("completed_at")
+        date_str = _format_date(completed_at) if completed_at else "unknown"
+        branch = last.get("branch", "unknown")
         lines.append("")
         lines.append("Last build:")
         lines.append(
-            f"  {result_emoji} {_escape(last.branch or 'unknown')} · <code>{_escape(short_hash)}</code> · {date_str}"
+            f"  {result_emoji} {_escape(branch or 'unknown')} · <code>{_escape(short_hash)}</code> · {date_str}"
         )
 
     await update.message.reply_text(

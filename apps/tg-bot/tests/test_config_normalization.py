@@ -12,7 +12,6 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="tendoo-tg-bot.vinhngt.dev",
     )
     assert config1.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -23,7 +22,6 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="tendoo-tg-bot.vinhngt.dev/",
     )
     assert config2.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -34,7 +32,6 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="tendoo-tg-bot.vinhngt.dev/webapp",
     )
     assert config3.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -45,7 +42,6 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="https://tendoo-tg-bot.vinhngt.dev/webapp/",
     )
     assert config4.webapp_url == "https://tendoo-tg-bot.vinhngt.dev/webapp/"
@@ -56,7 +52,6 @@ def test_webapp_url_normalization() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
     )
     assert config5.webapp_url == "http://localhost:9090/webapp/"
@@ -69,7 +64,6 @@ def test_branches_parsing() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
         branches={"Production": "main", "Staging": "develop"},
     )
@@ -81,7 +75,6 @@ def test_branches_parsing() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
         branches='{"Production": "main", "Staging": "develop"}',
     )
@@ -93,7 +86,6 @@ def test_branches_parsing() -> None:
         allowed_chat_ids=[12345],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
         branches="main, develop",
     )
@@ -107,7 +99,6 @@ def test_allowed_chat_ids_parsing() -> None:
         allowed_chat_ids=[123, -456],
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
     )
     assert config1.allowed_chat_ids == [123, -456]
@@ -118,7 +109,6 @@ def test_allowed_chat_ids_parsing() -> None:
         allowed_chat_ids="123, -456",
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
     )
     assert config2.allowed_chat_ids == [123, -456]
@@ -129,7 +119,6 @@ def test_allowed_chat_ids_parsing() -> None:
         allowed_chat_ids="[123, -456]",
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
     )
     assert config3.allowed_chat_ids == [123, -456]
@@ -140,7 +129,6 @@ def test_allowed_chat_ids_parsing() -> None:
         allowed_chat_ids="",
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
     )
     assert config4.allowed_chat_ids == []
@@ -150,7 +138,6 @@ def test_allowed_chat_ids_parsing() -> None:
         telegram_bot_token="123456:test-token",
         bot_service_url="http://bot:9090",
         build_manager_url="http://build-manager:9010",
-        file_manager_url="http://file-manager:9092",
         webapp_url="http://localhost:9090",
     )
     assert config5.allowed_chat_ids == []

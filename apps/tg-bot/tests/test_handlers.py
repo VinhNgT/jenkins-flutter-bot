@@ -93,13 +93,14 @@ def _make_build_client():
     client.get_build_status = AsyncMock(return_value={"completed_count": 5})
 
     # Mock recent builds
-    b1 = MagicMock()
-    b1.branch = "main"
-    b1.result = "success"
-    b1.commit_hash = "abcdef123"
-    b1.completed_at = 1700000100.0
-    b1.triggered_at = 1700000000.0
-    b1.download_url = "https://example.com/download.apk"
+    b1 = {
+        "branch": "main",
+        "result": "success",
+        "commit_hash": "abcdef123",
+        "completed_at": 1700000100.0,
+        "triggered_at": 1700000000.0,
+        "download_url": "https://example.com/download.apk",
+    }
     client.get_recent_builds = AsyncMock(return_value=[b1])
     return client
 

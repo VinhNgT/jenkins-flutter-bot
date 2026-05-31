@@ -191,16 +191,6 @@ class BotSettings(ServiceSettings):
             "json_key": "bot.build_manager_url",
         },
     )
-    file_manager_url: str = Field(
-        title="File Manager URL",
-        description="Internal URL of the file-manager service",
-        json_schema_extra={
-            "group": "Advanced",
-            "order": 3,
-            "help_html": "Internal URL of the file-manager service (e.g., <code>http://file-manager:9092</code>). Used to query build history.",
-            "json_key": "bot.file_manager_url",
-        },
-    )
 
     @field_validator("branches", mode="before")
     @classmethod

@@ -3,20 +3,15 @@
 import pytest
 import httpx
 
-from tg_bot.build_client import BuildClient, BuildClientError, BuildResult
+from tg_bot.build_client import BuildClient, BuildClientError
 
 
 def _build_client(handler) -> BuildClient:
-    """Create a BuildClient backed by MockTransport.
-
-    The same mock transport handles both build-manager and file-manager
-    requests — the test handler inspects the URL to route.
-    """
+    """Create a BuildClient backed by MockTransport."""
     transport = httpx.MockTransport(handler)
     client = httpx.AsyncClient(transport=transport)
     return BuildClient(
         "http://build-manager:9010",
-        "http://file-manager:9092",
         client=client,
     )
 
@@ -105,7 +100,7 @@ class TestCancelBuild:
 
 
 # ---------------------------------------------------------------------------
-# get_recent_builds (queries file-manager)
+# get_recent_builds (queries build-manager)
 # ---------------------------------------------------------------------------
 
 
@@ -132,9 +127,9 @@ class TestGetRecentBuilds:
         client = _build_client(handler)
         builds = await client.get_recent_builds(count=5)
         assert len(builds) == 1
-        assert isinstance(builds[0], BuildResult)
-        assert builds[0].branch == "main"
-        assert builds[0].download_url == "https://example.com/file.apk"
+        assert isinstance(builds[0], dict)
+        assert builds[0]["branch"] == "main"
+        assert builds[0]["download_url"] == "https://example.com/file.apk"
         await client.close()
 
     async def test_non_200_returns_empty(self):

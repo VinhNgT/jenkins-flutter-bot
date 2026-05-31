@@ -94,9 +94,7 @@ class BotManager:
                 raise StartupError(str(e)) from e
 
             try:
-                build_client = BuildClient(
-                    config.build_manager_url, config.file_manager_url
-                )
+                build_client = BuildClient(config.build_manager_url)
                 bot = Bot(self.bootstrap.telegram_bot_token)
                 application, bot_context = _build_application(
                     config,

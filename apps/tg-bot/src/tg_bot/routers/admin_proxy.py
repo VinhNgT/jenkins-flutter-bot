@@ -77,7 +77,6 @@ def _bot_config_to_env() -> str:
         f"PROJECT_GITHUB_URL={config.github_url}",
         f"BOT_SERVICE_URL={config.bot_service_url}",
         f"BOT_BUILD_MANAGER_URL={config.build_manager_url}",
-        f"BOT_FILE_MANAGER_URL={config.file_manager_url}",
     ]
     return "\n".join(lines)
 

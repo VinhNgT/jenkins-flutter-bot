@@ -5,7 +5,7 @@
  * header. Errors throw ApiError with the structured detail from the backend.
  */
 
-import type { AppConfig, ApiErrorDetail, RecentBuild } from './types';
+import type { AppConfig, ApiErrorDetail } from './types';
 
 /** Structured API error preserving backend detail shape. */
 export class ApiError extends Error {
@@ -38,21 +38,12 @@ function authHeaders(initData: string): HeadersInit {
   return { 'X-Telegram-Init-Data': initData };
 }
 
-/** GET /api/webapp/config — Fetch app configuration and active builds. */
+/** GET /api/webapp/config — Fetch app configuration. */
 export async function fetchConfig(initData: string): Promise<AppConfig> {
   const res = await fetch('/api/webapp/config', {
     headers: authHeaders(initData),
   });
   return handleResponse<AppConfig>(res);
-}
-
-/** GET /api/webapp/recent — Fetch recent completed builds. */
-export async function fetchRecentBuilds(initData: string): Promise<RecentBuild[]> {
-  const res = await fetch('/api/webapp/recent', {
-    headers: authHeaders(initData),
-  });
-  const data = await handleResponse<{ builds: RecentBuild[] }>(res);
-  return data.builds;
 }
 
 /** POST /api/webapp/trigger — Trigger a new build. Returns request_id. */

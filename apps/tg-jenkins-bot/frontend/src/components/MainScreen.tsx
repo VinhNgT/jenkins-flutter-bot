@@ -14,15 +14,16 @@ import BranchSelector from './BranchSelector';
 import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
 import RecentBuilds from './RecentBuilds';
-import type { AppConfig, RecentBuild } from '../types';
+import type { ActiveBuild, AppConfig, RecentBuild } from '../types';
 
 interface MainScreenProps {
   config: AppConfig;
+  activeBuilds: ActiveBuild[];
   recentBuilds: RecentBuild[];
   onBuildSelect: (type: 'active' | 'recent', id: string) => void;
 }
 
-export default function MainScreen({ config, recentBuilds, onBuildSelect }: MainScreenProps) {
+export default function MainScreen({ config, activeBuilds, recentBuilds, onBuildSelect }: MainScreenProps) {
   const { initData, haptic, hasNativePrimaryButton, showAlert } = usePlatform();
   const isActive = useScreenActive();
   const { showToast } = useToast();
@@ -36,7 +37,7 @@ export default function MainScreen({ config, recentBuilds, onBuildSelect }: Main
 
   // Check if selected branch already has an active build.
   // Block trigger until PlatformStorage preference is loaded to avoid race conditions.
-  const isDuplicate = config.active_builds.some((b) => b.ref === selectedBranch);
+  const isDuplicate = activeBuilds.some((b) => b.ref === selectedBranch);
   const hasSelection = selectedBranch != null && selectedBranch.trim() !== '';
   const isVisible = (hasSelection && !isDuplicate && notifyLoaded) || isLoading;
   const isEnabled = isVisible && !isLoading;
@@ -149,7 +150,7 @@ export default function MainScreen({ config, recentBuilds, onBuildSelect }: Main
         </List>
       )}
 
-      <ActiveBuilds builds={config.active_builds} onSelect={(b) => onBuildSelect('active', b.request_id)} />
+      <ActiveBuilds builds={activeBuilds} onSelect={(b) => onBuildSelect('active', b.request_id)} />
 
       <RecentBuilds builds={recentBuilds} onSelect={(b) => onBuildSelect('recent', b.request_id)} />
 

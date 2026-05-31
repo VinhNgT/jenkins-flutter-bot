@@ -38,7 +38,6 @@ export interface AppConfig {
   app_name: string;
   app_version: string;
   branches: Branch[];
-  active_builds: ActiveBuild[];
 }
 
 /**

@@ -26,6 +26,7 @@ function AppShell() {
   const navigator = useNavigator();
 
   const [config, setConfig] = useState<AppConfig | null>(null);
+  const [activeBuilds, setActiveBuilds] = useState<ActiveBuild[]>([]);
   const [error, setError] = useState<ErrorState | null>(null);
 
   // Ref mirrors the navigator's current screen for SSE callback
@@ -86,11 +87,9 @@ function AppShell() {
   const sseUrl = config ? `/api/webapp/stream?init_data=${encodeURIComponent(initData)}` : null;
 
   const handleBuildsUpdate = useCallback((builds: ActiveBuild[]) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      // Skip re-render if builds haven't changed
-      if (JSON.stringify(prev.active_builds) === JSON.stringify(builds)) return prev;
-      return { ...prev, active_builds: builds };
+    setActiveBuilds((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(builds)) return prev;
+      return builds;
     });
 
     // Auto-transition: if viewing an active build detail and it just
@@ -135,6 +134,7 @@ function AppShell() {
       mainScreen={
         <MainScreen
           config={config}
+          activeBuilds={activeBuilds}
           recentBuilds={recentBuilds}
           onBuildSelect={(type, id) =>
             navigator.push({ screen: 'build-detail', type, id })
@@ -144,7 +144,7 @@ function AppShell() {
       detailScreen={
         navigator.current ? (
           <BuildDetailScreen
-            config={config}
+            activeBuilds={activeBuilds}
             recentBuilds={recentBuilds}
             type={navigator.current.type}
             id={navigator.current.id}
@@ -155,7 +155,7 @@ function AppShell() {
       exitingScreen={
         navigator.exiting ? (
           <BuildDetailScreen
-            config={config}
+            activeBuilds={activeBuilds}
             recentBuilds={recentBuilds}
             type={navigator.exiting.type}
             id={navigator.exiting.id}

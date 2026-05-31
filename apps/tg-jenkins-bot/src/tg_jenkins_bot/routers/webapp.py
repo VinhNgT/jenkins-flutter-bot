@@ -73,7 +73,7 @@ class WebAppConfigResponse(BaseModel):
     app_name: str
     app_version: str
     branches: list[BranchItem]
-    active_builds: list[ActiveBuildResponse]
+
 
 
 class RecentBuildItem(BaseModel):
@@ -90,11 +90,6 @@ class RecentBuildItem(BaseModel):
     file_size: int = 0
     build_number: int = 0
 
-
-class RecentBuildsResponse(BaseModel):
-    """GET /api/webapp/recent response."""
-
-    builds: list[RecentBuildItem]
 
 
 class TriggerResponse(BaseModel):
@@ -256,7 +251,7 @@ async def get_webapp_config(
     manager: ManagerDep,
     user: ValidatedUser,
 ) -> WebAppConfigResponse:
-    """Return configuration and active builds for the web app."""
+    """Return configuration for the web app."""
     ctx = manager.bot_context
     if ctx is None:
         raise HTTPException(status_code=503, detail="Bot not initialized")
@@ -265,21 +260,6 @@ async def get_webapp_config(
     branches_list = []
     for label, ref in ctx.config.branches.items():
         branches_list.append(BranchItem(label=label, ref=ref))
-
-    # Get active builds formatted for frontend
-    active_builds = []
-    for build in ctx.list_building():
-        active_builds.append(
-            ActiveBuildResponse(
-                request_id=build.request_id,
-                label=build.label,
-                ref=build.ref,
-                triggered_at=build.triggered_at,
-                triggered_by=build.triggered_by,
-                triggered_by_id=build.triggered_by_id,
-                estimated_duration=build.estimated_duration,
-            )
-        )
 
     try:
         v = importlib.metadata.version("tg-jenkins-bot")
@@ -291,7 +271,6 @@ async def get_webapp_config(
         app_name=ctx.config.app_name,
         app_version=v,
         branches=branches_list,
-        active_builds=active_builds,
     )
 
 
@@ -495,35 +474,4 @@ async def cancel_webapp_build(
 
     return CancelResponse()
 
-
-@router.get("/recent", response_model=RecentBuildsResponse)
-async def get_recent_builds(
-    manager: ManagerDep,
-    user: ValidatedUser,
-) -> RecentBuildsResponse:
-    """Return recent completed builds for the web app."""
-    ctx = manager.bot_context
-    if ctx is None:
-        raise HTTPException(status_code=503, detail="Bot not initialized")
-
-    branches_map = {v: k for k, v in ctx.config.branches.items()}
-
-    builds = await ctx.build_client.get_recent_builds(count=5)
-    return RecentBuildsResponse(
-        builds=[
-            RecentBuildItem(
-                request_id=b.request_id,
-                branch=b.branch,
-                label=branches_map.get(b.branch, b.branch),
-                commit_hash=b.commit_hash,
-                result=b.result,
-                triggered_at=b.triggered_at,
-                completed_at=b.completed_at,
-                download_url=b.download_url,
-                file_size=b.file_size,
-                build_number=b.build_number,
-            )
-            for b in builds
-        ]
-    )
 

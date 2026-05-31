@@ -23,10 +23,10 @@ import { Scaffold, List, Badge, Spinner, Button, useScreenActive } from 'tg-ui-p
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
 import { cancelBuild as cancelBuildApi } from '../api';
-import type { ActiveBuild, RecentBuild, AppConfig } from '../types';
+import type { ActiveBuild, RecentBuild } from '../types';
 
 interface BuildDetailScreenProps {
-  config: AppConfig;
+  activeBuilds: ActiveBuild[];
   recentBuilds: RecentBuild[];
   type: 'active' | 'recent';
   id: string;
@@ -77,7 +77,7 @@ function getResultVisuals(result: string) {
   }
 }
 
-export default function BuildDetailScreen({ config, recentBuilds, type, id, onBack }: BuildDetailScreenProps) {
+export default function BuildDetailScreen({ activeBuilds, recentBuilds, type, id, onBack }: BuildDetailScreenProps) {
   const platform = usePlatform();
   const isActive = useScreenActive();
   const { initData, userId, haptic, hasNativePrimaryButton } = platform;
@@ -89,7 +89,7 @@ export default function BuildDetailScreen({ config, recentBuilds, type, id, onBa
   const [lastActiveBuild, setLastActiveBuild] = useState<ActiveBuild | null>(null);
 
   const activeBuild = type === 'active'
-    ? config.active_builds.find((b) => b.request_id === id) ?? null
+    ? activeBuilds.find((b) => b.request_id === id) ?? null
     : null;
 
   const recentBuild = type === 'recent'

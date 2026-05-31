@@ -22,7 +22,7 @@ members = [
 
 [[package]]
 name = "agent-control"
-version = "0.4.7"
+version = "0.5.0.dev1"
 source = { editable = "apps/agent-control" }
 dependencies = [
     { name = "config-core" },
@@ -131,7 +131,7 @@ wheels = [
 
 [[package]]
 name = "build-manager"
-version = "0.4.7"
+version = "0.5.0.dev1"
 source = { editable = "apps/build-manager" }
 dependencies = [
     { name = "config-core" },
@@ -321,7 +321,7 @@ wheels = [
 
 [[package]]
 name = "config-core"
-version = "0.4.7"
+version = "0.5.0.dev1"
 source = { editable = "libs/config-core" }
 dependencies = [
     { name = "pydantic" },
@@ -500,7 +500,7 @@ wheels = [
 
 [[package]]
 name = "file-manager"
-version = "0.4.7"
+version = "0.5.0.dev1"
 source = { editable = "apps/file-manager" }
 dependencies = [
     { name = "config-core" },
@@ -675,7 +675,7 @@ wheels = [
 
 [[package]]
 name = "jenkins-telegram-bot"
-version = "0.4.7"
+version = "0.5.0.dev1"
 source = { virtual = "." }
 dependencies = [
     { name = "agent-control" },
@@ -1312,7 +1312,7 @@ wheels = [
 
 [[package]]
 name = "service-hub"
-version = "0.4.7"
+version = "0.5.0.dev1"
 source = { editable = "apps/service-hub" }
 dependencies = [
     { name = "config-core" },
@@ -1346,7 +1346,7 @@ wheels = [
 
 [[package]]
 name = "tg-bot"
-version = "0.4.7"
+version = "0.5.0.dev1"
 source = { editable = "apps/tg-bot" }
 dependencies = [
     { name = "config-core" },

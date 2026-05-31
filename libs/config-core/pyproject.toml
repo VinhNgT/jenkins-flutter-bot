@@ -1,6 +1,6 @@
 [project]
 name = "config-core"
-version = "0.4.7"
+version = "0.5.0-dev.1"
 description = "Configuration core framework for the Jenkins Telegram Bot stack based on Pydantic"
 requires-python = ">=3.12"
 dependencies = [

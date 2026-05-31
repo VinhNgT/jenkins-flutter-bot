@@ -1,6 +1,6 @@
 [project]
 name = "tg-bot"
-version = "0.4.7"
+version = "0.5.0-dev.1"
 description = "Telegram bot frontend for triggering builds via the build-manager service"
 requires-python = ">=3.12"
 dependencies = [

@@ -18,10 +18,10 @@
 # access; the host maps an unprivileged port (e.g. 8880:80) for local
 # development. Path-based routing separates the two web apps:
 #
-#   /webapp*              → tg-jenkins-bot (user-facing Telegram Mini App)
-#   /webapp-admin*        → config-hub (admin dashboard)
-#   /api/webapp/*         → tg-jenkins-bot API
-#   /api/webapp-admin/*   → config-hub API
+#   /webapp*              → tg-bot (user-facing Telegram Mini App)
+#   /webapp-admin*        → tg-bot (admin dashboard)
+#   /api/webapp/*         → tg-bot API
+#   /api/webapp-admin/*   → tg-bot API (proxies to service-hub)
 #
 :80 {
     # ── Basic Auth network restriction ────────────────────────────
@@ -83,7 +83,7 @@
     # Admin SSE stream — requires immediate flushing
     handle /api/webapp-admin/services/stream {
         header Cache-Control "no-store"
-        reverse_proxy config-hub:9000 {
+        reverse_proxy tg-bot:9090 {
             flush_interval -1
         }
     }
@@ -94,19 +94,19 @@
     }
     handle @admin_html {
         header Cache-Control "no-cache"
-        reverse_proxy config-hub:9000
+        reverse_proxy tg-bot:9090
     }
 
     # Admin API — never cache
     handle /api/webapp-admin/* {
         header Cache-Control "no-store"
-        reverse_proxy config-hub:9000
+        reverse_proxy tg-bot:9090
     }
 
     # Admin sub-resources (JS, CSS, assets) — content-hashed, cache forever
     handle /webapp-admin/* {
         header Cache-Control "public, max-age=31536000, immutable"
-        reverse_proxy config-hub:9000
+        reverse_proxy tg-bot:9090
     }
 
     # ── Bot webapp handlers ───────────────────────────────────────
@@ -114,7 +114,7 @@
     # Bot SSE stream — requires immediate flushing
     handle /api/webapp/stream {
         header Cache-Control "no-store"
-        reverse_proxy tg-jenkins-bot:9090 {
+        reverse_proxy tg-bot:9090 {
             flush_interval -1
         }
     }
@@ -125,19 +125,19 @@
     }
     handle @bot_html {
         header Cache-Control "no-cache"
-        reverse_proxy tg-jenkins-bot:9090
+        reverse_proxy tg-bot:9090
     }
 
     # Bot API — never cache
     handle /api/webapp/* {
         header Cache-Control "no-store"
-        reverse_proxy tg-jenkins-bot:9090
+        reverse_proxy tg-bot:9090
     }
 
     # Bot sub-resources (JS, CSS, assets) — content-hashed, cache forever
     handle /webapp/* {
         header Cache-Control "public, max-age=31536000, immutable"
-        reverse_proxy tg-jenkins-bot:9090
+        reverse_proxy tg-bot:9090
     }
 
     # ── Catch-all ─────────────────────────────────────────────────

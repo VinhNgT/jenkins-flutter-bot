@@ -7,6 +7,7 @@ artifacts and their metadata.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -28,6 +29,12 @@ class PendingBuild:
     queue_id: int | None = None
     frontend_callback_url: str = ""
     app_name: str | None = None
+    label: str = ""
+    triggered_by: str = ""
+    triggered_by_id: int = 0
+    notify: bool = True
+    estimated_duration: int = 0
+    chat_id: int = 0
 
 
 class BuildTracker:
@@ -44,6 +51,7 @@ class BuildTracker:
         self._data_dir = data_dir
         self._pending_path = data_dir / "pending_builds.json"
         self._pending: dict[str, PendingBuild] = self._load_pending()
+        self._listeners: set[asyncio.Event] = set()
 
         # On fresh startup, any persisted pending builds are zombies from a
         # previous crash — no poll tasks exist for them. Clear them so
@@ -63,6 +71,24 @@ class BuildTracker:
             )
         self._pending.clear()
         self._save_pending()
+        self._notify_listeners()
+
+    # ------------------------------------------------------------------
+    # Event listeners for state changes
+    # ------------------------------------------------------------------
+
+    def add_listener(self, event: asyncio.Event) -> None:
+        """Register an asyncio.Event listener to be notified on tracker mutations."""
+        self._listeners.add(event)
+
+    def remove_listener(self, event: asyncio.Event) -> None:
+        """Remove an asyncio.Event listener."""
+        self._listeners.discard(event)
+
+    def _notify_listeners(self) -> None:
+        """Set all registered event listeners to trigger immediate wakeup."""
+        for event in list(self._listeners):
+            event.set()
 
     # ------------------------------------------------------------------
     # Persistence
@@ -88,6 +114,12 @@ class BuildTracker:
                 "queue_id": v.queue_id,
                 "frontend_callback_url": v.frontend_callback_url,
                 "app_name": v.app_name,
+                "label": v.label,
+                "triggered_by": v.triggered_by,
+                "triggered_by_id": v.triggered_by_id,
+                "notify": v.notify,
+                "estimated_duration": v.estimated_duration,
+                "chat_id": v.chat_id,
             }
             for k, v in self._pending.items()
         }
@@ -114,6 +146,12 @@ class BuildTracker:
         queue_id: int | None = None,
         frontend_callback_url: str = "",
         app_name: str | None = None,
+        label: str = "",
+        triggered_by: str = "",
+        triggered_by_id: int = 0,
+        notify: bool = True,
+        estimated_duration: int = 0,
+        chat_id: int = 0,
     ) -> PendingBuild:
         """Register a new pending build."""
         pending = PendingBuild(
@@ -123,9 +161,16 @@ class BuildTracker:
             queue_id=queue_id,
             frontend_callback_url=frontend_callback_url,
             app_name=app_name,
+            label=label,
+            triggered_by=triggered_by,
+            triggered_by_id=triggered_by_id,
+            notify=notify,
+            estimated_duration=estimated_duration,
+            chat_id=chat_id,
         )
         self._pending[request_id] = pending
         self._save_pending()
+        self._notify_listeners()
         return pending
 
     def get_pending(self, request_id: str) -> PendingBuild | None:
@@ -137,7 +182,15 @@ class BuildTracker:
         result = self._pending.pop(request_id, None)
         if result:
             self._save_pending()
+            self._notify_listeners()
         return result
+
+    def find_by_branch(self, branch: str) -> PendingBuild | None:
+        """Find an in-flight pending build by branch reference."""
+        for pending in self._pending.values():
+            if pending.branch == branch:
+                return pending
+        return None
 
     def list_pending(self) -> dict[str, PendingBuild]:
         """Return a snapshot of all pending builds."""

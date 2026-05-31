@@ -5,8 +5,8 @@
     "libs/platform-core",
     "libs/tg-ui-preact",
     "libs/tg-core-preact",
-    "apps/tg-jenkins-bot/frontend",
-    "apps/config-hub/frontend"
+    "apps/tg-bot/frontend",
+    "apps/tg-bot/frontend-admin"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

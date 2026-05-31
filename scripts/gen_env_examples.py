@@ -17,9 +17,9 @@ from pydantic_settings import BaseSettings
 
 from agent_control.config import AgentSettings
 from build_manager.config import BuildSettings
-from config_hub.config import HubBootstrap
 from file_manager.config import StorageSettings
-from tg_jenkins_bot.config import BotSettings
+from service_hub.config import ServiceHubBootstrap
+from tg_bot.config import BotSettings
 
 
 def _generate_example(cls: type[BaseSettings], title: str) -> list[str]:
@@ -87,7 +87,7 @@ def main() -> None:
     ]
 
     examples: list[tuple[type[BaseSettings], str]] = [
-        (HubBootstrap, "Config Hub (Infra)"),
+        (ServiceHubBootstrap, "Service Hub (Infra)"),
         (BotSettings, "Telegram Bot"),
         (AgentSettings, "Agent Control"),
         (StorageSettings, "File Manager"),

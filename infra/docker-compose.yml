@@ -44,11 +44,11 @@ services:
     networks:
       - jenkins
 
-  config-hub:
+  service-hub:
     build:
       context: ..
-      dockerfile: apps/config-hub/Dockerfile
-    container_name: config-hub
+      dockerfile: apps/service-hub/Dockerfile
+    container_name: service-hub
     restart: unless-stopped
     env_file:
       - path: compose.env
@@ -56,36 +56,30 @@ services:
     expose:
       - "9000"
     environment:
-      BOT_CONTROL_URL: ${BOT_CONTROL_URL:-http://tg-jenkins-bot:9090}
       AGENT_CONTROL_URL: ${AGENT_CONTROL_URL:-http://agent-control:9091}
       FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
       BUILD_MANAGER_URL: ${BUILD_MANAGER_URL:-http://build-manager:9010}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
-      ENABLE_BROWSER_PREVIEW: ${ENABLE_BROWSER_PREVIEW:-false}
-      BROWSER_AUTH_USERNAME: ${BROWSER_AUTH_USERNAME:-}
-      BROWSER_AUTH_PASSWORD: ${BROWSER_AUTH_PASSWORD:-}
     depends_on:
-      - tg-jenkins-bot
       - agent-control
       - file-manager
       - build-manager
     networks:
       - jenkins
 
-  tg-jenkins-bot:
+  tg-bot:
     build:
       context: ..
-      dockerfile: apps/tg-jenkins-bot/Dockerfile
-    container_name: tg-jenkins-bot
+      dockerfile: apps/tg-bot/Dockerfile
+    container_name: tg-bot
     restart: unless-stopped
     env_file:
       - path: compose.env
         required: false
     environment:
-      BOT_SERVICE_URL: ${BOT_SERVICE_URL:-http://tg-jenkins-bot:9090}
+      BOT_SERVICE_URL: ${BOT_SERVICE_URL:-http://tg-bot:9090}
       BUILD_MANAGER_URL: ${BUILD_MANAGER_URL:-http://build-manager:9010}
       FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
+      SERVICE_HUB_URL: ${SERVICE_HUB_URL:-http://service-hub:9000}
       ENABLE_BROWSER_PREVIEW: ${ENABLE_BROWSER_PREVIEW:-false}
       BROWSER_AUTH_USERNAME: ${BROWSER_AUTH_USERNAME:-}
       BROWSER_AUTH_PASSWORD: ${BROWSER_AUTH_PASSWORD:-}
@@ -95,6 +89,8 @@ services:
       - bot-data:/app/data
     depends_on:
       - file-manager
+      - service-hub
+      - build-manager
     networks:
       - jenkins
 
@@ -147,6 +143,8 @@ services:
       - "127.0.0.1:8880:80"
     volumes:
       - ./gateway/Caddyfile:/etc/caddy/Caddyfile
+    depends_on:
+      - tg-bot
     networks:
       - jenkins
 

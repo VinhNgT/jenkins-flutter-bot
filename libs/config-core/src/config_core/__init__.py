@@ -27,10 +27,6 @@ from config_core.redact import (
     redact as redact,
 )
 
-from config_core.telegram import (
-    verify_init_data as verify_init_data,
-)
-
 from config_core.logging import (
     setup_service_logging as setup_service_logging,
     get_buffer_logs as get_buffer_logs,

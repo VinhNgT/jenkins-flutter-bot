@@ -30,6 +30,11 @@ from .state import BuildTracker
 logger = logging.getLogger(__name__)
 
 
+class DuplicateBuildError(Exception):
+    """Raised when a build for the branch is already in progress."""
+    pass
+
+
 class BuildCoordinator:
     """Coordinates the full build lifecycle.
 
@@ -132,7 +137,7 @@ class BuildCoordinator:
             return
         try:
             logger.info("Forcing VPN disconnection on shutdown...")
-            resp = await self._http.post(f"{self._agent_control_url}/control/vpn/disconnect")
+            resp = await self._http.post(f"{self._agent_control_url}/control/vpn/disconnect", timeout=2.0)
             resp.raise_for_status()
             logger.info("VPN disconnection initiated successfully.")
         except Exception as e:
@@ -167,14 +172,31 @@ class BuildCoordinator:
         return 0
 
     async def trigger_build(
-        self, branch: str, *, frontend_callback_url: str = "", app_name: str | None = None
+        self,
+        branch: str,
+        *,
+        frontend_callback_url: str = "",
+        app_name: str | None = None,
+        label: str = "",
+        triggered_by: str = "",
+        triggered_by_id: int = 0,
+        notify: bool = True,
+        chat_id: int = 0,
     ) -> dict[str, Any]:
         """Trigger a Jenkins build for the given branch.
 
         Returns ``{request_id, status, estimated_duration}`` on success.
 
+        Raises ``DuplicateBuildError`` if a build for the branch is already pending.
         Raises ``JenkinsTriggerError`` on failure.
         """
+        # Validate duplicate branch
+        existing = self._tracker.find_by_branch(branch)
+        if existing:
+            raise DuplicateBuildError(
+                f"A build on branch '{branch}' is already in progress."
+            )
+
         request_id = BuildTracker.generate_request_id()
 
         # Resolve branch-specific estimated duration before triggering
@@ -195,6 +217,12 @@ class BuildCoordinator:
                 queue_id=queue_id,
                 frontend_callback_url=frontend_callback_url,
                 app_name=app_name,
+                label=label,
+                triggered_by=triggered_by,
+                triggered_by_id=triggered_by_id,
+                notify=notify,
+                estimated_duration=estimated_duration,
+                chat_id=chat_id,
             )
         except Exception:
             # If Jenkins trigger or state persistence fails after VPN was
@@ -374,6 +402,11 @@ class BuildCoordinator:
                 completed_at=now,
                 download_url=record_result.get("download_url", ""),
                 build_number=jenkins_build.number,
+                label=pending.label,
+                triggered_by=pending.triggered_by,
+                triggered_by_id=pending.triggered_by_id,
+                notify=pending.notify,
+                chat_id=pending.chat_id,
             )
 
         await self._disconnect_vpn_if_idle()
@@ -427,6 +460,11 @@ class BuildCoordinator:
                 triggered_at=pending.triggered_at,
                 completed_at=now,
                 download_url="",
+                label=pending.label,
+                triggered_by=pending.triggered_by,
+                triggered_by_id=pending.triggered_by_id,
+                notify=pending.notify,
+                chat_id=pending.chat_id,
             )
 
         await self._disconnect_vpn_if_idle()
@@ -493,6 +531,11 @@ class BuildCoordinator:
         completed_at: float,
         download_url: str = "",
         build_number: int = 0,
+        label: str = "",
+        triggered_by: str = "",
+        triggered_by_id: int = 0,
+        notify: bool = True,
+        chat_id: int = 0,
     ) -> None:
         """Forward a build result to the frontend's callback URL.
 
@@ -507,6 +550,11 @@ class BuildCoordinator:
             "completed_at": completed_at,
             "download_url": download_url,
             "build_number": build_number,
+            "label": label,
+            "triggered_by": triggered_by,
+            "triggered_by_id": triggered_by_id,
+            "notify": notify,
+            "chat_id": chat_id,
         }
         try:
             resp = await self._http.post(callback_url, json=payload)

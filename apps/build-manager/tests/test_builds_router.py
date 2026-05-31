@@ -66,7 +66,14 @@ async def test_trigger_success_with_app_name(client, mock_coordinator):
     assert resp.status_code == 200
     assert resp.json()["status"] == "queued"
     mock_coordinator.trigger_build.assert_called_with(
-        "main", frontend_callback_url="http://bot/cb", app_name="My App"
+        "main",
+        frontend_callback_url="http://bot/cb",
+        app_name="My App",
+        label="",
+        triggered_by="",
+        triggered_by_id=0,
+        notify=True,
+        chat_id=0,
     )
 
 
@@ -125,3 +132,31 @@ async def test_build_status_response(client, mock_coordinator):
     assert resp.status_code == 200
     data = resp.json()
     assert "pending_count" in data
+
+
+# ---------------------------------------------------------------------------
+# GET /api/builds/stream
+# ---------------------------------------------------------------------------
+
+
+async def test_build_stream(client, mock_coordinator):
+    """Verify that the build manager streams events in SSE format."""
+    mock_coordinator._file_manager_url = "http://file-manager"
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"builds": []}
+    mock_coordinator._http = AsyncMock()
+    mock_coordinator._http.get.return_value = mock_response
+
+    async with client.stream("GET", "/api/builds/stream") as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/event-stream"
+
+        lines = []
+        async for line in response.iter_lines():
+            lines.append(line)
+            if not line:
+                break
+
+        event_content = "\n".join(lines)
+        assert "event: builds" in event_content

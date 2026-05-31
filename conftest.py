@@ -70,22 +70,6 @@ def jenkins_build_factory(**overrides: Any) -> Any:
     return JenkinsBuild(**defaults)
 
 
-def tracked_message_factory(**overrides: Any) -> Any:
-    """Create a ``TrackedMessage`` with sensible defaults."""
-    from tg_jenkins_bot.bot.tracker import TrackedMessage
-
-    defaults: dict[str, Any] = {
-        "chat_id": 12345,
-        "message_id": 100,
-        "user_id": 67890,
-        "state": "building",
-        "created_at": 1_700_000_000.0,
-        "data": {"ref": "main", "request_id": "abc123def456"},
-    }
-    defaults.update(overrides)
-    return TrackedMessage(**defaults)
-
-
 # ── HTTP Mock Fixtures ───────────────────────────────────────────────
 
 
@@ -244,24 +228,3 @@ def make_handler_context(bot_context: Any, *, bot: Any = None) -> Any:
     ctx.job_queue = MagicMock()
     ctx.job_queue.run_once = MagicMock()
     return ctx
-
-
-async def make_test_application(bot_context: Any, *, bot: Any = None) -> Any:
-    """Build a fully-wired ``Application`` for integration testing.
-
-    Uses ``_build_application()`` with a mock bot so the full handler
-    dispatch chain (``CommandHandler`` → handler function → bot method)
-    is exercised via ``await app.process_update(update)``.
-
-    Caller must ``await app.shutdown()`` after testing.
-    """
-    from tg_jenkins_bot.manager import _build_application
-
-    bot = bot or bot_context.bot or make_mock_bot()
-    application, _ = _build_application(
-        bot_context.config,
-        bot_context.build_client,
-        bot,
-    )
-    await application.initialize()
-    return application

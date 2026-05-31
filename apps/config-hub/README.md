@@ -1,10 +1,10 @@
 # config-hub
 
-Centralized configuration proxy and web dashboard for the Jenkins Flutter Bot microservice ecosystem. Serves as the single operational entry point for all configuration management, service control, OAuth flows, and UI tooling.
+Centralized configuration proxy and Admin Telegram Mini App for the Jenkins Flutter Bot microservice ecosystem. Serves as the single operational entry point for all configuration management, service control, OAuth flows, and UI tooling.
 
 ## Features
 
-- **Web Dashboard** — browser-based SPA for configuring all services, managing Google Drive OAuth, and controlling service lifecycle
+- **Admin Mini App** — Telegram Mini App (with best-effort standalone browser support) for configuring all services, managing Google Drive OAuth, and controlling service lifecycle
 - **Config CRUD** — proxies read, update, and deep-merge operations to the owning service via HTTP (`/control/config`)
 - **Service Control** — start, stop, restart, and check status of all managed services via their `/control/*` APIs
 - **Drive OAuth** — proxies browser-redirect and headless code-exchange OAuth flows to file-manager
@@ -25,7 +25,7 @@ config-hub (FastAPI + StaticFiles)
     ├─ /api/import/*       Tarball import
     ├─ /api/jenkinsfile    Pipeline generation (from build-manager config)
     ├─ /api/version        Version endpoint
-    └─ /                   Web dashboard (SPA)
+    └─ /                   Admin Mini App / Web Webapp (SPA)
 ```
 
 UI scope names map to their owning services:

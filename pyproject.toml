@@ -20,7 +20,7 @@ package = false
 [tool.uv.workspace]
 members = [
     "apps/*",
-    "libs/*",
+    "libs/config-core",
 ]
 
 [tool.uv.sources]
@@ -42,7 +42,6 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.0",
     "httpx>=0.27.0",
-    "respx>=0.22.0",
     "time-machine>=2.13.0",
     "dirty-equals>=0.8.0",
 ]

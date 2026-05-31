@@ -77,8 +77,8 @@ This starts all eight containers:
 | Service          | URL                    | Purpose                                           |
 | ---------------- | ---------------------- | ------------------------------------------------- |
 | `jenkins`        | http://localhost:8080   | Jenkins controller (web UI)                       |
-| `gateway`        | http://localhost:8880/webapp-admin | Ingress Gateway (proxies to config-hub) |
-| `config-hub`     | Internal (:9000)       | Configuration dashboard and operational hub       |
+| `gateway`        | http://localhost:8880/webapp-admin | Ingress Gateway (proxies to config-hub Mini App) |
+| `config-hub`     | Internal (:9000)       | Config proxy, service control, and admin Mini App |
 | `tg-jenkins-bot` | Internal (:9090)       | Telegram bot + webhook receiver (publicly proxied to gateway:80) |
 | `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs, OpenVPN management + control API |
 | `file-manager`   | Internal (:9092)       | Google Drive OAuth, build log, and retention enforcement |
@@ -87,13 +87,16 @@ This starts all eight containers:
 > [!NOTE]
 > The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so config-hub can manage them.
 
-Open **http://localhost:8880/webapp-admin** (proxied securely via the gateway) — you'll use this dashboard throughout the remaining steps.
+Open the **Config Hub Admin Mini App** in your Telegram client or, on a **best-effort basis**, access the standalone browser fallback at **http://localhost:8880/webapp-admin** (proxied securely via the gateway). You will use this interface throughout the remaining steps.
+
+> [!NOTE]
+> Both frontends are designed natively as **Telegram Mini Apps** to run inside the Telegram client. Direct access via standard standalone desktop browsers is supported on a **best-effort basis only**, utilizing standard browser storage and local SDK emulation (`emulator.ts`) for local development and verification.
 
 ### 1b. Config Hub Security (Basic Authentication)
 
 By default, Config Hub operates with no authentication in development for rapid setup. To secure your configuration dashboard (especially when hosting publicly or in production):
 
-1. Create or edit **`infra/env/config-hub.env`** and add your credentials:
+1. Create or edit **`infra/compose.env`** and add your credentials:
    ```env
    CONFIG_HUB_AUTH_USERNAME=your_username
    CONFIG_HUB_AUTH_PASSWORD=your_secure_password
@@ -458,7 +461,7 @@ Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http:/
 > - **`ephemeral`**: A local disk-persisted temporary directory storage backend. Uploaded APKs are stored in a temporary directory on the local filesystem and are served via an internal download endpoint. This temporary directory is completely wiped clean on every startup of the service to prevent memory or disk bloat. No external accounts or configurations are required.
 > - **`log_only`**: A minimal dummy backend that logs upload and delete operations to the console and returns mock URLs without storing any files. Extremely useful for lightweight local testing or offline development.
 >
-> To use these, set the `STORAGE_BACKEND` environment variable in `infra/env/file-manager.env` to either `ephemeral` or `log_only` and restart the file-manager service.
+> To use these, set the `STORAGE_BACKEND` environment variable in `infra/compose.env` to either `ephemeral` or `log_only` and restart the file-manager service.
 
 ---
 

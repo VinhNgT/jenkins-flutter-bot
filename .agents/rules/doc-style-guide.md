@@ -29,45 +29,31 @@ They should NOT convey:
 
 ---
 
+## Agent Contributions
+
+The AI agent is authorized and encouraged to update codebase documentation, READMEs, and AI guides to maintain alignment with codebase changes, following standard workflows.
+
+---
+
+## Additional Hard Constraints
+
+- **Single Mermaid Source of Truth**: Only the main root `README.md` is authorized to contain the Mermaid system topology graph. Sub-guides must NEVER contain duplicate Mermaid graphs to avoid documentation drift.
+- **Code Comments for Low-Level Rules**: Highly specific code rules, function signatures, class interfaces, local constraints, and implementation details must be placed in the code itself as standard code comments, keeping sub-guides highly compacted and focused strictly on high-level design principles.
+
+---
+
 ## What Makes a Good Rule File
 
 ### 1. Stable Over Time
-
 A good rule file should remain accurate for months, not days. Before writing a section, ask: *"Will this still be true after the next three feature PRs?"*
-
-**Durable content:**
-- Architectural boundaries ("the bot never initiates OAuth")
-- Design patterns ("all services use the same config precedence chain")
-- Naming conventions ("kebab-case directories, snake_case packages")
-- Hard constraints ("never mount docker.sock")
-
-**Fragile content (avoid):**
-- Exact line numbers or function signatures
-- Complete config field lists (they grow constantly)
-- Specific HTTP response shapes (read the code)
-- Package version numbers
+- **Durable content**: Architectural boundaries, design patterns, naming conventions, and hard constraints.
+- **Fragile content (avoid)**: Line numbers, complete config field lists, specific HTTP response shapes, and package versions.
 
 ### 2. Structural, Not Exhaustive
-
-Describe the *shape* of things, not every instance. For example:
-
-> **Good:** "Each service's `config.py` declares a `ServiceSettings` subclass with fields tagged as portable or infrastructure."
-
-> **Bad:** "BOT_FIELDS contains 12 entries: telegram.bot_token, telegram.allowed_chat_ids, telegram.admin_contact, ..."
-
-The first sentence stays accurate when fields are added. The second is instantly stale.
+Describe the *shape* of things, not every instance. For example, specify that each service's `config.py` inherits from `ServiceSettings`, not a list of all fields.
 
 ### 3. Constraint-Oriented
-
-The highest-value content in a guide is the list of things an agent must NOT do. Constraints prevent expensive mistakes. State them clearly and explain the rationale:
-
-> **Do NOT expose bot or agent ports to the host** — only `jenkins:8080` and `config-hub:9000` are host-facing.
-
-The constraint is the rule. The explanation prevents the agent from "helpfully" overriding it.
-
-### 4. Grounded in Architecture
-
-Every statement should be traceable to an architectural decision. If a rule exists only because "we've always done it this way," either find the architectural reason or remove the rule.
+The highest-value content in a guide is the list of things an agent must NOT do. State them clearly and explain the rationale.
 
 ---
 
@@ -80,78 +66,14 @@ Each rule file covers a single concern domain:
 | File | Concern |
 |------|---------|
 | `general-guide.md` | Project identity, repo layout, service topology, hard constraints |
-| `python-conventions.md` | Python language, tooling, backend project structure patterns |
-| `web-conventions.md` | Frontend stack, project structure, build pipeline, state management |
-| `config-and-secrets.md` | Schema system, precedence chain, secret masking, inter-service auth |
-| `docker-and-infra.md` | Containers, volumes, networking, CI/CD pipeline |
-| `testing-conventions.md` | Unified testing methodology for backend (pytest) and frontend (Vitest) |
-| `communication-flows.md` | Service-to-service protocols, OAuth, build flow |
+| `personality-guide.md` | Identity, ownership mindset, stepping back, and declining instructions |
+| `python-conventions.md` | Python conventions, Bigger Applications layout, dependency injection |
+| `web-conventions.md` | Pure Preact stack, Telegram design language, stack-based navigation |
+| `config-and-secrets.md` | Schema system, secret masking, dual-auth paradigm, and configuration migrations |
+| `docker-and-infra.md` | Mock-first local dev, compose profiles, container rebuild, Windows bash usage |
+| `testing-conventions.md` | Hermetic test isolation, pytest mocking, Vitest JSDOM environment |
+| `communication-flows.md` | Build trigger pipeline, aggregated SSE streams, Google Drive OAuth |
 | `doc-style-guide.md` | Meta-guide — how to write and maintain rule files |
 
 ### Trigger Metadata
-
-Every file starts with a YAML frontmatter block:
-
-```yaml
----
-trigger: always_on | glob | model_decision
-globs: **/*.py                              # only for trigger: glob
-description: One-line summary of when this file is relevant.
----
-```
-
-- **`always_on`** — loaded on every interaction (use sparingly — only for `general-guide.md`)
-- **`glob`** — loaded when files matching the glob pattern are edited (by user or agent)
-- **`model_decision`** — loaded at the model's discretion based on the task context
-
-### Cross-References
-
-Use prose references to other rule files rather than duplicating content:
-
-> "For the config precedence chain, see `config-and-secrets.md`."
-
-Duplication creates drift. If the same fact appears in two files, it will eventually be updated in one and not the other.
-
----
-
-## Anti-Patterns
-
-### 1. Tutorial-Style Walkthroughs
-
-❌ "First, open `config.py`. Then add a `Field()` with the right metadata. Then open `routers/control.py` and wire it up..."
-
-✅ "To add a new config field, add a Pydantic `Field()` to the owning module's `config.py`. Everything else — UI rendering, env var mapping, defaults — is derived automatically."
-
-The second version tells the agent *what to do* without prescribing *exactly how*, which lets it adapt to the current state of the code.
-
-### 2. Snapshot Documentation
-
-❌ Copying an entire `docker-compose.yml` into a rule file.
-
-✅ Describing the service topology and volume layout as a table.
-
-The compose file changes frequently. The topology changes rarely.
-
-### 3. Redundant with Code
-
-If something is already expressed clearly in code (type hints, docstrings, variable names), don't repeat it in a rule file. Rule files should cover the *implicit* knowledge — the things you'd explain to a new team member that aren't obvious from reading the code.
-
-### 4. Mixing Levels of Abstraction
-
-Don't put "what is this project" and "how to parse webhook JSON" in the same section. Use separate files for high-level architecture and low-level protocol details, with clear triggers so the model loads only what it needs.
-
----
-
-## Maintenance Checklist
-
-When making significant architectural changes, review rule files for staleness:
-
-1. **Service count** — did you add or remove a service? Update `general-guide.md` topology.
-2. **Volume layout** — did you rename or add volumes? Update `docker-and-infra.md`.
-3. **Shared libraries** — did you extract or rename a library? Update `python-conventions.md` and `general-guide.md`.
-4. **Config scopes** — did you rename or add a config scope? Update `config-and-secrets.md`.
-5. **Communication patterns** — did you add a new service-to-service flow? Update `communication-flows.md`.
-6. **Hard constraints** — did you establish a new boundary? Add it to `general-guide.md`.
-7. **Testing patterns** — did you change test infrastructure, fixtures, or methodology? Update `testing-conventions.md`.
-
-The rule files are the **last thing updated** in an architectural change — after the code is working and verified.
+Every file starts with a YAML frontmatter block defining the trigger mode (`always_on`, `glob`, or `model_decision`), path globs, and a short description.

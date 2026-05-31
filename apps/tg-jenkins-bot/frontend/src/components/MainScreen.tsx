@@ -5,7 +5,7 @@
  * Manages branch selection state and the trigger build action.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useMemo, useState } from 'preact/hooks';
 import { usePlatform, usePrimaryButton, usePlatformStorage } from 'platform-core';
 import { Scaffold, List, ListItem, Switch, Button, useScreenActive } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
@@ -14,14 +14,15 @@ import BranchSelector from './BranchSelector';
 import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
 import RecentBuilds from './RecentBuilds';
-import type { AppConfig } from '../types';
+import type { AppConfig, RecentBuild } from '../types';
 
 interface MainScreenProps {
   config: AppConfig;
+  recentBuilds: RecentBuild[];
   onBuildSelect: (type: 'active' | 'recent', id: string) => void;
 }
 
-export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
+export default function MainScreen({ config, recentBuilds, onBuildSelect }: MainScreenProps) {
   const { initData, haptic, hasNativePrimaryButton, showAlert } = usePlatform();
   const isActive = useScreenActive();
   const { showToast } = useToast();
@@ -30,20 +31,8 @@ export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
   const [customInput, setCustomInput] = useState('');
   const [isCustom, setIsCustom] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [recentRefreshKey, setRecentRefreshKey] = useState(0);
   const [notifyChat, setNotifyChat, notifyLoading] = usePlatformStorage('notify_completion', true);
   const notifyLoaded = !notifyLoading;
-
-  // Detect when a build disappears from active → trigger recent builds refresh
-  const [prevBuildIds, setPrevBuildIds] = useState<string[]>([]);
-  useEffect(() => {
-    const currentIds = config.active_builds.map((b) => b.request_id);
-    const hasCompleted = prevBuildIds.some((id) => !currentIds.includes(id));
-    if (hasCompleted) {
-      setRecentRefreshKey((k) => k + 1);
-    }
-    setPrevBuildIds(currentIds);
-  }, [config.active_builds]);
 
   // Check if selected branch already has an active build.
   // Block trigger until PlatformStorage preference is loaded to avoid race conditions.
@@ -162,7 +151,7 @@ export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
 
       <ActiveBuilds builds={config.active_builds} onSelect={(b) => onBuildSelect('active', b.request_id)} />
 
-      <RecentBuilds refreshKey={recentRefreshKey} onSelect={(b) => onBuildSelect('recent', b.request_id)} />
+      <RecentBuilds builds={recentBuilds} onSelect={(b) => onBuildSelect('recent', b.request_id)} />
 
       {/* App Version */}
       <div class="tg-section-footer build-fingerprint">

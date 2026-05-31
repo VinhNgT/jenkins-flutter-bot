@@ -9,15 +9,19 @@
  */
 
 import { useEffect, useRef } from 'preact/hooks';
-import type { ActiveBuild } from '../types';
+import type { ActiveBuild, RecentBuild } from '../types';
 
 export function useSSE(
   url: string | null,
   onBuilds: (builds: ActiveBuild[]) => void,
+  onRecentBuilds: (builds: RecentBuild[]) => void,
 ): void {
   const esRef = useRef<EventSource | null>(null);
   const onBuildsRef = useRef(onBuilds);
   onBuildsRef.current = onBuilds;
+
+  const onRecentBuildsRef = useRef(onRecentBuilds);
+  onRecentBuildsRef.current = onRecentBuilds;
 
   useEffect(() => {
     if (!url) return;
@@ -40,6 +44,15 @@ export function useSSE(
         try {
           const builds = JSON.parse((event as MessageEvent).data) as ActiveBuild[];
           onBuildsRef.current(builds);
+        } catch (err) {
+          console.error('Failed parsing SSE payload:', err);
+        }
+      });
+
+      newEs.addEventListener('recent', (event) => {
+        try {
+          const builds = JSON.parse((event as MessageEvent).data) as RecentBuild[];
+          onRecentBuildsRef.current(builds);
         } catch (err) {
           console.error('Failed parsing SSE payload:', err);
         }

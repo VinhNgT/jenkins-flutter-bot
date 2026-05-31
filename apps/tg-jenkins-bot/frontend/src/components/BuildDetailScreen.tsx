@@ -22,11 +22,12 @@ import { usePlatform, usePrimaryButton } from 'platform-core';
 import { Scaffold, List, Badge, Spinner, Button, useScreenActive } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
-import { cancelBuild as cancelBuildApi, fetchRecentBuilds } from '../api';
+import { cancelBuild as cancelBuildApi } from '../api';
 import type { ActiveBuild, RecentBuild, AppConfig } from '../types';
 
 interface BuildDetailScreenProps {
   config: AppConfig;
+  recentBuilds: RecentBuild[];
   type: 'active' | 'recent';
   id: string;
   onBack: () => void;
@@ -76,15 +77,12 @@ function getResultVisuals(result: string) {
   }
 }
 
-export default function BuildDetailScreen({ config, type, id, onBack }: BuildDetailScreenProps) {
+export default function BuildDetailScreen({ config, recentBuilds, type, id, onBack }: BuildDetailScreenProps) {
   const platform = usePlatform();
   const isActive = useScreenActive();
   const { initData, userId, haptic, hasNativePrimaryButton } = platform;
   const { showToast } = useToast();
   const [cancelling, setCancelling] = useState(false);
-
-  // Resolve build data: active builds come from live config, recent builds are fetched
-  const [recentBuild, setRecentBuild] = useState<RecentBuild | null>(null);
 
   // Preserve the last-known active build so the screen stays populated
   // during the active→recent transition (build completes while viewing).
@@ -92,6 +90,10 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
 
   const activeBuild = type === 'active'
     ? config.active_builds.find((b) => b.request_id === id) ?? null
+    : null;
+
+  const recentBuild = type === 'recent'
+    ? recentBuilds.find((b) => b.request_id === id) ?? null
     : null;
 
   // Snapshot the active build whenever it's available, so it persists
@@ -102,22 +104,12 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
     }
   }, [activeBuild]);
 
+  // If the build is completed but not found in streamed builds after loading, navigate back
   useEffect(() => {
-    if (type !== 'recent') return;
-    fetchRecentBuilds(initData)
-      .then((builds) => {
-        const match = builds.find((b) => b.request_id === id);
-        if (match) {
-          setRecentBuild(match);
-        } else {
-          // Build not found — navigate back
-          onBack();
-        }
-      })
-      .catch(() => {
-        onBack();
-      });
-  }, [type, id, initData, onBack]);
+    if (type === 'recent' && recentBuilds.length > 0 && !recentBuild) {
+      onBack();
+    }
+  }, [type, recentBuilds, recentBuild, onBack]);
 
   // Determine the resolved data and current display mode.
   // During active→recent transition, fall back to the last active build

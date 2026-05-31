@@ -7,12 +7,12 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { usePlatform } from 'platform-core';
 import { useNavigator, Navigator, ErrorBoundary } from 'tg-ui-preact';
 import { useSSE } from './hooks/useSSE';
-import { fetchConfig, fetchRecentBuilds, ApiError } from './api';
+import { fetchConfig, ApiError } from './api';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import MainScreen from './components/MainScreen';
 import BuildDetailScreen from './components/BuildDetailScreen';
-import type { ActiveBuild, AppConfig, ApiErrorDetail } from './types';
+import type { ActiveBuild, AppConfig, ApiErrorDetail, RecentBuild } from './types';
 
 interface ErrorState {
   title: string;
@@ -71,7 +71,18 @@ function AppShell() {
       });
   }, [initData, hasTelegram]);
 
-  // SSE stream for active builds — only when config is loaded
+  const [recentBuilds, setRecentBuilds] = useState<RecentBuild[]>([]);
+  const recentBuildsRef = useRef<RecentBuild[]>([]);
+
+  const handleRecentBuildsUpdate = useCallback((recent: RecentBuild[]) => {
+    recentBuildsRef.current = recent;
+    setRecentBuilds((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(recent)) return prev;
+      return recent;
+    });
+  }, []);
+
+  // SSE stream for active and recent builds — only when config is loaded
   const sseUrl = config ? `/api/webapp/stream?init_data=${encodeURIComponent(initData)}` : null;
 
   const handleBuildsUpdate = useCallback((builds: ActiveBuild[]) => {
@@ -83,30 +94,25 @@ function AppShell() {
     });
 
     // Auto-transition: if viewing an active build detail and it just
-    // completed, fetch recent builds and switch to the result screen.
+    // completed, use the streamed recent builds and switch to the result screen.
     const viewing = currentRef.current;
     if (viewing?.type === 'active') {
       const stillActive = builds.some((b) => b.request_id === viewing.id);
       if (!stillActive) {
-        fetchRecentBuilds(initData)
-          .then((recent) => {
-            const match = recent.find((r) => r.request_id === viewing.id);
-            if (match) {
-              navigator.replace({ screen: 'build-detail', type: 'recent', id: match.request_id });
-            } else {
-              // Build completed but not yet in recent — return to main
-              navigator.pop();
-            }
-          })
-          .catch(() => {
-            // Fetch failed — return to main screen gracefully
+        setTimeout(() => {
+          const match = recentBuildsRef.current.find((r) => r.request_id === viewing.id);
+          if (match) {
+            navigator.replace({ screen: 'build-detail', type: 'recent', id: match.request_id });
+          } else {
+            // Build completed but not in recent yet — return to main
             navigator.pop();
-          });
+          }
+        }, 50);
       }
     }
-  }, [initData, navigator]);
+  }, [navigator]);
 
-  useSSE(sseUrl, handleBuildsUpdate);
+  useSSE(sseUrl, handleBuildsUpdate, handleRecentBuildsUpdate);
 
 
   if (error) {
@@ -129,6 +135,7 @@ function AppShell() {
       mainScreen={
         <MainScreen
           config={config}
+          recentBuilds={recentBuilds}
           onBuildSelect={(type, id) =>
             navigator.push({ screen: 'build-detail', type, id })
           }
@@ -138,6 +145,7 @@ function AppShell() {
         navigator.current ? (
           <BuildDetailScreen
             config={config}
+            recentBuilds={recentBuilds}
             type={navigator.current.type}
             id={navigator.current.id}
             onBack={() => navigator.pop()}
@@ -148,6 +156,7 @@ function AppShell() {
         navigator.exiting ? (
           <BuildDetailScreen
             config={config}
+            recentBuilds={recentBuilds}
             type={navigator.exiting.type}
             id={navigator.exiting.id}
             onBack={() => navigator.pop()}

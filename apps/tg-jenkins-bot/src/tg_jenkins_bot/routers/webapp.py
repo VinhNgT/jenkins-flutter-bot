@@ -314,7 +314,8 @@ async def stream_active_builds(
 
     event = asyncio.Event()
     ctx.store.add_listener(event)
-    last_sent_hash = None
+    last_sent_active_hash = None
+    last_sent_recent_hash = None
 
     try:
         while True:
@@ -336,15 +337,37 @@ async def stream_active_builds(
                     }
                 )
 
-            # Only stream updates down the wire when the builds state actually mutates.
-            # Hash the canonical JSON for deduplication, but pass the raw list to
-            # ServerSentEvent — FastAPI serializes `data` automatically.
-            current_str = json.dumps(active_builds, sort_keys=True)
-            current_hash = hashlib.sha256(current_str.encode()).hexdigest()
+            branches_map = {v: k for k, v in ctx.config.branches.items()}
+            recent_builds_list = await ctx.build_client.get_recent_builds(count=5)
+            recent_builds = [
+                {
+                    "request_id": b.request_id,
+                    "branch": b.branch,
+                    "label": branches_map.get(b.branch, b.branch),
+                    "commit_hash": b.commit_hash,
+                    "result": b.result,
+                    "triggered_at": b.triggered_at,
+                    "completed_at": b.completed_at,
+                    "download_url": b.download_url,
+                    "file_size": b.file_size,
+                    "build_number": b.build_number,
+                }
+                for b in recent_builds_list
+            ]
 
-            if last_sent_hash is None or current_hash != last_sent_hash:
-                last_sent_hash = current_hash
+            active_str = json.dumps(active_builds, sort_keys=True)
+            active_hash = hashlib.sha256(active_str.encode()).hexdigest()
+
+            recent_str = json.dumps(recent_builds, sort_keys=True)
+            recent_hash = hashlib.sha256(recent_str.encode()).hexdigest()
+
+            if last_sent_active_hash is None or active_hash != last_sent_active_hash:
+                last_sent_active_hash = active_hash
                 yield ServerSentEvent(data=active_builds, event="builds")
+
+            if last_sent_recent_hash is None or recent_hash != last_sent_recent_hash:
+                last_sent_recent_hash = recent_hash
+                yield ServerSentEvent(data=recent_builds, event="recent")
 
             # Wait until store mutation sets the event, or timeout (15s) for a keep-alive window.
             try:

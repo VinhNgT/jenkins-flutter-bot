@@ -66,6 +66,7 @@ def mock_build_client():
         return_value={"request_id": "req-999", "status": "queued"}
     )
     client.cancel_build = AsyncMock(return_value={"status": "cancelled"})
+    client.get_recent_builds = AsyncMock(return_value=[])
     return client
 
 
@@ -271,6 +272,23 @@ async def test_webapp_stream_direct(app_with_mocks) -> None:
         triggered_by="Alice",
     )
 
+    from tg_jenkins_bot.build_client import BuildResult
+    app_with_mocks.state.manager.bot_context.build_client.get_recent_builds = AsyncMock(
+        return_value=[
+            BuildResult(
+                request_id="req-recent-1",
+                branch="main",
+                commit_hash="abcdef0",
+                result="success",
+                triggered_at=1715500000.0,
+                completed_at=1715501000.0,
+                download_url="https://example.com/apk",
+                file_size=1024,
+                build_number=1,
+            )
+        ]
+    )
+
     from fastapi import Request
     from unittest.mock import MagicMock
 
@@ -298,6 +316,12 @@ async def test_webapp_stream_direct(app_with_mocks) -> None:
     assert first_event.event == "builds"
     assert isinstance(first_event.data, list)
     assert any(b["request_id"] == "req-stream-test" for b in first_event.data)
+
+    second_event = await gen.__anext__()
+    assert second_event.event == "recent"
+    assert isinstance(second_event.data, list)
+    assert len(second_event.data) == 1
+    assert second_event.data[0]["request_id"] == "req-recent-1"
 
 
 @pytest.mark.asyncio

@@ -1,13 +1,13 @@
 # config-core
 
-Shared workspace library providing the Pydantic-based configuration framework used by all microservices in the Jenkins Flutter Bot ecosystem.
+Shared workspace library providing the Pydantic-based configuration framework used by all microservices in the Jenkins Telegram Bot ecosystem.
 
 ## What It Provides
 
 ### Configuration Framework
-- **`BootstrapSettings`** — Pydantic `BaseSettings` subclass for env-only config resolved once at process start. Hard crash if required fields are missing. Used by services with no dashboard-editable state (`config-hub`).
-- **`ServiceSettings`** — Pydantic `BaseSettings` subclass with JSON > Env precedence. Loaded on demand by service managers; raises `ValidationError` on missing required fields (caught by managers for soft fail). All fields are visible in the config-hub dashboard.
-- **`get_frontend_schema()`** — Adapter to convert a Pydantic model's fields into the config-hub UI schema format.
+- **`BootstrapSettings`** — Pydantic `BaseSettings` subclass for env-only config resolved once at process start. Hard crash if required fields are missing. Used by services with no dashboard-editable state (`service-hub`).
+- **`ServiceSettings`** — Pydantic `BaseSettings` subclass with JSON > Env precedence. Loaded on demand by service managers; raises `ValidationError` on missing required fields (caught by managers for soft fail). All fields are visible in the service-hub dashboard.
+- **`get_frontend_schema()`** — Adapter to convert a Pydantic model's fields into the service-hub UI schema format.
 - **`ConfigDocument`** — Object-oriented wrapper for nested dict manipulation (dotted-key get/set, deep merge).
 - **`get_secret_keys()`** — Returns the set of field names marked as secrets for a given settings subclass.
 - **`read_masked_config()`** — Reads a service's JSON config file and masks secret field values before returning.

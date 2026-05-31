@@ -1,4 +1,4 @@
-# Jenkins Flutter Bot — Setup Guide
+# Jenkins Telegram Bot — Setup Guide
 
 ← [Back to README](../README.md)
 
@@ -13,16 +13,16 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 - [Step 2 — Set Up Jenkins](#step-2--set-up-jenkins)
   - [2a. Initial Jenkins Setup](#2a-initial-jenkins-setup)
   - [2b. Create the Flutter Agent Node](#2b-create-the-flutter-agent-node)
-  - [2c. Configure the Agent in Config Hub](#2c-configure-the-agent-in-config-hub)
+  - [2c. Configure the Agent in Service Hub](#2c-configure-the-agent-in-service-hub)
   - [2d. Create a Jenkins API Token](#2d-create-a-jenkins-api-token)
   - [2e. Add Repository Credentials (Private Repos)](#2e-add-repository-credentials-private-repos)
   - [2f. Create the Pipeline Job](#2f-create-the-pipeline-job)
-  - [2g. Save Jenkins Settings in Config Hub](#2g-save-jenkins-settings-in-config-hub)
+  - [2g. Save Jenkins Settings in Service Hub](#2g-save-jenkins-settings-in-service-hub)
   - [2h. Optimize Jenkins for Bot-Only Operation (Storage & Resources)](#2h-optimize-jenkins-for-bot-only-operation-storage--resources)
 - [Step 3 — Set Up the Telegram Bot](#step-3--set-up-the-telegram-bot)
 - [Step 4 — Set Up Google Drive](#step-4--set-up-google-drive)
   - [4a. Create Google Cloud Credentials](#4a-create-google-cloud-credentials)
-  - [4b. Save & Connect in Config Hub](#4b-save--connect-in-config-hub)
+  - [4b. Save & Connect in Service Hub](#4b-save--connect-in-service-hub)
 - [Step 5 — Start Services & Test](#step-5--start-services--test)
 - [Troubleshooting](#troubleshooting)
 
@@ -47,8 +47,8 @@ Step-by-step instructions to get the full CI/CD stack running: a Telegram bot th
 ## Step 1 — Clone & Start the Stack
 
 ```bash
-git clone https://github.com/VinhNgT/jenkins-flutter-bot.git
-cd jenkins-flutter-bot/infra
+git clone https://github.com/VinhNgT/jenkins-telegram-bot.git
+cd jenkins-telegram-bot/infra
 ./compose.sh up -d --build
 ```
 
@@ -77,33 +77,33 @@ This starts all eight containers:
 | Service          | URL                    | Purpose                                           |
 | ---------------- | ---------------------- | ------------------------------------------------- |
 | `jenkins`        | http://localhost:8080   | Jenkins controller (web UI)                       |
-| `gateway`        | http://localhost:8880/webapp-admin | Ingress Gateway (proxies to config-hub Mini App) |
-| `config-hub`     | Internal (:9000)       | Config proxy, service control, and admin Mini App |
-| `tg-jenkins-bot` | Internal (:9090)       | Telegram bot + webhook receiver (publicly proxied to gateway:80) |
+| `gateway`        | http://localhost:8880/webapp-admin | Ingress Gateway (proxies to service-hub Mini App) |
+| `service-hub`    | Internal (:9000)       | Config proxy, service control, and admin Mini App |
+| `tg-bot`         | Internal (:9090)       | Telegram bot + webhook receiver (publicly proxied to gateway:80) |
 | `agent-control`  | Internal (:9091)       | Jenkins agent with Flutter/Android SDKs, OpenVPN management + control API |
 | `file-manager`   | Internal (:9092)       | Google Drive OAuth, build log, and retention enforcement |
 | `build-manager`  | Internal (:9010)       | Jenkins build trigger and job state tracking      |
 
 > [!NOTE]
-> The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so config-hub can manage them.
+The bot and agent won't fully start yet — that's expected. They need configuration first (Steps 2–4). Their control APIs remain available so service-hub can manage them.
 
-Open the **Config Hub Admin Mini App** in your Telegram client or, on a **best-effort basis**, access the standalone browser fallback at **http://localhost:8880/webapp-admin** (proxied securely via the gateway). You will use this interface throughout the remaining steps.
+Open the **Service Hub Admin Mini App** in your Telegram client or, on a **best-effort basis**, access the standalone browser fallback at **http://localhost:8880/webapp-admin** (proxied securely via the gateway). You will use this interface throughout the remaining steps.
 
 > [!NOTE]
 > Both frontends are designed natively as **Telegram Mini Apps** to run inside the Telegram client. Direct access via standard standalone desktop browsers is supported on a **best-effort basis only**, utilizing standard browser storage and a fallback platform provider for local development and verification.
 
-### 1b. Config Hub Security (Basic Authentication)
+### 1b. Service Hub / Browser Preview Security (Basic Authentication)
 
-By default, Config Hub operates with no authentication in development for rapid setup. To secure your configuration dashboard (especially when hosting publicly or in production):
+By default, the admin dashboard operates with no authentication in development for rapid setup. To secure your configuration dashboard (especially when hosting publicly or in production):
 
 1. Create or edit **`infra/compose.env`** and add your credentials:
    ```env
-   CONFIG_HUB_AUTH_USERNAME=your_username
-   CONFIG_HUB_AUTH_PASSWORD=your_secure_password
+   BROWSER_AUTH_USERNAME=your_username
+   BROWSER_AUTH_PASSWORD=your_secure_password
    ```
-2. Restart the Config Hub container:
+2. Restart the tg-bot container:
    ```bash
-   ./compose.sh restart config-hub
+   ./compose.sh restart tg-bot
    ```
 
 Once configured, the web UI and APIs will prompt for standard HTTP Basic Authentication credentials.
@@ -113,9 +113,9 @@ Once configured, the web UI and APIs will prompt for standard HTTP Basic Authent
 
 ### 1c. Configuration Portability (Export & Import)
 
-Config Hub provides symmetric configuration transfer under the **Export / Import** sidebar:
+Service Hub provides symmetric configuration transfer under the **Export / Import** sidebar:
 - **Export**: Generates a self-documenting unified `compose.env` file along with the JSON configurations of all running services packaged into a portable `.tar.gz` archive. The export routine can optionally package your active Google Drive OAuth tokens (`oauth.json`) and your current OpenVPN configuration (`client.ovpn`) if they exist.
-- **Import**: Allows you to upload the `.tar.gz` package to fully restore the state of all services. Config Hub extracts the package, applies the Pydantic configurations to each service, writes the certificates, and automatically triggers service restarts.
+- **Import**: Allows you to upload the `.tar.gz` package to fully restore the state of all services. Service Hub extracts the package, applies the Pydantic configurations to each service, writes the certificates, and automatically triggers service restarts.
 
 This makes cloning configurations across dev, mock, and production environments exceptionally clean and fast.
 
@@ -148,9 +148,9 @@ This makes cloning configurations across dev, mock, and production environments 
 6. Click **Save**
 7. On the node status page, find the **secret token** (shown in the agent launch command, after `-secret`)
 
-### 2c. Configure the Agent in Config Hub
+### 2c. Configure the Agent in Service Hub
 
-Now switch to **config-hub** at http://localhost:8880/webapp-admin:
+Now switch to **service-hub** at http://localhost:8880/webapp-admin:
 
 1. Open the **Jenkins Agent** tab
 2. Paste the **secret token** from the previous step into the **Agent Secret** field
@@ -164,7 +164,7 @@ Back in Jenkins (http://localhost:8080):
 
 1. Click your username (top-right) → **Configure**
 2. Under **API Token**, click **Add new Token**
-3. Give it a name (e.g., `jenkins-flutter-bot` or `build-manager`) and click **Generate**
+3. Give it a name (e.g., `jenkins-telegram-bot` or `build-manager`) and click **Generate**
 4. **Copy the token immediately** — it won't be shown again
 
 ### 2e. Add Repository Credentials (Private Repos)
@@ -217,7 +217,7 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
 
 5. Under **Pipeline**, paste a Jenkinsfile script.
 
-   > **💡 Tip:** After completing the next sub-step ([2g](#2g-save-jenkins-settings-in-config-hub)), the config-hub dashboard has a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration. You can select features like discarding old builds, cleaning workspaces, and shallow cloning, then copy the generated Groovy script directly into Jenkins.
+   > **💡 Tip:** After completing the next sub-step ([2g](#2g-save-jenkins-settings-in-service-hub)), the service-hub dashboard has a **Jenkins Pipeline** tab that generates a customized Jenkinsfile based on your configuration. You can select features like discarding old builds, cleaning workspaces, and shallow cloning, then copy the generated Groovy script directly into Jenkins.
 
    Alternatively, use this reference template:
 
@@ -282,9 +282,9 @@ If your Flutter project lives in a **private repository** (GitLab, GitHub, Bitbu
 
 6. Click **Save**
 
-### 2g. Save Jenkins Settings in Config Hub
+### 2g. Save Jenkins Settings in Service Hub
 
-Switch to **config-hub** at http://localhost:8880/webapp-admin:
+Switch to **service-hub** at http://localhost:8880/webapp-admin:
 
 1. Open the **Build Manager** tab
 2. Fill in the Jenkins fields:
@@ -305,19 +305,19 @@ Switch to **config-hub** at http://localhost:8880/webapp-admin:
 
 Because the project delegates build compilation to Jenkins but manages **build history, download delivery, and file hosting** entirely within its own internal services and Google Drive, you can configure Jenkins for highly optimized, low-footprint operations. This prevents your Jenkins server's disk space from filling up over time.
 
-Implement these optimizations in your Jenkins pipeline using the **integrated checkboxes in config-hub's "Jenkins Pipeline" tab**:
+Implement these optimizations in your Jenkins pipeline using the **integrated checkboxes in service-hub's "Jenkins Pipeline" tab**:
 
 #### 1. Discard Old Builds Automatically
 Since the bot immediately downloads the successful artifact and hosts it on Google Drive, and the build-manager tracks build logs/metadata locally, Jenkins does not need to store historical builds.
-* Switch on the **Discard Old Builds** option in config-hub to limit the build history to **`1`** build.
+* Switch on the **Discard Old Builds** option in service-hub to limit the build history to **`1`** build.
 
 #### 2. Clean Workspaces Post-Build
 By default, Jenkins retains checked-out code and build caches on the agent's disk, which can grow to tens of gigabytes for Flutter/Android projects. Wipe this clean after every execution.
-* Switch on the **Clean Workspace Post-Build** option in config-hub to clean workspace files after completion.
+* Switch on the **Clean Workspace Post-Build** option in service-hub to clean workspace files after completion.
 
 #### 3. Enable Shallow Clones (Speed & Space Optimization)
 If your git history is large, downloading the entire repository history wastes time and disk space. Perform a shallow clone instead.
-* Switch on the **Shallow Git Clone** option in config-hub to enable `--depth=1` shallow cloning.
+* Switch on the **Shallow Git Clone** option in service-hub to enable `--depth=1` shallow cloning.
 
 #### 4. Restrict Node Concurrency
 To ensure the `flutter-agent` build container isn't overwhelmed by multiple parallel builds:
@@ -350,7 +350,7 @@ To ensure the `flutter-agent` build container isn't overwhelmed by multiple para
      help - Show usage instructions
      ```
 
-Now enter these values in config-hub:
+Now enter these values in service-hub:
 
 6. Open the **Telegram Bot** tab at http://localhost:8880/webapp-admin
 7. Fill in:
@@ -382,7 +382,7 @@ Telegram Web Apps require a public **HTTPS** URL. An exceptionally secure, fast,
 The `cloudflared` tunnel and a pre-configured **Caddy Ingress Gateway** are already integrated into `infra/docker-compose.yml`. The Ingress Gateway acts as a secure routing perimeter, exposing **only** the public Web App (`/webapp`) and its APIs (`/api/webapp`), while keeping all administrative and webhook paths completely isolated and closed to the public.
 
 1. Open your Cloudflare Zero Trust Dashboard and go to **Networks → Tunnels**.
-2. Click **Create a Tunnel**, choose **Cloudflared**, name it (e.g., `jenkins-flutter-bot`), and click **Save**.
+2. Click **Create a Tunnel**, choose **Cloudflared**, name it (e.g., `jenkins-telegram-bot`), and click **Save**.
 3. Under **Install and run a connector**, select **Docker** and copy the **token** from the provided command (the long hash after `--token`).
 4. Simply create or edit your **`infra/.env`** file and add your token:
    ```env
@@ -413,7 +413,7 @@ If you prefer to run the connector natively on your host machine:
    - **URL:** `http://localhost:9090`
 
 #### Finalizing the Setup
-Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http://localhost:8880/webapp-admin):
+Once the tunnel is active, configure your `WEBAPP_URL` in **service-hub** (http://localhost:8880/webapp-admin):
 - Set **Web App URL** to `https://bot.yourdomain.com/webapp/` (make sure it ends with `/webapp/` and uses `https`).
 - Click **Save Bot Config** and restart the bot service. The bot will automatically register the `🚀 Build` MenuButtonWebApp pointing to your new Cloudflare domain!
 
@@ -443,7 +443,7 @@ Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http:/
    - Click **Create**
    - Copy the **Client ID** and **Client Secret**
 
-### 4b. Save & Connect in Config Hub
+### 4b. Save & Connect in Service Hub
 
 1. Open the **Google Drive** tab at http://localhost:8880/webapp-admin
 2. Paste the **Client ID** and **Client Secret** you just created
@@ -469,7 +469,7 @@ Once the tunnel is active, configure your `WEBAPP_URL` in **config-hub** (http:/
 
 ### Start the Bot and Agent
 
-Use the **Service Control** section in the config-hub dashboard:
+Use the **Service Control** section in the service-hub dashboard:
 
 1. Click **Start** next to the **Agent** service — this connects the `flutter-agent` to Jenkins
 2. Click **Start** next to the **Bot** service — this starts Telegram polling
@@ -510,9 +510,9 @@ docker compose restart
 
 ```bash
 # Check logs for a specific service
-docker compose logs tg-jenkins-bot
+docker compose logs tg-bot
 docker compose logs agent-control
-docker compose logs config-hub
+docker compose logs service-hub
 docker compose logs build-manager
 docker compose logs file-manager
 ```
@@ -546,10 +546,10 @@ docker compose logs file-manager
 
 - Build-manager polls Jenkins REST API for build status. Ensure the Jenkins credentials and job name are configured correctly in the **Build Manager** tab.
 - The pipeline MUST archive the APK (via `archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/*.apk'`). Check that the archive pattern matches your APK output location.
-- Verify that `tg-jenkins-bot` and `build-manager` are successfully communicating. Check logs:
+- Verify that `tg-bot` and `build-manager` are successfully communicating. Check logs:
   ```bash
   docker compose logs build-manager
-  docker compose logs tg-jenkins-bot
+  docker compose logs tg-bot
   ```
 
 ### OAuth popup says "redirect_uri_mismatch"

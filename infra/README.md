@@ -1,6 +1,6 @@
 # Infrastructure & Environments
 
-The `jenkins-flutter-bot` orchestrates its microservices using Docker Compose. The infrastructure configuration is centralized in the `infra/` directory, following standard Docker compose patterns.
+The `jenkins-telegram-bot` orchestrates its microservices using Docker Compose. The infrastructure configuration is centralized in the `infra/` directory, following standard Docker compose patterns.
 
 ## Directory Layout
 
@@ -49,9 +49,9 @@ Instead of running `docker compose` directly, always use the `compose.sh` runner
    ./compose.sh mock up -d --build
    ```
 
-## Config Hub Export / Import Relationship
+## Service Hub Export / Import Relationship
 
-The Config Hub provides an Export/Import feature (`jfb-config.tar.gz`) that is structurally mapped directly to the local file system and Docker named volumes.
+The Service Hub provides an Export/Import feature (`jtb-config.tar.gz`) that is structurally mapped directly to the local file system and Docker named volumes.
 
 When you download a config backup, the tarball contains:
 - `infra/compose.env`

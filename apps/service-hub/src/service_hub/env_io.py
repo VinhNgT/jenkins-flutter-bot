@@ -187,7 +187,7 @@ def generate_compose_env(
     """Generate a single compose.env file containing all service configurations."""
     lines: list[str] = [
         "# ══════════════════════════════════════════════════",
-        "# Jenkins Flutter Bot — Exported Configuration",
+        "# Jenkins Telegram Bot — Exported Configuration",
         "# ══════════════════════════════════════════════════",
         "# This file contains the portable environment variables.",
         "",

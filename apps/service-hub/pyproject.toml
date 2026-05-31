@@ -1,7 +1,7 @@
 [project]
 name = "service-hub"
 version = "0.4.7"
-description = "Centralized configuration proxy and web dashboard for the Jenkins Flutter Bot stack"
+description = "Centralized configuration proxy and web dashboard for the Jenkins Telegram Bot stack"
 requires-python = ">=3.12"
 dependencies = [
     "config-core",

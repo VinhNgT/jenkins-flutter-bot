@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="apps/tg-bot/webapp-admin/public/favicon.svg" width="64" height="64" alt="Jenkins Flutter Bot" />
-  <h1>Jenkins Flutter Bot</h1>
+  <img src="apps/tg-bot/webapp-admin/public/favicon.svg" width="64" height="64" alt="Jenkins Telegram Bot" />
+  <h1>Jenkins Telegram Bot</h1>
   <p>A self-hosted microservice CI/CD ecosystem — Telegram Mini Apps trigger Flutter builds on Jenkins and deliver APKs through Google Drive.</p>
 
-  [![Build & Push Docker Images](https://github.com/VinhNgT/jenkins-flutter-bot/actions/workflows/build-images.yml/badge.svg)](https://github.com/VinhNgT/jenkins-flutter-bot/actions/workflows/build-images.yml)
+  [![Build & Push Docker Images](https://github.com/VinhNgT/jenkins-telegram-bot/actions/workflows/build-images.yml/badge.svg)](https://github.com/VinhNgT/jenkins-telegram-bot/actions/workflows/build-images.yml)
 </div>
 
 ---
@@ -71,8 +71,8 @@ graph TD
 ## Quick Start
 
 ```bash
-git clone https://github.com/VinhNgT/jenkins-flutter-bot.git
-cd jenkins-flutter-bot/infra
+git clone https://github.com/VinhNgT/jenkins-telegram-bot.git
+cd jenkins-telegram-bot/infra
 ./compose.sh up -d --build
 ```
 

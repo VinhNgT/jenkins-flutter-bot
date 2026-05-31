@@ -1,6 +1,6 @@
 # build-manager
 
-Build orchestration service for the Jenkins Flutter Bot. Acts as the intermediary between the Telegram bot and Jenkins — manages build triggers, polls for completion, downloads build artifacts, and coordinates final callbacks.
+Build orchestration service for the Jenkins Telegram Bot. Acts as the intermediary between the Telegram bot and Jenkins — manages build triggers, polls for completion, downloads build artifacts, and coordinates final callbacks.
 
 ## Features
 

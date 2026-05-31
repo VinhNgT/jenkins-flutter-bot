@@ -1,7 +1,7 @@
 [project]
 name = "config-core"
 version = "0.4.7"
-description = "Configuration core framework for the Jenkins Flutter Bot stack based on Pydantic"
+description = "Configuration core framework for the Jenkins Telegram Bot stack based on Pydantic"
 requires-python = ">=3.12"
 dependencies = [
     "python-dotenv>=1.0.0",

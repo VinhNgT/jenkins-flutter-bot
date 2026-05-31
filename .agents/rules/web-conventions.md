@@ -1,7 +1,7 @@
 ---
 trigger: glob
 description: Frontend conventions for Preact + Vite web applications — state, build, and UI design principles.
-globs: **/frontend*/**/*.tsx, **/frontend*/**/*.ts, **/frontend*/vite.config.*, **/frontend*/package.json
+globs: **/webapp*/**/*.tsx, **/webapp*/**/*.ts, **/webapp*/vite.config.*, **/webapp*/package.json
 ---
 
 # Web conventions

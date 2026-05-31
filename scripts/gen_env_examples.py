@@ -70,7 +70,7 @@ def main() -> None:
     
     lines: list[str] = [
         "# ══════════════════════════════════════════════════",
-        "# Jenkins Flutter Bot — Configuration",
+        "# Jenkins Telegram Bot — Configuration",
         "# ══════════════════════════════════════════════════",
         "# Edit this file, then run:  ./compose.sh prod up -d",
         "# To regenerate template:    uv run python scripts/gen_env_examples.py",

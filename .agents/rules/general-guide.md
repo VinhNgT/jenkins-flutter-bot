@@ -3,9 +3,9 @@ trigger: always_on
 description: Core architectural reference — project identity, repo layout, service topology, and hard constraints.
 ---
 
-# Jenkins Flutter Bot — AI Agent Guide
+# Jenkins Telegram Bot — AI Agent Guide
 
-Core architectural reference and principles for the **jenkins-flutter-bot** monorepo CI/CD ecosystem.
+Core architectural reference and principles for the **jenkins-telegram-bot** monorepo CI/CD ecosystem.
 
 ---
 
@@ -31,7 +31,7 @@ Public webapp traffic and administrative access are routed behind a single Ingre
 - **`gateway` (port 80)**: Caddy Ingress perimeter managing unified path routing to `tg-bot`.
 - **`cloudflared`**: Cloudflare Tunnel providing secure inbound HTTPS ingress.
 
-*Note: For the visual Mermaid architecture diagram, consult the authoritative root [README.md](file:///Users/victor/Desktop/jenkins-flutter-bot/README.md).*
+*Note: For the visual Mermaid architecture diagram, consult the authoritative root [README.md](file:///Users/victor/Desktop/jenkins-telegram-bot/README.md).*
 
 ---
 

@@ -1,6 +1,6 @@
 # service-hub
 
-Centralized configuration proxy and operational orchestrator for the Jenkins Flutter Bot microservice ecosystem. Serves as the single backend controller for all core configuration management, service control, OAuth flows, and pipeline generation.
+Centralized configuration proxy and operational orchestrator for the Jenkins Telegram Bot microservice ecosystem. Serves as the single backend controller for all core configuration management, service control, OAuth flows, and pipeline generation.
 
 ## Features
 

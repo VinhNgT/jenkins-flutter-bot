@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Jenkins Flutter Bot — CI/CD Pipeline
+// Jenkins Telegram Bot — CI/CD Pipeline
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // Auto-generated Jenkinsfile for the Flutter build pipeline.
-// This pipeline is designed to work with the jenkins-flutter-bot stack:
-//   https://github.com/VinhNgT/jenkins-flutter-bot
+// This pipeline is designed to work with the jenkins-telegram-bot stack:
+//   https://github.com/VinhNgT/jenkins-telegram-bot
 //
 // HOW IT WORKS:
 //   1. The build-manager triggers this pipeline via Jenkins REST API

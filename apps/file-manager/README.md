@@ -1,6 +1,6 @@
 # file-manager
 
-Storage backend service for the Jenkins Flutter Bot. Manages build artifact storage, build completion logs, retention enforcement, and Google Drive OAuth. Supports three storage backends: Google Drive (production), ephemeral local disk storage (dev/mock), and log-only storage (dev/mock/minimal).
+Storage backend service for the Jenkins Telegram Bot. Manages build artifact storage, build completion logs, retention enforcement, and Google Drive OAuth. Supports three storage backends: Google Drive (production), ephemeral local disk storage (dev/mock), and log-only storage (dev/mock/minimal).
 
 ## Features
 

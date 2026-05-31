@@ -10,6 +10,23 @@ import {
 } from 'platform-core';
 
 /**
+ * Resolves a color value for the native Telegram WebApp SDK.
+ * CSS variables (e.g. `var(--...)`) are only present in the DOM within
+ * the webview context. Since the native Telegram client renders elements
+ * like MainButton out-of-process, it cannot interpret CSS custom properties.
+ * This resolves CSS variables to their computed color strings at the boundary.
+ */
+function resolveColor(value: string): string {
+  if (typeof document === 'undefined') return value;
+  const match = value.match(/^var\((--[^,)]+)(?:,\s*([^)]+))?\)$/);
+  if (!match) return value;
+  const resolved = getComputedStyle(document.documentElement)
+    .getPropertyValue(match[1].trim())
+    .trim();
+  return resolved || match[2]?.trim() || value;
+}
+
+/**
  * Concrete Telegram Provider.
  * Enforces a strict Telegram-only runtime environment and exposes native SDK bindings
  * through the provider-agnostic platform-core interfaces.
@@ -218,8 +235,8 @@ export function TelegramProvider({ children }: { children: ComponentChildren }) 
 
     return {
       show(config) {
-        const color = config.color ?? theme.button_color ?? '#2481cc';
-        const textColor = config.textColor ?? theme.button_text_color ?? '#ffffff';
+        const color = resolveColor(config.color ?? theme.button_color ?? '#2481cc');
+        const textColor = resolveColor(config.textColor ?? theme.button_text_color ?? '#ffffff');
 
         mainButtonCallbackRef.current = config.onClick;
 

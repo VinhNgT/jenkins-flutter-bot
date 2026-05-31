@@ -18,9 +18,10 @@ The Telegram build trigger acts as a highly decoupled state machine:
 
 ---
 
-## 2. Real-Time Service Status Streaming (SSE)
-- **Aggregated SSE Stream**: Status signals (configured status, running state, and startup uptime stamps) from all Python microservices are proxied to `config-hub`.
-- **MD5-Based Hashing Filters**: To avoid client re-rendering and optimize network traffic, the SSE server aggregates, serializes, and hashes status payloads using MD5. It transmits events down the socket solely when state changes occur.
+## 2. Real-Time Service Status & Build Streaming (SSE)
+- **Aggregated Service Status Stream**: Operational status signals (configured status, running state, and startup uptime stamps) from all Python microservices are proxied to `config-hub` and hashed using MD5. Events are transmitted only when the aggregated state changes.
+- **Aggregated Build Status Stream**: Active builds and recent completed builds are streamed from the bot backend to the Telegram client over a single server-pushed SSE connection (`GET /api/webapp/stream`). This serves as the absolute single source of truth for all frontend build states, replacing REST polling.
+- **SHA-256 Deduplication Hashing**: To optimize bandwidth and avoid client re-renders, the build SSE server aggregates, serializes, and hashes build payloads using SHA-256, transmitting events down the socket solely when a state mutation occurs.
 
 ---
 

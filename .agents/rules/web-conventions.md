@@ -26,10 +26,12 @@ Triggered when editing frontend TypeScript/TSX files. Defines the architectural 
 - **UX Separation**:
   - **Bot client**: High-fidelity, strict, minimal interface targeting standard mobile Telegram client users.
   - **Config Hub**: Denser layout designed for operational speed, accommodating expand controls, information status lists, and management features while maintaining styling parity.
-- **Standalone Desktop Fallback**: Standalone browser/desktop layouts and actions operate on a **best-effort basis only**. Standard storage degrades gracefully to local `localStorage`, and native elements are visually simulated.
+- **Standalone Desktop Fallback**: Standalone browser/desktop layouts and actions operate on a **best-effort basis only**. Standard storage degrades gracefully to local `localStorage`. Custom HTML emulation scripts and styles are completely removed in favor of direct, native WebApp SDK binding.
 
 ---
 
 ## 3. UI Flow & Navigation Principles
 - **Stack-Based Navigation**: Avoid React Router or default browser history APIs. All navigation must utilize the custom CSS-transform-based screen transition stacks managed via `useNavigator()`.
-- **Delayed Unmount Animation**: Exit transitions must implement a delayed unmount pattern (~300ms) to ensure clean visual exits and prevent hook cleanup events (like hiding the physical back button) from firing prematurely mid-transition.
+- **Delayed Unmount Animation**: Exit transitions must implement a delayed unmount pattern (~300ms) to ensure clean visual exits.
+- **Screen Visibility Lifecycles**: Use `ScreenActiveContext` (`useScreenActive()`) to coordinate screen-level side effects (like physical back buttons and primary main buttons). Setup and cleanup/unregister routines must check screen visibility to trigger immediately when screens pop, rather than waiting for visual exit transition timers to expire.
+- **Native Button Color Resolution**: Native out-of-process client controls (like Telegram's `MainButton`) cannot interpret CSS custom property variable colors (e.g., `var(--...)`). Any CSS variables passed to the platform CTA buttons must be computed and resolved to raw hex values before crossing the platform context boundary.

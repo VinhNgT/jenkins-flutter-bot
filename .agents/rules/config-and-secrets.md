@@ -15,7 +15,7 @@ Triggered when editing config-related files. Outlines the unified schema system,
   - `BootstrapSettings`: Env-only settings, resolved at startup. Crashes if invalid (used by non-configurable services like `config-hub`).
   - `ServiceSettings`: Schema-driven JSON > Env configuration. soft-fails to pending states to keep API responsive for remote adjustments.
 - **Dotted-Key Schema Conversion**: Config options map to JSON via `get_frontend_schema()`. Dynamic UI forms are derived entirely from field metadata.
-- **Deep Merge on Save**: Config updates are recursively deep-merged. Saving a partial payload preserves untouched JSON keys. Do not implement destructive overwrites.
+- **Deep Merge on Save**: Config updates are recursively deep-merged to preserve untouched JSON keys. For secret fields: empty string (`""`) or absent values are automatically stripped before merge to preserve existing secrets, whereas explicitly passing `None` when the key exists in the payload triggers an explicit deletion, removing the key entirely from the JSON file at rest.
 
 ---
 

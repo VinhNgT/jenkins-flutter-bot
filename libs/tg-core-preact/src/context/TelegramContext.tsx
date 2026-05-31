@@ -67,7 +67,7 @@ export function TelegramProvider({ children }: { children: ComponentChildren }) 
       };
     }
 
-    const initData = tg.initData ?? 'preview';
+    const initData = tg.initData ?? '';
     const userId = tg.initDataUnsafe?.user?.id ?? null;
 
     const haptic = {

@@ -3,8 +3,6 @@
  *
  * Stubs the window.Telegram.WebApp global with enough surface area
  * to test hooks that depend on the SDK (useMainButton, useCloudStorage).
- * The emulator.ts module in the production source serves as the
- * canonical reference for realistic mock shapes.
  */
 
 import { vi } from 'vitest';
@@ -79,6 +77,9 @@ const mockWebApp = {
   showAlert: vi.fn(),
   showConfirm: vi.fn(),
   showPopup: vi.fn(),
+  disableVerticalSwipes: vi.fn(),
+  enableVerticalSwipes: vi.fn(),
+  setBottomBarColor: vi.fn(),
   HapticFeedback: {
     impactOccurred: vi.fn(),
     notificationOccurred: vi.fn(),

@@ -186,7 +186,7 @@ export default function BuildDetailScreen({ config, type, id, onBack }: BuildDet
   // Active build fields
   const triggeredBy = showingActiveUI ? (resolvedData as ActiveBuild).triggered_by : null;
   const triggeredById = showingActiveUI ? (resolvedData as ActiveBuild).triggered_by_id : null;
-  const canCancel = showingActiveUI && isActiveBuild && (initData === 'preview' || (userId != null && triggeredById === userId));
+  const canCancel = showingActiveUI && isActiveBuild && (!userId || (userId != null && triggeredById === userId));
   const estimatedDurationMs = showingActiveUI ? (resolvedData as ActiveBuild).estimated_duration : 0;
 
   // Recent build fields

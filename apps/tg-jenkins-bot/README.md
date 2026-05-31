@@ -52,8 +52,8 @@ The bot FastAPI service mounts a static directory at `/webapp` serving `index.ht
 - `POST /api/webapp/trigger` — Triggers a new build.
 - `POST /api/webapp/cancel` — Cancels an active build.
 
-### Preview Mode & Standalone Fallback
-When opened directly in a browser (where `window.Telegram.WebApp` is unavailable), the Mini App operates in a best-effort "Preview Mode" with simulated data to enable easy local development and validation. In development (on localhost), a rich desktop SDK emulator (`emulator.ts`) is automatically loaded. The emulator mimics theme parameters (light/dark auto-syncing), WebApp properties, HapticFeedback, events system (`onEvent`/`offEvent`), `showPopup` confirmation modal, and injects interactive floating controls for the `MainButton`/`BackButton` inside the desktop viewport. Standard direct standalone browser layouts and actions operate on a best-effort basis.
+### Standalone Browser Fallback
+When opened directly in a browser (where `window.Telegram.WebApp` is unavailable), the Mini App operates in a best-effort standalone fallback mode with standard browser controls and local storage integrations to enable easy local development and verification. Standard direct standalone browser layouts and actions operate on a best-effort basis.
 
 ## License
 

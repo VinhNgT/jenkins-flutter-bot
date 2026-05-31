@@ -8,15 +8,15 @@ export interface ViewportState {
 export function useViewport(options?: {
   disableSwipes?: boolean;
 }): ViewportState {
-  const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
-  const isTelegram = !!(tg && tg.initData && tg.initData !== 'preview');
   const [viewport, setViewport] = useState<ViewportState>({
-    height: window.innerHeight,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
     isExpanded: true,
   });
 
   useEffect(() => {
-    if (!isTelegram || !tg) return;
+    if (typeof window === 'undefined') return;
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
 
     tg.expand();
 
@@ -40,7 +40,7 @@ export function useViewport(options?: {
       window.removeEventListener('resize', handleResize);
       tg.offEvent('viewportChanged', handleResize);
     };
-  }, [tg, isTelegram, options?.disableSwipes]);
+  }, [options?.disableSwipes]);
 
   return viewport;
 }

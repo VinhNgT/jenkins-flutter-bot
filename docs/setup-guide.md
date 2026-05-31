@@ -90,7 +90,7 @@ This starts all eight containers:
 Open the **Config Hub Admin Mini App** in your Telegram client or, on a **best-effort basis**, access the standalone browser fallback at **http://localhost:8880/webapp-admin** (proxied securely via the gateway). You will use this interface throughout the remaining steps.
 
 > [!NOTE]
-> Both frontends are designed natively as **Telegram Mini Apps** to run inside the Telegram client. Direct access via standard standalone desktop browsers is supported on a **best-effort basis only**, utilizing standard browser storage and local SDK emulation (`emulator.ts`) for local development and verification.
+> Both frontends are designed natively as **Telegram Mini Apps** to run inside the Telegram client. Direct access via standard standalone desktop browsers is supported on a **best-effort basis only**, utilizing standard browser storage and a fallback platform provider for local development and verification.
 
 ### 1b. Config Hub Security (Basic Authentication)
 
@@ -486,9 +486,6 @@ docker compose restart
 1. **Jenkins:** Go to http://localhost:8080 → Nodes — the `flutter-agent` should show as **online**
 2. **Telegram:** Send `/status` to your bot — it should report service health and confirm the bot is ready
 
-> [!TIP]
-> **Local WebApp Emulator for Development:**
-> Both the `tg-jenkins-bot` webapp and the `config-hub` admin app include an integrated **Telegram WebApp Emulator** for rapid in-browser testing without relying on the physical Telegram client. When you access these apps in your browser locally (e.g. `http://localhost:8880/webapp/` or `http://localhost:8880/webapp-admin/`), the emulator provides a mock mobile UI container simulating custom theme styles, Main/Back button integration, and editable Telegram `initData` parameters.
 
 ### Run Your First Build
 

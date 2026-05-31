@@ -26,6 +26,6 @@ Triggered when writing or modifying tests. Defines the testing methodologies, he
 
 ## 3. Frontend Testing (Vitest + JSDOM)
 - **Vitest Setup**: Preact apps run in `jsdom` test environments using Vitest setup hooks (`defineConfig` imported from `vitest/config`).
-- **Telegram SDK Simulation**: Preact hooks and components are tested against simulated WebApp contexts (spy models based on `emulator.ts`).
+- **Telegram SDK Simulation**: Preact hooks and components are tested against simulated WebApp contexts defined in the test setup.
 - **Isolation of Hook Timers**: Use Vitest fake timers (`vi.useFakeTimers()`) to verify hooks like `useNavigator()` which govern transition phases (push -> active -> pop -> delayed unmount -> idle) over time.
 - **Mock Network Boundaries**: Mock `api.ts` clients using Vitest `vi.mock()` to isolate layout components from active HTTP networks.

@@ -77,7 +77,7 @@ cd jenkins-flutter-bot/infra
 Open **http://localhost:8880/webapp-admin** (best-effort standalone browser support or through Telegram client) and follow the **[Setup Guide](docs/setup-guide.md)** to configure Jenkins, Telegram, and Google Drive.
 
 > [!NOTE]
-> Both frontends are designed natively as **Telegram Mini Apps** to run inside the Telegram client. Direct access via standard standalone desktop browsers is supported on a **best-effort basis only**, utilizing standard browser storage and local SDK emulation (`emulator.ts`) for local development and verification.
+> Both frontends are designed natively as **Telegram Mini Apps** to run inside the Telegram client. Direct access via standard standalone desktop browsers is supported on a **best-effort basis only**, utilizing standard browser storage and a fallback platform provider for local development and verification.
 
 > **Production:** Pre-built images are on GHCR — use `./compose.sh prod up -d`. See the setup guide for details.
 

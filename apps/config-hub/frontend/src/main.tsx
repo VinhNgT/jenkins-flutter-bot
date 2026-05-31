@@ -40,18 +40,7 @@ function AppBootstrap() {
   );
 }
 
-// Conditionally load the Telegram SDK emulator in dev mode.
-// The emulator injects window.Telegram.WebApp on localhost
-// when no real SDK is present. It must run before App mounts
-// so TelegramProvider/BrowserPlatformProvider sees the mock SDK.
-async function bootstrap() {
-  const isLocalHost = ['localhost', '127.0.0.1'].includes(location.hostname);
-  const hasRealSDK = !!window.Telegram?.WebApp?.initData;
-
-  if (isLocalHost && !hasRealSDK) {
-    await import('./emulator');
-  }
-
+function bootstrap() {
   const isTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp;
   const Provider = isTelegram ? TelegramProvider : BrowserPlatformProvider;
 

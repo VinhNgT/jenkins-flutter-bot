@@ -70,17 +70,14 @@ def verify_init_data(init_data: str, bot_token: str) -> dict[str, Any]:
     if not hmac.compare_digest(computed_hash, received_hash):
         raise ValueError("Invalid hash signature")
 
-    # Replay protection: reject initData older than the TTL
+    # Replay protection: reject initData if auth_date is missing or older than the TTL
     auth_date_str = params_dict.get("auth_date")
-    if auth_date_str:
-        try:
-            auth_date = int(auth_date_str)
-            if time.time() - auth_date > _INIT_DATA_TTL:
-                raise ValueError("initData expired (auth_date too old)")
-        except ValueError:
-            raise
-        except (TypeError, OverflowError):
-            pass
+    if not auth_date_str:
+        raise ValueError("Missing auth_date parameter")
+
+    auth_date = int(auth_date_str)
+    if time.time() - auth_date > _INIT_DATA_TTL:
+        raise ValueError("initData expired (auth_date too old)")
 
     # Parse nested JSON structures (e.g. user, chat objects)
     result: dict[str, Any] = {}

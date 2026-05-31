@@ -9,7 +9,7 @@ import { useCallback, useMemo, useState } from 'preact/hooks';
 import { usePlatform, usePrimaryButton, usePlatformStorage } from 'platform-core';
 import { Scaffold, List, ListItem, Switch, Button, useScreenActive } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
-import { triggerBuild } from '../api';
+import { useAPI } from '../context/ApiContext';
 import BranchSelector from './BranchSelector';
 import CustomBranchInput from './CustomBranchInput';
 import ActiveBuilds from './ActiveBuilds';
@@ -24,6 +24,7 @@ interface MainScreenProps {
 }
 
 export default function MainScreen({ config, activeBuilds, recentBuilds, onBuildSelect }: MainScreenProps) {
+  const api = useAPI();
   const { initData, haptic, hasNativePrimaryButton, showAlert } = usePlatform();
   const isActive = useScreenActive();
   const { showToast } = useToast();
@@ -83,7 +84,7 @@ export default function MainScreen({ config, activeBuilds, recentBuilds, onBuild
     setIsLoading(true);
 
     try {
-      await triggerBuild(initData, selectedBranch, notifyChat);
+      await api.triggerBuild(selectedBranch, notifyChat);
 
       // Reset selection
       setSelectedBranch(null);

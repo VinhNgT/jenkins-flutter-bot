@@ -10,7 +10,7 @@ Requires ``uv sync`` so all workspace packages are importable.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Type
+from typing import Any
 
 from pydantic_core import PydanticUndefined
 from pydantic_settings import BaseSettings
@@ -76,10 +76,6 @@ def main() -> None:
         "# To regenerate template:    uv run python scripts/gen_env_examples.py",
         "",
         "# ── Global Infrastructure ──",
-        "",
-        "# Service Auth Token",
-        "# Optional token for inter-service HTTP security (generate: python -c \"import secrets; print(secrets.token_urlsafe(32))\")",
-        "# SERVICE_AUTH_TOKEN=",
         "",
         "# Cloudflare Tunnel Token",
         "# Used by cloudflared to expose the gateway to the internet",

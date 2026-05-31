@@ -7,7 +7,7 @@
 
 import { FileCode, Copy, Info } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import { useToast } from '../context/ToastContext';
 import type { JenkinsfileResult } from '../types';
 import { Scaffold } from 'tg-ui-preact';
@@ -17,6 +17,7 @@ interface JenkinsfilePanelProps {
 }
 
 export default function JenkinsfilePanel({ onBack }: JenkinsfilePanelProps) {
+  const api = useAPI();
   const { showToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<JenkinsfileResult | null>(null);
@@ -50,7 +51,7 @@ export default function JenkinsfilePanel({ onBack }: JenkinsfilePanelProps) {
     localStorage.setItem('jf_repo_url', repoUrl);
     localStorage.setItem('jf_credentials_id', credentialsId);
 
-    const data = await API.getJenkinsfile({
+    const data = await api.getJenkinsfile({
       discard_builds: String(discardBuilds),
       clean_workspace: String(cleanWorkspace),
       shallow_clone: String(shallowClone),

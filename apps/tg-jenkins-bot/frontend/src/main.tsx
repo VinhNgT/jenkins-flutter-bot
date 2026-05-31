@@ -47,7 +47,7 @@ function AppBootstrap() {
 }
 
 function bootstrap() {
-  const isTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp;
+  const isTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData;
   const Provider = isTelegram ? TelegramProvider : BrowserPlatformProvider;
 
   render(

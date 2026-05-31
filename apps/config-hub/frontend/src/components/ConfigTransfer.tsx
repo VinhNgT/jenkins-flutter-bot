@@ -7,7 +7,7 @@
 
 import { Download, Upload, Copy, FileCode, CheckCircle, XCircle, SkipForward, AlertTriangle } from 'lucide-preact';
 import { useCallback, useRef, useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import { useToast } from '../context/ToastContext';
 import type { ExportEnvResult } from '../types';
 import { Scaffold, Button, TextArea } from 'tg-ui-preact';
@@ -25,6 +25,7 @@ interface ConfigTransferProps {
 }
 
 export default function ConfigTransfer({ onBack }: ConfigTransferProps) {
+  const api = useAPI();
   const { showToast } = useToast();
 
   // Export state
@@ -49,7 +50,7 @@ export default function ConfigTransfer({ onBack }: ConfigTransferProps) {
 
   async function handleGenerate() {
     setGenerating(true);
-    const result = await API.getExportEnv();
+    const result = await api.getExportEnv();
     setGenerating(false);
 
     if (result) {
@@ -59,7 +60,7 @@ export default function ConfigTransfer({ onBack }: ConfigTransferProps) {
 
   async function handleDownload() {
     setDownloading(true);
-    await API.downloadTarball();
+    await api.downloadTarball();
     setDownloading(false);
 
   }
@@ -82,7 +83,7 @@ export default function ConfigTransfer({ onBack }: ConfigTransferProps) {
   async function handleImport() {
     if (!selectedFile) return;
     setImporting(true);
-    const result = (await API.importTarball(selectedFile)) as unknown as ImportResult | null;
+    const result = (await api.importTarball(selectedFile)) as unknown as ImportResult | null;
     setImporting(false);
 
     if (result) {

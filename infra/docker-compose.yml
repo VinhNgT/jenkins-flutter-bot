@@ -35,7 +35,6 @@ services:
       FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
       JENKINS_URL: ${JENKINS_URL:-http://jenkins:8080}
       AGENT_CONTROL_URL: ${AGENT_CONTROL_URL:-http://agent-control:9091}
-      JFB_DEV_MODE: "true"
     expose:
       - "9010"
     volumes:
@@ -63,7 +62,9 @@ services:
       BUILD_MANAGER_URL: ${BUILD_MANAGER_URL:-http://build-manager:9010}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
-      JFB_DEV_MODE: "true"
+      ENABLE_BROWSER_PREVIEW: ${ENABLE_BROWSER_PREVIEW:-false}
+      BROWSER_AUTH_USERNAME: ${BROWSER_AUTH_USERNAME:-}
+      BROWSER_AUTH_PASSWORD: ${BROWSER_AUTH_PASSWORD:-}
     depends_on:
       - tg-jenkins-bot
       - agent-control
@@ -85,7 +86,9 @@ services:
       BOT_SERVICE_URL: ${BOT_SERVICE_URL:-http://tg-jenkins-bot:9090}
       BUILD_MANAGER_URL: ${BUILD_MANAGER_URL:-http://build-manager:9010}
       FILE_MANAGER_URL: ${FILE_MANAGER_URL:-http://file-manager:9092}
-      JFB_DEV_MODE: "true"
+      ENABLE_BROWSER_PREVIEW: ${ENABLE_BROWSER_PREVIEW:-false}
+      BROWSER_AUTH_USERNAME: ${BROWSER_AUTH_USERNAME:-}
+      BROWSER_AUTH_PASSWORD: ${BROWSER_AUTH_PASSWORD:-}
     expose:
       - "9090"
     volumes:
@@ -111,7 +114,6 @@ services:
         required: false
     environment:
       JENKINS_URL: ${JENKINS_URL:-http://jenkins:8080}
-      JFB_DEV_MODE: "true"
     expose:
       - "9091"
     volumes:
@@ -133,9 +135,6 @@ services:
       - "9092"
     volumes:
       - storage-data:/app/data
-    environment:
-      SERVICE_AUTH_TOKEN: ${SERVICE_AUTH_TOKEN:-}
-      JFB_DEV_MODE: "true"
     networks:
       - jenkins
 
@@ -145,7 +144,7 @@ services:
     container_name: gateway
     restart: unless-stopped
     ports:
-      - "8880:80"
+      - "127.0.0.1:8880:80"
     volumes:
       - ./gateway/Caddyfile:/etc/caddy/Caddyfile
     networks:

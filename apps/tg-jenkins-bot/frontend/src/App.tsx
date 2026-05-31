@@ -7,7 +7,8 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { usePlatform } from 'platform-core';
 import { useNavigator, Navigator, ErrorBoundary } from 'tg-ui-preact';
 import { useSSE } from './hooks/useSSE';
-import { fetchConfig, ApiError } from './api';
+import { createAPI, ApiError } from './api';
+import { ApiProvider, useAPI } from './context/ApiContext';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorScreen from './components/ErrorScreen';
 import MainScreen from './components/MainScreen';
@@ -21,6 +22,7 @@ interface ErrorState {
 }
 
 function AppShell() {
+  const api = useAPI();
   const platform = usePlatform();
   const { initData } = platform;
   const navigator = useNavigator();
@@ -34,21 +36,9 @@ function AppShell() {
   const currentRef = useRef(navigator.current);
   currentRef.current = navigator.current;
 
-  // If not in Telegram, block access
-  const hasTelegram = platform.initData !== '';
-
   // Fetch initial config
   useEffect(() => {
-    if (!hasTelegram) {
-      setError({
-        title: 'Telegram Client Required',
-        description: 'This application can only be accessed securely inside the official Telegram client messenger.',
-        detail: { error: 'direct_browser_disabled' },
-      });
-      return;
-    }
-
-    fetchConfig(initData)
+    api.fetchConfig()
       .then((cfg) => {
         setConfig(cfg);
         setError(null);
@@ -70,7 +60,7 @@ function AppShell() {
           });
         }
       });
-  }, [initData, hasTelegram]);
+  }, [initData]);
 
   const [recentBuilds, setRecentBuilds] = useState<RecentBuild[]>([]);
   const recentBuildsRef = useRef<RecentBuild[]>([]);
@@ -168,9 +158,14 @@ function AppShell() {
 }
 
 export default function App() {
+  const platform = usePlatform();
+  const api = createAPI(platform.initData);
+
   return (
     <ErrorBoundary>
-      <AppShell />
+      <ApiProvider api={api}>
+        <AppShell />
+      </ApiProvider>
     </ErrorBoundary>
   );
 }

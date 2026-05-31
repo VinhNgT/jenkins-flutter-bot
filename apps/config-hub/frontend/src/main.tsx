@@ -7,8 +7,12 @@ import { TelegramProvider } from 'tg-core-preact';
 import { BrowserPlatformProvider, usePlatform } from 'platform-core';
 import { ThemeProvider, BackButtonContext, ErrorBoundary } from 'tg-ui-preact';
 
+import { createAPI } from './api';
+import { ApiProvider } from './context/ApiContext';
+
 function AppBootstrap() {
   const platform = usePlatform();
+  const api = createAPI(platform.initData);
   const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
 
   const isDark = tg?.colorScheme === 'dark';
@@ -32,16 +36,18 @@ function AppBootstrap() {
   };
 
   return (
-    <BackButtonContext.Provider value={backButtonRegistry}>
-      <ThemeProvider theme={theme} isDark={isDark}>
-        <App />
-      </ThemeProvider>
-    </BackButtonContext.Provider>
+    <ApiProvider api={api}>
+      <BackButtonContext.Provider value={backButtonRegistry}>
+        <ThemeProvider theme={theme} isDark={isDark}>
+          <App />
+        </ThemeProvider>
+      </BackButtonContext.Provider>
+    </ApiProvider>
   );
 }
 
 function bootstrap() {
-  const isTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp;
+  const isTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData;
   const Provider = isTelegram ? TelegramProvider : BrowserPlatformProvider;
 
   render(

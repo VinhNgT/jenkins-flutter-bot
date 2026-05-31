@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { useNavigator, Navigator as NavigationContainer } from 'tg-ui-preact';
-import { API } from './api';
+import { useAPI } from './context/ApiContext';
 import HomeScreen from './components/HomeScreen';
 import ConfigScreen from './components/ConfigScreen';
 import JenkinsfilePanel from './components/JenkinsfilePanel';
@@ -40,6 +40,7 @@ const SECTION_SCOPES: Record<string, Scope[]> = {
 };
 
 export default function App() {
+  const api = useAPI();
   const navigator = useNavigator();
   const confirm = useConfirm();
   const [schemas, setSchemas] = useState<Schemas | null>(null);
@@ -85,8 +86,8 @@ export default function App() {
   useEffect(() => {
     async function load() {
       const [schemaResult, configResult] = await Promise.all([
-        API.getSchema(),
-        API.getConfig(),
+        api.getSchema(),
+        api.getConfig(),
       ]);
 
       if (!schemaResult && !configResult) {
@@ -131,8 +132,8 @@ export default function App() {
 
   const handleConfigReload = useCallback(async () => {
     const [schemaResult, configResult] = await Promise.all([
-      API.getSchema(),
-      API.getConfig(),
+      api.getSchema(),
+      api.getConfig(),
     ]);
     if (schemaResult) setSchemas(schemaResult);
     if (configResult) setConfig(configResult);

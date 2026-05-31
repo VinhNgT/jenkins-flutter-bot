@@ -7,10 +7,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse
 
-from config_core import setup_service_logging, verify_service_token
+from config_core import setup_service_logging
 
 from .manager import AgentManager, StartupError
 from .routers.control import router as control_router
@@ -38,8 +38,9 @@ def create_app() -> FastAPI:
     """Create the FastAPI app hosting agent control routes."""
     app = FastAPI(
         title="agent-control",
+        docs_url=None,
+        redoc_url=None,
         lifespan=lifespan,
-        dependencies=[Depends(verify_service_token)],
     )
     app.state.manager = AgentManager()
 

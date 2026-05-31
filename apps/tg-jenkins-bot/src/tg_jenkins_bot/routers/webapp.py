@@ -13,6 +13,8 @@ from typing import Annotated
 
 from config_core import verify_init_data
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
 
@@ -108,10 +110,14 @@ class CancelResponse(BaseModel):
 
 
 
+security = HTTPBasic(auto_error=False)
+
+
 async def validate_webapp_request(
     manager: ManagerDep,
     x_telegram_init_data: str | None = Header(None),
     init_data: str | None = Query(None),
+    credentials: HTTPBasicCredentials | None = Depends(security),
 ) -> WebAppUser:
     """Validate initData and check chat authorization."""
     ctx = manager.bot_context
@@ -129,20 +135,42 @@ async def validate_webapp_request(
             detail="Missing Telegram authentication credentials",
         )
 
-    # Allow preview mode bypass only in development / testing environments
+    # Validate preview mode requests using configured Basic Auth credentials
     if init_data_str == "preview":
-        is_dev = os.environ.get(
-            "JFB_DEV_MODE"
-        ) == "true" or ctx.config.telegram_bot_token in (
-            "123456:test-token",
-            "fake:token",
-            "",
-        )
-        if not is_dev:
+        enable_preview = os.environ.get("ENABLE_BROWSER_PREVIEW") == "true"
+        if not enable_preview:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Preview mode is not allowed in production",
+                detail="Browser preview is disabled in production",
             )
+
+        # Require Basic Auth
+        username = os.environ.get("BROWSER_AUTH_USERNAME")
+        password = os.environ.get("BROWSER_AUTH_PASSWORD")
+
+        if not username or not password:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Browser preview authentication credentials not configured on backend",
+            )
+
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+
+        is_correct_username = secrets.compare_digest(credentials.username, username)
+        is_correct_password = secrets.compare_digest(credentials.password, password)
+
+        if not (is_correct_username and is_correct_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+
         if not ctx.config.allowed_chat_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

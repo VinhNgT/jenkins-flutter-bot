@@ -22,7 +22,7 @@ import { usePlatform, usePrimaryButton } from 'platform-core';
 import { Scaffold, List, Badge, Spinner, Button, useScreenActive } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
-import { cancelBuild as cancelBuildApi } from '../api';
+import { useAPI } from '../context/ApiContext';
 import type { ActiveBuild, RecentBuild } from '../types';
 
 interface BuildDetailScreenProps {
@@ -78,6 +78,7 @@ function getResultVisuals(result: string) {
 }
 
 export default function BuildDetailScreen({ activeBuilds, recentBuilds, type, id, onBack }: BuildDetailScreenProps) {
+  const api = useAPI();
   const platform = usePlatform();
   const isActive = useScreenActive();
   const { initData, userId, haptic, hasNativePrimaryButton } = platform;
@@ -212,7 +213,7 @@ export default function BuildDetailScreen({ activeBuilds, recentBuilds, type, id
     const doCancel = async () => {
       setCancelling(true);
       try {
-        await cancelBuildApi(initData, requestId);
+        await api.cancelBuild(requestId);
         haptic.notification('success');
         showToast('Build successfully cancelled.');
         onBack();

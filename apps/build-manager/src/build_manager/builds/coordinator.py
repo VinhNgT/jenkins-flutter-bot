@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from config_core import get_service_auth_headers
+
 
 from .jenkins_client import JenkinsBuild, JenkinsClient
 from .state import BuildTracker
@@ -70,9 +70,7 @@ class BuildCoordinator:
         self._tracker = BuildTracker(
             data_dir,
         )
-        self._http = http_client or httpx.AsyncClient(
-            timeout=30.0, headers=get_service_auth_headers()
-        )
+        self._http = http_client or httpx.AsyncClient(timeout=30.0)
         self._poll_tasks: dict[str, asyncio.Task[None]] = {}
 
 

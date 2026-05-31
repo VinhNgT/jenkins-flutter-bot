@@ -130,7 +130,7 @@ class BootstrapSettings(BaseSettings):
     )
 
     @classmethod
-    def load(cls) -> Self:
+    def load(cls, *args: Any, **kwargs: Any) -> Self:
         """Load bootstrap config from env vars. Raises ValidationError if invalid."""
         load_dotenv()
         return cls()
@@ -163,7 +163,7 @@ class ServiceSettings(BaseSettings):
         return (JsonConfigSettingsSource(settings_cls), env_settings, dotenv_settings, init_settings)
 
     @classmethod
-    def load(cls) -> Self:
+    def load(cls, *args: Any, **kwargs: Any) -> Self:
         """Load config from JSON + env. Raises ValidationError if invalid."""
         load_dotenv()
         instance = cls()

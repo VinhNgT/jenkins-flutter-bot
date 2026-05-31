@@ -9,11 +9,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import JSONResponse
 
-from config_core import setup_service_logging, verify_service_token
+from config_core import setup_service_logging
 
 from .manager import BotManager, StartupError
 from .routers.callbacks import router as callbacks_router
@@ -70,7 +70,12 @@ class _ScrubInitDataFilter(logging.Filter):
 
 def create_app() -> FastAPI:
     """Create the FastAPI app hosting callback, control, and Web App routes."""
-    app = FastAPI(title="tg-jenkins-bot", lifespan=lifespan)
+    app = FastAPI(
+        title="tg-jenkins-bot",
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
     app.state.manager = BotManager()
 
     @app.exception_handler(StartupError)
@@ -98,11 +103,9 @@ def create_app() -> FastAPI:
         "/webapp", StaticFiles(directory=str(static_dir), html=True), name="webapp"
     )
 
-    # API routers — control + callbacks require service token auth,
-    # webapp uses Telegram initData auth (different trust boundary).
-    service_auth = [Depends(verify_service_token)]
-    app.include_router(control_router, dependencies=service_auth)
-    app.include_router(callbacks_router, dependencies=service_auth)
+    # API routers
+    app.include_router(control_router)
+    app.include_router(callbacks_router)
     app.include_router(webapp_router)
     return app
 

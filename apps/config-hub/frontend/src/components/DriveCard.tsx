@@ -6,7 +6,7 @@
 
 import { Cloud, LogOut, RotateCcw } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import { useToast } from '../context/ToastContext';
 import type { DriveStatus } from '../types';
 import { Dialog } from 'tg-ui-preact';
@@ -18,6 +18,7 @@ interface DriveCardProps {
 }
 
 export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
+  const api = useAPI();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -57,7 +58,7 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
 
   async function startOAuthFlow() {
     setBusy(true);
-    const result = await API.startDriveConnect();
+    const result = await api.startDriveConnect();
     if (!result?.auth_url) {
       setBusy(false);
       return;
@@ -98,7 +99,7 @@ export default function DriveCard({ driveStatus, onRefresh }: DriveCardProps) {
 
   async function disconnect() {
     setBusy(true);
-    const result = await API.disconnectDrive();
+    const result = await api.disconnectDrive();
     setBusy(false);
     if (result) {
       showToast('Google Drive disconnected', 'info');

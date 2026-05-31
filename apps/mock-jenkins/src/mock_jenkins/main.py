@@ -33,7 +33,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """Application factory for mock-jenkins."""
     config = MockJenkinsConfig()
-    app = FastAPI(title="mock-jenkins", lifespan=lifespan)
+    app = FastAPI(
+        title="mock-jenkins",
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
     app.state.manager = MockBuildManager(config)
     app.include_router(jenkins_router)
     return app

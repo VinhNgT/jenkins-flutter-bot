@@ -6,7 +6,7 @@
 
 import { Play, RotateCcw, Square, Terminal } from 'lucide-preact';
 import { useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import { useConfirm } from '../context/ConfirmDialog';
 import { usePlatform } from 'platform-core';
 import type { Scope, ServiceStatus } from '../types';
@@ -52,6 +52,7 @@ export default function ServiceCard({
   status,
   onRefresh,
 }: ServiceCardProps) {
+  const api = useAPI();
 
   const confirm = useConfirm();
   const { haptic } = usePlatform();
@@ -94,7 +95,7 @@ export default function ServiceCard({
     }
 
     setBusy(true);
-    const result = await API.controlService(scope, action);
+    const result = await api.controlService(scope, action);
     setBusy(false);
 
     if (result) {

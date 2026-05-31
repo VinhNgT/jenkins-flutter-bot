@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from config_hub.config import HubBootstrap
+from config_hub.dependencies import verify_admin_auth
 from config_hub.main import create_app
 from config_hub.manager import ConfigHubManager
 
@@ -13,14 +14,8 @@ from config_hub.manager import ConfigHubManager
 @pytest.fixture(autouse=True)
 def isolate_config(tmp_path, monkeypatch):
     """Redirect all config I/O to a temp directory.
-
-    Also sets JFB_DEV_MODE=true so the default no-auth-configured path
-    falls through to the dev bypass instead of the production fail-closed
-    503.  Individual tests that need production behaviour should override
-    or unset JFB_DEV_MODE themselves.
     """
     monkeypatch.setenv("JFB_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("JFB_DEV_MODE", "true")
 
 
 @pytest.fixture
@@ -39,6 +34,12 @@ def app():
     )
     test_app = create_app()
     test_app.state.manager = ConfigHubManager(config=test_config)
+
+    # Bypass authentication for testing by overriding verify_admin_auth dependency
+    async def bypass_auth() -> None:
+        pass
+
+    test_app.dependency_overrides[verify_admin_auth] = bypass_auth
     return test_app
 
 
@@ -49,3 +50,4 @@ async def client(app):
         base_url="http://test",
     ) as c:
         yield c
+

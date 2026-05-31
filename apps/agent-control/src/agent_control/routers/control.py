@@ -10,7 +10,7 @@ from config_core import (
     read_masked_config,
     save_config_with_merge,
 )
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 
 from ..config import AgentSettings, _DEFAULT_CONFIG_PATH
 from ..dependencies import ManagerDep
@@ -109,7 +109,7 @@ async def upload_vpn_file(manager: ManagerDep, file: UploadFile = File(...)) -> 
     return {"status": "uploaded", "size": len(content)}
 
 
-from fastapi.responses import Response
+
 
 @router.get("/vpn/download")
 async def download_vpn_file(manager: ManagerDep) -> Response:

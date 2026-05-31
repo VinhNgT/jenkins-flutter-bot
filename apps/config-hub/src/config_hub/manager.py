@@ -10,11 +10,9 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-from typing import Any
+from typing import Any, cast
 
 import httpx
-
-from config_core import get_service_auth_headers
 
 from .config import HubBootstrap
 from .env_io import (
@@ -56,8 +54,9 @@ class ConfigHubManager:
     ) -> None:
         resolved = config or HubBootstrap.load()
         self.file_manager_url: str | None = resolved.file_manager_url
-        self.auth_username: str | None = resolved.auth_username
-        self.auth_password: str | None = resolved.auth_password
+        self.enable_browser_preview: bool = resolved.enable_browser_preview
+        self.browser_auth_username: str | None = resolved.browser_auth_username
+        self.browser_auth_password: str | None = resolved.browser_auth_password
         self.telegram_bot_token: str | None = resolved.telegram_bot_token
         self.admin_telegram_user_ids: list[int] = resolved.admin_telegram_user_ids
         self.services = service_client or ServiceClient(
@@ -66,9 +65,7 @@ class ConfigHubManager:
             file_manager_url=resolved.file_manager_url,
             build_manager_url=resolved.build_manager_url,
         )
-        self.fm_client = fm_client or httpx.AsyncClient(
-            timeout=10.0, headers=get_service_auth_headers()
-        )
+        self.fm_client = fm_client or httpx.AsyncClient(timeout=10.0)
 
     async def start(self) -> None:
         """No-op — config-hub has no daemon to start."""
@@ -83,8 +80,9 @@ class ConfigHubManager:
         await self.stop()
         resolved = config or HubBootstrap.load()
         self.file_manager_url = resolved.file_manager_url
-        self.auth_username = resolved.auth_username
-        self.auth_password = resolved.auth_password
+        self.enable_browser_preview = resolved.enable_browser_preview
+        self.browser_auth_username = resolved.browser_auth_username
+        self.browser_auth_password = resolved.browser_auth_password
         self.telegram_bot_token = resolved.telegram_bot_token
         self.admin_telegram_user_ids = resolved.admin_telegram_user_ids
         self.services = ServiceClient(
@@ -93,9 +91,7 @@ class ConfigHubManager:
             file_manager_url=resolved.file_manager_url,
             build_manager_url=resolved.build_manager_url,
         )
-        self.fm_client = httpx.AsyncClient(
-            timeout=10.0, headers=get_service_auth_headers()
-        )
+        self.fm_client = httpx.AsyncClient(timeout=10.0)
         logger.info("ConfigHubManager restarted")
 
     def status(self) -> dict[str, Any]:
@@ -214,16 +210,19 @@ class ConfigHubManager:
             self.services.get_oauth_token(),
         )
 
-        fetched_schemas = fetched[: len(services)]
-        fetched_configs = fetched[len(services) : len(services) * 2]
-        vpn_file = fetched[-2]
-        oauth_token = fetched[-1]
+        fetched_schemas = cast(list[Any], fetched[: len(services)])
+        fetched_configs = cast(list[Any], fetched[len(services) : len(services) * 2])
+        vpn_file = cast(bytes | None, fetched[-2])
+        oauth_token = cast(dict[str, Any] | None, fetched[-1])
 
-        schemas = dict(zip(scopes, fetched_schemas))
-        configs = {
-            scope: (config if config else {})
-            for scope, config in zip(scopes, fetched_configs)
-        }
+        schemas = cast(dict[str, dict[str, Any] | None], dict(zip(scopes, fetched_schemas)))
+        configs = cast(
+            dict[str, dict[str, Any]],
+            {
+                scope: (config if isinstance(config, dict) else {})
+                for scope, config in zip(scopes, fetched_configs)
+            }
+        )
 
         compose_env_str, _ = generate_compose_env(
             bot_config=configs.get("bot", {}),

@@ -11,7 +11,6 @@ from typing import Any
 
 import httpx
 
-from config_core import get_service_auth_headers
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -37,9 +36,7 @@ class ServiceClient:
         self._agent_url = agent_url
         self._file_manager_url = file_manager_url
         self._build_manager_url = build_manager_url
-        self._client = client or httpx.AsyncClient(
-            timeout=5.0, headers=get_service_auth_headers()
-        )
+        self._client = client or httpx.AsyncClient(timeout=5.0)
 
     async def close(self) -> None:
         """Shut down the underlying HTTP client."""

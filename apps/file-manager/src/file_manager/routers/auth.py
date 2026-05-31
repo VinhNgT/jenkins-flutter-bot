@@ -161,7 +161,7 @@ async def get_token(manager: ManagerDep) -> dict[str, Any]:
     
     # We read the file directly since the manager loads it into memory as a Google Credentials object
     import json
-    token_path = drive.CREDENTIALS_PATH
+    token_path = drive.token_path
     if not token_path.exists():
         raise HTTPException(status_code=404, detail="OAuth token not found")
         

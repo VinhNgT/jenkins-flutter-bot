@@ -8,7 +8,7 @@
 
 import { RefreshCw, ArrowDownToLine, X } from 'lucide-preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import type { Scope } from '../types';
 
 interface LogViewerProps {
@@ -28,13 +28,14 @@ function logLevel(line: string): 'error' | 'warning' | 'info' | 'debug' | null {
 }
 
 export default function LogViewer({ scope, onClose }: LogViewerProps) {
+  const api = useAPI();
   const [lines, setLines] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const fetchLogs = useCallback(async () => {
-    const result = await API.getServiceLogs(scope);
+    const result = await api.getServiceLogs(scope);
     if (result) {
       setLines(result.lines);
       setLoading(false);

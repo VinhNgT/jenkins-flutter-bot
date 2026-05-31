@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import ServiceCard from './ServiceCard';
 import DriveCard from './DriveCard';
 import StorageBanner from './StorageBanner';
@@ -66,14 +66,15 @@ export default function HomeScreen({
   githubUrl,
   dirtyScopes,
 }: HomeScreenProps) {
+  const api = useAPI();
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
 
   // Initial fetch + 5-second short polling interval
   useEffect(() => {
     async function load() {
       const [statusResult, driveResult] = await Promise.all([
-        API.getServiceStatus(),
-        API.getDriveStatus(),
+        api.getServiceStatus(),
+        api.getDriveStatus(),
       ]);
       if (statusResult) onStatusUpdate(statusResult);
       setDriveStatus(driveResult);
@@ -81,7 +82,7 @@ export default function HomeScreen({
     load();
 
     const interval = setInterval(async () => {
-      const statusResult = await API.getServiceStatus();
+      const statusResult = await api.getServiceStatus();
       if (statusResult) onStatusUpdate(statusResult);
     }, 5000);
 
@@ -90,15 +91,15 @@ export default function HomeScreen({
 
   const refreshAll = useCallback(async () => {
     const [statusResult, driveResult] = await Promise.all([
-      API.getServiceStatus(),
-      API.getDriveStatus(),
+      api.getServiceStatus(),
+      api.getDriveStatus(),
     ]);
     if (statusResult) onStatusUpdate(statusResult);
     setDriveStatus(driveResult);
   }, [onStatusUpdate]);
 
   const refreshDrive = useCallback(async () => {
-    const result = await API.getDriveStatus();
+    const result = await api.getDriveStatus();
     setDriveStatus(result);
   }, []);
 

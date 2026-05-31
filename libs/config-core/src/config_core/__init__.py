@@ -6,7 +6,6 @@ dict helpers, and config I/O utilities used by every service in the stack.
 
 Security primitives:
   - ``redact`` / ``register_secret`` / ``install_log_redaction`` — secret scrubbing
-  - ``verify_service_token`` / ``get_service_auth_headers`` — inter-service auth
   - ``setup_service_logging`` — standardised logging with auto-redaction
 """
 
@@ -26,11 +25,6 @@ from config_core.redact import (
     install_log_redaction as install_log_redaction,
     register_secret as register_secret,
     redact as redact,
-)
-
-from config_core.auth import (
-    verify_service_token as verify_service_token,
-    get_service_auth_headers as get_service_auth_headers,
 )
 
 from config_core.telegram import (

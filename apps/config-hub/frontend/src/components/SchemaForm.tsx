@@ -10,7 +10,7 @@
 
 import { Save, RotateCcw } from 'lucide-preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import { useToast } from '../context/ToastContext';
 import { usePlatform } from 'platform-core';
 import type { Schema, SchemaField, Scope, ScopeConfig } from '../types';
@@ -38,6 +38,7 @@ export default function SchemaForm({
   onConfigReload,
   onDirtyChange,
 }: SchemaFormProps) {
+  const api = useAPI();
   const { showToast } = useToast();
   const { haptic } = usePlatform();
   const formRef = useRef<HTMLFormElement>(null);
@@ -250,7 +251,7 @@ export default function SchemaForm({
 
     const payload = buildPayload();
     setSaving(true);
-    const result = await API.saveScope(scope, payload);
+    const result = await api.saveScope(scope, payload);
 
     if (result) {
       haptic.notification('success');

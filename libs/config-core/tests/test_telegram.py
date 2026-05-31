@@ -136,6 +136,25 @@ class TestSignatureValidation:
 class TestReplayProtection:
     """auth_date-based TTL enforcement (1 hour window)."""
 
+    def test_missing_auth_date_raises(self) -> None:
+        """initData without auth_date is rejected."""
+        params = {
+            "user": json.dumps({"id": 99999}),
+        }
+        sorted_params = sorted(params.items())
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted_params)
+        secret_key = hmac.new(
+            b"WebAppData", _TEST_TOKEN.encode(), hashlib.sha256
+        ).digest()
+        computed_hash = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256
+        ).hexdigest()
+        params["hash"] = computed_hash
+        init_data = urllib.parse.urlencode(params)
+
+        with pytest.raises(ValueError, match="Missing auth_date"):
+            verify_init_data(init_data, _TEST_TOKEN)
+
     def test_expired_init_data_raises(self) -> None:
         """initData signed >1 hour ago is rejected."""
         old_auth_date = int(time.time()) - 3601

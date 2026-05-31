@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 from typing import Annotated
 
@@ -42,19 +41,10 @@ async def verify_admin_auth(
     request: Request,
     credentials: HTTPBasicCredentials | None = Depends(security),
 ) -> None:
-    """Verify admin authentication — Telegram initData or Basic Auth.
+    """Verify admin authentication — Telegram initData or Basic Auth in preview mode.
 
-    Telegram initData is the primary authentication mechanism. Basic Auth
-    is disabled by default and only activated when credentials are
-    explicitly configured. The Caddy gateway strips the Authorization
-    header from non-local requests, so Basic Auth only works from the
-    same local network even when configured.
-
-    Checks in order:
-    1. X-Telegram-Init-Data header → validate HMAC, check admin user ID
-    2. Basic Auth credentials (opt-in) → username/password check
-    3. JFB_DEV_MODE bypass → allow unauthenticated access in dev
-    4. Reject with 401/403 (fail-closed)
+    Telegram initData is the primary authentication mechanism. Browser preview mode
+    is enabled by ENABLE_BROWSER_PREVIEW and protected by Basic Auth.
     """
     manager = request.app.state.manager
 
@@ -66,12 +56,41 @@ async def verify_admin_auth(
     if request.url.path == "/api/webapp-admin/drive/oauth/callback":
         return
 
-    # --- 1. Telegram initData authentication (primary) ---
+    # --- 1. Telegram initData or Preview Authentication ---
     init_data = request.headers.get(_INIT_DATA_HEADER)
+
     if init_data:
-        # Dev mode preview bypass
-        if init_data == "preview" and os.environ.get("JFB_DEV_MODE"):
-            return
+        # Dev / preview bypass branch
+        if init_data == "preview":
+            if not manager.enable_browser_preview:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Browser preview is disabled in production",
+                )
+
+            # Require Basic Auth for preview mode
+            if not credentials:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required",
+                    headers={"WWW-Authenticate": "Basic"},
+                )
+
+            is_correct_username = secrets.compare_digest(
+                credentials.username, manager.browser_auth_username or ""
+            )
+            is_correct_password = secrets.compare_digest(
+                credentials.password, manager.browser_auth_password or ""
+            )
+
+            if is_correct_username and is_correct_password:
+                return
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized",
+                headers={"WWW-Authenticate": "Basic"},
+            )
 
         bot_token = manager.telegram_bot_token
         if not bot_token:
@@ -96,7 +115,13 @@ async def verify_admin_auth(
         user_id = user.get("id") if isinstance(user, dict) else None
         admin_ids = manager.admin_telegram_user_ids
 
-        if admin_ids and user_id not in admin_ids:
+        if not admin_ids:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Admin access not configured. Set ADMIN_TELEGRAM_USER_IDS.",
+            )
+
+        if user_id not in admin_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User not authorized for admin access",
@@ -104,36 +129,7 @@ async def verify_admin_auth(
 
         return
 
-    # --- 2. Basic Auth (opt-in, local network only) ---
-    username = manager.auth_username
-    password = manager.auth_password
-
-    if username and password and credentials:
-        is_correct_username = secrets.compare_digest(credentials.username, username)
-        is_correct_password = secrets.compare_digest(credentials.password, password)
-
-        if is_correct_username and is_correct_password:
-            return
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-
-    # --- 3. Dev mode bypass ---
-    if os.environ.get("JFB_DEV_MODE"):
-        return
-
-    # --- 4. Fail-closed ---
-    # Prompt for Basic Auth if it's configured, otherwise generic 401
-    if username and password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-
+    # --- 2. Fail-closed (no initData) ---
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required",

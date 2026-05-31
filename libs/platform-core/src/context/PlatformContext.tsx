@@ -61,7 +61,7 @@ export function BrowserPlatformProvider({ children }: { children: ComponentChild
 
   const platformValue = useMemo<PlatformContextValue>(() => {
     return {
-      initData: '',
+      initData: 'preview',
       userId: null,
       hasPhysicalBackButton: false,
       hasNativePrimaryButton: false,

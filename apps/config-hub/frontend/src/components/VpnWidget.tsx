@@ -19,13 +19,14 @@ import {
   Unplug,
 } from 'lucide-preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { API } from '../api';
+import { useAPI } from '../context/ApiContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmDialog';
 import { usePlatform } from 'platform-core';
 import type { VpnStatus } from '../types';
 
 export default function VpnWidget() {
+  const api = useAPI();
   const { showToast } = useToast();
   const confirm = useConfirm();
   const { haptic } = usePlatform();
@@ -34,7 +35,7 @@ export default function VpnWidget() {
   const [busy, setBusy] = useState(false);
 
   const refreshStatus = useCallback(async () => {
-    const result = await API.vpnStatus();
+    const result = await api.vpnStatus();
     setStatus(result);
     setLoading(false);
   }, []);
@@ -51,7 +52,7 @@ export default function VpnWidget() {
     }
     haptic.impact('medium');
     setBusy(true);
-    const result = await API.vpnUpload(file);
+    const result = await api.vpnUpload(file);
     if (result) {
       showToast('Config uploaded', 'success');
       await refreshStatus();
@@ -64,7 +65,7 @@ export default function VpnWidget() {
   async function handleConnect() {
     haptic.impact('medium');
     setBusy(true);
-    const result = await API.vpnConnect();
+    const result = await api.vpnConnect();
     if (result) {
       showToast('Connected', 'success');
       await refreshStatus();
@@ -77,7 +78,7 @@ export default function VpnWidget() {
   async function handleDisconnect() {
     haptic.impact('medium');
     setBusy(true);
-    const result = await API.vpnDisconnect();
+    const result = await api.vpnDisconnect();
     if (result) {
       showToast('Disconnected', 'info');
       await refreshStatus();
@@ -99,7 +100,7 @@ export default function VpnWidget() {
     haptic.impact('heavy');
 
     setBusy(true);
-    const result = await API.vpnDelete();
+    const result = await api.vpnDelete();
     if (result) {
       showToast('Config removed', 'info');
       await refreshStatus();

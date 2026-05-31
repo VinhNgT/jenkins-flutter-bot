@@ -14,7 +14,7 @@ Usage::
 
     # Secrets from ServiceSettings are auto-registered on .load().
     # For ad-hoc secrets not in Pydantic models:
-    register_secret(os.environ.get("SERVICE_AUTH_TOKEN", ""))
+    register_secret("my-custom-api-token")
 """
 
 from __future__ import annotations

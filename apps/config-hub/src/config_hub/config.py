@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from config_core import BootstrapSettings
 
 
@@ -20,13 +20,17 @@ class HubBootstrap(BootstrapSettings):
     agent_control_url: str | None = Field(None)
     file_manager_url: str | None = Field(None)
     build_manager_url: str | None = Field(None)
-    auth_username: str | None = Field(
-        None,
-        description="Username for Web UI Basic Authentication (local network only)",
+    enable_browser_preview: bool = Field(
+        False,
+        description="Enable administrative access via standard desktop web browser for local development/preview",
     )
-    auth_password: str | None = Field(
+    browser_auth_username: str | None = Field(
         None,
-        description="Password for Web UI Basic Authentication (local network only)",
+        description="Username for Basic Authentication in browser preview mode",
+    )
+    browser_auth_password: str | None = Field(
+        None,
+        description="Password for Basic Authentication in browser preview mode",
     )
     telegram_bot_token: str | None = Field(
         None,
@@ -58,3 +62,13 @@ class HubBootstrap(BootstrapSettings):
         if isinstance(v, list):
             return [int(x) for x in v]
         return v
+
+    @model_validator(mode="after")
+    def validate_preview_credentials(self) -> HubBootstrap:
+        """Ensure preview basic auth credentials are provided when preview is enabled."""
+        if self.enable_browser_preview:
+            if not self.browser_auth_username or not self.browser_auth_password:
+                raise ValueError(
+                    "BROWSER_AUTH_USERNAME and BROWSER_AUTH_PASSWORD are required when ENABLE_BROWSER_PREVIEW is enabled"
+                )
+        return self

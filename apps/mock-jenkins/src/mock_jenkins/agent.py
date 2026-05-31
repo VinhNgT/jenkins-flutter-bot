@@ -138,7 +138,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Application factory for the mock agent-control server."""
-    app = FastAPI(title="mock-agent-control", lifespan=lifespan)
+    app = FastAPI(
+        title="mock-agent-control",
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
     app.state.manager = MockAgentState()
 
     @app.exception_handler(StartupError)

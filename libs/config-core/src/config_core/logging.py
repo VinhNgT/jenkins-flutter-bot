@@ -23,9 +23,8 @@ from __future__ import annotations
 
 import collections
 import logging
-import os
 
-from config_core.redact import install_log_redaction, register_secret
+from config_core.redact import install_log_redaction
 
 _MAX_LOG_LINES = 1000
 
@@ -57,15 +56,13 @@ def get_buffer_logs() -> list[str]:
 def setup_service_logging() -> None:
     """Standard logging setup for all JFB services.
 
-    Performs five things in order:
+    Performs four things in order:
 
     1. Configures ``basicConfig`` with the project-standard format
     2. Suppresses noisy ``httpx`` debug/info logs
     3. Installs ``RedactingLogFilter`` on the root logger so all log
        output is automatically scrubbed of registered secrets
-    4. Registers ``SERVICE_AUTH_TOKEN`` for redaction (secrets from
-       ``ServiceSettings`` are auto-registered when ``.load()`` runs)
-    5. Attaches a ``RingBufferHandler`` to the root logger to capture
+    4. Attaches a ``RingBufferHandler`` to the root logger to capture
        redacted log lines in memory for the ``/control/logs`` endpoint
     """
     log_format = "%(asctime)s [%(name)s] %(levelname)s — %(message)s"
@@ -77,7 +74,6 @@ def setup_service_logging() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     install_log_redaction()
-    register_secret(os.environ.get("SERVICE_AUTH_TOKEN", ""))
 
     # Attach the ring buffer handler with the same format so captured
     # lines are identical to what appears on stdout.

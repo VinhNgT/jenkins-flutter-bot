@@ -118,11 +118,16 @@ async def test_client(app_with_mocks):
         yield c
 
 
-async def test_webapp_config_preview_bypass(test_client) -> None:
-    """Test standard config access using preview mode."""
+async def test_webapp_config_preview_bypass(test_client, monkeypatch) -> None:
+    """Test standard config access using preview mode with credentials."""
+    monkeypatch.setenv("ENABLE_BROWSER_PREVIEW", "true")
+    monkeypatch.setenv("BROWSER_AUTH_USERNAME", "preview_user")
+    monkeypatch.setenv("BROWSER_AUTH_PASSWORD", "secret123")
+
     response = await test_client.get(
         "/api/webapp/config",
         headers={"X-Telegram-Init-Data": "preview"},
+        auth=("preview_user", "secret123"),
     )
     assert response.status_code == 200
     data = response.json()
@@ -133,28 +138,11 @@ async def test_webapp_config_preview_bypass(test_client) -> None:
     ]
 
 
-async def test_webapp_preview_bypass_with_dev_mode_env(app_with_mocks, monkeypatch) -> None:
-    """Test that JFB_DEV_MODE='true' allows preview bypass even with a production-like token."""
-    # Temporarily set token to something non-test, but set JFB_DEV_MODE to true
+
+async def test_webapp_preview_bypass_rejected_when_disabled(app_with_mocks, monkeypatch) -> None:
+    """Test that preview bypass is rejected when ENABLE_BROWSER_PREVIEW is disabled."""
     app_with_mocks.state.manager.bot_context.config.telegram_bot_token = "production_token_1234"
-    monkeypatch.setenv("JFB_DEV_MODE", "true")
-
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app_with_mocks), base_url="http://test",
-    ) as c:
-        response = await c.get(
-            "/api/webapp/config",
-            headers={"X-Telegram-Init-Data": "preview"},
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["app_name"] == "TestApp"
-
-
-async def test_webapp_preview_bypass_rejected_in_prod(app_with_mocks, monkeypatch) -> None:
-    """Test that preview bypass is rejected in production (non-test token, no JFB_DEV_MODE)."""
-    app_with_mocks.state.manager.bot_context.config.telegram_bot_token = "production_token_1234"
-    monkeypatch.delenv("JFB_DEV_MODE", raising=False)
+    monkeypatch.setenv("ENABLE_BROWSER_PREVIEW", "false")
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app_with_mocks), base_url="http://test",
@@ -164,11 +152,68 @@ async def test_webapp_preview_bypass_rejected_in_prod(app_with_mocks, monkeypatc
             headers={"X-Telegram-Init-Data": "preview"},
         )
         assert response.status_code == 401
-        assert "Preview mode is not allowed in production" in response.json()["detail"]
+        assert "disabled" in response.json()["detail"]
 
 
-async def test_webapp_config_includes_triggered_by_id(app_with_mocks, test_client) -> None:
-    """Verify that triggered_by_id is serialized in the config response."""
+async def test_webapp_preview_bypass_valid_credentials_works(app_with_mocks, monkeypatch) -> None:
+    """Test that preview bypass works when ENABLE_BROWSER_PREVIEW is enabled and correct Basic Auth is provided."""
+    app_with_mocks.state.manager.bot_context.config.telegram_bot_token = "production_token_1234"
+    monkeypatch.setenv("ENABLE_BROWSER_PREVIEW", "true")
+    monkeypatch.setenv("BROWSER_AUTH_USERNAME", "preview_user")
+    monkeypatch.setenv("BROWSER_AUTH_PASSWORD", "secret123")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_with_mocks), base_url="http://test",
+    ) as c:
+        response = await c.get(
+            "/api/webapp/config",
+            headers={"X-Telegram-Init-Data": "preview"},
+            auth=("preview_user", "secret123"),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["app_name"] == "TestApp"
+
+
+async def test_webapp_preview_bypass_invalid_credentials_returns_401(app_with_mocks, monkeypatch) -> None:
+    """Test that preview bypass is rejected with 401 when incorrect Basic Auth is provided."""
+    app_with_mocks.state.manager.bot_context.config.telegram_bot_token = "production_token_1234"
+    monkeypatch.setenv("ENABLE_BROWSER_PREVIEW", "true")
+    monkeypatch.setenv("BROWSER_AUTH_USERNAME", "preview_user")
+    monkeypatch.setenv("BROWSER_AUTH_PASSWORD", "secret123")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_with_mocks), base_url="http://test",
+    ) as c:
+        response = await c.get(
+            "/api/webapp/config",
+            headers={"X-Telegram-Init-Data": "preview"},
+            auth=("preview_user", "wrong_pass"),
+        )
+        assert response.status_code == 401
+        assert response.headers["www-authenticate"] == "Basic"
+
+
+async def test_webapp_preview_bypass_missing_credentials_returns_401(app_with_mocks, monkeypatch) -> None:
+    """Test that preview bypass is rejected with 401 when Basic Auth is missing."""
+    app_with_mocks.state.manager.bot_context.config.telegram_bot_token = "production_token_1234"
+    monkeypatch.setenv("ENABLE_BROWSER_PREVIEW", "true")
+    monkeypatch.setenv("BROWSER_AUTH_USERNAME", "preview_user")
+    monkeypatch.setenv("BROWSER_AUTH_PASSWORD", "secret123")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_with_mocks), base_url="http://test",
+    ) as c:
+        response = await c.get(
+            "/api/webapp/config",
+            headers={"X-Telegram-Init-Data": "preview"},
+        )
+        assert response.status_code == 401
+        assert response.headers["www-authenticate"] == "Basic"
+
+
+async def test_webapp_stream_includes_triggered_by_id(app_with_mocks) -> None:
+    """Verify that triggered_by_id is serialized in the stream response."""
     ctx = app_with_mocks.state.manager.bot_context
     ctx.store.register(
         request_id="req-999",
@@ -178,15 +223,31 @@ async def test_webapp_config_includes_triggered_by_id(app_with_mocks, test_clien
         triggered_by="Alice",
         triggered_by_id=67890,
     )
-    
-    response = await test_client.get(
-        "/api/webapp/config",
-        headers={"X-Telegram-Init-Data": "preview"},
+
+    from fastapi import Request
+    from unittest.mock import MagicMock
+    from tg_jenkins_bot.routers.webapp import stream_active_builds, WebAppUser
+
+    mock_request = MagicMock(spec=Request)
+    mock_request.is_disconnected = AsyncMock(return_value=False)
+
+    user = WebAppUser(
+        chat_id=-12345,
+        user_id=12345,
+        first_name="Alice",
+        username="alice_tg",
     )
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["active_builds"]) == 1
-    assert data["active_builds"][0]["triggered_by_id"] == 67890
+
+    gen = stream_active_builds(
+        request=mock_request,
+        manager=app_with_mocks.state.manager,
+        user=user,
+    )
+
+    first_event = await gen.__anext__()
+    assert first_event.event == "builds"
+    assert len(first_event.data) == 1
+    assert first_event.data[0]["triggered_by_id"] == 67890
 
 
 

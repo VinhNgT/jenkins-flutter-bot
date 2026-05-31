@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,10 +40,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    # Only expose Swagger docs in dev mode — hidden in production.
-    docs_url = "/api/webapp-admin/docs" if os.environ.get("JFB_DEV_MODE") else None
-
-    app = FastAPI(title="config-hub", docs_url=docs_url, lifespan=lifespan)
+    app = FastAPI(
+        title="config-hub",
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
 
     # --- Manager ---
     manager = ConfigHubManager()
@@ -61,7 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(version.router, dependencies=auth_deps)
 
     # --- Static files & SPA shell (must be after API routers) ---
-    app.include_router(pages.router, dependencies=auth_deps)
+    app.include_router(pages.router)
     app.mount(
         "/webapp-admin",
         StaticFiles(directory=str(WEBAPP_DIR)),

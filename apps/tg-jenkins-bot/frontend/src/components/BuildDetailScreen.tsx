@@ -19,7 +19,7 @@ import {
   Copy, Download, HardDrive, FileText,
 } from 'lucide-preact';
 import { usePlatform, usePrimaryButton } from 'platform-core';
-import { Scaffold, List, Badge, Spinner, Button } from 'tg-ui-preact';
+import { Scaffold, List, Badge, Spinner, Button, useScreenActive } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
 import { useRelativeTime } from '../hooks/useRelativeTime';
 import { cancelBuild as cancelBuildApi, fetchRecentBuilds } from '../api';
@@ -29,9 +29,6 @@ interface BuildDetailScreenProps {
   config: AppConfig;
   type: 'active' | 'recent';
   id: string;
-  /** Whether this screen is the active (topmost) screen.
-   *  False during exit animation — triggers immediate MainButton/BackButton hide. */
-  isActive: boolean;
   onBack: () => void;
 }
 
@@ -79,8 +76,9 @@ function getResultVisuals(result: string) {
   }
 }
 
-export default function BuildDetailScreen({ config, type, id, isActive, onBack }: BuildDetailScreenProps) {
+export default function BuildDetailScreen({ config, type, id, onBack }: BuildDetailScreenProps) {
   const platform = usePlatform();
+  const isActive = useScreenActive();
   const { initData, userId, haptic, hasNativePrimaryButton } = platform;
   const { showToast } = useToast();
   const [cancelling, setCancelling] = useState(false);

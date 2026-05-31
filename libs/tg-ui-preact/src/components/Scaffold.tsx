@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useContext, useEffect } from 'preact/hooks';
 import { ChevronLeft } from 'lucide-preact';
 import { BackButtonContext } from '../context/BackButtonContext';
+import { useScreenActive } from '../context/ScreenActiveContext';
 
 export interface ScaffoldProps {
   /** Page header title (optional) */
@@ -24,13 +25,14 @@ export function Scaffold({
   children,
 }: ScaffoldProps) {
   const registry = useContext(BackButtonContext);
+  const isActive = useScreenActive();
 
   // Automatically register the back button callback with the platform context if available
   useEffect(() => {
-    if (!onBack || !registry) return;
+    if (!onBack || !registry || !isActive) return;
     const unregister = registry.register(onBack);
     return unregister;
-  }, [onBack, registry]);
+  }, [onBack, registry, isActive]);
 
   // Visual back button is shown if onBack is provided AND the active provider has no physical button support
   const showVisualBackButton = onBack && (!registry || !registry.hasPhysicalBackButton);

@@ -193,19 +193,16 @@ export default function App() {
                 reloadSeq={reloadSeq}
                 onConfigReload={handleConfigReload}
                 onDirtyChange={handleDirtyChange}
-                isActive={true}
                 onBack={handleBack}
               />
             )}
             {navigator.current.screen === 'jenkinsfile' && (
               <JenkinsfilePanel
-                isActive={true}
                 onBack={handleBack}
               />
             )}
             {navigator.current.screen === 'transfer' && (
               <ConfigTransfer
-                isActive={true}
                 onBack={handleBack}
               />
             )}
@@ -223,19 +220,16 @@ export default function App() {
                 reloadSeq={reloadSeq}
                 onConfigReload={handleConfigReload}
                 onDirtyChange={handleDirtyChange}
-                isActive={false}
                 onBack={handleBack}
               />
             )}
             {navigator.exiting.screen === 'jenkinsfile' && (
               <JenkinsfilePanel
-                isActive={false}
                 onBack={handleBack}
               />
             )}
             {navigator.exiting.screen === 'transfer' && (
               <ConfigTransfer
-                isActive={false}
                 onBack={handleBack}
               />
             )}

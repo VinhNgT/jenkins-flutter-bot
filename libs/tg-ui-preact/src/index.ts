@@ -4,6 +4,9 @@ export * from './context/ThemeProvider';
 // Export Back Button bridge context
 export * from './context/BackButtonContext';
 
+// Export Screen Active lifecycle context
+export * from './context/ScreenActiveContext';
+
 // Export CSS-transform Stack Navigator State Hook
 export * from './hooks/useNavigator';
 

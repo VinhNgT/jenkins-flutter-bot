@@ -21,7 +21,6 @@ interface ImportResult {
 }
 
 interface ConfigTransferProps {
-  isActive: boolean;
   onBack: () => void;
 }
 

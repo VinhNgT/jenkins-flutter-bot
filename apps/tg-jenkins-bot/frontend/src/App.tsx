@@ -129,7 +129,6 @@ function AppShell() {
       mainScreen={
         <MainScreen
           config={config}
-          isActive={navigator.current === null && navigator.exiting === null}
           onBuildSelect={(type, id) =>
             navigator.push({ screen: 'build-detail', type, id })
           }
@@ -141,7 +140,6 @@ function AppShell() {
             config={config}
             type={navigator.current.type}
             id={navigator.current.id}
-            isActive={true}
             onBack={() => navigator.pop()}
           />
         ) : null
@@ -152,7 +150,6 @@ function AppShell() {
             config={config}
             type={navigator.exiting.type}
             id={navigator.exiting.id}
-            isActive={false}
             onBack={() => navigator.pop()}
           />
         ) : null

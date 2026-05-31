@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { usePlatform, usePrimaryButton, usePlatformStorage } from 'platform-core';
-import { Scaffold, List, ListItem, Switch, Button } from 'tg-ui-preact';
+import { Scaffold, List, ListItem, Switch, Button, useScreenActive } from 'tg-ui-preact';
 import { useToast } from '../context/ToastContext';
 import { triggerBuild } from '../api';
 import BranchSelector from './BranchSelector';
@@ -18,12 +18,12 @@ import type { AppConfig } from '../types';
 
 interface MainScreenProps {
   config: AppConfig;
-  isActive: boolean;
   onBuildSelect: (type: 'active' | 'recent', id: string) => void;
 }
 
-export default function MainScreen({ config, isActive, onBuildSelect }: MainScreenProps) {
+export default function MainScreen({ config, onBuildSelect }: MainScreenProps) {
   const { initData, haptic, hasNativePrimaryButton, showAlert } = usePlatform();
+  const isActive = useScreenActive();
   const { showToast } = useToast();
 
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);

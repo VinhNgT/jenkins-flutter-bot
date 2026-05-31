@@ -35,7 +35,6 @@ interface ConfigScreenProps {
   reloadSeq: number;
   onConfigReload: () => Promise<void>;
   onDirtyChange: (scope: Scope, isDirty: boolean) => void;
-  isActive: boolean;
   onBack: () => void;
 }
 

@@ -31,10 +31,11 @@ export function usePrimaryButton(
     if (!registry) return;
 
     if (!isActive || !config) {
-      if (onClickRef.current) {
-        onClickRef.current = null;
-      }
-      registry.hide();
+      onClickRef.current = null;
+      // Do not call registry.hide() here. When transitioning between screens,
+      // the cleanup function from the previously-active effect already handles
+      // hiding. Calling hide() in the inactive branch would race against the
+      // newly-active screen's show() call and clobber it.
       return;
     }
 
@@ -42,9 +43,7 @@ export function usePrimaryButton(
     onClickRef.current = config.onClick;
 
     return () => {
-      if (onClickRef.current) {
-        onClickRef.current = null;
-      }
+      onClickRef.current = null;
       registry.hide();
     };
   }, [registry, isActive, config?.text, config?.color, config?.textColor,

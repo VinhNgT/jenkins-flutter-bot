@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import type { NavPhase } from '../hooks/useNavigator';
+import { ScreenActiveContext } from '../context/ScreenActiveContext';
 
 interface NavigatorProps {
   /** The active transition phase ('idle', 'pushing', 'pushed', 'popping') */
@@ -24,20 +25,26 @@ export function Navigator({
     <div className={viewportClass}>
       {/* Main / Root Screen */}
       <div className="nav-screen nav-screen--main">
-        {mainScreen}
+        <ScreenActiveContext.Provider value={detailScreen == null}>
+          {mainScreen}
+        </ScreenActiveContext.Provider>
       </div>
 
       {/* Detail Screen Overlay */}
       {detailScreen && (
         <div className="nav-screen nav-screen--detail">
-          {detailScreen}
+          <ScreenActiveContext.Provider value={true}>
+            {detailScreen}
+          </ScreenActiveContext.Provider>
         </div>
       )}
 
       {/* Exiting Screen (Delayed Visual Unmount Overlay) */}
       {!detailScreen && exitingScreen && (
         <div className="nav-screen nav-screen--detail">
-          {exitingScreen}
+          <ScreenActiveContext.Provider value={false}>
+            {exitingScreen}
+          </ScreenActiveContext.Provider>
         </div>
       )}
     </div>

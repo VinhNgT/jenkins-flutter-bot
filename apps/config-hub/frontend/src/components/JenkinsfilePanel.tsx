@@ -13,7 +13,6 @@ import type { JenkinsfileResult } from '../types';
 import { Scaffold } from 'tg-ui-preact';
 
 interface JenkinsfilePanelProps {
-  isActive: boolean;
   onBack: () => void;
 }
 

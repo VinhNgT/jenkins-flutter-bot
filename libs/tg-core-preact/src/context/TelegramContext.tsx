@@ -16,6 +16,7 @@ import {
  */
 export function TelegramProvider({ children }: { children: ComponentChildren }) {
   const initializedRef = useRef(false);
+  const mainButtonCallbackRef = useRef<(() => void) | null>(null);
 
   // 1. Enforce strict Telegram-available environment at startup
   if (typeof window !== 'undefined' && !window.Telegram?.WebApp) {
@@ -39,6 +40,18 @@ export function TelegramProvider({ children }: { children: ComponentChildren }) 
     tg.onEvent('fullscreenChanged', handleFullscreenChange);
     return () => {
       tg.offEvent('fullscreenChanged', handleFullscreenChange);
+    };
+  }, [tg]);
+
+  // Bind native MainButton click events to the active component's callback
+  useEffect(() => {
+    if (!tg) return;
+    const handleMainButtonClick = () => {
+      mainButtonCallbackRef.current?.();
+    };
+    tg.onEvent('mainButtonClicked', handleMainButtonClick);
+    return () => {
+      tg.offEvent('mainButtonClicked', handleMainButtonClick);
     };
   }, [tg]);
 
@@ -208,6 +221,8 @@ export function TelegramProvider({ children }: { children: ComponentChildren }) 
         const color = config.color ?? theme.button_color ?? '#2481cc';
         const textColor = config.textColor ?? theme.button_text_color ?? '#ffffff';
 
+        mainButtonCallbackRef.current = config.onClick;
+
         btn.setParams({
           text: config.text,
           color,
@@ -227,6 +242,7 @@ export function TelegramProvider({ children }: { children: ComponentChildren }) 
         }
       },
       hide() {
+        mainButtonCallbackRef.current = null;
         btn.hideProgress();
         btn.hide();
       },

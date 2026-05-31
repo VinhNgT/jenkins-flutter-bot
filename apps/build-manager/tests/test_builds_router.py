@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -148,15 +148,33 @@ async def test_build_stream(client, mock_coordinator):
     mock_coordinator._http = AsyncMock()
     mock_coordinator._http.get.return_value = mock_response
 
-    async with client.stream("GET", "/api/builds/stream") as response:
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "text/event-stream"
+    call_count = 0
 
-        lines = []
-        async for line in response.iter_lines():
-            lines.append(line)
-            if not line:
-                break
+    async def fake_is_disconnected(self):
+        nonlocal call_count
+        call_count += 1
+        return call_count > 1
 
-        event_content = "\n".join(lines)
-        assert "event: builds" in event_content
+    original_add = mock_coordinator.tracker.add_listener
+
+    def fake_add_listener(evt):
+        original_add(evt)
+        evt.set()
+
+    # Force the SSE event listener to trigger immediately to avoid the 15-second idle wait
+    mock_coordinator.tracker.add_listener = fake_add_listener
+
+    # Mock Request.is_disconnected so the infinite SSE stream loop exits cleanly under ASGITransport
+    with patch("starlette.requests.Request.is_disconnected", fake_is_disconnected):
+        async with client.stream("GET", "/api/builds/stream") as response:
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith("text/event-stream")
+
+            lines = []
+            async for line in response.aiter_lines():
+                lines.append(line)
+                if not line:
+                    break
+
+            event_content = "\n".join(lines)
+            assert "event: builds" in event_content

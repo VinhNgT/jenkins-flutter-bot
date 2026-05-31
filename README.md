@@ -50,7 +50,7 @@ graph TD
     BM -- "trigger / status / logs" --> JNK
     JNK -- "dispatches" --> AGT
     BM -- "polls" --> JNK
-    BM -- "delegates build records / APKs" --> FM
+    BM -- "delegates builds / queries history" --> FM
     BM -- "vpn tunnel command" --> AGT
     FM -- "OAuth & Drive upload" --> GD
 ```
@@ -62,7 +62,7 @@ graph TD
 | `tg-bot` | 9090 | No | Unified gateway serving both Telegram Mini Apps (`/webapp` and `/webapp-admin`), proxying administrative requests, and running Telegram bot polling |
 | `agent-control` | 9091 | No | Jenkins inbound agent with Flutter/Android SDKs, OpenVPN management + control API |
 | `file-manager` | 9092 | No | Storage backend — Google Drive OAuth, build log, retention enforcement, ephemeral/log_only storage |
-| `build-manager` | 9010 | No | Build orchestration — triggers Jenkins builds, tracks job state persistently, and delegates APK files to file-manager |
+| `build-manager` | 9010 | No | Build orchestration — triggers Jenkins builds, tracks job state persistently, and delegates APK files to and queries history from file-manager |
 | `gateway` | 80 | Yes | Caddy Ingress Gateway — unified path-based routing for `/webapp` and `/webapp-admin` to `tg-bot`. Host maps `8880:80` in dev |
 | `cloudflared` | — | No | Cloudflare Tunnel — secure HTTPS tunnel connecting local gateway to Cloudflare |
 

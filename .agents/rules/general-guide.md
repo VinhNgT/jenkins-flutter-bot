@@ -27,7 +27,7 @@ Public webapp traffic and administrative access are routed behind a single Ingre
 - **`tg-bot` (port 9090)**: Unified Telegram gateway serving user Mini App (`/webapp`) and admin dashboard Mini App (`/webapp-admin`), proxying administrative requests, and running bot polling.
 - **`agent-control` (port 9091)**: Inbound build agent with Android/Flutter SDKs.
 - **`file-manager` (port 9092)**: Drive OAuth, log retention, and storage backends.
-- **`build-manager` (port 9010)**: Jenkins pipeline triggers, persistent job tracking, and SSE status stream.
+- **`build-manager` (port 9010)**: Jenkins pipeline triggers, persistent job tracking, SSE status stream, and proxied build history.
 - **`gateway` (port 80)**: Caddy Ingress perimeter managing unified path routing to `tg-bot`.
 - **`cloudflared`**: Cloudflare Tunnel providing secure inbound HTTPS ingress.
 

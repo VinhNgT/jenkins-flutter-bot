@@ -14,7 +14,8 @@ The Telegram build trigger acts as a highly decoupled state machine:
 - **Trigger**: The whitelisted Telegram client transmits a trigger request containing branch and identifier metadata to `tg-bot`.
 - **Delegation**: The bot validates the request and forwards the build trigger to `build-manager`, which tracks active builds persistently, manages duplicate validation, and publishes real-time state mutations.
 - **VPN Execution & Poll**: `build-manager` brings up an isolated VPN connection via `agent-control`, schedules the parameterized pipeline build in Jenkins, and active-polls for completion.
-- **Upload & Delivery**: Once complete, `build-manager` transfers the compiled APK and metadata record to `file-manager`. The `build-manager` operates statelessly with zero concern or knowledge of how files are handled, stored, or authenticated. The `file-manager` service itself handles storage, manages Google Drive OAuth credentials, and enforces old build retention policies, returning download urls to notify the bot.
+- **Upload & Delivery**: Once complete, `build-manager` transfers the compiled APK and metadata record to `file-manager`. The `build-manager` operates statelessly with zero concern or knowledge of how files are handled, stored, or authenticated. The `file-manager` service itself handles storage, manages Google Drive OAuth credentials, and enforces old build retention policies, returning download URLs to `build-manager` to record in the build status.
+- **Completed History Delegation**: `tg-bot` is completely decoupled from `file-manager`. The bot queries completed build history exclusively through `build-manager`'s proxy API (`GET /api/builds/recent`), which in turn resolves it from `file-manager`.
 
 ---
 

@@ -18,14 +18,14 @@ class _TestSettings(ServiceSettings):
 
 
 def test_resolve_config_path_without_override(monkeypatch) -> None:
-    """Without JFB_DATA_DIR, paths pass through unchanged."""
-    monkeypatch.delenv("JFB_DATA_DIR", raising=False)
+    """Without JTB_DATA_DIR, paths pass through unchanged."""
+    monkeypatch.delenv("JTB_DATA_DIR", raising=False)
     assert resolve_config_path(Path("/app/data/bot.json")) == Path("/app/data/bot.json")
 
 
 def test_resolve_config_path_with_override(tmp_path, monkeypatch) -> None:
-    """With JFB_DATA_DIR, parent dir is replaced but filename preserved."""
-    monkeypatch.setenv("JFB_DATA_DIR", str(tmp_path))
+    """With JTB_DATA_DIR, parent dir is replaced but filename preserved."""
+    monkeypatch.setenv("JTB_DATA_DIR", str(tmp_path))
     result = resolve_config_path(Path("/app/data/bot.json"))
     assert result == tmp_path / "bot.json"
 

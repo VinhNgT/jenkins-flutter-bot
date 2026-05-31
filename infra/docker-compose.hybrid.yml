@@ -1,7 +1,7 @@
 # Hybrid environment — builds all services locally except agent-control, which is pulled from GHCR.
 # Usage: ./compose.sh hybrid [args]
 
-name: jfb
+name: jtb
 
 include:
   - docker-compose.yml

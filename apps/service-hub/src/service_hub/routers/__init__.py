@@ -1,1 +1,1 @@
-"""Router package for the config-hub API."""
+"""Router package for the service-hub API."""

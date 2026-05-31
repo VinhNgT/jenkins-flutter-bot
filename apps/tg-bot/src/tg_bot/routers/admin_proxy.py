@@ -407,7 +407,7 @@ async def export_tarball(manager: ManagerDep) -> Response:
     return Response(
         content=out_file.getvalue(),
         media_type="application/gzip",
-        headers={"Content-Disposition": "attachment; filename=jfb-config.tar.gz"},
+        headers={"Content-Disposition": "attachment; filename=jtb-config.tar.gz"},
     )
 
 
@@ -442,7 +442,7 @@ async def import_config_tarball(
     service_hub_url = _get_service_hub_url(manager)
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            files = {"file": (file.filename or "jfb-config.tar.gz", raw, "application/gzip")}
+            files = {"file": (file.filename or "jtb-config.tar.gz", raw, "application/gzip")}
             resp = await client.post(f"{service_hub_url}/api/import/tarball", files=files)
             resp.raise_for_status()
             hub_result = resp.json()

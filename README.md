@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/tg-bot/frontend-admin/public/favicon.svg" width="64" height="64" alt="Jenkins Flutter Bot" />
+  <img src="apps/tg-bot/webapp-admin/public/favicon.svg" width="64" height="64" alt="Jenkins Flutter Bot" />
   <h1>Jenkins Flutter Bot</h1>
   <p>A self-hosted microservice CI/CD ecosystem — Telegram Mini Apps trigger Flutter builds on Jenkins and deliver APKs through Google Drive.</p>
 

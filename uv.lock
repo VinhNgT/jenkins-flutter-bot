@@ -14,7 +14,7 @@ members = [
     "build-manager",
     "config-core",
     "file-manager",
-    "jenkins-flutter-bot",
+    "jenkins-telegram-bot",
     "mock-jenkins",
     "service-hub",
     "tg-bot",
@@ -674,7 +674,7 @@ wheels = [
 ]
 
 [[package]]
-name = "jenkins-flutter-bot"
+name = "jenkins-telegram-bot"
 version = "0.4.7"
 source = { virtual = "." }
 dependencies = [

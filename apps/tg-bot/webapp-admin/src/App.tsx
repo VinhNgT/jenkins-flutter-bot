@@ -160,7 +160,7 @@ export default function App() {
       >
         <h2 class="panel-title">Unable to Load Dashboard</h2>
         <p class="panel-desc" style={{ maxWidth: '400px' }}>
-          Could not connect to the config-hub API. Check that all services are
+          Could not connect to the service-hub API. Check that all services are
           running.
         </p>
         <button class="btn btn-accent" onClick={() => location.reload()}>

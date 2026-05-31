@@ -1,6 +1,6 @@
 # mock-jenkins
 
-Development-only mock that replaces the real Jenkins controller and flutter-agent
+Development-only mock that replaces the real Jenkins controller and agent-control
 in the `infra/mock/docker-compose.yml` overlay.
 
 ## What It Does
@@ -20,7 +20,7 @@ Used exclusively via the mock compose overlay:
 ./compose.sh mock up -d --build
 ```
 
-This replaces both the `jenkins` and `flutter-agent` services with a single
+This replaces both the `jenkins` and `agent-control` services with a single
 `mock-jenkins` container, enabling full end-to-end development without a real
 Jenkins installation.
 
@@ -29,7 +29,7 @@ Jenkins installation.
 The mock agent-control API uses the **real** `AgentSettings` schema from the
 `agent-control` package. This means:
 
-- The schema served to config-hub is always in sync — no hardcoded copies to drift.
+- The schema served to service-hub is always in sync — no hardcoded copies to drift.
 - Config saves via `PUT /control/config` are persisted to the `mock-agent-data` volume.
 - The agent secret is a required field — without it, the mock reports `configured: false`
   and `/control/start` returns an error, matching real agent-control behaviour.

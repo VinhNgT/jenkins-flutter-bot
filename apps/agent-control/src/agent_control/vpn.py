@@ -47,7 +47,7 @@ class VpnManager:
     @property
     def LOG_PATH(self) -> Path:
         # Log path for OpenVPN output, useful for troubleshooting handshakes
-        # and network routing issues. Redirected under JFB_DATA_DIR in tests.
+        # and network routing issues. Redirected under JTB_DATA_DIR in tests.
         return resolve_config_path(Path("/app/data/openvpn.log"))
 
     @property

@@ -13,7 +13,7 @@ from service_hub.manager import ServiceHubManager
 @pytest.fixture(autouse=True)
 def isolate_config(tmp_path, monkeypatch):
     """Redirect all config I/O to a temp directory."""
-    monkeypatch.setenv("JFB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("JTB_DATA_DIR", str(tmp_path))
 
 
 @pytest.fixture

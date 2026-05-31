@@ -1,5 +1,5 @@
 /**
- * Shared utility functions for the config-hub frontend.
+ * Shared utility functions for the service-hub frontend.
  */
 
 import type { ServiceStatus } from './types';

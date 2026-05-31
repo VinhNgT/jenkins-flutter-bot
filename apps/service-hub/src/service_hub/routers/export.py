@@ -28,7 +28,7 @@ async def export_tarball(manager: ManagerDep) -> Response:
     return Response(
         content=tarball,
         media_type="application/gzip",
-        headers={"Content-Disposition": "attachment; filename=jfb-config.tar.gz"},
+        headers={"Content-Disposition": "attachment; filename=jtb-config.tar.gz"},
     )
 
 

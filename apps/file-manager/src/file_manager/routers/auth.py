@@ -108,7 +108,7 @@ async def oauth_callback(manager: ManagerDep, request: Request) -> dict[str, str
 async def oauth_callback_proxy(manager: ManagerDep, request: Request) -> dict[str, str]:
     """Exchange a proxied authorization response URL for tokens.
 
-    Used by config-hub: Google redirects there, which forwards the full
+    Used by service-hub: Google redirects there, which forwards the full
     ``authorization_response`` URL here.
     Only available with the Google Drive backend.
     """

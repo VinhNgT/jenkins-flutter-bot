@@ -7,10 +7,10 @@ COPY package.json ./
 COPY libs/platform-core/package.json ./libs/platform-core/
 COPY libs/tg-core-preact/package.json ./libs/tg-core-preact/
 COPY libs/tg-ui-preact/package.json ./libs/tg-ui-preact/
-COPY apps/tg-bot/frontend/package.json ./apps/tg-bot/frontend/
-COPY apps/tg-bot/frontend-admin/package.json ./apps/tg-bot/frontend-admin/
+COPY apps/tg-bot/webapp/package.json ./apps/tg-bot/webapp/
+COPY apps/tg-bot/webapp-admin/package.json ./apps/tg-bot/webapp-admin/
 
-RUN npm install --workspace=tg-bot-webapp --workspace=config-hub-frontend --include-workspace-root
+RUN npm install --workspace=tg-bot-webapp --workspace=tg-bot-admin-webapp --include-workspace-root
 
 COPY libs/platform-core/ ./libs/platform-core/
 RUN npm run build --workspace=platform-core
@@ -21,11 +21,11 @@ RUN npm run build --workspace=tg-core-preact
 COPY libs/tg-ui-preact/ ./libs/tg-ui-preact/
 RUN npm run build --workspace=tg-ui-preact
 
-COPY apps/tg-bot/frontend/ ./apps/tg-bot/frontend/
+COPY apps/tg-bot/webapp/ ./apps/tg-bot/webapp/
 RUN npm run build --workspace=tg-bot-webapp
 
-COPY apps/tg-bot/frontend-admin/ ./apps/tg-bot/frontend-admin/
-RUN npm run build --workspace=config-hub-frontend
+COPY apps/tg-bot/webapp-admin/ ./apps/tg-bot/webapp-admin/
+RUN npm run build --workspace=tg-bot-admin-webapp
 
 
 # Stage 2: Build Python

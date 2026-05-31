@@ -1,4 +1,4 @@
-name: jfb
+name: jtb
 
 services:
   # Development/testing convenience — in production, point JENKINS_URL to an
@@ -20,7 +20,7 @@ services:
     volumes:
       - jenkins-data:/var/jenkins_home
     networks:
-      - jenkins
+      - jtb
 
   build-manager:
     build:
@@ -42,7 +42,7 @@ services:
     depends_on:
       - file-manager
     networks:
-      - jenkins
+      - jtb
 
   service-hub:
     build:
@@ -64,7 +64,7 @@ services:
       - file-manager
       - build-manager
     networks:
-      - jenkins
+      - jtb
 
   tg-bot:
     build:
@@ -86,13 +86,13 @@ services:
     expose:
       - "9090"
     volumes:
-      - bot-data:/app/data
+      - tg-bot-data:/app/data
     depends_on:
       - file-manager
       - service-hub
       - build-manager
     networks:
-      - jenkins
+      - jtb
 
   agent-control:
     platform: linux/amd64
@@ -113,9 +113,9 @@ services:
     expose:
       - "9091"
     volumes:
-      - agent-data:/app/data
+      - agent-control-data:/app/data
     networks:
-      - jenkins
+      - jtb
 
 
   file-manager:
@@ -130,9 +130,9 @@ services:
     expose:
       - "9092"
     volumes:
-      - storage-data:/app/data
+      - file-manager-data:/app/data
     networks:
-      - jenkins
+      - jtb
 
 
   gateway:
@@ -146,7 +146,7 @@ services:
     depends_on:
       - tg-bot
     networks:
-      - jenkins
+      - jtb
 
   cloudflared:
     # Note: On Docker for Mac/Linux, you might see a warning about UDP buffer size:
@@ -162,14 +162,14 @@ services:
     depends_on:
       - gateway
     networks:
-      - jenkins
+      - jtb
 
 volumes:
   jenkins-data:
-  bot-data:
-  agent-data:
+  tg-bot-data:
+  agent-control-data:
   build-manager-data:
-  storage-data:
+  file-manager-data:
 
 networks:
-  jenkins:
+  jtb:

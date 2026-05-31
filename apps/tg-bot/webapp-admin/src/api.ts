@@ -1,4 +1,4 @@
-/** Centralized API client — typed fetch wrappers for all config-hub endpoints. */
+/** Centralized API client — typed fetch wrappers for all service-hub endpoints. */
 
 import type {
   ConfigData,
@@ -185,7 +185,7 @@ export function createAPI(initData: string) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'jfb-config.tar.gz';
+        a.download = 'jtb-config.tar.gz';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

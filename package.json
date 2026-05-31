@@ -1,12 +1,12 @@
 {
-  "name": "jenkins-flutter-bot-workspace",
+  "name": "jenkins-telegram-bot-workspace",
   "private": true,
   "workspaces": [
     "libs/platform-core",
     "libs/tg-ui-preact",
     "libs/tg-core-preact",
-    "apps/tg-bot/frontend",
-    "apps/tg-bot/frontend-admin"
+    "apps/tg-bot/webapp",
+    "apps/tg-bot/webapp-admin"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

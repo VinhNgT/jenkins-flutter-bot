@@ -1,4 +1,4 @@
-name: jfb
+name: jtb
 
 # Mock override — replaces jenkins + flutter-agent with lightweight mocks.
 # Usage: ./compose.sh mock [args]
@@ -28,7 +28,7 @@ services:
       MOCK_FAILURE_RATE: ${MOCK_FAILURE_RATE:-0}
     volumes: !reset []
     networks:
-      - jenkins
+      - jtb
 
   # Replace real agent-control with mock agent-control API
   agent-control:
@@ -48,7 +48,7 @@ services:
     volumes:
       - mock-agent-data:/app/data
     networks:
-      - jenkins
+      - jtb
 
   # Use log_only storage instead of Google Drive
   file-manager:

@@ -1,6 +1,6 @@
-"""Mock agent-control server — emulates the flutter-agent's control API.
+"""Mock agent-control server — emulates the agent-control's control API.
 
-Serves the same /control/* endpoints that config-hub queries, using the
+Serves the same /control/* endpoints that service-hub queries, using the
 real AgentSettings schema to stay in sync automatically.  Unlike the real
 agent-control (which manages a Jenkins subprocess), this mock simply
 tracks configured/running state so the dashboard lifecycle is testable.

@@ -18,9 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: tg-jenkins-bot
+          - name: tg-bot
             context: .
-            dockerfile: apps/tg-jenkins-bot/Dockerfile
+            dockerfile: apps/tg-bot/Dockerfile
             platforms: linux/amd64,linux/arm64
 
           - name: build-manager
@@ -28,9 +28,9 @@ jobs:
             dockerfile: apps/build-manager/Dockerfile
             platforms: linux/amd64,linux/arm64
 
-          - name: config-hub
+          - name: service-hub
             context: .
-            dockerfile: apps/config-hub/Dockerfile
+            dockerfile: apps/service-hub/Dockerfile
             platforms: linux/amd64,linux/arm64
 
           # Build context must be repo root so the Dockerfile can reach

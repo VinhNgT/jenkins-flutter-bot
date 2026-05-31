@@ -2,7 +2,7 @@
 # Pin a specific release: IMAGE_TAG=v1.2.3 ./compose.sh prod up -d
 #
 
-name: jfb
+name: jtb
 
 include:
   - docker-compose.yml
@@ -12,13 +12,13 @@ services:
     build: !reset null
     image: ghcr.io/vinhngt/jenkins-flutter-bot/build-manager:${IMAGE_TAG:-latest}
 
-  config-hub:
+  service-hub:
     build: !reset null
-    image: ghcr.io/vinhngt/jenkins-flutter-bot/config-hub:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/service-hub:${IMAGE_TAG:-latest}
 
-  tg-jenkins-bot:
+  tg-bot:
     build: !reset null
-    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-jenkins-bot:${IMAGE_TAG:-latest}
+    image: ghcr.io/vinhngt/jenkins-flutter-bot/tg-bot:${IMAGE_TAG:-latest}
 
   agent-control:
     build: !reset null

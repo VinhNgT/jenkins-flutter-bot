@@ -12,11 +12,11 @@ Storage backend service for the Jenkins Flutter Bot. Manages build artifact stor
 - **Retention Enforcement** — evicts oldest build records and their backend files when the log exceeds `max_recent_builds`
 - **OAuth Flow** — supports both browser-redirect (popup) and headless code-paste authorization
 - **Token Lifecycle** — stores and refreshes OAuth tokens automatically
-- **Config & Schema API** — exposes `/control/config` and `/control/schema` so config-hub can manage it
+- **Config & Schema API** — exposes `/control/config` and `/control/schema` so service-hub can manage it
 
 ## How It Works
 
-1. On first use, config-hub initiates the OAuth flow — user signs in via a browser popup
+1. On first use, service-hub initiates the OAuth flow — user signs in via a browser popup
 2. file-manager exchanges the auth code for tokens and stores them in `/app/data/oauth.json`
 3. On each completed build, build-manager sends build metadata and artifact to file-manager via `POST /api/files/builds/record`
 4. file-manager uploads to the storage backend, records the build in its log, enforces retention, and returns the download URL

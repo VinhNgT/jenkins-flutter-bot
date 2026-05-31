@@ -1,4 +1,4 @@
-/** Shared TypeScript interfaces for the config-hub dashboard. */
+/** Shared TypeScript interfaces for the service-hub dashboard. */
 
 /* ─── Schema Types ────────────────────────────────────────────── */
 

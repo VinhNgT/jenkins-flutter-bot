@@ -9,7 +9,7 @@ Build orchestration service for the Jenkins Flutter Bot. Acts as the intermediar
 - **Polling Completion Detection** — each triggered build gets a dedicated `asyncio` poll worker that queries Jenkins until `building == False`
 - **Artifact Download** — on success, downloads the archived APK directly from Jenkins and delegates upload to file-manager
 - **Branch Resolution** — queries the remote Git repository to resolve branch head commits before triggering
-- **Config & Schema API** — exposes `/control/config` and `/control/schema` so config-hub can manage it
+- **Config & Schema API** — exposes `/control/config` and `/control/schema` so service-hub can manage it
 
 ## How It Works
 

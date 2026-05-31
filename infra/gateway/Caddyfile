@@ -1,16 +1,16 @@
 # ── Global options ─────────────────────────────────────────────────
 {
-    # Process the rate_limit directive before reverse_proxy so that
-    # over-limit requests are rejected without reaching the backend.
-    order rate_limit before reverse_proxy
+	# Process the rate_limit directive before reverse_proxy so that
+	# over-limit requests are rejected without reaching the backend.
+	order rate_limit before reverse_proxy
 
-    servers {
-        # Trust Docker bridge network IPs so that {remote_host} resolves
-        # to the real client IP (via X-Forwarded-For from cloudflared)
-        # instead of the container IP. Scoped to Docker's default bridge
-        # pool — excludes 10.0.0.0/8 and 192.168.0.0/16.
-        trusted_proxies static 172.16.0.0/12
-    }
+	servers {
+		# Trust Docker bridge network IPs so that {remote_host} resolves
+		# to the real client IP (via X-Forwarded-For from cloudflared)
+		# instead of the container IP. Scoped to Docker's default bridge
+		# pool — excludes 10.0.0.0/8 and 192.168.0.0/16.
+		trusted_proxies static 172.16.0.0/12
+	}
 }
 
 # ── Unified ingress (single port) ─────────────────────────────────
@@ -24,124 +24,140 @@
 #   /api/webapp-admin/*   → tg-bot API (proxies to service-hub)
 #
 :80 {
-    # ── Basic Auth network restriction ────────────────────────────
-    # Strip the Authorization header from non-local requests to admin
-    # endpoints. This prevents Basic Auth from working over the public
-    # internet (via Cloudflare tunnel) while preserving it for
-    # same-network access. Telegram initData auth uses a different
-    # header (X-Telegram-Init-Data) and is unaffected.
-    @admin_not_local {
-        path /webapp-admin* /api/webapp-admin/*
-        not remote_ip 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 ::1
-    }
-    request_header @admin_not_local -Authorization
+	# ── Basic Auth network restriction ────────────────────────────
+	# Strip the Authorization header from non-local requests to admin
+	# endpoints. This prevents Basic Auth from working over the public
+	# internet (via Cloudflare tunnel) while preserving it for
+	# same-network access. Telegram initData auth uses a different
+	# header (X-Telegram-Init-Data) and is unaffected.
+	@admin_not_local {
+		path /webapp-admin* /api/webapp-admin/*
+		not remote_ip 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 ::1
+	}
+	request_header @admin_not_local -Authorization
 
-    # ── Rate limiting ─────────────────────────────────────────────
+	# ── Browser Preview localhost restriction ─────────────────────
+	# Enforce that browser preview mode (init_data=preview) can only
+	# be accessed from localhost/loopback. Protects against accidental
+	# host port exposure to the LAN.
+	@preview_header_not_localhost {
+		header x-telegram-init-data preview
+		not remote_ip 127.0.0.0/8 172.16.0.0/12 ::1
+	}
+	respond @preview_header_not_localhost "Forbidden: Browser preview is only permitted from localhost." 403
 
-    # Bot webapp: mutating endpoints — strict limit
-    @webapp_mutate {
-        path /api/webapp/trigger /api/webapp/cancel
-    }
-    rate_limit @webapp_mutate {
-        zone webapp_mutate {
-            key    {remote_host}
-            events 10
-            window 1m
-        }
-    }
+	@preview_query_not_localhost {
+		query init_data=preview
+		not remote_ip 127.0.0.0/8 172.16.0.0/12 ::1
+	}
+	respond @preview_query_not_localhost "Forbidden: Browser preview is only permitted from localhost." 403
 
-    # Bot webapp: read endpoints — higher limit for normal polling
-    @webapp_read {
-        path /api/webapp/config /api/webapp/recent
-    }
-    rate_limit @webapp_read {
-        zone webapp_read {
-            key    {remote_host}
-            events 30
-            window 1m
-        }
-    }
+	# ── Rate limiting ─────────────────────────────────────────────
 
-    # Config-hub admin: brute-force protection
-    @admin_api {
-        path /api/webapp-admin/*
-    }
-    rate_limit @admin_api {
-        zone hub_admin {
-            key    {remote_host}
-            events 30
-            window 1m
-        }
-    }
+	# Bot webapp: mutating endpoints — strict limit
+	@webapp_mutate {
+		path /api/webapp/trigger /api/webapp/cancel
+	}
+	rate_limit @webapp_mutate {
+		zone webapp_mutate {
+			key {remote_host}
+			events 10
+			window 1m
+		}
+	}
 
-    # SSE streams are NOT rate-limited — they are long-lived
-    # connections, not repeated requests.
+	# Bot webapp: read endpoints — higher limit for normal polling
+	@webapp_read {
+		path /api/webapp/config /api/webapp/recent
+	}
+	rate_limit @webapp_read {
+		zone webapp_read {
+			key {remote_host}
+			events 30
+			window 1m
+		}
+	}
 
-    # ── Config-hub admin handlers (declared first — /webapp-admin* ─
-    # ── is a superstring of /webapp*, so must match before bot)  ──
+	# Admin dashboard: brute-force protection
+	@admin_api {
+		path /api/webapp-admin/*
+	}
+	rate_limit @admin_api {
+		zone hub_admin {
+			key {remote_host}
+			events 30
+			window 1m
+		}
+	}
 
-    # Admin SSE stream — requires immediate flushing
-    handle /api/webapp-admin/services/stream {
-        header Cache-Control "no-store"
-        reverse_proxy tg-bot:9090 {
-            flush_interval -1
-        }
-    }
+	# SSE streams are NOT rate-limited — they are long-lived
+	# connections, not repeated requests.
 
-    # Admin HTML entry point — always revalidate
-    @admin_html {
-        path /webapp-admin /webapp-admin/
-    }
-    handle @admin_html {
-        header Cache-Control "no-cache"
-        reverse_proxy tg-bot:9090
-    }
+	# ── Admin dashboard handlers (declared first — /webapp-admin* ───
+	# ── is a superstring of /webapp*, so must match before bot) ────
 
-    # Admin API — never cache
-    handle /api/webapp-admin/* {
-        header Cache-Control "no-store"
-        reverse_proxy tg-bot:9090
-    }
+	# Admin SSE stream — requires immediate flushing
+	handle /api/webapp-admin/services/stream {
+		header Cache-Control "no-store"
+		reverse_proxy tg-bot:9090 {
+			flush_interval -1
+		}
+	}
 
-    # Admin sub-resources (JS, CSS, assets) — content-hashed, cache forever
-    handle /webapp-admin/* {
-        header Cache-Control "public, max-age=31536000, immutable"
-        reverse_proxy tg-bot:9090
-    }
+	# Admin HTML entry point — always revalidate
+	@admin_html {
+		path /webapp-admin /webapp-admin/
+	}
+	handle @admin_html {
+		header Cache-Control "no-cache"
+		reverse_proxy tg-bot:9090
+	}
 
-    # ── Bot webapp handlers ───────────────────────────────────────
+	# Admin API — never cache
+	handle /api/webapp-admin/* {
+		header Cache-Control "no-store"
+		reverse_proxy tg-bot:9090
+	}
 
-    # Bot SSE stream — requires immediate flushing
-    handle /api/webapp/stream {
-        header Cache-Control "no-store"
-        reverse_proxy tg-bot:9090 {
-            flush_interval -1
-        }
-    }
+	# Admin sub-resources (JS, CSS, assets) — content-hashed, cache forever
+	handle /webapp-admin/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy tg-bot:9090
+	}
 
-    # Bot HTML entry point — always revalidate
-    @bot_html {
-        path /webapp /webapp/
-    }
-    handle @bot_html {
-        header Cache-Control "no-cache"
-        reverse_proxy tg-bot:9090
-    }
+	# ── Bot webapp handlers ───────────────────────────────────────
 
-    # Bot API — never cache
-    handle /api/webapp/* {
-        header Cache-Control "no-store"
-        reverse_proxy tg-bot:9090
-    }
+	# Bot SSE stream — requires immediate flushing
+	handle /api/webapp/stream {
+		header Cache-Control "no-store"
+		reverse_proxy tg-bot:9090 {
+			flush_interval -1
+		}
+	}
 
-    # Bot sub-resources (JS, CSS, assets) — content-hashed, cache forever
-    handle /webapp/* {
-        header Cache-Control "public, max-age=31536000, immutable"
-        reverse_proxy tg-bot:9090
-    }
+	# Bot HTML entry point — always revalidate
+	@bot_html {
+		path /webapp /webapp/
+	}
+	handle @bot_html {
+		header Cache-Control "no-cache"
+		reverse_proxy tg-bot:9090
+	}
 
-    # ── Catch-all ─────────────────────────────────────────────────
-    handle {
-        respond "Not Found" 404
-    }
+	# Bot API — never cache
+	handle /api/webapp/* {
+		header Cache-Control "no-store"
+		reverse_proxy tg-bot:9090
+	}
+
+	# Bot sub-resources (JS, CSS, assets) — content-hashed, cache forever
+	handle /webapp/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy tg-bot:9090
+	}
+
+	# ── Catch-all ─────────────────────────────────────────────────
+	handle {
+		respond "Not Found" 404
+	}
 }

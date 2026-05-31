@@ -1,7 +1,7 @@
 ---
 trigger: glob
 description: Frontend conventions for Preact + Vite web applications — state, build, and UI design principles.
-globs: **/frontend/**/*.tsx, **/frontend/**/*.ts, **/frontend/vite.config.*, **/frontend/package.json
+globs: **/frontend*/**/*.tsx, **/frontend*/**/*.ts, **/frontend*/vite.config.*, **/frontend*/package.json
 ---
 
 # Web conventions
@@ -25,7 +25,7 @@ Triggered when editing frontend TypeScript/TSX files. Defines the architectural 
 - **Native UI Prominence**: Always prioritize native `window.Telegram.WebApp` client actions (e.g., `tg.showAlert()`, `tg.showPopup()`, `tg.MainButton` for primary CTA overlays) over raw HTML alert elements or custom modal dialogs.
 - **UX Separation**:
   - **Bot client**: High-fidelity, strict, minimal interface targeting standard mobile Telegram client users.
-  - **Config Hub**: Denser layout designed for operational speed, accommodating expand controls, information status lists, and management features while maintaining styling parity.
+  - **Admin dashboard**: Denser layout designed for operational speed, accommodating expand controls, information status lists, and management features while maintaining styling parity.
 - **Standalone Desktop Fallback**: Standalone browser/desktop layouts and actions operate on a **best-effort basis only**. Standard storage degrades gracefully to local `localStorage`. Custom HTML emulation scripts and styles are completely removed in favor of direct, native WebApp SDK binding.
 
 ---

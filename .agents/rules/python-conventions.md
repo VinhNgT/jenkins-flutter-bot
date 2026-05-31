@@ -18,7 +18,7 @@ Triggered when editing Python files. Outlines the architectural principles, micr
 ---
 
 ## 2. Microservice Architecture (Bigger Applications)
-All FastAPI services (`tg-jenkins-bot`, `agent-control`, `build-manager`, `file-manager`, `config-hub`, `mock-jenkins`) must consistently implement the official **Bigger Applications** layout:
+All FastAPI services (`tg-bot`, `agent-control`, `build-manager`, `file-manager`, `service-hub`, `mock-jenkins`) must consistently implement the official **Bigger Applications** layout:
 - **`main.py`**: The central FastAPI application factory, lifecycle/lifespan context manager, and entry point.
 - **`config.py`**: Declares Pydantic `ServiceSettings` (dashboard-controlled) or `BootstrapSettings` (env-only) configurations.
 - **`manager.py`**: Standardized service lifecycle controller managing domain resources and clean startup/shutdown bounds.

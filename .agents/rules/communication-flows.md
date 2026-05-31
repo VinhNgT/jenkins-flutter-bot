@@ -11,16 +11,16 @@ Triggered when developing cross-service messaging, webhook systems, or async int
 
 ## 1. Unified Build Trigger Pipeline
 The Telegram build trigger acts as a highly decoupled state machine:
-- **Trigger**: The whitelisted Telegram client transmits a trigger request containing branch and identifier metadata to `tg-jenkins-bot`.
-- **Delegation**: The bot registers the active build in-memory and triggers the `build-manager` orchestrator.
+- **Trigger**: The whitelisted Telegram client transmits a trigger request containing branch and identifier metadata to `tg-bot`.
+- **Delegation**: The bot validates the request and forwards the build trigger to `build-manager`, which tracks active builds persistently, manages duplicate validation, and publishes real-time state mutations.
 - **VPN Execution & Poll**: `build-manager` brings up an isolated VPN connection via `agent-control`, schedules the parameterized pipeline build in Jenkins, and active-polls for completion.
-- **Upload & Delivery**: Once complete, the orchestrator transfers the archived APK to `file-manager` for secure Google Drive storage, evicts old builds per retention plans, and posts an immutable download card to the chat.
+- **Upload & Delivery**: Once complete, `build-manager` transfers the compiled APK and metadata record to `file-manager`. The `build-manager` operates statelessly with zero concern or knowledge of how files are handled, stored, or authenticated. The `file-manager` service itself handles storage, manages Google Drive OAuth credentials, and enforces old build retention policies, returning download urls to notify the bot.
 
 ---
 
 ## 2. Real-Time Service Status & Build Streaming (SSE)
-- **Aggregated Service Status Stream**: Operational status signals (configured status, running state, and startup uptime stamps) from all Python microservices are proxied to `config-hub` and hashed using MD5. Events are transmitted only when the aggregated state changes.
-- **Aggregated Build Status Stream**: Active builds and recent completed builds are streamed from the bot backend to the Telegram client over a single server-pushed SSE connection (`GET /api/webapp/stream`). This serves as the absolute single source of truth for all frontend build states, replacing REST polling.
+- **Aggregated Service Status Stream**: Operational status signals (configured status, running state, and startup uptime stamps) from all Python microservices are proxied to `service-hub` and hashed using MD5. Events are transmitted only when the aggregated state changes.
+- **Aggregated Build Status Stream**: The persistent source of truth for all build states is maintained in `build-manager`, which streams active and recently completed builds via Server-Sent Events (SSE). The `tg-bot` gateway hosts a stateless, secure proxy endpoint (`GET /api/webapp/stream`) that streams these real-time events to the Telegram client, replacing REST polling.
 - **SHA-256 Deduplication Hashing**: To optimize bandwidth and avoid client re-renders, the build SSE server aggregates, serializes, and hashes build payloads using SHA-256, transmitting events down the socket solely when a state mutation occurs.
 
 ---

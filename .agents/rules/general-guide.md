@@ -11,9 +11,9 @@ Core architectural reference and principles for the **jenkins-flutter-bot** mono
 
 ## 1. Project Overview & Repository Layout
 A self-hosted CI/CD ecosystem: a Telegram Mini App triggers Flutter builds on Jenkins, delivering compiled APKs through Google Drive. The architecture is managed under a **uv Workspace**:
-- **`apps/`**: Six containerized Python applications implementing microservice boundaries (with a seventh dev-only `mock-jenkins` simulator).
+- **`apps/`**: Five containerized Python applications implementing microservice boundaries (with a sixth dev-only `mock-jenkins` simulator).
 - **`libs/`**: Shared Preact/TypeScript and Pydantic core workspace libraries:
-  - `config-core`: Base configuration schemas, secret masking, logging, and signature validation helpers.
+  - `config-core`: Base configuration schemas, secret masking, and logging.
   - `platform-core` / `tg-core-preact` / `tg-ui-preact`: High-fidelity, decoupled Preact UI and SDK platform hooks.
 - **`infra/`**: Docker Compose deployment environments and Caddy gateway configurations.
 - **`scripts/`**: Centralized developer utilities.
@@ -22,13 +22,13 @@ A self-hosted CI/CD ecosystem: a Telegram Mini App triggers Flutter builds on Je
 
 ## 2. Microservice Service Roles
 Public webapp traffic and administrative access are routed behind a single Ingress gateway:
-- **`config-hub` (port 9000)**: Operational proxy and Admin Telegram Mini App (`/webapp-admin`). Proxies config mutations and service statuses.
+- **`service-hub` (port 9000)**: Headless configuration orchestrator — environment settings orchestrator and service control APIs.
 - **`jenkins` (port 8080)**: Standard compilation controller (can be external).
-- **`tg-jenkins-bot` (port 9090)**: Polling bot + web client endpoints (`/webapp`).
+- **`tg-bot` (port 9090)**: Unified Telegram gateway serving user Mini App (`/webapp`) and admin dashboard Mini App (`/webapp-admin`), proxying administrative requests, and running bot polling.
 - **`agent-control` (port 9091)**: Inbound build agent with Android/Flutter SDKs.
 - **`file-manager` (port 9092)**: Drive OAuth, log retention, and storage backends.
-- **`build-manager` (port 9010)**: Jenkins pipeline triggers and active job tracking.
-- **`gateway` (port 80)**: Caddy Ingress perimeter managing unified path routing.
+- **`build-manager` (port 9010)**: Jenkins pipeline triggers, persistent job tracking, and SSE status stream.
+- **`gateway` (port 80)**: Caddy Ingress perimeter managing unified path routing to `tg-bot`.
 - **`cloudflared`**: Cloudflare Tunnel providing secure inbound HTTPS ingress.
 
 *Note: For the visual Mermaid architecture diagram, consult the authoritative root [README.md](file:///Users/victor/Desktop/jenkins-flutter-bot/README.md).*

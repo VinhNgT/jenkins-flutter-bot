@@ -12,7 +12,7 @@ Triggered when editing config-related files. Outlines the unified schema system,
 
 ## 1. Schema System & Storage Bounds
 - **Pydantic Separation**:
-  - `BootstrapSettings`: Env-only settings, resolved at startup. Crashes if invalid (used by non-configurable services like `config-hub`).
+  - `BootstrapSettings`: Env-only settings, resolved at startup. Crashes if invalid (used by services like `tg-bot` and `service-hub`).
   - `ServiceSettings`: Schema-driven JSON > Env configuration. soft-fails to pending states to keep API responsive for remote adjustments.
 - **Dotted-Key Schema Conversion**: Config options map to JSON via `get_frontend_schema()`. Dynamic UI forms are derived entirely from field metadata.
 - **Deep Merge on Save**: Config updates are recursively deep-merged to preserve untouched JSON keys. For secret fields: empty string (`""`) or absent values are automatically stripped before merge to preserve existing secrets, whereas explicitly passing `None` when the key exists in the payload triggers an explicit deletion, removing the key entirely from the JSON file at rest.
@@ -26,10 +26,11 @@ Triggered when editing config-related files. Outlines the unified schema system,
 ---
 
 ## 3. Dual-Authentication Paradigm
-Config Hub implements a strict security boundary using two authentication vectors:
+The Telegram gateway bot (`tg-bot`) implements a strict authentication and security boundary before proxying administrative operations to the headless `service-hub`:
 1. **Primary Authentication (Telegram WebApp initData)**: Visitor sessions are validated cryptographically on the backend using HMAC-SHA256 signature verification against the Telegram `InitData` header. Whitelisted admin Telegram IDs grant dashboard access.
-2. **Fallback Authentication (HTTP Basic Auth)**: Reserved strictly for local/LAN setups.
-3. **Gateway Strip Constraint**: To prevent credential brute-forcing, Caddy must systematically strip the `Authorization` header from all incoming non-LAN public ingress traffic. Google Drive OAuth redirect callbacks (`/api/webapp-admin/drive/oauth/callback`) are exempted to permit external accounts redirects.
+2. **Fallback Authentication (HTTP Basic Auth)**: Reserved strictly for localhost setups or development preview modes.
+3. **Gateway Strip & Exemptions**: To prevent credential brute-forcing, the Caddy ingress gateway must systematically strip the `Authorization` header from all incoming non-localhost public ingress traffic. Google Drive OAuth redirect callbacks (`/api/webapp-admin/drive/oauth/callback`) are explicitly exempted to permit external account redirects from Google to bypass the auth checks.
+4. **Headless Trust Boundary**: The core configuration service (`service-hub`) is unauthenticated and headless, trusting all incoming RPC and config proxy calls from the internal Docker network.
 
 ---
 

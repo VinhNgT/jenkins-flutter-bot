@@ -101,15 +101,47 @@ def test_save_preserves_existing(isolate_config):
 
 
 def test_save_strips_empty_secrets(isolate_config):
-    """None/empty secret not written to disk — preserves existing."""
+    """Empty secret string not written to disk — preserves existing."""
     config_path = Path("/app/data/test.json")
     resolved = isolate_config / "test.json"
 
     # Existing config with a real secret
     resolved.write_text(json.dumps({"telegram": {"bot_token": "real-secret"}}))
 
-    # Frontend sends None for the secret (masked) — it should NOT overwrite
-    save_config_with_merge(_TestSettings, config_path, {"telegram": {"bot_token": None, "app_name": "Updated"}})
+    # Empty string for secret should NOT overwrite
+    save_config_with_merge(_TestSettings, config_path, {"telegram": {"bot_token": "", "app_name": "Updated"}})
+
+    result = json.loads(resolved.read_text())
+    assert result["telegram"]["bot_token"] == "real-secret"
+    assert result["telegram"]["app_name"] == "Updated"
+
+
+def test_save_deletes_secret_with_explicit_null(isolate_config):
+    """Explicit None/null value in payload deletes the secret from stored config."""
+    config_path = Path("/app/data/test.json")
+    resolved = isolate_config / "test.json"
+
+    # Existing config with a real secret
+    resolved.write_text(json.dumps({"telegram": {"bot_token": "real-secret", "app_name": "My App"}}))
+
+    # Explicit None in payload should delete the secret key
+    save_config_with_merge(_TestSettings, config_path, {"telegram": {"bot_token": None}})
+
+    result = json.loads(resolved.read_text())
+    assert "bot_token" not in result["telegram"]
+    assert result["telegram"]["app_name"] == "My App"
+
+
+def test_save_preserves_secret_when_key_absent(isolate_config):
+    """Absence of secret key in payload preserves the existing secret."""
+    config_path = Path("/app/data/test.json")
+    resolved = isolate_config / "test.json"
+
+    # Existing config with a real secret
+    resolved.write_text(json.dumps({"telegram": {"bot_token": "real-secret", "app_name": "My App"}}))
+
+    # Saving only app_name should preserve the bot_token
+    save_config_with_merge(_TestSettings, config_path, {"telegram": {"app_name": "Updated"}})
 
     result = json.loads(resolved.read_text())
     assert result["telegram"]["bot_token"] == "real-secret"

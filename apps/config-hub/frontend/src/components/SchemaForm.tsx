@@ -196,8 +196,26 @@ export default function SchemaForm({
       if (!key) continue;
 
       const strValue = String(value).trim();
-      // Skip empty only for secret fields to avoid overwriting them
-      if (strValue === '' && secretKeys.has(key)) continue;
+
+      if (secretKeys.has(key)) {
+        if (strValue === '') {
+          if (editingSecrets.has(key)) {
+            // Secret field was unlocked and cleared — set to null to trigger deletion
+            const parts = key.split('.');
+            let target: Record<string, unknown> = payload;
+            for (let i = 0; i < parts.length - 1; i++) {
+              const part = parts[i]!;
+              if (!(part in target)) target[part] = {};
+              target = target[part] as Record<string, unknown>;
+            }
+            target[parts[parts.length - 1]!] = null;
+            continue;
+          } else {
+            // Locked secret input is empty — omit to preserve existing value
+            continue;
+          }
+        }
+      }
 
       // Build nested structure from dotted key
       const parts = key.split('.');
@@ -211,7 +229,7 @@ export default function SchemaForm({
     }
 
     return payload;
-  }, [schema]);
+  }, [schema, editingSecrets]);
 
   async function handleSave() {
     setSaveAttempted(true);

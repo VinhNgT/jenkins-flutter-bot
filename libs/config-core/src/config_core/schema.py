@@ -454,6 +454,19 @@ def _coerce_payload_types(
             pass  # leave as-is; Pydantic will surface a clear error later
 
 
+def _key_present_in_payload(payload: dict[str, Any], dotted_key: str) -> bool:
+    """Walk a nested dict following a dotted key path to check physical existence.
+
+    Returns True if the key is present in the payload, False otherwise.
+    """
+    current: Any = payload
+    for part in dotted_key.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return False
+        current = current[part]
+    return True
+
+
 def save_config_with_merge(
     config_cls: type[BaseModel],
     path: Path,
@@ -461,8 +474,9 @@ def save_config_with_merge(
 ) -> None:
     """Strip empty secrets from *payload*, deep-merge with existing, and write.
 
-    Empty or ``None`` secret values are removed from the payload before
-    merging so that ``deep_merge()`` preserves existing secret values.
+    Empty secret values are removed from the payload before merging so that
+    ``deep_merge()`` preserves existing values. Explicitly providing ``None``
+    for a secret field deletes that key from the final configuration.
 
     String values are coerced to their native Python type (int, float, bool)
     before writing so the JSON file stays type-correct and Pydantic can
@@ -479,7 +493,15 @@ def save_config_with_merge(
     payload_doc = ConfigDocument(payload)
     secret_keys = get_secret_keys(config_cls)
 
-    # Strip empty/None secrets to avoid overwriting existing values
+    # Track secret keys marked for explicit deletion (value is None and key present in payload)
+    deleted_keys: list[str] = []
+    for key in secret_keys:
+        value = payload_doc.get(key)
+        if value is None:
+            if _key_present_in_payload(payload, key):
+                deleted_keys.append(key)
+
+    # Strip empty/None secrets to avoid overwriting existing values during merge
     for key in secret_keys:
         value = payload_doc.get(key)
         if value is None or value == "":
@@ -501,6 +523,19 @@ def save_config_with_merge(
 
     doc = ConfigDocument(existing)
     doc.merge(payload_doc.data)
+
+    # Remove explicitly deleted keys from the final merged config
+    for key in deleted_keys:
+        parts = key.split(".")
+        container = doc.data
+        for part in parts[:-1]:
+            if isinstance(container, dict):
+                container = container.get(part)
+            else:
+                container = None
+                break
+        if isinstance(container, dict):
+            container.pop(parts[-1], None)
 
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(json.dumps(doc.data, indent=2))
